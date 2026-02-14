@@ -1,0 +1,3 @@
+{
+  "/api/teacher/homework/create/route": "app/api/teacher/homework/create/route.js"
+}

@@ -1,0 +1,3 @@
+{
+  "/api/admin/fees/notify/route": "app/api/admin/fees/notify/route.js"
+}

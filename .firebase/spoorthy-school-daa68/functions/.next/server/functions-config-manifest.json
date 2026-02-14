@@ -1,0 +1,11 @@
+{
+  "version": 1,
+  "functions": {
+    "/api/admin/demo/super-seed": {
+      "maxDuration": 120
+    },
+    "/api/admin/purge-data": {
+      "maxDuration": 60
+    }
+  }
+}

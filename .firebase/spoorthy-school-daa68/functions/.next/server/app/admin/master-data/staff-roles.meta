@@ -1,0 +1,17 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/admin/layout,_N_T_/admin/master-data/layout,_N_T_/admin/master-data/staff-roles/layout,_N_T_/admin/master-data/staff-roles/page,_N_T_/admin/master-data/staff-roles"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/admin/master-data/staff-roles/__PAGE__",
+    "/admin/master-data/staff-roles",
+    "/admin/master-data",
+    "/admin",
+    "/_index",
+    "/_head"
+  ]
+}

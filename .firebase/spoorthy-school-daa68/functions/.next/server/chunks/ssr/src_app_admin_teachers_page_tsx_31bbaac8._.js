@@ -1,0 +1,3 @@
+module.exports=[21419,a=>{"use strict";var b=a.i(87924),c=a.i(72131),d=a.i(50944),e=a.i(96221);function f(){let a=(0,d.useRouter)();return(0,c.useEffect)(()=>{a.replace("/admin/faculty")},[a]),(0,b.jsx)("div",{className:"flex h-[50vh] w-full items-center justify-center",children:(0,b.jsx)(e.Loader2,{className:"h-8 w-8 animate-spin text-muted-foreground"})})}a.s(["default",()=>f])}];
+
+//# sourceMappingURL=src_app_admin_teachers_page_tsx_31bbaac8._.js.map

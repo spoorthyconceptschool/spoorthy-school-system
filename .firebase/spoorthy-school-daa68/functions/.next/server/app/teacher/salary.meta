@@ -1,0 +1,16 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/teacher/layout,_N_T_/teacher/salary/layout,_N_T_/teacher/salary/page,_N_T_/teacher/salary"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/teacher/salary/__PAGE__",
+    "/teacher/salary",
+    "/teacher",
+    "/_index",
+    "/_head"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/admin/layout,_N_T_/admin/master-data/layout,_N_T_/admin/master-data/classes-sections/layout,_N_T_/admin/master-data/classes-sections/page,_N_T_/admin/master-data/classes-sections"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/admin/master-data/classes-sections/__PAGE__",
+    "/admin/master-data/classes-sections",
+    "/admin/master-data",
+    "/admin",
+    "/_index",
+    "/_head"
+  ]
+}

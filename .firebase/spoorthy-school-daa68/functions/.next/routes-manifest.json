@@ -1,0 +1,784 @@
+{
+  "version": 3,
+  "pages404": true,
+  "appType": "app",
+  "caseSensitive": false,
+  "basePath": "",
+  "redirects": [
+    {
+      "source": "/:path+/",
+      "destination": "/:path+",
+      "internal": true,
+      "priority": true,
+      "statusCode": 308,
+      "regex": "^(?:/((?:[^/]+?)(?:/(?:[^/]+?))*))/$"
+    }
+  ],
+  "headers": [],
+  "rewrites": {
+    "beforeFiles": [],
+    "afterFiles": [],
+    "fallback": []
+  },
+  "dynamicRoutes": [
+    {
+      "page": "/admin/exams/[id]",
+      "regex": "^/admin/exams/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/admin/exams/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/admin/exams/[id]/print/[classId]",
+      "regex": "^/admin/exams/([^/]+?)/print/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid",
+        "nxtPclassId": "nxtPclassId"
+      },
+      "namedRegex": "^/admin/exams/(?<nxtPid>[^/]+?)/print/(?<nxtPclassId>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/admin/staff/[id]",
+      "regex": "^/admin/staff/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/admin/staff/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/admin/students/[id]",
+      "regex": "^/admin/students/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/admin/students/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/admin/teachers/[id]",
+      "regex": "^/admin/teachers/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/admin/teachers/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/student/exams/[id]/hall-ticket",
+      "regex": "^/student/exams/([^/]+?)/hall\\-ticket(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/student/exams/(?<nxtPid>[^/]+?)/hall\\-ticket(?:/)?$"
+    },
+    {
+      "page": "/student/exams/[id]/results",
+      "regex": "^/student/exams/([^/]+?)/results(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/student/exams/(?<nxtPid>[^/]+?)/results(?:/)?$"
+    },
+    {
+      "page": "/student/fees/invoice/[id]",
+      "regex": "^/student/fees/invoice/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/student/fees/invoice/(?<nxtPid>[^/]+?)(?:/)?$"
+    },
+    {
+      "page": "/teacher/exams/[id]",
+      "regex": "^/teacher/exams/([^/]+?)(?:/)?$",
+      "routeKeys": {
+        "nxtPid": "nxtPid"
+      },
+      "namedRegex": "^/teacher/exams/(?<nxtPid>[^/]+?)(?:/)?$"
+    }
+  ],
+  "staticRoutes": [
+    {
+      "page": "/",
+      "regex": "^/(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/(?:/)?$"
+    },
+    {
+      "page": "/_global-error",
+      "regex": "^/_global\\-error(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_global\\-error(?:/)?$"
+    },
+    {
+      "page": "/_not-found",
+      "regex": "^/_not\\-found(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/_not\\-found(?:/)?$"
+    },
+    {
+      "page": "/admin",
+      "regex": "^/admin(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin(?:/)?$"
+    },
+    {
+      "page": "/admin/attendance",
+      "regex": "^/admin/attendance(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/attendance(?:/)?$"
+    },
+    {
+      "page": "/admin/cms",
+      "regex": "^/admin/cms(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/cms(?:/)?$"
+    },
+    {
+      "page": "/admin/exams",
+      "regex": "^/admin/exams(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/exams(?:/)?$"
+    },
+    {
+      "page": "/admin/faculty",
+      "regex": "^/admin/faculty(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/faculty(?:/)?$"
+    },
+    {
+      "page": "/admin/fees",
+      "regex": "^/admin/fees(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/fees(?:/)?$"
+    },
+    {
+      "page": "/admin/fees/config",
+      "regex": "^/admin/fees/config(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/fees/config(?:/)?$"
+    },
+    {
+      "page": "/admin/fees/custom",
+      "regex": "^/admin/fees/custom(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/fees/custom(?:/)?$"
+    },
+    {
+      "page": "/admin/fees/pending",
+      "regex": "^/admin/fees/pending(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/fees/pending(?:/)?$"
+    },
+    {
+      "page": "/admin/fees/structures",
+      "regex": "^/admin/fees/structures(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/fees/structures(?:/)?$"
+    },
+    {
+      "page": "/admin/groups",
+      "regex": "^/admin/groups(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/groups(?:/)?$"
+    },
+    {
+      "page": "/admin/homework",
+      "regex": "^/admin/homework(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/homework(?:/)?$"
+    },
+    {
+      "page": "/admin/leaves",
+      "regex": "^/admin/leaves(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/leaves(?:/)?$"
+    },
+    {
+      "page": "/admin/master-data/classes-sections",
+      "regex": "^/admin/master\\-data/classes\\-sections(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/master\\-data/classes\\-sections(?:/)?$"
+    },
+    {
+      "page": "/admin/master-data/staff-roles",
+      "regex": "^/admin/master\\-data/staff\\-roles(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/master\\-data/staff\\-roles(?:/)?$"
+    },
+    {
+      "page": "/admin/master-data/subjects",
+      "regex": "^/admin/master\\-data/subjects(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/master\\-data/subjects(?:/)?$"
+    },
+    {
+      "page": "/admin/master-data/villages",
+      "regex": "^/admin/master\\-data/villages(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/master\\-data/villages(?:/)?$"
+    },
+    {
+      "page": "/admin/notices",
+      "regex": "^/admin/notices(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/notices(?:/)?$"
+    },
+    {
+      "page": "/admin/payments",
+      "regex": "^/admin/payments(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/payments(?:/)?$"
+    },
+    {
+      "page": "/admin/purge-data",
+      "regex": "^/admin/purge\\-data(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/purge\\-data(?:/)?$"
+    },
+    {
+      "page": "/admin/salary",
+      "regex": "^/admin/salary(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/salary(?:/)?$"
+    },
+    {
+      "page": "/admin/settings",
+      "regex": "^/admin/settings(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/settings(?:/)?$"
+    },
+    {
+      "page": "/admin/storage",
+      "regex": "^/admin/storage(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/storage(?:/)?$"
+    },
+    {
+      "page": "/admin/students",
+      "regex": "^/admin/students(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/students(?:/)?$"
+    },
+    {
+      "page": "/admin/teachers",
+      "regex": "^/admin/teachers(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/teachers(?:/)?$"
+    },
+    {
+      "page": "/admin/timetable",
+      "regex": "^/admin/timetable(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/timetable(?:/)?$"
+    },
+    {
+      "page": "/admin/timetable/assignments",
+      "regex": "^/admin/timetable/assignments(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/timetable/assignments(?:/)?$"
+    },
+    {
+      "page": "/admin/timetable/coverage",
+      "regex": "^/admin/timetable/coverage(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/timetable/coverage(?:/)?$"
+    },
+    {
+      "page": "/admin/timetable/manage",
+      "regex": "^/admin/timetable/manage(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admin/timetable/manage(?:/)?$"
+    },
+    {
+      "page": "/admissions",
+      "regex": "^/admissions(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admissions(?:/)?$"
+    },
+    {
+      "page": "/admissions/apply",
+      "regex": "^/admissions/apply(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/admissions/apply(?:/)?$"
+    },
+    {
+      "page": "/api/admin/academic-years/create",
+      "regex": "^/api/admin/academic\\-years/create(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/academic\\-years/create(?:/)?$"
+    },
+    {
+      "page": "/api/admin/academic-years/history",
+      "regex": "^/api/admin/academic\\-years/history(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/academic\\-years/history(?:/)?$"
+    },
+    {
+      "page": "/api/admin/academic-years/start-new",
+      "regex": "^/api/admin/academic\\-years/start\\-new(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/academic\\-years/start\\-new(?:/)?$"
+    },
+    {
+      "page": "/api/admin/academic-years/update",
+      "regex": "^/api/admin/academic\\-years/update(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/academic\\-years/update(?:/)?$"
+    },
+    {
+      "page": "/api/admin/attendance/staff/mark",
+      "regex": "^/api/admin/attendance/staff/mark(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/attendance/staff/mark(?:/)?$"
+    },
+    {
+      "page": "/api/admin/attendance/teachers/mark",
+      "regex": "^/api/admin/attendance/teachers/mark(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/attendance/teachers/mark(?:/)?$"
+    },
+    {
+      "page": "/api/admin/demo/setup-logins",
+      "regex": "^/api/admin/demo/setup\\-logins(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/demo/setup\\-logins(?:/)?$"
+    },
+    {
+      "page": "/api/admin/demo/setup-vihaan",
+      "regex": "^/api/admin/demo/setup\\-vihaan(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/demo/setup\\-vihaan(?:/)?$"
+    },
+    {
+      "page": "/api/admin/demo/super-seed",
+      "regex": "^/api/admin/demo/super\\-seed(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/demo/super\\-seed(?:/)?$"
+    },
+    {
+      "page": "/api/admin/fees/adjust",
+      "regex": "^/api/admin/fees/adjust(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/fees/adjust(?:/)?$"
+    },
+    {
+      "page": "/api/admin/fees/custom/create",
+      "regex": "^/api/admin/fees/custom/create(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/fees/custom/create(?:/)?$"
+    },
+    {
+      "page": "/api/admin/fees/notify",
+      "regex": "^/api/admin/fees/notify(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/fees/notify(?:/)?$"
+    },
+    {
+      "page": "/api/admin/homework/create",
+      "regex": "^/api/admin/homework/create(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/homework/create(?:/)?$"
+    },
+    {
+      "page": "/api/admin/leaves/approve",
+      "regex": "^/api/admin/leaves/approve(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/leaves/approve(?:/)?$"
+    },
+    {
+      "page": "/api/admin/media/upload",
+      "regex": "^/api/admin/media/upload(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/media/upload(?:/)?$"
+    },
+    {
+      "page": "/api/admin/notices/create",
+      "regex": "^/api/admin/notices/create(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/notices/create(?:/)?$"
+    },
+    {
+      "page": "/api/admin/payroll/adjust-salary",
+      "regex": "^/api/admin/payroll/adjust\\-salary(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/payroll/adjust\\-salary(?:/)?$"
+    },
+    {
+      "page": "/api/admin/payroll/delete",
+      "regex": "^/api/admin/payroll/delete(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/payroll/delete(?:/)?$"
+    },
+    {
+      "page": "/api/admin/payroll/process",
+      "regex": "^/api/admin/payroll/process(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/payroll/process(?:/)?$"
+    },
+    {
+      "page": "/api/admin/purge-data",
+      "regex": "^/api/admin/purge\\-data(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/purge\\-data(?:/)?$"
+    },
+    {
+      "page": "/api/admin/search/reindex",
+      "regex": "^/api/admin/search/reindex(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/search/reindex(?:/)?$"
+    },
+    {
+      "page": "/api/admin/settings/branding",
+      "regex": "^/api/admin/settings/branding(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/settings/branding(?:/)?$"
+    },
+    {
+      "page": "/api/admin/staff/create",
+      "regex": "^/api/admin/staff/create(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/staff/create(?:/)?$"
+    },
+    {
+      "page": "/api/admin/students/create",
+      "regex": "^/api/admin/students/create(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/students/create(?:/)?$"
+    },
+    {
+      "page": "/api/admin/students/import",
+      "regex": "^/api/admin/students/import(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/students/import(?:/)?$"
+    },
+    {
+      "page": "/api/admin/teachers/create",
+      "regex": "^/api/admin/teachers/create(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/teachers/create(?:/)?$"
+    },
+    {
+      "page": "/api/admin/timetable/assign",
+      "regex": "^/api/admin/timetable/assign(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/timetable/assign(?:/)?$"
+    },
+    {
+      "page": "/api/admin/timetable/coverage/resolve",
+      "regex": "^/api/admin/timetable/coverage/resolve(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/timetable/coverage/resolve(?:/)?$"
+    },
+    {
+      "page": "/api/admin/timetable/publish",
+      "regex": "^/api/admin/timetable/publish(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/timetable/publish(?:/)?$"
+    },
+    {
+      "page": "/api/admin/user-actions",
+      "regex": "^/api/admin/user\\-actions(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/user\\-actions(?:/)?$"
+    },
+    {
+      "page": "/api/admin/users/create",
+      "regex": "^/api/admin/users/create(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/users/create(?:/)?$"
+    },
+    {
+      "page": "/api/admin/users/delete",
+      "regex": "^/api/admin/users/delete(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/users/delete(?:/)?$"
+    },
+    {
+      "page": "/api/admin/users/reset-password",
+      "regex": "^/api/admin/users/reset\\-password(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/admin/users/reset\\-password(?:/)?$"
+    },
+    {
+      "page": "/api/attendance/mark",
+      "regex": "^/api/attendance/mark(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/attendance/mark(?:/)?$"
+    },
+    {
+      "page": "/api/auth/change-password",
+      "regex": "^/api/auth/change\\-password(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/auth/change\\-password(?:/)?$"
+    },
+    {
+      "page": "/api/seed",
+      "regex": "^/api/seed(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/seed(?:/)?$"
+    },
+    {
+      "page": "/api/setup-data",
+      "regex": "^/api/setup\\-data(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/setup\\-data(?:/)?$"
+    },
+    {
+      "page": "/api/setup-teacher",
+      "regex": "^/api/setup\\-teacher(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/setup\\-teacher(?:/)?$"
+    },
+    {
+      "page": "/api/student/fees/pay",
+      "regex": "^/api/student/fees/pay(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/student/fees/pay(?:/)?$"
+    },
+    {
+      "page": "/api/student/leaves",
+      "regex": "^/api/student/leaves(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/student/leaves(?:/)?$"
+    },
+    {
+      "page": "/api/teacher/homework/create",
+      "regex": "^/api/teacher/homework/create(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/teacher/homework/create(?:/)?$"
+    },
+    {
+      "page": "/api/teacher/leaves/request",
+      "regex": "^/api/teacher/leaves/request(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/teacher/leaves/request(?:/)?$"
+    },
+    {
+      "page": "/api/teacher/notices/create",
+      "regex": "^/api/teacher/notices/create(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/teacher/notices/create(?:/)?$"
+    },
+    {
+      "page": "/api/teacher/student-leaves",
+      "regex": "^/api/teacher/student\\-leaves(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/teacher/student\\-leaves(?:/)?$"
+    },
+    {
+      "page": "/api/timetable/my-schedule",
+      "regex": "^/api/timetable/my\\-schedule(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/api/timetable/my\\-schedule(?:/)?$"
+    },
+    {
+      "page": "/auth/force-password-change",
+      "regex": "^/auth/force\\-password\\-change(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/auth/force\\-password\\-change(?:/)?$"
+    },
+    {
+      "page": "/auth/student/login",
+      "regex": "^/auth/student/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/auth/student/login(?:/)?$"
+    },
+    {
+      "page": "/auth/teacher/login",
+      "regex": "^/auth/teacher/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/auth/teacher/login(?:/)?$"
+    },
+    {
+      "page": "/favicon.ico",
+      "regex": "^/favicon\\.ico(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/favicon\\.ico(?:/)?$"
+    },
+    {
+      "page": "/gallery",
+      "regex": "^/gallery(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/gallery(?:/)?$"
+    },
+    {
+      "page": "/login",
+      "regex": "^/login(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/login(?:/)?$"
+    },
+    {
+      "page": "/student",
+      "regex": "^/student(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/student(?:/)?$"
+    },
+    {
+      "page": "/student/attendance",
+      "regex": "^/student/attendance(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/student/attendance(?:/)?$"
+    },
+    {
+      "page": "/student/change-password",
+      "regex": "^/student/change\\-password(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/student/change\\-password(?:/)?$"
+    },
+    {
+      "page": "/student/dashboard",
+      "regex": "^/student/dashboard(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/student/dashboard(?:/)?$"
+    },
+    {
+      "page": "/student/exams",
+      "regex": "^/student/exams(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/student/exams(?:/)?$"
+    },
+    {
+      "page": "/student/fees",
+      "regex": "^/student/fees(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/student/fees(?:/)?$"
+    },
+    {
+      "page": "/student/holidays",
+      "regex": "^/student/holidays(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/student/holidays(?:/)?$"
+    },
+    {
+      "page": "/student/homework",
+      "regex": "^/student/homework(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/student/homework(?:/)?$"
+    },
+    {
+      "page": "/student/leaves",
+      "regex": "^/student/leaves(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/student/leaves(?:/)?$"
+    },
+    {
+      "page": "/student/notices",
+      "regex": "^/student/notices(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/student/notices(?:/)?$"
+    },
+    {
+      "page": "/student/notifications",
+      "regex": "^/student/notifications(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/student/notifications(?:/)?$"
+    },
+    {
+      "page": "/student/profile",
+      "regex": "^/student/profile(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/student/profile(?:/)?$"
+    },
+    {
+      "page": "/student/timetable",
+      "regex": "^/student/timetable(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/student/timetable(?:/)?$"
+    },
+    {
+      "page": "/teacher",
+      "regex": "^/teacher(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/teacher(?:/)?$"
+    },
+    {
+      "page": "/teacher/attendance",
+      "regex": "^/teacher/attendance(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/teacher/attendance(?:/)?$"
+    },
+    {
+      "page": "/teacher/change-password",
+      "regex": "^/teacher/change\\-password(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/teacher/change\\-password(?:/)?$"
+    },
+    {
+      "page": "/teacher/dashboard",
+      "regex": "^/teacher/dashboard(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/teacher/dashboard(?:/)?$"
+    },
+    {
+      "page": "/teacher/exams",
+      "regex": "^/teacher/exams(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/teacher/exams(?:/)?$"
+    },
+    {
+      "page": "/teacher/groups",
+      "regex": "^/teacher/groups(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/teacher/groups(?:/)?$"
+    },
+    {
+      "page": "/teacher/holidays",
+      "regex": "^/teacher/holidays(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/teacher/holidays(?:/)?$"
+    },
+    {
+      "page": "/teacher/homework",
+      "regex": "^/teacher/homework(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/teacher/homework(?:/)?$"
+    },
+    {
+      "page": "/teacher/leaves",
+      "regex": "^/teacher/leaves(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/teacher/leaves(?:/)?$"
+    },
+    {
+      "page": "/teacher/notices",
+      "regex": "^/teacher/notices(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/teacher/notices(?:/)?$"
+    },
+    {
+      "page": "/teacher/profile",
+      "regex": "^/teacher/profile(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/teacher/profile(?:/)?$"
+    },
+    {
+      "page": "/teacher/salary",
+      "regex": "^/teacher/salary(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/teacher/salary(?:/)?$"
+    },
+    {
+      "page": "/teacher/timetable",
+      "regex": "^/teacher/timetable(?:/)?$",
+      "routeKeys": {},
+      "namedRegex": "^/teacher/timetable(?:/)?$"
+    }
+  ],
+  "dataRoutes": [],
+  "rsc": {
+    "header": "rsc",
+    "varyHeader": "rsc, next-router-state-tree, next-router-prefetch, next-router-segment-prefetch",
+    "prefetchHeader": "next-router-prefetch",
+    "didPostponeHeader": "x-nextjs-postponed",
+    "contentTypeHeader": "text/x-component",
+    "suffix": ".rsc",
+    "prefetchSegmentHeader": "next-router-segment-prefetch",
+    "prefetchSegmentSuffix": ".segment.rsc",
+    "prefetchSegmentDirSuffix": ".segments",
+    "clientParamParsing": false,
+    "dynamicRSCPrerender": false
+  },
+  "rewriteHeaders": {
+    "pathHeader": "x-nextjs-rewritten-path",
+    "queryHeader": "x-nextjs-rewritten-query"
+  }
+}

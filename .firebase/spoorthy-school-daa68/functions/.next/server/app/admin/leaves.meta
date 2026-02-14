@@ -1,0 +1,16 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/admin/layout,_N_T_/admin/leaves/layout,_N_T_/admin/leaves/page,_N_T_/admin/leaves"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/admin/leaves/__PAGE__",
+    "/admin/leaves",
+    "/admin",
+    "/_index",
+    "/_head"
+  ]
+}

@@ -1,0 +1,17 @@
+{
+  "headers": {
+    "x-nextjs-stale-time": "300",
+    "x-nextjs-prerender": "1",
+    "x-next-cache-tags": "_N_T_/layout,_N_T_/admin/layout,_N_T_/admin/timetable/layout,_N_T_/admin/timetable/assignments/layout,_N_T_/admin/timetable/assignments/page,_N_T_/admin/timetable/assignments"
+  },
+  "segmentPaths": [
+    "/_tree",
+    "/_full",
+    "/admin/timetable/assignments/__PAGE__",
+    "/admin/timetable/assignments",
+    "/admin/timetable",
+    "/admin",
+    "/_index",
+    "/_head"
+  ]
+}
