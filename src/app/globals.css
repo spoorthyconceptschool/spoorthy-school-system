@@ -173,25 +173,48 @@
   --font-display: var(--font-display), serif;
   --font-body: 'Inter', 'system-ui', sans-serif;
 
-  --background: oklch(0.12 0.02 250);
-  --foreground: oklch(0.98 0.01 250);
-  --card: oklch(0.15 0.03 250);
-  --card-foreground: oklch(0.98 0.01 250);
-  --popover: oklch(0.15 0.03 250);
-  --popover-foreground: oklch(0.98 0.01 250);
-  --primary: oklch(0.7 0.15 250);
-  --primary-foreground: oklch(0.12 0.02 250);
-  --secondary: oklch(0.2 0.05 250);
-  --secondary-foreground: oklch(0.98 0.01 250);
-  --muted: oklch(0.2 0.05 250);
-  --muted-foreground: oklch(0.7 0.02 250);
-  --accent: oklch(0.7 0.15 250);
-  --accent-foreground: oklch(0.12 0.02 250);
-  --destructive: oklch(0.5 0.2 25);
-  --destructive-foreground: oklch(0.98 0.01 250);
-  --border: oklch(0.2 0.05 250);
-  --input: oklch(0.2 0.05 250);
-  --ring: oklch(0.7 0.15 250);
+  /* Core Theme Colors with proper Tailwind 4 syntax */
+  --color-background: oklch(0.12 0.02 250);
+  --color-foreground: oklch(0.98 0.01 250);
+  --color-card: oklch(0.15 0.03 250);
+  --color-card-foreground: oklch(0.98 0.01 250);
+  --color-popover: oklch(0.15 0.03 250);
+  --color-popover-foreground: oklch(0.98 0.01 250);
+  --color-primary: oklch(0.8 0.15 250);
+  --color-primary-foreground: oklch(0.12 0.02 250);
+  --color-secondary: oklch(0.25 0.05 250);
+  --color-secondary-foreground: oklch(0.98 0.01 250);
+  --color-muted: oklch(0.25 0.05 250);
+  --color-muted-foreground: oklch(0.85 0.02 250);
+  --color-accent: oklch(0.8 0.15 250);
+  --color-accent-foreground: oklch(0.12 0.02 250);
+  --color-destructive: oklch(0.5 0.25 25);
+  --color-destructive-foreground: oklch(0.98 0.01 250);
+  --color-border: oklch(0.25 0.05 250);
+  --color-input: oklch(0.25 0.05 250);
+  --color-ring: oklch(0.8 0.15 250);
+
+  /* Support for shadcn/ui components using variables without prefix */
+  --background: var(--color-background);
+  --foreground: var(--color-foreground);
+  --card: var(--color-card);
+  --card-foreground: var(--color-card-foreground);
+  --popover: var(--color-popover);
+  --popover-foreground: var(--color-popover-foreground);
+  --primary: var(--color-primary);
+  --primary-foreground: var(--color-primary-foreground);
+  --secondary: var(--color-secondary);
+  --secondary-foreground: var(--color-secondary-foreground);
+  --muted: var(--color-muted);
+  --muted-foreground: var(--color-muted-foreground);
+  --accent: var(--color-accent);
+  --accent-foreground: var(--color-accent-foreground);
+  --destructive: var(--color-destructive);
+  --destructive-foreground: var(--color-destructive-foreground);
+  --border: var(--color-border);
+  --input: var(--color-input);
+  --ring: var(--color-ring);
+
   --chart-1: oklch(0.646 0.222 41.116);
   --chart-2: oklch(0.6 0.118 184.704);
   --chart-3: oklch(0.398 0.07 227.392);

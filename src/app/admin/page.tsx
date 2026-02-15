@@ -311,10 +311,10 @@ export default function AdminDashboard() {
         <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500 pb-10 px-2 md:px-0">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="font-display text-3xl md:text-5xl font-bold tracking-tighter italic pb-1">
-                        <span className="bg-gradient-to-r from-white to-white/40 bg-clip-text text-transparent">Admin</span> Central
+                    <h1 className="font-display text-3xl md:text-5xl font-bold tracking-tighter italic pb-1 text-white">
+                        <span className="bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">Admin</span> Central
                     </h1>
-                    <p className="text-muted-foreground mt-1 text-[10px] md:text-xs uppercase tracking-widest font-black opacity-30">Real-time School Operations</p>
+                    <p className="text-muted-foreground mt-1 text-[10px] md:text-xs uppercase tracking-widest font-black opacity-70">Real-time School Operations</p>
                 </div>
                 <div className="flex flex-wrap gap-2 md:gap-3">
                     <Button variant="outline" className="gap-2 border-white/5 bg-black/40 hover:bg-white/5 text-[10px] md:text-sm h-9 md:h-12 rounded-xl backdrop-blur-md">

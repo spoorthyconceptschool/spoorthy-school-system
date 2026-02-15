@@ -182,7 +182,7 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
                     if (item.type === "separator") {
                         if (collapsed && !mobile) return <div key={idx} className="h-4" />;
                         return (
-                            <div key={idx} className="px-3 pt-6 pb-2 text-[10px] font-bold text-[#8892B0] uppercase tracking-widest font-mono whitespace-nowrap overflow-hidden">
+                            <div key={idx} className="px-3 pt-6 pb-2 text-[10px] font-bold text-[#A8B2D1] uppercase tracking-widest font-mono whitespace-nowrap overflow-hidden">
                                 {item.label}
                             </div>
                         );
@@ -198,15 +198,15 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
                                 "flex items-center gap-4 px-3 py-3 rounded-md transition-all duration-200 group relative font-medium text-sm border border-transparent",
                                 isActive
                                     ? "bg-[#64FFDA]/10 text-[#64FFDA] border-[#64FFDA]/20 shadow-[0_0_15px_-5px_#64FFDA]"
-                                    : "text-[#8892B0] hover:text-[#E6F1FF] hover:bg-white/5"
+                                    : "text-[#A8B2D1] hover:text-[#E6F1FF] hover:bg-white/5"
                             )}>
                                 {item.icon && (
                                     <item.icon
                                         size={20}
-                                        strokeWidth={isActive ? 2.5 : 2}
+                                        strokeWidth={isActive ? 3 : 2}
                                         className={cn(
                                             "shrink-0 transition-colors",
-                                            isActive ? "text-[#64FFDA]" : "text-[#8892B0] group-hover:text-[#E6F1FF]"
+                                            isActive ? "text-[#64FFDA]" : "text-[#A8B2D1] group-hover:text-[#E6F1FF]"
                                         )}
                                     />
                                 )}
@@ -245,7 +245,7 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
                 <button
                     onClick={signOut}
                     className={cn(
-                        "flex items-center gap-3 px-3 py-3 rounded-md transition-colors w-full text-left text-[#8892B0] hover:text-[#FF5555] hover:bg-[#FF5555]/10",
+                        "flex items-center gap-3 px-3 py-3 rounded-md transition-colors w-full text-left text-[#A8B2D1] hover:text-[#FF5555] hover:bg-[#FF5555]/10",
                         (collapsed && !mobile) ? "justify-center px-0" : ""
                     )}
                 >
