@@ -28,9 +28,13 @@ jobs:
         with:
           node-version: '22'
       - run: npm ci && npm run build
-      - uses: FirebaseExtended/action-hosting-deploy@v0
+      - name: Authenticate with Google Cloud
+        id: auth
+        uses: google-github-actions/auth@v2
         with:
-          repoToken: ${{ secrets.GITHUB_TOKEN }}
-          firebaseServiceAccount: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPOORTHY_SCHOOL_DAA68 }}
-          channelId: live
-          projectId: spoorthy-school-daa68
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPOORTHY_SCHOOL_DAA68 }}
+
+      - name: Deploy to Firebase Hosting
+        run: npx firebase-tools deploy --only hosting --non-interactive --project spoorthy-school-daa68
+        env:
+          FIREBASE_CLI_EXPERIMENTS: frameworks
