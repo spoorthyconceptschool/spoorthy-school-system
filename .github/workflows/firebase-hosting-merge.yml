@@ -38,3 +38,4 @@ jobs:
         run: npx firebase-tools deploy --only hosting --non-interactive --project spoorthy-school-daa68
         env:
           FIREBASE_CLI_EXPERIMENTS: frameworks
+          GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
