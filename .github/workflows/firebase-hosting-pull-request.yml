@@ -37,7 +37,7 @@ jobs:
           credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPOORTHY_SCHOOL_DAA68 }}
 
       - name: Deploy to Firebase Hosting Preview
-        run: npx firebase hosting:channel:deploy pr-${{ github.event.pull_request.number }} --expires 7d --non-interactive --project spoorthy-school-daa68
+        run: npx firebase hosting:channel:deploy pr-${{ github.event.pull_request.number }} --expires 7d --non-interactive --project spoorthy-school-daa68 --force
         env:
           FIREBASE_CLI_EXPERIMENTS: webframeworks
           GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}
