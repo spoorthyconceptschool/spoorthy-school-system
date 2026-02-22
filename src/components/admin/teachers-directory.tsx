@@ -21,6 +21,28 @@ import { Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 
+interface Teacher {
+    id: string;
+    uid?: string;
+    name: string;
+    schoolId: string;
+    mobile: string;
+    status: string;
+    salary?: number;
+    recoveryPassword?: string;
+}
+
+interface Staff {
+    id: string;
+    uid?: string;
+    name: string;
+    schoolId: string;
+    mobile: string;
+    status: string;
+    baseSalary?: number;
+    roleCode: string;
+}
+
 interface TeachersDirectoryProps {
     hideHeader?: boolean;
     onTabChange?: (tab: string) => void;
@@ -46,8 +68,8 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
     }, [activeTab, onTabChange]);
 
     // Data State
-    const [teachers, setTeachers] = useState<any[]>([]);
-    const [staff, setStaff] = useState<any[]>([]);
+    const [teachers, setTeachers] = useState<Teacher[]>([]);
+    const [staff, setStaff] = useState<Staff[]>([]);
     const [loading, setLoading] = useState(true);
 
     // Filter State
@@ -75,14 +97,14 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
         // Real-time Teachers
         const qT = query(collection(db, "teachers"), orderBy("schoolId"));
         const unsubscribeTeachers = onSnapshot(qT, (snap) => {
-            setTeachers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setTeachers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Teacher)));
             setLoading(false);
         });
 
         // Real-time Staff
         const qS = query(collection(db, "staff"), orderBy("schoolId"));
         const unsubscribeStaff = onSnapshot(qS, (snap) => {
-            setStaff(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setStaff(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff)));
             setLoading(false);
         });
 
@@ -204,7 +226,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                             {
                                 key: "name",
                                 header: "Staff Info",
-                                render: (t: any) => (
+                                render: (t: Teacher) => (
                                     <div className="flex items-center gap-3">
                                         <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center border border-white/5 group-hover:border-accent/30 transition-colors">
                                             <User size={16} className="text-white/40 group-hover:text-accent transition-colors" />
@@ -219,7 +241,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                             {
                                 key: "mobile",
                                 header: "Contact",
-                                render: (t: any) => (
+                                render: (t: Teacher) => (
                                     <div className="flex items-center gap-1.5 text-xs text-white/60">
                                         <Phone size={12} className="text-white/20" />
                                         <span className="font-mono">{t.mobile}</span>
@@ -229,7 +251,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                             {
                                 key: "password",
                                 header: "Secret Key",
-                                render: (t: any) => (
+                                render: (t: Teacher) => (
                                     <div className="flex items-center gap-1.5 text-[10px] text-amber-500/80 bg-amber-500/5 px-2 py-1 rounded border border-amber-500/10 w-fit">
                                         <Key size={10} className="text-amber-500" />
                                         <span className="font-mono tracking-wider font-bold">{t.recoveryPassword || t.mobile}</span>
@@ -241,14 +263,14 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                                 header: "Base Salary",
                                 headerClassName: "text-right",
                                 cellClassName: "text-right",
-                                render: (t: any) => role === "MANAGER" ? <span className="text-white/20">••••••</span> : <span className="font-mono font-black text-sm text-emerald-400">₹{t.salary?.toLocaleString() || '0'}</span>
+                                render: (t: Teacher) => role === "MANAGER" ? <span className="text-white/20">••••••</span> : <span className="font-mono font-black text-sm text-emerald-400">₹{t.salary?.toLocaleString() || '0'}</span>
                             },
                             {
                                 key: "status",
                                 header: "Status",
                                 headerClassName: "text-center",
                                 cellClassName: "text-center",
-                                render: (t: any) => (
+                                render: (t: Teacher) => (
                                     <Badge className={cn(
                                         "text-[9px] font-black uppercase tracking-tighter py-0 h-5 border-none transition-all",
                                         t.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
@@ -303,7 +325,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                             {
                                 key: "name",
                                 header: "Staff Info",
-                                render: (s: any) => (
+                                render: (s: Staff) => (
                                     <div className="flex items-center gap-3">
                                         <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center border border-white/5 group-hover:border-blue-400/30 transition-colors">
                                             <Briefcase size={16} className="text-white/40 group-hover:text-blue-400 transition-colors" />
@@ -318,11 +340,11 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                             {
                                 key: "role",
                                 header: "Role & Placement",
-                                render: (s: any) => {
-                                    const role = roles.find(r => r.code === s.roleCode);
+                                render: (s: Staff) => {
+                                    const roleObj = roles.find(r => r.code === s.roleCode);
                                     return (
                                         <div className="flex flex-col gap-1">
-                                            <span className="text-[10px] uppercase font-black text-muted-foreground tracking-tighter bg-white/5 px-2 py-0.5 rounded border border-white/5 w-fit lowercase">{role?.name || s.roleCode || "Staff"}</span>
+                                            <span className="text-[10px] uppercase font-black text-muted-foreground tracking-tighter bg-white/5 px-2 py-0.5 rounded border border-white/5 w-fit lowercase">{roleObj?.name || s.roleCode || "Staff"}</span>
                                             <div className="flex items-center gap-1.5 text-[10px] text-white/30">
                                                 <Phone size={10} className="opacity-40" />
                                                 <span className="font-mono">{s.mobile}</span>
@@ -336,14 +358,14 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                                 header: "Base Salary",
                                 headerClassName: "text-right",
                                 cellClassName: "text-right",
-                                render: (s: any) => role === "MANAGER" ? <span className="text-white/20">••••••</span> : <span className="font-mono font-black text-sm text-emerald-400">₹{s.baseSalary?.toLocaleString() || "0"}</span>
+                                render: (s: Staff) => role === "MANAGER" ? <span className="text-white/20">••••••</span> : <span className="font-mono font-black text-sm text-emerald-400">₹{s.baseSalary?.toLocaleString() || "0"}</span>
                             },
                             {
                                 key: "status",
                                 header: "Status",
                                 headerClassName: "text-center",
                                 cellClassName: "text-center",
-                                render: (s: any) => (
+                                render: (s: Staff) => (
                                     <Badge className={cn(
                                         "text-[9px] font-black uppercase tracking-tighter py-0 h-5 border-none transition-all",
                                         s.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
