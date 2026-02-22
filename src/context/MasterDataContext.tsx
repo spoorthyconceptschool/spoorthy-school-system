@@ -107,7 +107,7 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
         };
 
         onValue(dataRef, callback, (error) => {
-            console.error("RTDB Error (master):", error);
+            console.warn("RTDB Permission/Error (master):", error.message);
         });
         return () => off(dataRef, "value", callback);
     }, []);
@@ -170,7 +170,7 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
                 setData(prev => ({ ...prev, academicYears: yearsMap }));
             }
         }, (error) => {
-            console.error("Firestore Error (config/academic_years):", error);
+            console.warn("Firestore Permission/Error (config/academic_years):", error.message);
             setData(prev => ({
                 ...prev,
                 academicYears: {

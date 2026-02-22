@@ -85,11 +85,11 @@ export function NotificationManager() {
                     } else {
                         handleSnapshot(s);
                     }
-                }, (fallbackErr) => {
-                    console.error("Notice notification fallback error:", fallbackErr);
+                }, (fallbackErr: any) => {
+                    console.warn("Notice notification fallback error:", fallbackErr.message);
                 });
             } else {
-                console.error("Notice notification error:", err);
+                console.warn("Notice notification error:", err.message);
             }
         });
 

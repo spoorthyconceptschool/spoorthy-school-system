@@ -25,8 +25,8 @@ export function Hero() {
                 setContent(snap.val());
             }
             setLoading(false);
-        }, (error) => {
-            console.error("RTDB Error (hero):", error);
+        }, (error: any) => {
+            console.warn("RTDB Permission (hero):", error.message);
             setLoading(false);
         });
 
