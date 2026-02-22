@@ -186,13 +186,17 @@ export function Facilities() {
                                         setActiveIndex(idx);
                                     }}
                                 >
-                                    <Image
-                                        src={item.image}
-                                        alt={item.title}
-                                        fill
-                                        className="object-cover"
-                                        priority={isFocused}
-                                    />
+                                    {item.image ? (
+                                        <Image
+                                            src={item.image}
+                                            alt={item.title || "Facility"}
+                                            fill
+                                            className="object-cover"
+                                            priority={isFocused}
+                                        />
+                                    ) : (
+                                        <div className="absolute inset-0 bg-[#0A192F]" />
+                                    )}
 
                                     <div className={cn(
                                         "absolute inset-0 bg-gradient-to-t from-[#0A192F] via-[#0A192F]/10 to-transparent transition-opacity duration-1000",
