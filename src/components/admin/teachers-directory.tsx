@@ -203,7 +203,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                         columns={[
                             {
                                 key: "name",
-                                header: "Faculty Info",
+                                header: "Staff Info",
                                 render: (t: any) => (
                                     <div className="flex items-center gap-3">
                                         <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center border border-white/5 group-hover:border-accent/30 transition-colors">
