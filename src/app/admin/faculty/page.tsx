@@ -8,9 +8,10 @@ import { LeavesManager } from "@/components/admin/leaves-manager";
 import { CoverageManager } from "@/components/admin/coverage-manager";
 import { AddTeacherModal } from "@/components/admin/add-teacher-modal";
 import { AddStaffModal } from "@/components/admin/add-staff-modal";
-import { Users, Calendar, ShieldAlert, Loader2, Plus } from "lucide-react";
+import { Users, Calendar, ShieldAlert, Loader2, Plus, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { StaffQueriesManager } from "@/components/admin/staff-queries-manager";
 
 function FacultyManagementContent() {
     const searchParams = useSearchParams();
@@ -73,6 +74,13 @@ function FacultyManagementContent() {
                             <ShieldAlert size={14} className="md:w-4 md:h-4" />
                             <span>Coverage</span>
                         </TabsTrigger>
+                        <TabsTrigger
+                            value="queries"
+                            className="data-[state=active]:bg-white data-[state=active]:text-black rounded-xl py-2 md:py-3 font-bold transition-all text-[10px] md:text-sm flex flex-col md:flex-row items-center gap-1 md:gap-2"
+                        >
+                            <MessageSquare size={14} className="md:w-4 md:h-4" />
+                            <span>Queries</span>
+                        </TabsTrigger>
                     </TabsList>
                 </div>
 
@@ -90,6 +98,10 @@ function FacultyManagementContent() {
 
                     <TabsContent value="coverage" className="outline-none m-0 px-2 md:px-0">
                         <CoverageManager />
+                    </TabsContent>
+
+                    <TabsContent value="queries" className="outline-none m-0 px-2 md:px-0">
+                        <StaffQueriesManager />
                     </TabsContent>
                 </div>
             </Tabs>
