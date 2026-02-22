@@ -195,7 +195,7 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
             <DropdownMenuContent align="end" className="w-80 bg-[#112240] border-[#64FFDA]/20 text-[#E6F1FF] backdrop-blur-xl p-0 shadow-2xl rounded-xl">
                 <DropdownMenuLabel className="p-4 flex justify-between items-center border-b border-[#64FFDA]/10">
                     <span className="font-bold">Notifications</span>
-                    {unreadCount > 0 && <Badge variant="secondary" className="bg-[#64FFDA]/10 text-[#64FFDA]">{unreadCount} New</Badge>}
+                    {unreadCount > 0 && <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-[#64FFDA]/10 text-[#64FFDA]">{unreadCount} New</span>}
                 </DropdownMenuLabel>
                 <div className="max-h-[400px] overflow-y-auto">
                     {notifications.length === 0 ? (
