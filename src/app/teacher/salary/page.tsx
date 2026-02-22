@@ -75,7 +75,7 @@ export default function SalaryPage() {
                         <CardTitle className="text-emerald-500">Current Status</CardTitle>
                         <p className="text-sm text-muted-foreground">This Month</p>
                     </div>
-                    <Wallet className="w-8 h-8 text-emerald-500 opacity-50" />
+                    <Wallet className="w-8 h-8 text-emerald-500 opacity-90" />
                 </CardHeader>
                 <CardContent>
                     {/* Mock Status */}

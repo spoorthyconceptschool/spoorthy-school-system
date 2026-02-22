@@ -192,7 +192,7 @@ export default function TeacherProfilePage() {
                     <CardContent className="space-y-4">
                         <div className="grid grid-cols-2 gap-4">
                             <div>
-                                <Label className="text-muted-foreground">Mobile</Label>
+                                <Label className="text-muted-foreground">Mobile Number</Label>
                                 <div className="flex items-center gap-2 mt-1">
                                     <Phone className="w-4 h-4 text-blue-400" />
                                     <span className="font-mono">{teacher.mobile}</span>
@@ -218,24 +218,35 @@ export default function TeacherProfilePage() {
                             </div>
                             {teacher.classTeacherOf && (
                                 <div className="col-span-2">
-                                    <Label className="text-muted-foreground">Class In-charge</Label>
+                                    <Label className="text-muted-foreground">Class Teacher Assignment</Label>
                                     <div className="flex items-center gap-2 mt-1 text-emerald-400 font-bold">
                                         <CheckCircle className="w-4 h-4" />
-                                        <span>Class Teacher of {teacher.classTeacherOf.classId.toUpperCase()} - {teacher.classTeacherOf.sectionId}</span>
+                                        <span>Class {teacher.classTeacherOf.classId.toUpperCase()} - Section {teacher.classTeacherOf.sectionId}</span>
                                     </div>
                                 </div>
                             )}
                         </div>
 
-                        <div className="pt-4 border-t border-white/10">
-                            <Label className="text-muted-foreground block mb-2">Teaching Subjects</Label>
-                            <div className="flex gap-2">
-                                {teacher.subjects?.map((sub: string) => (
-                                    <Badge key={sub} className="bg-purple-500/10 text-purple-400 border border-purple-500/20 px-3 py-1">
-                                        <BookOpen className="w-3 h-3 mr-2" /> {sub}
+                        <div className="pt-4 border-t border-white/10 grid grid-cols-2 gap-4">
+                            <div>
+                                <Label className="text-muted-foreground block mb-2">Primary Subject</Label>
+                                {teacher.subjects?.[0] ? (
+                                    <Badge className="bg-purple-500/10 text-purple-400 border border-purple-500/20 px-3 py-1">
+                                        <BookOpen className="w-3 h-3 mr-2" /> {teacher.subjects[0]}
                                     </Badge>
-                                ))}
-                                {(!teacher.subjects || teacher.subjects.length === 0) && <span className="text-muted-foreground italic">No subjects assigned</span>}
+                                ) : (
+                                    <span className="text-muted-foreground italic text-sm">Not assigned</span>
+                                )}
+                            </div>
+                            <div>
+                                <Label className="text-muted-foreground block mb-2">Secondary Subject</Label>
+                                {teacher.subjects?.[1] ? (
+                                    <Badge className="bg-purple-500/10 text-purple-400 border border-purple-500/20 px-3 py-1">
+                                        <BookOpen className="w-3 h-3 mr-2" /> {teacher.subjects[1]}
+                                    </Badge>
+                                ) : (
+                                    <span className="text-muted-foreground italic text-sm">Not assigned</span>
+                                )}
                             </div>
                         </div>
                     </CardContent>

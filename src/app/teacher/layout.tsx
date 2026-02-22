@@ -26,7 +26,6 @@ const TEACHER_NAV = [
     { label: "Homework", icon: BookOpen, href: "/teacher/homework" },
     { label: "Notices", icon: Bell, href: "/teacher/notices" },
     { label: "Leave Requests", icon: Calendar, href: "/teacher/leaves" },
-    { label: "Salary", icon: Wallet, href: "/teacher/salary" },
     { label: "Groups", icon: Users, href: "/teacher/groups" },
     { label: "Holidays", icon: Calendar, href: "/teacher/holidays" },
     { label: "Profile", icon: User, href: "/teacher/profile" },
@@ -40,6 +39,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
     const [checking, setChecking] = useState(true);
 
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [userRole, setUserRole] = useState("Loading...");
 
     useEffect(() => {
         if (loading) return;
@@ -48,20 +48,35 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
             return;
         }
 
-        // Verify Rule: Must Change Password
+        // Verify Rule: Must Change Password and Role
         const checkSecurity = async () => {
             try {
                 const userDoc = await getDoc(doc(db, "users", user.uid));
                 if (userDoc.exists()) {
                     const userData = userDoc.data();
+                    const actualRole = userData.role || "";
+                    setUserRole(actualRole);
+
+                    if (["ADMIN", "SUPER_ADMIN", "MANAGER", "DEVELOPER", "OWNER"].includes(actualRole)) {
+                        router.replace("/admin");
+                        return;
+                    }
+                    if (actualRole === "STUDENT") {
+                        router.replace("/student");
+                        return;
+                    }
+
                     if (userData.mustChangePassword && pathname !== "/teacher/change-password") {
                         router.push("/teacher/change-password");
                         setChecking(false);
                         return;
                     }
+                } else {
+                    setUserRole("Teacher");
                 }
             } catch (e) {
                 console.error("Security check failed", e);
+                setUserRole("Teacher");
             }
             setChecking(false);
         };
@@ -173,7 +188,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
                                     </div>
                                     <div className="text-left">
                                         <div className="text-sm font-medium leading-none text-[#E6F1FF]">{user?.email?.split('@')[0].toUpperCase()}</div>
-                                        <div className="text-xs text-[#8892B0]">Teacher</div>
+                                        <div className="text-xs text-[#8892B0]">{userRole}</div>
                                     </div>
                                 </button>
                             </DropdownMenuTrigger>

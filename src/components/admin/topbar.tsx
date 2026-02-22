@@ -89,7 +89,7 @@ export function TopBar() {
                                     </Button>
                                 </DropdownMenuTrigger>
                                 <DropdownMenuContent align="end" className="bg-[#0A192F]/95 backdrop-blur-xl border border-[#64FFDA]/20 text-white min-w-[150px]">
-                                    <DropdownMenuLabel className="text-[10px] uppercase tracking-widest opacity-50">Academic Session</DropdownMenuLabel>
+                                    <DropdownMenuLabel className="text-[10px] uppercase tracking-widest opacity-90">Academic Session</DropdownMenuLabel>
                                     <DropdownMenuSeparator className="bg-white/10" />
                                     {Object.values(academicYears).sort((a, b) => b.id.localeCompare(a.id)).map((y: any) => (
                                         <DropdownMenuItem
@@ -129,7 +129,7 @@ export function TopBar() {
                                 </button>
                             </DropdownMenuTrigger>
                             <DropdownMenuContent align="end" className="w-56 bg-[#0A192F]/90 backdrop-blur-xl border border-[#64FFDA]/20 text-white p-1 shadow-2xl rounded-xl mt-2">
-                                <DropdownMenuLabel className="px-3 py-2 text-sm font-bold opacity-50 uppercase tracking-widest">Account</DropdownMenuLabel>
+                                <DropdownMenuLabel className="px-3 py-2 text-sm font-bold opacity-90 uppercase tracking-widest">Account</DropdownMenuLabel>
                                 <DropdownMenuSeparator className="bg-white/10 mx-1" />
                                 <DropdownMenuItem className="focus:bg-white/10 focus:text-white cursor-pointer rounded-lg px-3 py-2 text-sm font-medium">
                                     <User className="mr-3 h-4 w-4" />

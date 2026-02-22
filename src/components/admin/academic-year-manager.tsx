@@ -223,7 +223,7 @@ export function AcademicYearManager() {
             {/* Active Year Card - Premium Look */}
             {activeYear && (
                 <Card className="overflow-hidden border-white/10 bg-gradient-to-br from-indigo-900/20 via-zinc-900/40 to-black/40 backdrop-blur-xl relative group shadow-2xl ring-1 ring-white/5">
-                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-500/10 via-transparent to-transparent opacity-50" />
+                    <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_top_right,_var(--tw-gradient-stops))] from-indigo-500/10 via-transparent to-transparent opacity-90" />
 
                     <Button
                         variant="ghost"

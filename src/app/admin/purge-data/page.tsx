@@ -225,7 +225,7 @@ export default function PurgeDataPage() {
                                     log.type === 'success' && "bg-emerald-500/5 text-emerald-500 border-emerald-500/10",
                                     log.type === 'err' && "bg-red-500/5 text-red-500 border-red-500/10"
                                 )}>
-                                    <span className="opacity-30 mr-2">[{new Date().toLocaleTimeString()}]</span>
+                                    <span className="opacity-90 mr-2">[{new Date().toLocaleTimeString()}]</span>
                                     {log.msg}
                                 </div>
                             ))}

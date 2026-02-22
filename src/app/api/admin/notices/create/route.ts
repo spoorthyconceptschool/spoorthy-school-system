@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { adminAuth, adminDb, FieldValue } from "@/lib/firebase-admin";
 import { notifyManagerActionServer } from "@/lib/notifications-server";
 
 export async function POST(req: NextRequest) {
@@ -25,10 +24,11 @@ export async function POST(req: NextRequest) {
 
         // RBAC: Must be ADMIN or SUPER_ADMIN
         const userDoc = await adminDb.collection("users").doc(decodedToken.uid).get();
-        const actorRole = userDoc.data()?.role || decodedToken.role || "UNKNOWN";
+        let actorRole = userDoc.data()?.role || decodedToken.role || "UNKNOWN";
+        actorRole = String(actorRole).toUpperCase();
         const actorName = userDoc.data()?.name || decodedToken.name || "Manager";
 
-        if (!["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(actorRole) && !decodedToken.email?.includes("admin")) {
+        if (!["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(actorRole) && !decodedToken.email?.toLowerCase().includes("admin")) {
             console.warn(`[Admin Create Notice] Warning: weak permission check passed for ${decodedToken.email} (${actorRole})`);
             return NextResponse.json({ error: "Insufficient Permissions" }, { status: 403 });
         }
@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
         // But field 'target' usually implies audience. 
         // Let's set target='ADMIN' if type='HOLIDAY' to match strict visibility requirement.
 
-        const audience = noticeType === "HOLIDAY" ? "ADMIN" : (target || "ALL");
+        const audience = target || (noticeType === "HOLIDAY" ? "ALL" : "ALL");
 
         const noticeRef = adminDb.collection("notices").doc();
         await noticeRef.set({

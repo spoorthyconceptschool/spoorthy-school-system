@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { adminAuth, adminDb, FieldValue } from "@/lib/firebase-admin";
 
 export async function POST(req: NextRequest) {
     try {
@@ -39,8 +38,18 @@ export async function POST(req: NextRequest) {
             senderId: decodedToken.uid,
             senderName: decodedToken.name || "Teacher",
             senderRole: "TEACHER",
-            target: { type: "CLASS", id: targetClassId },
+            target: targetClassId, // Store as string for direct student query match
             expiresAt: expiryDate,
+            createdAt: FieldValue.serverTimestamp()
+        });
+
+        // Broadcast to relevant students
+        await adminDb.collection("notifications").add({
+            title: `New Teacher Notice: ${title}`,
+            message: content.substring(0, 100),
+            type: "NOTICE",
+            target: `class_${targetClassId}`,
+            status: "UNREAD",
             createdAt: FieldValue.serverTimestamp()
         });
 

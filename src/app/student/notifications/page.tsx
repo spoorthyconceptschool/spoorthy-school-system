@@ -23,60 +23,61 @@ export default function StudentNotificationsPage() {
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (!user) return;
+        if (!user?.email) return;
 
+        const schoolIdFromEmail = user.email.split('@')[0].toUpperCase();
         let isMounted = true;
         const unsubscribes: (() => void)[] = [];
 
-        const startListeners = async () => {
-            if (!user?.uid) return;
+        // 1. Personal Notifications - Realtime (UID based)
+        const qPersonal = query(collection(db, "notifications"), where("userId", "==", user.uid), limit(50));
+        const unsubPersonal = onSnapshot(qPersonal, (snap) => {
+            if (!isMounted) return;
+            const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification));
+            updateNotifications(list);
+        });
+        unsubscribes.push(unsubPersonal);
 
-            // 1. Personal Notifications - Realtime
-            const qPersonal = query(collection(db, "notifications"), where("userId", "==", user.uid), limit(50));
-            const unsubPersonal = onSnapshot(qPersonal, (snap) => {
-                if (!isMounted) return;
-                const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification));
-                updateNotifications(list, "personal");
-            });
-            unsubscribes.push(unsubPersonal);
-
-            // 2. Class Notifications - Realtime
-            try {
-                // Fetch class ID once
-                const sQuery = query(collection(db, "students"), where("uid", "==", user.uid), limit(1));
-                const sSnap = await getDocs(sQuery);
-
-                if (!isMounted) return;
-
-                if (!sSnap.empty) {
-                    const studentData = sSnap.docs[0].data();
-                    const classId = studentData.classId;
-                    if (classId) {
-                        const qClass = query(collection(db, "notifications"), where("target", "==", `class_${classId}`), limit(50));
-                        const unsubClass = onSnapshot(qClass, (snap) => {
-                            if (!isMounted) return;
-                            const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification));
-                            updateNotifications(list, "class");
-                        });
-                        unsubscribes.push(unsubClass);
-                    }
-                }
-            } catch (e) {
-                console.error("Error setting up class listeners:", e);
+        // 2. Class Notifications - Dual Strategy Profile Fetch
+        const setupClassListener = (student: any) => {
+            const classId = student.classId;
+            if (classId) {
+                const qClass = query(collection(db, "notifications"), where("target", "==", `class_${classId}`), limit(50));
+                const unsubClass = onSnapshot(qClass, (snap) => {
+                    if (!isMounted) return;
+                    const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification));
+                    updateNotifications(list);
+                });
+                unsubscribes.push(unsubClass);
             }
-
             setLoading(false);
         };
 
+        const unsubProfile = onSnapshot(doc(db, "students", schoolIdFromEmail), (pSnap) => {
+            if (pSnap.exists()) {
+                setupClassListener(pSnap.data());
+            } else if (user.uid) {
+                const q = query(collection(db, "students"), where("uid", "==", user.uid));
+                const unsubQuery = onSnapshot(q, (qSnap) => {
+                    if (!qSnap.empty) setupClassListener(qSnap.docs[0].data());
+                    else setLoading(false);
+                });
+                unsubscribes.push(unsubQuery);
+            } else {
+                setLoading(false);
+            }
+        }, (err) => {
+            console.error("Profile sync error:", err);
+            setLoading(false);
+        });
+        unsubscribes.push(unsubProfile);
+
         // Helper to merge lists safely
-        const updateNotifications = (newList: Notification[], source: string) => {
+        const updateNotifications = (newList: Notification[]) => {
             if (!isMounted) return;
             setNotifications(prev => {
-                // Remove existing items that are being updated by this new list
                 const newIds = new Set(newList.map(n => n.id));
                 const filteredPrev = prev.filter(p => !newIds.has(p.id));
-
-                // Combine and Sort
                 const combined = [...filteredPrev, ...newList];
                 return combined.sort((a, b) => {
                     const timeA = a.createdAt?.seconds || 0;
@@ -85,8 +86,6 @@ export default function StudentNotificationsPage() {
                 }).slice(0, 50);
             });
         };
-
-        startListeners();
 
         return () => {
             isMounted = false;

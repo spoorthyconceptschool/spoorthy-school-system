@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { adminAuth, adminDb, FieldValue } from "@/lib/firebase-admin";
 
 export async function POST(req: NextRequest) {
     try {
@@ -20,10 +19,11 @@ export async function POST(req: NextRequest) {
         const taskRef = adminDb.collection("coverage_tasks").doc(taskId);
         const existingSubsSnap = await adminDb.collection("substitutions").where("taskId", "==", taskId).get();
 
-        await adminDb.runTransaction(async (t: FirebaseFirestore.Transaction) => {
-            const taskDoc = (await t.get(taskRef)) as unknown as FirebaseFirestore.DocumentSnapshot;
+        await adminDb.runTransaction(async (t: any) => {
+            const taskDoc = (await t.get(taskRef)) as any;
             if (!taskDoc.exists) throw new Error("Task not found");
-            const task = taskDoc.data()!;
+            const task = taskDoc.data();
+            if (!task) throw new Error("Task data is empty");
 
             const originalTeacherId = task.originalTeacherId;
             const date = task.date;
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
                 // Check Schedule
                 const subScheduleRef = adminDb.collection("teacher_schedules").doc(`${yearId}_${substituteTeacherId}`);
-                const subScheduleDoc = (await t.get(subScheduleRef)) as unknown as FirebaseFirestore.DocumentSnapshot;
+                const subScheduleDoc = (await t.get(subScheduleRef)) as any;
                 const schedule = subScheduleDoc.data()?.schedule || {};
 
                 if (schedule[dayName]?.[slotId]) {
@@ -51,11 +51,11 @@ export async function POST(req: NextRequest) {
                 // Try schoolId match
                 const tQuery = await adminDb.collection("teachers").where("schoolId", "==", substituteTeacherId).limit(1).get();
                 if (!tQuery.empty) {
-                    targetUid = tQuery.docs[0].data().uid;
+                    targetUid = tQuery.docs[0].data()?.uid;
                 } else {
                     // Try docId match
                     const docSnap = await adminDb.collection("teachers").doc(substituteTeacherId).get();
-                    if (docSnap.exists) targetUid = docSnap.data().uid;
+                    if (docSnap.exists) targetUid = docSnap.data()?.uid;
                 }
             }
 

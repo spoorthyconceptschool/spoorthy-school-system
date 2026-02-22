@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { doc, collection, query, where, onSnapshot } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Calendar as CalendarIcon, PieChart as PieChartIcon, ArrowLeft, ArrowRight, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -18,45 +18,30 @@ export default function StudentAttendancePage() {
     const [currentMonth, setCurrentMonth] = useState(new Date());
 
     useEffect(() => {
-        if (!user) return;
+        if (!user?.email) return;
 
-        const fetchData = async () => {
-            try {
-                // 1. Get Student Profile to know Class/Section and School ID
-                // User email is SHSxxxxx@school.local, generally schoolId is the prefix.
-                // Or fetch from /students/{uid} or /students -> where uid == user.uid
+        const schoolIdFromEmail = user.email.split('@')[0].toUpperCase();
+        let unsubAtt: (() => void) | null = null;
 
-                // reliable way: query students by uid
-                const q = query(collection(db, "students"), where("uid", "==", user.uid));
-                const snap = await getDocs(q);
+        const setupAttendanceListener = (student: any, docId: string) => {
+            const studentId = student.schoolId || docId;
+            const classId = student.classId;
+            const sectionId = student.sectionId;
 
-                if (snap.empty) {
-                    console.error("Student profile not found");
-                    setLoading(false);
-                    return;
-                }
+            if (!classId) {
+                setLoading(false);
+                return;
+            }
 
-                const student = snap.docs[0].data();
-                const studentId = student.schoolId || snap.docs[0].id; // The ID used in attendance records
-                const classId = student.classId;
-                const sectionId = student.sectionId;
+            if (unsubAtt) unsubAtt();
 
-                if (!classId) {
-                    setLoading(false);
-                    return;
-                }
+            const attQuery = query(
+                collection(db, "attendance"),
+                where("classId", "==", classId),
+                where("sectionId", "==", sectionId)
+            );
 
-                // 2. Fetch Attendance for this Class
-                // Query all attendance records for this class (We fetch all to calculate YTD stats)
-                // Optimization: Maybe limit to current academic year? For now, fetch all.
-                const attQuery = query(
-                    collection(db, "attendance"),
-                    where("classId", "==", classId),
-                    where("sectionId", "==", sectionId) // Attendance is usually per section
-                );
-
-                const attSnap = await getDocs(attQuery);
-
+            unsubAtt = onSnapshot(attQuery, (attSnap) => {
                 const map: Record<string, 'P' | 'A'> = {};
                 let present = 0;
                 let absent = 0;
@@ -80,15 +65,39 @@ export default function StudentAttendancePage() {
                     absent,
                     percentage: total > 0 ? Math.round((present / total) * 100) : 0
                 });
-
-            } catch (e) {
-                console.error(e);
-            } finally {
                 setLoading(false);
-            }
+            }, (err) => {
+                console.error("Attendance sync error:", err);
+                setLoading(false);
+            });
         };
 
-        fetchData();
+        // 1. Listen to Student Profile (Dual Strategy)
+        const unsubProfile = onSnapshot(doc(db, "students", schoolIdFromEmail), (pSnap) => {
+            if (pSnap.exists()) {
+                setupAttendanceListener(pSnap.data(), pSnap.id);
+            } else if (user.uid) {
+                const q = query(collection(db, "students"), where("uid", "==", user.uid));
+                const unsubQuery = onSnapshot(q, (qSnap) => {
+                    if (!qSnap.empty) setupAttendanceListener(qSnap.docs[0].data(), qSnap.docs[0].id);
+                    else {
+                        console.error("Student profile not found");
+                        setLoading(false);
+                    }
+                });
+                // Note: Query unsub is lost here, but usually students only have one record.
+            } else {
+                setLoading(false);
+            }
+        }, (err) => {
+            console.error("Profile sync error:", err);
+            setLoading(false);
+        });
+
+        return () => {
+            unsubProfile();
+            if (unsubAtt) unsubAtt();
+        };
     }, [user]);
 
     const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));

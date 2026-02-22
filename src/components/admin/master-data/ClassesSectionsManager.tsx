@@ -315,7 +315,7 @@ export function ClassesSectionsManager() {
                                                         <div
                                                             key={s.id}
                                                             onClick={async () => await set(ref(rtdb, `master/classSubjects/${c.id}/${s.id}`), !isSelected)}
-                                                            className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${isSelected ? "bg-indigo-500/20 border-indigo-500/50" : "bg-white/5 border-white/10 opacity-50 hover:opacity-100"
+                                                            className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all ${isSelected ? "bg-indigo-500/20 border-indigo-500/50" : "bg-white/5 border-white/10 opacity-90 hover:opacity-100"
                                                                 }`}
                                                         >
                                                             <span className="font-medium">{s.name}</span>

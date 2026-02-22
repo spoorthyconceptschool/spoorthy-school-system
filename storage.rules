@@ -1,0 +1,29 @@
+rules_version = '2';
+service firebase.storage {
+  match /b/{bucket}/o {
+    // Allow public read for any files in the 'demo' or 'public' folders
+    match /demo/{allPaths=**} {
+      allow read: if true;
+    }
+    match /public/{allPaths=**} {
+      allow read: if true;
+    }
+    
+    // User-specific files
+    match /users/{userId}/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
+    }
+    
+    // School data
+    match /school/{allPaths=**} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.token.role in ['ADMIN', 'SUPER_ADMIN'];
+    }
+
+    // Default: Authenticated users can read/write their own uploads
+    match /{allPaths=**} {
+      allow read, write: if request.auth != null;
+    }
+  }
+}

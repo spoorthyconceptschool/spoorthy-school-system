@@ -187,7 +187,7 @@ export default function TeacherHomeworkPage() {
                         <CardTitle className="flex items-center gap-3 text-2xl font-display italic">
                             <Plus className="w-6 h-6 text-accent" /> Assign Homework
                         </CardTitle>
-                        <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-1 opacity-50">Fill the tasks for the subjects you teach</p>
+                        <p className="text-[10px] text-muted-foreground uppercase font-black tracking-widest mt-1 opacity-90">Fill the tasks for the subjects you teach</p>
                     </div>
                     <CardContent className="p-6">
                         <form onSubmit={handleSubmit} className="space-y-6">
@@ -317,7 +317,7 @@ export default function TeacherHomeworkPage() {
                                         <Calendar className="w-3.5 h-3.5" />
                                         Due {new Date(hw.dueDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
                                     </div>
-                                    <span className="text-[8px] text-muted-foreground font-black uppercase tracking-widest opacity-30">
+                                    <span className="text-[8px] text-muted-foreground font-black uppercase tracking-widest opacity-90">
                                         {hw.createdAt ? new Date(hw.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "..."}
                                     </span>
                                 </div>

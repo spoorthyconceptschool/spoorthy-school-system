@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, getDoc, documentId } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc, documentId, onSnapshot } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -41,15 +41,7 @@ export default function AttendanceManager({
 
     const date = defaultDate || new Date().toISOString().split('T')[0];
 
-    useEffect(() => {
-        if (classId && sectionId) {
-            if (viewStats) {
-                fetchStats();
-            } else {
-                fetchData();
-            }
-        }
-    }, [classId, sectionId, date, viewStats, statsMonth]);
+
 
     const fetchStats = async () => {
         setLoading(true);
@@ -133,7 +125,7 @@ export default function AttendanceManager({
     };
 
     const handlePrint = () => {
-        const classObj = classes.find((c: any) => c.id === classId);
+        const classObj = Object.values(classes).find((c: any) => c.id === classId);
         const period = statsMonth === "ALL" ? `Annual Report ${new Date().getFullYear()}` : `Monthly Report - ${new Date(2000, Number(statsMonth) - 1).toLocaleString('default', { month: 'long' })} ${new Date().getFullYear()}`;
 
         const html = `
@@ -212,64 +204,84 @@ export default function AttendanceManager({
         win?.document.close();
     };
 
-    const fetchData = async () => {
-        setLoading(true);
-        try {
-            // 1. Fetch Students
-            const sQuery = query(
-                collection(db, "students"),
-                where("classId", "==", classId),
-                where("sectionId", "==", sectionId),
-                where("status", "==", "ACTIVE")
-            );
-            const sSnap = await getDocs(sQuery);
-            const sList = sSnap.docs.map(d => ({ id: d.id, ...d.data() } as any))
-                .sort((a, b) => (a.rollNumber || 0) - (b.rollNumber || 0));
-            setStudents(sList);
+    useEffect(() => {
+        if (!classId || !sectionId) return;
 
-            // 2. Fetch Approved Leaves to auto-mark Absent
-            const lQuery = query(
-                collection(db, "student_leaves"),
-                where("classId", "==", classId),
-                where("status", "==", "APPROVED")
-            );
-            const lSnap = await getDocs(lQuery);
-            const absentIds = new Set<string>();
-            lSnap.forEach(ld => {
-                const l = ld.data();
-                // Check if current date falls within leave range
-                if (l.fromDate <= date && l.toDate >= date) {
-                    // Check section match if applicable (some leaves might not have sectionId)
-                    if (!l.sectionId || l.sectionId === sectionId) {
-                        absentIds.add(l.studentId);
-                    }
-                }
-            });
-
-            // 3. Fetch Existing Attendance
-            const attId = `${date}_${classId}_${sectionId}`;
-            const attSnap = await getDoc(doc(db, "attendance", attId));
-
-            if (attSnap.exists()) {
-                setAlreadyMarked(true);
-                setAttendance(attSnap.data().records || {});
-            } else {
-                setAlreadyMarked(false);
-                const initial: Record<string, 'P' | 'A'> = {};
-                sList.forEach((s: any) => {
-                    // s.id is usually the School ID (SHS...). Check against approved leaves.
-                    const isOnLeave = absentIds.has(s.id) || (s.schoolId && absentIds.has(s.schoolId));
-                    initial[s.id] = isOnLeave ? 'A' : 'P';
-                });
-                setAttendance(initial);
-            }
-        } catch (e: any) {
-            console.error(e);
-            toast({ title: "Error", description: "Failed to fetch data.", type: "error" });
-        } finally {
-            setLoading(false);
+        if (viewStats) {
+            fetchStats();
+            return;
         }
-    };
+
+        let isMounted = true;
+        let unsubAttendance: (() => void) | null = null;
+
+        const fetchData = async () => {
+            setLoading(true);
+            try {
+                const sQuery = query(
+                    collection(db, "students"),
+                    where("classId", "==", classId),
+                    where("sectionId", "==", sectionId),
+                    where("status", "==", "ACTIVE")
+                );
+                const sSnap = await getDocs(sQuery);
+                const sList = sSnap.docs.map(d => ({ id: d.id, ...d.data() } as any))
+                    .sort((a, b) => (a.rollNumber || 0) - (b.rollNumber || 0));
+
+                if (!isMounted) return;
+                setStudents(sList);
+
+                const lQuery = query(
+                    collection(db, "student_leaves"),
+                    where("classId", "==", classId),
+                    where("status", "==", "APPROVED")
+                );
+                const lSnap = await getDocs(lQuery);
+                const absentIds = new Set<string>();
+                lSnap.forEach(ld => {
+                    const l = ld.data();
+                    if (l.fromDate <= date && l.toDate >= date) {
+                        if (!l.sectionId || l.sectionId === sectionId) {
+                            absentIds.add(l.studentId);
+                        }
+                    }
+                });
+
+                const attId = `${date}_${classId}_${sectionId}`;
+                unsubAttendance = onSnapshot(doc(db, "attendance", attId), (attSnap) => {
+                    if (!isMounted) return;
+                    if (attSnap.exists()) {
+                        setAlreadyMarked(true);
+                        setAttendance(attSnap.data().records || {});
+                    } else {
+                        setAlreadyMarked(false);
+                        const initial: Record<string, 'P' | 'A'> = {};
+                        sList.forEach((s: any) => {
+                            const isOnLeave = absentIds.has(s.id) || (s.schoolId && absentIds.has(s.schoolId));
+                            initial[s.id] = isOnLeave ? 'A' : 'P';
+                        });
+                        setAttendance(initial);
+                    }
+                    setLoading(false);
+                }, (err) => {
+                    console.error("Attendance listener error", err);
+                    setLoading(false);
+                });
+
+            } catch (e: any) {
+                console.error(e);
+                toast({ title: "Error", description: "Failed to fetch data.", type: "error" });
+                setLoading(false);
+            }
+        };
+
+        fetchData();
+
+        return () => {
+            isMounted = false;
+            if (unsubAttendance) unsubAttendance();
+        };
+    }, [classId, sectionId, date, viewStats, statsMonth]);
 
     const [touched, setTouched] = useState<Set<string>>(new Set());
 
@@ -326,7 +338,7 @@ export default function AttendanceManager({
 
     // SEARCH FILTER
     const filteredStudents = students.filter(s =>
-        s.studentName.toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (s.studentName || s.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
         (s.schoolId && s.schoolId.toLowerCase().includes(searchQuery.toLowerCase())) ||
         (s.rollNumber && String(s.rollNumber).includes(searchQuery))
     );

@@ -133,7 +133,7 @@ export default function StudentLoginPage() {
                     </form>
                 </div>
 
-                <p className="text-center text-xs text-muted-foreground uppercase tracking-widest opacity-50">
+                <p className="text-center text-xs text-muted-foreground uppercase tracking-widest opacity-90">
                     Spoorthy Concept School
                 </p>
             </div>

@@ -888,7 +888,7 @@ export function GroupsManager() {
                                             ? students.find(s => s.id === formCaptain)?.name || "Unknown Student"
                                             : "Select Captain"}
                                     </span>
-                                    <Search className="h-4 w-4 opacity-50" />
+                                    <Search className="h-4 w-4 opacity-90" />
                                 </Button>
                             </div>
 
@@ -906,7 +906,7 @@ export function GroupsManager() {
                                             ? students.find(s => s.id === formViceCaptain)?.name || "Unknown Student"
                                             : "Select Vice Captain"}
                                     </span>
-                                    <Search className="h-4 w-4 opacity-50" />
+                                    <Search className="h-4 w-4 opacity-90" />
                                 </Button>
                             </div>
 
@@ -924,7 +924,7 @@ export function GroupsManager() {
                                             ? `${formIncharges.length} Selected`
                                             : "Select Teachers Incharge"}
                                     </span>
-                                    <Search className="h-4 w-4 opacity-50 ml-2" />
+                                    <Search className="h-4 w-4 opacity-90 ml-2" />
                                 </Button>
                                 {/* Display selected incharges below */}
                                 {formIncharges.length > 0 && (

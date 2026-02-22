@@ -141,7 +141,7 @@ export default function AdminHomeworkPage() {
                             <form onSubmit={handleSubmit} className="space-y-4">
                                 <div className="grid grid-cols-2 gap-2">
                                     <div className="space-y-1">
-                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-50 ml-0.5">Class</label>
+                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-100 ml-0.5">Class</label>
                                         <Select onValueChange={(val) => { setClassId(val); setSectionId(""); }} value={classId}>
                                             <SelectTrigger className="bg-white/5 border-white/5 h-9 rounded-md focus:ring-accent transition-all text-white text-[10px] px-3">
                                                 <SelectValue placeholder="Select" />
@@ -157,7 +157,7 @@ export default function AdminHomeworkPage() {
                                     </div>
 
                                     <div className="space-y-1">
-                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-50 ml-0.5">Section</label>
+                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-100 ml-0.5">Section</label>
                                         <Select onValueChange={setSectionId} value={sectionId} disabled={!classId}>
                                             <SelectTrigger className="bg-white/5 border-white/5 h-9 rounded-md focus:ring-accent transition-all text-white text-[10px] px-3">
                                                 <SelectValue placeholder={classId ? "Select" : "..."} />
@@ -174,7 +174,7 @@ export default function AdminHomeworkPage() {
                                     </div>
 
                                     <div className="space-y-1">
-                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-50 ml-0.5">Subject</label>
+                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-100 ml-0.5">Subject</label>
                                         <Select onValueChange={setSubjectId} value={subjectId}>
                                             <SelectTrigger className="bg-white/5 border-white/5 h-9 rounded-md focus:ring-accent transition-all text-white text-[10px] px-3">
                                                 <SelectValue placeholder="Select" />
@@ -190,7 +190,7 @@ export default function AdminHomeworkPage() {
                                     </div>
 
                                     <div className="space-y-1">
-                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-50 ml-0.5">Due Date</label>
+                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-100 ml-0.5">Due Date</label>
                                         <Input
                                             type="date"
                                             value={dueDate}
@@ -202,7 +202,7 @@ export default function AdminHomeworkPage() {
 
                                 <div className="space-y-3 pt-2">
                                     <div className="space-y-1">
-                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-50">Homework Title</label>
+                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-100">Homework Title</label>
                                         <Input
                                             required
                                             value={title}
@@ -213,7 +213,7 @@ export default function AdminHomeworkPage() {
                                     </div>
 
                                     <div className="space-y-1">
-                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-50">Detailed Instructions</label>
+                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-100">Detailed Instructions</label>
                                         <Textarea
                                             required
                                             value={description}
@@ -256,7 +256,7 @@ export default function AdminHomeworkPage() {
 
                     <div className="space-y-4">
                         {homeworkHistory.length === 0 ? (
-                            <div className="md:col-span-2 glass-panel p-8 text-center rounded-2xl border-dashed border-white/10 opacity-50">
+                            <div className="md:col-span-2 glass-panel p-8 text-center rounded-2xl border-dashed border-white/10 opacity-90">
                                 <History className="w-8 h-8 mx-auto mb-2 text-muted-foreground" />
                                 <p className="text-[10px] font-medium uppercase tracking-widest">No recent broadcasts</p>
                             </div>
@@ -305,3 +305,4 @@ export default function AdminHomeworkPage() {
         </div>
     );
 }
+

@@ -1,10 +1,11 @@
 @import "tailwindcss";
 
-/* @plugin "tailwindcss-animate"; */
+@plugin "tailwindcss-animate";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
 @theme {
+  --breakpoint-xs: 400px;
   --font-sans: var(--font-body);
   --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
@@ -170,31 +171,31 @@
   --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
   --default-font-family: var(--font-body);
   --default-mono-font-family: var(--font-mono);
-  --font-display: var(--font-display), serif;
+  --font-display: var(--font-display, serif);
   --font-body: 'Inter', 'system-ui', sans-serif;
 
-  /* Core Theme Colors with proper Tailwind 4 syntax */
-  --color-background: oklch(0.12 0.02 250);
-  --color-foreground: oklch(0.98 0.01 250);
-  --color-card: oklch(0.15 0.03 250);
-  --color-card-foreground: oklch(0.98 0.01 250);
-  --color-popover: oklch(0.15 0.03 250);
-  --color-popover-foreground: oklch(0.98 0.01 250);
-  --color-primary: oklch(0.8 0.15 250);
-  --color-primary-foreground: oklch(0.12 0.02 250);
-  --color-secondary: oklch(0.25 0.05 250);
-  --color-secondary-foreground: oklch(0.98 0.01 250);
-  --color-muted: oklch(0.25 0.05 250);
-  --color-muted-foreground: oklch(0.85 0.02 250);
-  --color-accent: oklch(0.8 0.15 250);
-  --color-accent-foreground: oklch(0.12 0.02 250);
-  --color-destructive: oklch(0.5 0.25 25);
-  --color-destructive-foreground: oklch(0.98 0.01 250);
-  --color-border: oklch(0.25 0.05 250);
-  --color-input: oklch(0.25 0.05 250);
-  --color-ring: oklch(0.8 0.15 250);
+  /* Core Theme Colors with Hex for maximum compatibility */
+  --color-background: #0A0A0B;
+  --color-foreground: #FAFAFA;
+  --color-card: #111112;
+  --color-card-foreground: #FAFAFA;
+  --color-popover: #111112;
+  --color-popover-foreground: #FAFAFA;
+  --color-primary: #64FFDA;
+  --color-primary-foreground: #0A0A0B;
+  --color-secondary: #2D2D30;
+  --color-secondary-foreground: #FAFAFA;
+  --color-muted: #2D2D30;
+  --color-muted-foreground: #A8B2D1;
+  --color-accent: #64FFDA;
+  --color-accent-foreground: #0A0A0B;
+  --color-destructive: #FF5555;
+  --color-destructive-foreground: #FAFAFA;
+  --color-border: #2D2D30;
+  --color-input: #2D2D30;
+  --color-ring: #64FFDA;
 
-  /* Support for shadcn/ui components using variables without prefix */
+  /* Aliases for shadcn/ui */
   --background: var(--color-background);
   --foreground: var(--color-foreground);
   --card: var(--color-card);
@@ -215,10 +216,10 @@
   --input: var(--color-input);
   --ring: var(--color-ring);
 
-  --chart-1: oklch(0.646 0.222 41.116);
-  --chart-2: oklch(0.6 0.118 184.704);
-  --chart-3: oklch(0.398 0.07 227.392);
-  --chart-4: oklch(0.828 0.189 84.429);
-  --chart-5: oklch(0.769 0.188 70.08);
+  --chart-1: #4D79FF;
+  --chart-2: #64FFDA;
+  --chart-3: #8892B0;
+  --chart-4: #FCA311;
+  --chart-5: #E71D36;
   --radius: 0.5rem;
 }

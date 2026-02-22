@@ -116,7 +116,7 @@ export function StudentImportModal({ onSuccess }: StudentImportModalProps) {
                                 className="absolute inset-0 opacity-0 cursor-pointer"
                             />
                             <div className="flex flex-col items-center gap-2 text-gray-400">
-                                <Upload className="w-8 h-8 opacity-50" />
+                                <Upload className="w-8 h-8 opacity-90" />
                                 <p>{file ? file.name : "Click to browse or drag file here"}</p>
                             </div>
                         </div>

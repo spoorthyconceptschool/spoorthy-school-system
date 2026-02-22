@@ -1,0 +1,27 @@
+[
+  {
+    "id": "ZFLIOWxULbdzCeXLJL8xjBnP7j72",
+    "role": "ADMIN",
+    "displayName": "System Admin",
+    "email": "25r21a05e2@mlrit.ac.in",
+    "status": "ACTIVE",
+    "updatedAt": {
+      "_seconds": 1771353630,
+      "_nanoseconds": 690000000
+    },
+    "schoolId": "ADMIN",
+    "recoveryPassword": "PASSWORD",
+    "mustChangePassword": false,
+    "fcmTokens": [
+      "fmKqEIMrTpBsjwZIfKbLcb:APA91bF2TeK_5s2CBeHR-DM3auPRPcjeXPQAfxivTwAJhemkuZuafjveGEKQ72JYK2LP5a5gA1IAiQg60YBliKPqugPQNaGjJxyfwehfJEsagrvbQe9y8CM",
+      "f-NjA6yOLeqJg_Ekyxbzm1:APA91bFepSJV3HSLiojLBopPFNONE-Jdx8j0vd4YvNa9j2jPYH9MLL5TgfcyqgbKj6eSg2Tc7vIJaJTE1rNE3qFJt1OXNclFNKpsv4VkKy_KUuC_MbXhMXc",
+      "dPPUhiPQAk5HZ9Y9u5ZvpK:APA91bFFfM9uObeJDAOE55rND892TYsnuGzeVXP49gXpY81Vkx1g2uw0sQEbUGte2L00W9ruRUIG-U9MHl1cck-J5Thg9equrWYniRd-RfeflEf57XSkcoo",
+      "csrNjGn4KAT4NvhWf-tKXw:APA91bHQP88JU01f1S2177_EvhgaD0NHyR8i950ZIlGDsswGjbc1Q3KTpef5HDa4V7ztYJ8_gmybEs_IaC8md_U8vagXXF5OLZB9Is8bzxSpRq54cmcVmes",
+      "dPPUhiPQAk5HZ9Y9u5ZvpK:APA91bG81J1_RgsAD0b00bOblUEpDt4nNiS13zelKTBYNdHOx3pGCXIldOFKVL3aIUwOg_j6w_UXQnuYXeNBYlUfe7cVyqBWbOiLu7oT7nlbig6unkFbQnw"
+    ],
+    "lastFcmTokenAt": {
+      "_seconds": 1771780513,
+      "_nanoseconds": 958000000
+    }
+  }
+]

@@ -1,0 +1,155 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    // Basic Helper Functions
+    function isSignedIn() {
+      return request.auth != null;
+    }
+    
+    function getUserRole() {
+      // Prioritize Custom Claims (if set), fallback to checking the users collection
+      return request.auth.token.role != null 
+        ? request.auth.token.role 
+        : get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+    }
+    
+    function isAdmin() {
+      let role = getUserRole();
+      return isSignedIn() && (role == 'ADMIN' || role == 'SUPER_ADMIN');
+    }
+
+    function isManager() {
+      let role = getUserRole();
+      return isSignedIn() && (role == 'MANAGER' || isAdmin());
+    }
+
+    function isTeacher() {
+      return isSignedIn() && getUserRole() == 'TEACHER';
+    }
+
+    // --- COLLECTION RULES ---
+
+    // Admin-only collections (Audit, Analytics)
+    match /audit_logs/{log} { allow read, write: if isAdmin(); }
+    match /analytics/{doc} { allow read, write: if isAdmin(); }
+    
+    // Core Config (Academic years needed for Landing Page/Context)
+    match /config/academic_years { allow read: if true; allow write: if isAdmin(); }
+    match /config/{doc} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    
+    match /settings/{doc} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+
+    // Master Data (Public Read allowed for landing page/admissions)
+    match /master_classes/{doc} { allow read: if true; allow write: if isAdmin(); }
+    match /master_sections/{doc} { allow read: if true; allow write: if isAdmin(); }
+    match /master_villages/{doc} { allow read: if true; allow write: if isAdmin(); }
+    match /master_subjects/{doc} { allow read: if true; allow write: if isAdmin(); }
+    match /master_staff_roles/{doc} { allow read: if true; allow write: if isAdmin(); }
+    match /master_class_sections/{doc} { allow read: if true; allow write: if isAdmin(); }
+
+    // Users Collection
+    match /users/{userId} {
+      allow read: if isSignedIn() && (request.auth.uid == userId || isManager());
+      allow write: if isAdmin();
+    }
+
+    // Students & Teachers
+    match /students/{studentId} {
+      allow read: if isSignedIn() && (
+        request.auth.uid == studentId || 
+        request.auth.uid == resource.data.uid || 
+        request.auth.email.split('@')[0].upper() == studentId ||
+        isManager() || 
+        isTeacher()
+      );
+      allow write: if isAdmin();
+    }
+    
+    match /teachers/{teacherId} {
+      allow read: if isSignedIn() && (request.auth.uid == teacherId || resource.data.uid == request.auth.uid || isManager());
+      allow write: if isAdmin();
+    }
+
+    // Academic & Operations
+    match /exam_results/{id} {
+      allow read: if isSignedIn() && (request.auth.uid == resource.data.studentId || isManager() || isTeacher());
+      allow write: if isAdmin() || isTeacher();
+    }
+
+    match /homework/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin() || isTeacher();
+    }
+    
+    match /attendance/{id} {
+      allow read: if isSignedIn() && (isManager() || isTeacher() || getUserRole() == 'STUDENT');
+      allow write: if isAdmin() || isTeacher();
+    }
+    
+    match /student_fee_ledgers/{id} { 
+      allow read: if isSignedIn() && (
+        isManager() || 
+        request.auth.uid == resource.data.uid || 
+        request.auth.uid == resource.data.studentId ||
+        request.auth.email.split('@')[0].upper() == resource.data.studentId
+      ); 
+      allow write: if isAdmin(); 
+    }
+
+    match /payments/{id} { 
+      allow read: if isSignedIn() && (
+        isManager() || 
+        request.auth.uid == resource.data.uid || 
+        request.auth.uid == resource.data.studentId ||
+        request.auth.email.split('@')[0].upper() == resource.data.studentId
+      ); 
+      allow write: if isAdmin(); 
+    }
+    match /invoices/{id} { 
+      allow read: if isSignedIn() && (
+        isManager() || 
+        request.auth.uid == resource.data.uid || 
+        request.auth.uid == resource.data.studentId ||
+        request.auth.email.split('@')[0].upper() == resource.data.studentId
+      ); 
+      allow write: if isAdmin(); 
+    }
+
+    // Communication & Notices
+    match /notices/{id} {
+      allow read: if isSignedIn();
+      allow write: if isManager() || isTeacher();
+    }
+
+    match /notifications/{id} {
+      allow read: if isSignedIn() && (
+        resource.data.target == 'ALL' || 
+        resource.data.target == 'ALL_STUDENTS' || 
+        resource.data.userId == request.auth.uid ||
+        // Allow if userId matches the ID of a student doc owned by this user
+        (
+           exists(/databases/$(database)/documents/students/$(resource.data.userId)) &&
+           get(/databases/$(database)/documents/students/$(resource.data.userId)).data.uid == request.auth.uid
+        ) ||
+        isManager()
+      );
+      allow write: if isManager();
+    }
+
+    // Leave Management
+    match /student_leaves/{id} {
+      allow read: if isSignedIn() && (
+        resource.data.uid == request.auth.uid || 
+        isManager() || 
+        isTeacher()
+      );
+      allow create: if isSignedIn() && getUserRole() == 'STUDENT';
+      allow update, delete: if isManager();
+    }
+
+    // Global Catch-all (Default to Admin only for safety)
+    match /{document=**} {
+      allow read, write: if isAdmin();
+    }
+  }
+}

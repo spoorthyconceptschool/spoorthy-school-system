@@ -1,9 +1,21 @@
 import { NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase-admin";
-import { Timestamp } from "firebase-admin/firestore";
+import { getAdminAuth, adminDb, Timestamp } from "@/lib/firebase-admin";
 
 export async function POST(req: Request) {
     try {
+        const auth = getAdminAuth();
+        if (!auth) return NextResponse.json({ error: "Auth service not initialized" }, { status: 500 });
+
+        const authHeader = req.headers.get("Authorization");
+        if (!authHeader?.startsWith("Bearer ")) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+
+        const token = authHeader.split("Bearer ")[1];
+        try {
+            await auth.verifyIdToken(token);
+        } catch (e) {
+            return NextResponse.json({ error: "Invalid Token" }, { status: 401 });
+        }
+
         const body = await req.json();
         const { roleId, roleName, roleCode, name, mobile, address, baseSalary, initialAdjustment } = body; // roleCode e.g. "DRV"
 

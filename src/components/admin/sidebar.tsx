@@ -147,11 +147,20 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
                         animate={{ opacity: 1 }}
                         className="flex items-center gap-3 select-none overflow-hidden"
                     >
-                        <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl bg-white flex items-center justify-center p-1.5 border border-white/20 shadow-lg">
+                        <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl bg-white flex items-center justify-center p-1.5 border border-white/20 shadow-lg relative overflow-hidden">
                             {branding.schoolLogo ? (
-                                <img src={branding.schoolLogo} alt="Logo" className="w-full h-full object-contain" />
-                            ) : (
-                                <div className="w-full h-full bg-[#64FFDA]/10 flex items-center justify-center text-[#64FFDA] font-bold font-mono text-xl">S</div>
+                                <img
+                                    src={branding.schoolLogo}
+                                    alt="Logo"
+                                    className="w-full h-full object-contain"
+                                    onError={(e) => {
+                                        (e.currentTarget as HTMLImageElement).parentElement?.classList.add('broken-image');
+                                        e.currentTarget.style.display = 'none';
+                                    }}
+                                />
+                            ) : null}
+                            {(!branding.schoolLogo || typeof window !== 'undefined' && document.querySelector('.broken-image')) && (
+                                <div className="absolute inset-0 w-full h-full bg-[#64FFDA]/10 flex items-center justify-center text-[#64FFDA] font-bold font-mono text-xl">S</div>
                             )}
                         </div>
                         <div className="flex flex-col min-w-0">

@@ -6,6 +6,8 @@ import { AuthProvider } from "@/context/AuthContext";
 import { MasterDataProvider } from "@/context/MasterDataContext";
 import { Toaster } from "@/components/ui/toaster";
 import { NotificationManager } from "@/components/notification-manager";
+import { FCMTokenManager } from "@/components/fcm-token-manager";
+import { InstallPrompt } from "@/components/install-prompt";
 
 const inter = Inter({
   subsets: ['latin'],
@@ -23,6 +25,25 @@ const outfit = Outfit({
 export const metadata: Metadata = {
   title: 'Spoorthy Concept School',
   description: 'A premium educational institution.',
+  manifest: '/manifest.webmanifest',
+  appleWebApp: {
+    capable: true,
+    statusBarStyle: 'default',
+    title: 'Spoorthy School',
+  },
+  icons: {
+    icon: 'https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Flogo.png?alt=media',
+    apple: 'https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Flogo.png?alt=media',
+  }
+};
+
+export const viewport = {
+  themeColor: '#0A192F',
+  width: 'device-width',
+  initialScale: 1,
+  maximumScale: 1,
+  userScalable: false,
+  viewportFit: 'cover',
 };
 
 export default function RootLayout({
@@ -37,6 +58,8 @@ export default function RootLayout({
           <MasterDataProvider>
             {children}
             <NotificationManager />
+            <FCMTokenManager />
+            <InstallPrompt />
           </MasterDataProvider>
           <Toaster />
         </AuthProvider>

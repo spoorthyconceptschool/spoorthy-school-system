@@ -234,16 +234,7 @@ export default function TeacherProfilePage() {
                                         </div>
                                     </div>
                                 )}
-                                {Number(profile.salary) > 0 && (
-                                    <div className="space-y-1">
-                                        <label className="text-xs text-muted-foreground uppercase tracking-wider">
-                                            Monthly Salary
-                                        </label>
-                                        <div className="font-medium text-base text-white">
-                                            ₹{Number(profile.salary).toLocaleString("en-IN")}
-                                        </div>
-                                    </div>
-                                )}
+
                             </div>
                         </CardContent>
                     </Card>

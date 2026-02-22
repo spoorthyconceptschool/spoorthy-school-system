@@ -78,20 +78,26 @@ export function VillagesManager() {
 
     const toggleStatus = async (v: any) => {
         try {
-            await update(ref(rtdb, `master/villages/${v.id}`), {
-                active: !v.active
-            });
-        } catch (e) { console.error(e); }
+            // Optimistic update via RTDB
+            const villageRef = ref(rtdb, `master/villages/${v.id}`);
+            await update(villageRef, { active: !v.active });
+        } catch (e) {
+            console.error(e);
+            alert("Failed to update status");
+        }
     };
 
     const columns = [
         { key: "name", header: "Village Name", render: (v: any) => <span className="font-bold">{v.name}</span> },
-        { key: "code", header: "Code", render: (v: any) => <span className="font-mono text-xs">{v.code}</span> },
+        { key: "code", header: "Code", render: (v: any) => <span className="font-mono text-xs opacity-50">{v.code}</span> },
         {
             key: "active", header: "Status", render: (v: any) => (
-                <span className={`px-2 py-0.5 rounded text-xs ${v.active ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                <button
+                    onClick={() => toggleStatus(v)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider transition-all hover:scale-105 ${v.active ? 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20' : 'bg-red-500/10 text-red-500 hover:bg-red-500/20'}`}
+                >
                     {v.active ? 'Active' : 'Inactive'}
-                </span>
+                </button>
             )
         },
     ];
@@ -104,7 +110,7 @@ export function VillagesManager() {
                 </p>
                 <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) { setEditingId(null); setFormData({ name: "", code: "" }); } }}>
                     <DialogTrigger asChild>
-                        <Button className="w-full sm:w-auto bg-accent text-accent-foreground"><Plus size={16} className="mr-2" /> Add Village</Button>
+                        <Button className="bg-accent text-accent-foreground font-bold"><Plus size={16} className="mr-2" /> Add Village</Button>
                     </DialogTrigger>
                     <DialogContent className="bg-black/95 border-white/10 text-white">
                         <DialogHeader><DialogTitle>{editingId ? "Edit Village" : "Add Village"}</DialogTitle></DialogHeader>

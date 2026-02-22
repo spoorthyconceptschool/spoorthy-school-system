@@ -32,7 +32,7 @@ export const DatePickerInput = React.forwardRef<HTMLInputElement, DatePickerInpu
                 <input
                     type="date"
                     ref={inputRef}
-                    className="flex-1 w-full bg-transparent border-0 px-4 text-sm text-white placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-50 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden cursor-pointer h-full"
+                    className="flex-1 w-full bg-transparent border-0 px-4 text-sm text-white placeholder:text-muted-foreground focus:outline-none disabled:cursor-not-allowed disabled:opacity-90 [&::-webkit-calendar-picker-indicator]:hidden [&::-webkit-inner-spin-button]:hidden cursor-pointer h-full"
                     onClick={openPicker}
                     {...props}
                 />

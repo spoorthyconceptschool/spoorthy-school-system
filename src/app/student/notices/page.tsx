@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent } from "@/components/ui/card";
-import { collection, query, where, getDocs, orderBy, onSnapshot } from "firebase/firestore";
+import { doc, collection, query, where, getDocs, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 export default function StudentNoticesPage() {
@@ -13,22 +13,26 @@ export default function StudentNoticesPage() {
     const [useFallback, setUseFallback] = useState(false);
 
     useEffect(() => {
-        if (!user?.uid) return;
+        if (!user?.email) return;
 
-        const fetchProfile = async () => {
-            try {
-                const sRef = collection(db, "students");
-                const qProfile = query(sRef, where("uid", "==", user.uid));
-                const pSnap = await getDocs(qProfile);
-                if (!pSnap.empty) {
-                    setClassId(pSnap.docs[0].data().classId || "NONE");
-                }
-            } catch (e) {
-                console.error("Error fetching student profile:", e);
+        const schoolIdFromEmail = user.email.split('@')[0].toUpperCase();
+
+        // 1. Listen for Profile (Dual Strategy)
+        const unsubDoc = onSnapshot(doc(db, "students", schoolIdFromEmail), (pSnap) => {
+            if (pSnap.exists()) {
+                setClassId(pSnap.data().classId || "NONE");
+            } else if (user.uid) {
+                const q = query(collection(db, "students"), where("uid", "==", user.uid));
+                const unsubQuery = onSnapshot(q, (qSnap) => {
+                    if (!qSnap.empty) setClassId(qSnap.docs[0].data().classId || "NONE");
+                });
+                return () => unsubQuery();
             }
-        };
+        }, (err) => {
+            console.error("Profile sync error:", err);
+        });
 
-        fetchProfile();
+        return () => unsubDoc();
     }, [user]);
 
     useEffect(() => {

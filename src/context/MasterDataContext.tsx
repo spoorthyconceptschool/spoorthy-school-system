@@ -106,10 +106,27 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
             setData(prev => ({ ...prev, ...newState }));
         };
 
-        onValue(dataRef, callback, (error) => {
-            console.warn("RTDB Permission/Error (master):", error.message);
-        });
-        return () => off(dataRef, "value", callback);
+        const errorCallback = (error: any) => {
+            console.error("RTDB Sync Error:", error);
+            setData(prev => ({ ...prev, loading: false }));
+        };
+
+        onValue(dataRef, callback, errorCallback);
+
+        // Debug: Log the RTDB instance
+        if (typeof window !== 'undefined') {
+            console.log("[MasterData] Connecting to RTDB...", (rtdb as any)._repoInternal?.repoInfo_?.host);
+        }
+
+        // Safety timeout to prevent infinite loading
+        const timer = setTimeout(() => {
+            setData(prev => ({ ...prev, loading: false }));
+        }, 1500); // Fast fallback
+
+        return () => {
+            off(dataRef, "value", callback);
+            clearTimeout(timer);
+        };
     }, []);
 
     // 2. Firestore Sync for Academic Years

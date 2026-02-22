@@ -310,7 +310,7 @@ export default function TimetableManagePage() {
                     <h1 className="text-2xl md:text-5xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic leading-tight">
                         Timetable Manager
                     </h1>
-                    <p className="text-muted-foreground text-[10px] md:text-sm tracking-tight uppercase font-black opacity-50">
+                    <p className="text-muted-foreground text-[10px] md:text-sm tracking-tight uppercase font-black opacity-100">
                         Design and publish <span className="text-accent">academic schedules</span>
                     </p>
                 </div>
@@ -491,7 +491,7 @@ export default function TimetableManagePage() {
                                                 <tr key={day} className="border-b border-white/5 hover:bg-[#64FFDA]/5 group transition-colors">
                                                     <td className="p-2 md:p-4 bg-white/5">
                                                         <div className="text-[10px] md:text-xs font-black text-white italic">{day.substring(0, 3)}</div>
-                                                        <div className="text-[7px] md:text-[9px] text-muted-foreground font-mono opacity-50">{targetDate.toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}</div>
+                                                        <div className="text-[7px] md:text-[9px] text-muted-foreground font-mono opacity-100">{targetDate.toLocaleDateString(undefined, { day: '2-digit', month: 'short' })}</div>
                                                     </td>
                                                     {isHoliday ? (
                                                         <td colSpan={dayTemplate.length} className="p-2 md:p-4 bg-red-500/5 text-center border-l border-red-500/10">
@@ -564,3 +564,4 @@ export default function TimetableManagePage() {
         </div>
     );
 }
+

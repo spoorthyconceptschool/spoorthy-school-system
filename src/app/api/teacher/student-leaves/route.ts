@@ -77,6 +77,27 @@ export async function POST(req: NextRequest) {
             reviewedAt: new Date()
         });
 
+        // Send Notification to Student
+        if (leaveData?.uid) {
+            const notifRef = adminDb.collection("notifications").doc();
+            const statusText = action === "APPROVED" ? "Approved" : "Rejected";
+            await notifRef.set({
+                userId: leaveData.uid,
+                title: `Leave request ${statusText}`,
+                message: `Your leave request for ${leaveData.fromDate} to ${leaveData.toDate} has been ${statusText.toLowerCase()}.`,
+                type: action === "APPROVED" ? "SUCCESS" : "ERROR",
+                status: "UNREAD",
+                target: "student",
+                createdAt: new Date(),
+                metadata: {
+                    leaveId: leaveId,
+                    status: action,
+                    fromDate: leaveData.fromDate,
+                    toDate: leaveData.toDate
+                }
+            });
+        }
+
         // Auto-mark attendance as ABSENT if Approved
         if (action === "APPROVED" && leaveData) {
             const { fromDate, toDate, classId, sectionId, studentId } = leaveData;

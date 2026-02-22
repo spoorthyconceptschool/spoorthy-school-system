@@ -81,7 +81,8 @@ export async function POST(req: NextRequest) {
                 const PROTECTED_COLLECTIONS = [
                     'settings', 'users', 'config',
                     'master_classes', 'master_sections', 'master_villages',
-                    'master_subjects', 'master_class_sections', 'groups'
+                    'master_subjects', 'master_class_sections', 'groups',
+                    'site_content', 'landing_page', 'cms_content'
                 ];
 
                 collectionsToDelete = allCollections
@@ -171,12 +172,12 @@ export async function POST(req: NextRequest) {
                 tasks.push(adminDb.collection("counters").doc("staff").set({ current: 0 }));
             }
 
-            // F. STORAGE (Best effort)
+            // F. STORAGE (Best effort - NEVER delete 'siteMedia/' as it contains landing page images)
             if (adminStorage) {
                 if (purgeType === 'FULL_SYSTEM') {
                     tasks.push(adminStorage.bucket().deleteFiles({ prefix: 'users/' }).catch((e: any) => console.warn("Storage Wipe Error:", e)));
                 }
-                // tasks.push(adminStorage.bucket().deleteFiles({ prefix: 'siteMedia/' }).catch((e: any) => console.warn("Storage Wipe Error:", e)));
+                // PROTECTED: siteMedia/ - Do not add delete task for this prefix
                 tasks.push(adminStorage.bucket().deleteFiles({ prefix: 'homework/' }).catch((e: any) => console.warn("Storage Wipe Error:", e)));
                 tasks.push(adminStorage.bucket().deleteFiles({ prefix: 'notices/' }).catch((e: any) => console.warn("Storage Wipe Error:", e)));
             }

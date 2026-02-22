@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import { Timestamp } from "firebase-admin/firestore";
+import { adminAuth, adminDb, Timestamp } from "@/lib/firebase-admin";
 
 export async function POST(req: Request) {
     try {
@@ -140,7 +139,21 @@ export async function POST(req: Request) {
             });
 
             return { teacherId, uid };
-        });
+        }); // End Transaction
+
+        // Notification (After Transaction)
+        try {
+            const { sendServerNotification } = await import("@/lib/server-notifications");
+            await sendServerNotification({
+                target: "ALL_ADMINS",
+                title: "New Teacher Onboarded",
+                message: `${name} has been added as a Teacher. ID: ${result.teacherId}`,
+                type: "INFO",
+                actionBy: "SYSTEM"
+            });
+        } catch (noteError) {
+            console.error("Failed to send notification:", noteError);
+        }
 
         return NextResponse.json({ success: true, ...result });
 

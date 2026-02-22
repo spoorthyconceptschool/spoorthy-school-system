@@ -284,14 +284,47 @@ export function ReportCardGenerator({ exam, classId }: ReportCardGeneratorProps)
             const result = results[student.id];
             if (!result) return '';
 
-            const subEntries = Object.entries(result.subjects || {});
+            // Filter subjects enabled in the exam timetable for this class
+            const classTimetable = exam.timetables?.[classId];
+
+            // Get marks for all subjects
+            const allSubEntries = Object.entries(result.subjects || {});
+
+            let subEntries;
+            if (classTimetable) {
+                // If timetable exists, show ALL enabled subjects from timetable
+                // Even if the student has no marks for them yet (display as blank/absent)
+                const enabledSubjectIds = Object.keys(classTimetable).filter(sid => classTimetable[sid]?.enabled || true);
+
+                subEntries = enabledSubjectIds.map(subId => {
+                    const existingEntry = allSubEntries.find(([id]) => id === subId);
+                    if (existingEntry) return existingEntry;
+
+                    // Return placeholder for missing subject
+                    return [subId, { obtained: '-', maxMarks: '-', remarks: 'Not Updated' }];
+                });
+            } else {
+                // No timetable configured for this class -> Show all subjects with marks
+                subEntries = allSubEntries;
+            }
+
             let totalOb = 0;
             let totalMax = 0;
             subEntries.forEach(([_, data]: any) => {
                 const ob = parseFloat(data.obtained);
                 const mx = parseFloat(data.maxMarks);
-                if (!isNaN(ob)) totalOb += ob;
-                if (!isNaN(mx)) totalMax += mx;
+
+                // Only count subjects where marks are valid numbers
+                if (!isNaN(ob)) {
+                    totalOb += ob;
+                    // Only add to max marks if Obtained is present, otherwise it penalizes for un-entered marks
+                    // OR: adjust logic as needed. Standard: Add max marks if the subject is listed.
+                    if (!isNaN(mx)) {
+                        totalMax += mx;
+                    } else {
+                        totalMax += 100; // Fallback default
+                    }
+                }
             });
             const percentage = totalMax > 0 ? (totalOb / totalMax) * 100 : 0;
             const gradeMap = percentage >= 90 ? 'A+' : percentage >= 80 ? 'A' : percentage >= 70 ? 'B+' : percentage >= 60 ? 'B' : percentage >= 50 ? 'C' : percentage >= 35 ? 'D' : 'E (Fail)';
@@ -410,8 +443,8 @@ export function ReportCardGenerator({ exam, classId }: ReportCardGeneratorProps)
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline" className="gap-2 border-emerald-500/20 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20">
-                    <FileText className="w-4 h-4" /> Report Cards
+                <Button variant="outline" className="gap-2 border-emerald-500/20 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 h-11 px-6">
+                    <Printer className="w-4 h-4" /> Bulk Print Results
                 </Button>
             </DialogTrigger>
             <DialogContent className="bg-black/95 border-white/10 text-white w-[95vw] sm:max-w-md">

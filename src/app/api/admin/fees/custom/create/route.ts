@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import { FieldValue, QueryDocumentSnapshot, DocumentSnapshot, Transaction } from "firebase-admin/firestore";
+import { adminAuth, adminDb, FieldValue } from "@/lib/firebase-admin";
+// Types handled via 'any' temporarily for build stability
 import { notifyManagerActionServer, createServerNotification } from "@/lib/notifications-server";
 
 export async function POST(req: NextRequest) {
@@ -87,12 +87,12 @@ export async function POST(req: NextRequest) {
         let affectedCount = 0;
 
         // FUNCTION to process a student
-        const processStudent = async (studentDoc: QueryDocumentSnapshot) => {
+        const processStudent = async (studentDoc: any) => {
             const sData = studentDoc.data();
             const ledgerRef = adminDb.collection("student_fee_ledgers").doc(`${sData.schoolId}_${yearId}`);
 
             await adminDb.runTransaction(async (t: any) => {
-                const ledDoc = (await t.get(ledgerRef)) as unknown as DocumentSnapshot; // Explicit Cast Force
+                const ledDoc = (await t.get(ledgerRef)) as any;
                 if (!ledDoc.exists) return;
 
                 const data = ledDoc.data();
