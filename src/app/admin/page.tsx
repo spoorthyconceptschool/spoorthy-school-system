@@ -19,15 +19,42 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AddStudentModal } from "@/components/admin/add-student-modal";
 
+interface Application {
+    id: string;
+    studentName: string;
+    grade: string;
+    status: string;
+    submittedAt?: { seconds: number };
+}
+
+interface LeaveRequest {
+    id: string;
+    teacherName: string;
+    type: string;
+    fromDate: string;
+    status: string;
+    createdAt?: { seconds: number };
+}
+
+interface DashboardStats {
+    totalStudents: number;
+    pendingFees: number;
+    leaveRequests: number;
+    totalLeaves: number;
+    todayCollection: number;
+    totalStaff: number;
+    staffPresent: number;
+}
+
 export default function AdminDashboard() {
     const { user } = useAuth();
     const router = useRouter();
     const [role, setRole] = useState<string>("");
 
     // Admin State
-    const [applications, setApplications] = useState<any[]>([]);
-    const [pendingLeavesList, setPendingLeavesList] = useState<any[]>([]);
-    const [stats, setStats] = useState({
+    const [applications, setApplications] = useState<Application[]>([]);
+    const [pendingLeavesList, setPendingLeavesList] = useState<LeaveRequest[]>([]);
+    const [stats, setStats] = useState<DashboardStats>({
         totalStudents: 0,
         pendingFees: 0,
         leaveRequests: 0,
@@ -50,7 +77,7 @@ export default function AdminDashboard() {
 
         // Live stats for dashboard
         const unsubStudents = onSnapshot(collection(db, "students"), (snap) => {
-            setStats(prev => ({ ...prev, totalStudents: snap.size }));
+            setStats((prev: DashboardStats) => ({ ...prev, totalStudents: snap.size }));
             setLoading(false);
         });
 
@@ -65,26 +92,26 @@ export default function AdminDashboard() {
         );
         const unsubTodayPayments = onSnapshot(qTodayPayments, (snap) => {
             const total = snap.docs.reduce((acc, d) => acc + (d.data().amount || 0), 0);
-            setStats(prev => ({ ...prev, todayCollection: total }));
+            setStats((prev: DashboardStats) => ({ ...prev, todayCollection: total }));
         });
 
         // Financials - Aggregate Ledger Balance
         const unsubLedgers = onSnapshot(collection(db, "ledgers"), (snap) => {
             const total = snap.docs.reduce((acc, d) => acc + (Number(d.data().balance) || 0), 0);
-            setStats(prev => ({ ...prev, pendingFees: total }));
+            setStats((prev: DashboardStats) => ({ ...prev, pendingFees: total }));
         });
 
         // Faculty Presence
         const unsubTeachers = onSnapshot(collection(db, "teachers"), (snap) => {
-            setStats(prev => ({ ...prev, totalStaff: snap.size }));
+            setStats((prev: DashboardStats) => ({ ...prev, totalStaff: snap.size }));
         });
 
         const qLeaves = query(collection(db, "leave_requests"), where("status", "==", "PENDING"));
         const unsubLeaves = onSnapshot(qLeaves, (snap) => {
-            setStats(prev => ({ ...prev, leaveRequests: snap.size }));
+            setStats((prev: DashboardStats) => ({ ...prev, leaveRequests: snap.size }));
             // Sort client-side to avoid Index requirement
-            const leaves = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            leaves.sort((a: any, b: any) => {
+            const leaves = snap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveRequest));
+            leaves.sort((a, b) => {
                 const timeA = a.createdAt?.seconds || 0;
                 const timeB = b.createdAt?.seconds || 0;
                 return timeB - timeA;
@@ -93,7 +120,7 @@ export default function AdminDashboard() {
         });
 
         const unsubTotalLeaves = onSnapshot(collection(db, "leave_requests"), (snap) => {
-            setStats(prev => ({ ...prev, totalLeaves: snap.size }));
+            setStats((prev: DashboardStats) => ({ ...prev, totalLeaves: snap.size }));
         });
 
         return () => {
@@ -113,7 +140,7 @@ export default function AdminDashboard() {
 
         const appQ = query(collection(db, "applications"), orderBy("submittedAt", "desc"), limit(10));
         const unsubscribe = onSnapshot(appQ, (snapshot) => {
-            setApplications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            setApplications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Application)));
         });
 
         return () => unsubscribe();
@@ -124,13 +151,13 @@ export default function AdminDashboard() {
         {
             key: "studentName",
             header: "Student Name",
-            render: (app: any) => <span className="font-bold text-white italic">{app.studentName}</span>
+            render: (app: Application) => <span className="font-bold text-white italic">{app.studentName}</span>
         },
         { key: "grade", header: "Grade" },
         {
             key: "status",
             header: "Status",
-            render: (app: any) => (
+            render: (app: Application) => (
                 <Badge variant="outline" className="capitalize border-accent/20 text-accent bg-accent/5">
                     {app.status}
                 </Badge>
@@ -139,7 +166,7 @@ export default function AdminDashboard() {
         {
             key: "submittedAt",
             header: "Date",
-            render: (app: any) => (
+            render: (app: Application) => (
                 <span className="text-xs text-white/40 font-mono">
                     {app.submittedAt?.seconds ? new Date(app.submittedAt.seconds * 1000).toLocaleDateString() : 'Pending'}
                 </span>
@@ -211,7 +238,7 @@ export default function AdminDashboard() {
                                 </h2>
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {[
-                                        { label: "Faculty Info", desc: "View staff profiles & leaves", href: "/admin/faculty", icon: Users },
+                                        { label: "Staff Members", desc: "View staff profiles & leaves", href: "/admin/faculty", icon: Users },
                                         { label: "Class Operations", desc: "Manage sections and subjects", href: "/admin/master-data/classes-sections", icon: Layers },
                                         { label: "Timetable", desc: "Manage schedules & coverage", href: "/admin/timetable/manage", icon: Clock },
                                         { label: "Exam Logistics", desc: "Hall tickets and scheduling", href: "/admin/exams", icon: ClipboardList }
@@ -268,7 +295,7 @@ export default function AdminDashboard() {
                                     Pending Absences
                                 </h3>
                                 <div className="space-y-2">
-                                    {pendingLeavesList.slice(0, 3).map((leave) => (
+                                    {pendingLeavesList.slice(0, 3).map((leave: LeaveRequest) => (
                                         <div key={leave.id} className="p-3 rounded-xl bg-black/40 border border-white/5 flex items-center gap-3">
                                             <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-500 font-bold text-xs capitalize">
                                                 {leave.teacherName?.charAt(0)}
@@ -370,7 +397,7 @@ export default function AdminDashboard() {
                                 <Link href="/admin/faculty?tab=leaves" className="text-[9px] text-muted-foreground hover:text-white underline uppercase font-black tracking-widest">Process</Link>
                             </div>
                             <div className="grid gap-2">
-                                {pendingLeavesList.map((leave) => (
+                                {pendingLeavesList.map((leave: LeaveRequest) => (
                                     <div key={leave.id} onClick={() => router.push("/admin/faculty?tab=leaves")} className="flex items-center justify-between py-2 px-3 rounded-xl bg-black/40 border border-white/5 hover:border-rose-500/20 transition-all group cursor-pointer">
                                         <div className="flex flex-col">
                                             <span className="text-[10px] md:text-xs font-bold text-white group-hover:text-rose-400 transition-colors uppercase tracking-tight italic">{leave.teacherName}</span>
