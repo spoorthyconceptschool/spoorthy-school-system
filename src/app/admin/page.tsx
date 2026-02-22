@@ -239,7 +239,7 @@ export default function AdminDashboard() {
                                 <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                     {[
                                         { label: "Staff Members", desc: "View staff profiles & leaves", href: "/admin/faculty", icon: Users },
-                                        { label: "Class Operations", desc: "Manage sections and subjects", href: "/admin/master-data/classes-sections", icon: Layers },
+                                        { label: "Master Data", desc: "Manage classes, subjects & villages", href: "/admin/master-data", icon: Database },
                                         { label: "Timetable", desc: "Manage schedules & coverage", href: "/admin/timetable/manage", icon: Clock },
                                         { label: "Exam Logistics", desc: "Hall tickets and scheduling", href: "/admin/exams", icon: ClipboardList }
                                     ].map((action, i) => (

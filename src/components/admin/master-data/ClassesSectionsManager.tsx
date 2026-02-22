@@ -16,7 +16,7 @@ import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
 
-export default function ClassesSectionsPage() {
+export function ClassesSectionsManager() {
     const { classes, sections, classSections, subjects, classSubjects, subjectTeachers, branding, loading } = useMasterData();
     const [activeTab, setActiveTab] = useState("classes");
 
@@ -182,12 +182,14 @@ export default function ClassesSectionsPage() {
         setIsReportOpen(false);
     };
 
-    if (loading) return <div className="p-10 text-center animate-pulse">Loading Academy Data...</div>;
+    if (loading) return <div className="p-10 text-center animate-pulse text-white">Loading Academy Data...</div>;
 
     return (
         <div className="space-y-4 md:space-y-6 max-w-none p-0 animate-in fade-in">
             <div className="flex flex-col md:flex-row md:justify-between md:items-center gap-4 md:gap-0 px-1">
-                <h1 className="text-xl md:text-3xl font-display font-bold">Academic Structure</h1>
+                <p className="text-muted-foreground text-[10px] md:text-sm tracking-tight uppercase font-black opacity-50">
+                    Academic Structure & Staffing
+                </p>
                 <div className="flex gap-2">
                     <Dialog open={isReportOpen} onOpenChange={setIsReportOpen}>
                         <DialogTrigger asChild>
@@ -282,7 +284,6 @@ export default function ClassesSectionsPage() {
                     <TabsTrigger value="combinations">Combinations</TabsTrigger>
                 </TabsList>
 
-                {/* CLASSES TAB */}
                 <TabsContent value="classes" className="space-y-4 mt-4">
                     <Card className="bg-black/20 border-white/10 p-4">
                         <div className="flex gap-2">
@@ -299,7 +300,6 @@ export default function ClassesSectionsPage() {
                                     <span className="text-[10px] text-muted-foreground bg-white/5 px-2 py-0.5 rounded border border-white/10 uppercase tracking-widest">Order: {c.order}</span>
                                 </div>
                                 <div className="flex gap-2 w-full md:w-auto justify-end">
-                                    {/* SUBJECTS DIALOG */}
                                     <Dialog>
                                         <DialogTrigger asChild>
                                             <Button variant="outline" size="sm" className="gap-2 border-indigo-500/20 bg-indigo-500/10 text-indigo-400 hover:bg-indigo-500/20">
@@ -327,7 +327,6 @@ export default function ClassesSectionsPage() {
                                         </DialogContent>
                                     </Dialog>
 
-                                    {/* STAFFING DIALOG */}
                                     <Dialog>
                                         <DialogTrigger asChild>
                                             <Button variant="outline" size="sm" className="gap-2 border-emerald-500/20 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20">
@@ -345,7 +344,6 @@ export default function ClassesSectionsPage() {
                                                                 <span className="font-bold text-emerald-400 flex items-center gap-2"><Users size={16} /> Section {sections[cs.sectionId]?.name}</span>
                                                             </div>
 
-                                                            {/* Class Teacher */}
                                                             <div className="flex items-center justify-between gap-4 py-2 border-b border-white/5">
                                                                 <span className="text-sm font-bold text-white">Class Teacher</span>
                                                                 <select
@@ -358,7 +356,6 @@ export default function ClassesSectionsPage() {
                                                                 </select>
                                                             </div>
 
-                                                            {/* Subject Teachers */}
                                                             <div className="space-y-2">
                                                                 <span className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">Subject Teachers</span>
                                                                 {assignedSubjects.map(sid => (
@@ -389,7 +386,6 @@ export default function ClassesSectionsPage() {
                     </div>
                 </TabsContent>
 
-                {/* SECTIONS TAB */}
                 <TabsContent value="sections" className="space-y-4 mt-4">
                     <Card className="bg-black/20 border-white/10 p-4">
                         <div className="flex gap-2">
@@ -407,10 +403,8 @@ export default function ClassesSectionsPage() {
                     </div>
                 </TabsContent>
 
-                {/* COMBINATIONS TAB */}
                 <TabsContent value="combinations" className="mt-4 space-y-4">
-                    <Card className="bg-black/20 border-white/10 p-4 md:p-6 overflow-hidden">
-                        {/* Mobile Combinations View */}
+                    <Card className="bg-black/20 border-white/10 p-4 md:p-6 overflow-hidden text-white">
                         <div className="grid grid-cols-1 gap-3 md:hidden">
                             {Object.values(classes).sort((a: any, b: any) => a.order - b.order).map((c: any) => (
                                 <div key={c.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-4">
@@ -443,7 +437,6 @@ export default function ClassesSectionsPage() {
                             ))}
                         </div>
 
-                        {/* Desktop Combinations View */}
                         <div className="hidden md:block overflow-x-auto custom-scrollbar">
                             <table className="w-full border-collapse min-w-[700px]">
                                 <thead>
@@ -479,6 +472,6 @@ export default function ClassesSectionsPage() {
                     </Card>
                 </TabsContent>
             </Tabs>
-        </div >
+        </div>
     );
 }

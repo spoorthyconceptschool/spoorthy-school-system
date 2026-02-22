@@ -76,10 +76,7 @@ const STATIC_FEATURES: SearchIndexItem[] = [
     { id: "nav-attendance", entityId: "nav-attendance", type: "action", title: "Attendance Tracker", subtitle: "Student & Staff Attendance", url: "/admin/attendance", keywords: ["attendance", "present", "absent", "roll call", "register", "daily"] },
 
     // Master Data / Config
-    { id: "nav-master", entityId: "nav-master", type: "action", title: "Master Data Center", subtitle: "Configure School Data", url: "/admin/master-data", keywords: ["master", "data", "config", "setup"] },
-    { id: "nav-classes", entityId: "nav-classes", type: "action", title: "Classes & Sections", subtitle: "Manage Grade Levels", url: "/admin/master-data/classes-sections", keywords: ["class", "grade", "standard", "section", "division", "stream"] },
-    { id: "nav-subjects", entityId: "nav-subjects", type: "action", title: "Subjects & Curriculum", subtitle: "Manage Subjects", url: "/admin/master-data/subjects", keywords: ["subject", "book", "course", "syllabus", "topic"] },
-    { id: "nav-villages", entityId: "nav-villages", type: "action", title: "Villages & Routes", subtitle: "Manage Transport Locations", url: "/admin/master-data/villages", keywords: ["village", "location", "place", "stop", "area", "address"] },
+    { id: "nav-master", entityId: "nav-master", type: "action", title: "Master Data Center", subtitle: "Configure Classes, Subjects & Villages", url: "/admin/master-data", keywords: ["master", "data", "config", "setup", "classes", "subjects", "villages", "sections", "curriculum", "transport"] },
 
     // Website CMS
     { id: "nav-cms", entityId: "nav-cms", type: "action", title: "Website Manager", subtitle: "Edit School Website", url: "/admin/cms", keywords: ["cms", "website", "content", "news", "event", "gallery", "photo", "banner", "public"] },

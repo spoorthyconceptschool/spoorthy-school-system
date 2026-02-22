@@ -10,7 +10,7 @@ import { useMasterData } from "@/context/MasterDataContext";
 import { rtdb } from "@/lib/firebase";
 import { ref, update, push, set, remove } from "firebase/database";
 
-export default function SubjectsPage() {
+export function SubjectsManager() {
     const { subjects, loading } = useMasterData();
     const subjectList = Object.values(subjects || {});
 
@@ -23,7 +23,6 @@ export default function SubjectsPage() {
         e.preventDefault();
         setSubmitting(true);
         try {
-            // Create a promise that rejects after 5 seconds
             const timeoutPromise = new Promise((_, reject) =>
                 setTimeout(() => reject(new Error("Database operation timed out.")), 5000)
             );
@@ -74,17 +73,27 @@ export default function SubjectsPage() {
     return (
         <div className="space-y-6 max-w-none p-0 animate-in fade-in">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-0">
-                <h1 className="text-3xl font-display font-bold">Subjects</h1>
+                <p className="text-muted-foreground text-[10px] md:text-sm tracking-tight uppercase font-black opacity-50">
+                    Manage Curriculum Subjects
+                </p>
                 <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) { setEditingId(null); setFormData({ name: "", code: "" }); } }}>
                     <DialogTrigger asChild>
                         <Button className="w-full sm:w-auto bg-accent text-accent-foreground"><Plus size={16} className="mr-2" /> Add Subject</Button>
                     </DialogTrigger>
-                    <DialogContent>
+                    <DialogContent className="bg-black/95 border-white/10 text-white">
                         <DialogHeader><DialogTitle>{editingId ? "Edit Subject" : "Add Subject"}</DialogTitle></DialogHeader>
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div><label>Subject Name</label><Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} /></div>
-                            <div><label>Short Code</label><Input required value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} maxLength={4} placeholder="e.g. MATH" /></div>
-                            <Button type="submit" disabled={submitting} className="w-full">{submitting ? <Loader2 className="animate-spin" /> : "Save"}</Button>
+                        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Subject Name</label>
+                                <Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="bg-white/5 border-white/10" />
+                            </div>
+                            <div className="space-y-2">
+                                <label className="text-xs font-bold uppercase tracking-widest text-muted-foreground">Short Code</label>
+                                <Input required value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} maxLength={4} placeholder="e.g. MATH" className="bg-white/5 border-white/10" />
+                            </div>
+                            <Button type="submit" disabled={submitting} className="w-full bg-accent text-accent-foreground hover:opacity-90 transition-opacity">
+                                {submitting ? <Loader2 className="animate-spin" /> : "Save Changes"}
+                            </Button>
                         </form>
                     </DialogContent>
                 </Dialog>
@@ -95,10 +104,10 @@ export default function SubjectsPage() {
                 columns={columns}
                 isLoading={loading}
                 actions={(s) => (
-                    <>
-                        <Button size="sm" variant="ghost" onClick={() => handleEdit(s)}><Edit2 size={14} className="mr-2" /> Rename</Button>
-                        <Button size="sm" variant="ghost" className="text-red-500" onClick={() => handleDelete(s.id)}><Trash2 size={14} /></Button>
-                    </>
+                    <div className="flex gap-2">
+                        <Button size="sm" variant="ghost" onClick={() => handleEdit(s)} className="hover:bg-white/5"><Edit2 size={14} className="mr-2" /> Rename</Button>
+                        <Button size="sm" variant="ghost" className="text-red-500 hover:bg-red-500/10" onClick={() => handleDelete(s.id)}><Trash2 size={14} /></Button>
+                    </div>
                 )}
             />
         </div>
