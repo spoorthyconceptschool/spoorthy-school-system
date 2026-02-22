@@ -25,7 +25,8 @@ import {
     ShieldAlert,
     UserCheck,
     ClipboardCheck,
-    Trash2
+    Trash2,
+    MessageSquare
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -42,6 +43,7 @@ const NAV_ITEMS = [
     { type: "separator", label: "Entities" },
     { label: "Students", icon: GraduationCap, href: "/admin/students" },
     { label: "Staff & HR", icon: Users, href: "/admin/faculty" },
+    { label: "Staff Queries", icon: MessageSquare, href: "/admin/faculty/queries" },
     { label: "Groups", icon: Users, href: "/admin/groups" },
     { label: "Attendance", icon: UserCheck, href: "/admin/attendance" },
     { type: "separator", label: "Financials" },
