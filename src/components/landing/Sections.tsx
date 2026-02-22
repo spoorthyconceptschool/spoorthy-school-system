@@ -60,6 +60,8 @@ export function Facilities() {
                     setActiveIndex(list.length); // Start in the middle set
                 }
             }
+        }, (error: any) => {
+            console.warn("RTDB Permission (facilities):", error.message);
         });
         return () => unsub();
     }, []);
@@ -186,13 +188,17 @@ export function Facilities() {
                                         setActiveIndex(idx);
                                     }}
                                 >
-                                    <Image
-                                        src={item.image}
-                                        alt={item.title}
-                                        fill
-                                        className="object-cover"
-                                        priority={isFocused}
-                                    />
+                                    {item.image ? (
+                                        <Image
+                                            src={item.image}
+                                            alt={item.title || "Facility"}
+                                            fill
+                                            className="object-cover"
+                                            priority={isFocused}
+                                        />
+                                    ) : (
+                                        <div className="absolute inset-0 bg-[#0A192F]" />
+                                    )}
 
                                     <div className={cn(
                                         "absolute inset-0 bg-gradient-to-t from-[#0A192F] via-[#0A192F]/10 to-transparent transition-opacity duration-1000",
@@ -252,6 +258,8 @@ export function Leadership() {
     useEffect(() => {
         const unsub = onValue(ref(rtdb, 'siteContent/home/leadership'), (snap) => {
             if (snap.exists()) setLeaders((prev: any) => ({ ...prev, ...snap.val() }));
+        }, (error: any) => {
+            console.warn("RTDB Permission (leadership):", error.message);
         });
         return () => unsub();
     }, []);
@@ -387,6 +395,8 @@ export function GalleryPreview() {
     useEffect(() => {
         const unsub = onValue(ref(rtdb, 'siteContent/home/gallery'), (snap) => {
             if (snap.exists() && Array.isArray(snap.val())) setImages(snap.val());
+        }, (error: any) => {
+            console.warn("RTDB Permission (gallery):", error.message);
         });
         return () => unsub();
     }, []);

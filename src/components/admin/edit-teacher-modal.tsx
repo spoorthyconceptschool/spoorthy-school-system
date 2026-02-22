@@ -29,7 +29,7 @@ interface EditTeacherModalProps {
 }
 
 export function EditTeacherModal({ isOpen, onClose, teacher, onSuccess }: EditTeacherModalProps) {
-    const { subjects: masterSubjects } = useMasterData();
+    const { subjects: masterSubjects, classes: masterClasses, sections: masterSections } = useMasterData();
     const [subjects, setSubjects] = useState<any[]>([]);
 
     // Form
@@ -196,7 +196,7 @@ export function EditTeacherModal({ isOpen, onClose, teacher, onSuccess }: EditTe
                                     <SelectTrigger className="bg-white/5 border-white/10 text-xs"><SelectValue placeholder="Class" /></SelectTrigger>
                                     <SelectContent className="bg-black border-white/10 text-white">
                                         <SelectItem value="NONE">None</SelectItem>
-                                        {Object.values(useMasterData().classes).sort((a: any, b: any) => a.order - b.order).map((c: any) => (
+                                        {Object.values(masterClasses).sort((a: any, b: any) => a.order - b.order).map((c: any) => (
                                             <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                                         ))}
                                     </SelectContent>
@@ -204,7 +204,7 @@ export function EditTeacherModal({ isOpen, onClose, teacher, onSuccess }: EditTe
                                 <Select value={form.classTeacherSection} onValueChange={v => setForm({ ...form, classTeacherSection: v })}>
                                     <SelectTrigger className="bg-white/5 border-white/10 text-xs"><SelectValue placeholder="Section" /></SelectTrigger>
                                     <SelectContent className="bg-black border-white/10 text-white">
-                                        {Object.values(useMasterData().sections).map((s: any) => (
+                                        {Object.values(masterSections).map((s: any) => (
                                             <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
                                         ))}
                                     </SelectContent>

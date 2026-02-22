@@ -8,9 +8,10 @@ import { LeavesManager } from "@/components/admin/leaves-manager";
 import { CoverageManager } from "@/components/admin/coverage-manager";
 import { AddTeacherModal } from "@/components/admin/add-teacher-modal";
 import { AddStaffModal } from "@/components/admin/add-staff-modal";
-import { Users, Calendar, ShieldAlert, Loader2, Plus } from "lucide-react";
+import { Users, Calendar, ShieldAlert, Loader2, Plus, MessageSquare } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { StaffQueriesManager } from "@/components/admin/staff-queries-manager";
 
 function FacultyManagementContent() {
     const searchParams = useSearchParams();
@@ -32,21 +33,37 @@ function FacultyManagementContent() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2 md:px-0">
                 <div className="space-y-1">
                     <h1 className="text-2xl md:text-5xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic leading-tight">
-                        Faculty & HR
+                        Staff Section
                     </h1>
                     <p className="text-muted-foreground text-[10px] md:text-sm tracking-tight uppercase font-black opacity-50">
-                        Consolidated Management: <span className="text-accent">Directory • Leaves • Coverage</span>
+                        Consolidated Management: <span className="text-accent">Staff • Leaves • Coverage</span>
                     </p>
                 </div>
 
-                {activeTab === "directory" && (
+                <div className="flex items-center gap-2 md:gap-3">
                     <Button
-                        onClick={() => directoryTab === 'teachers' ? setShowTeacherModal(true) : setShowStaffModal(true)}
-                        className="h-10 md:h-12 bg-white text-black hover:bg-zinc-200 rounded-xl font-black uppercase tracking-tighter px-4 md:px-6 shadow-lg shadow-white/10 text-xs md:text-sm"
+                        onClick={() => setActiveTab("queries")}
+                        variant="outline"
+                        className={cn(
+                            "h-10 md:h-12 border-white/10 rounded-xl font-black uppercase tracking-tighter px-4 md:px-6 text-xs md:text-sm transition-all shadow-xl",
+                            activeTab === 'queries'
+                                ? "bg-accent text-black border-accent"
+                                : "bg-white/5 text-white hover:bg-white/10"
+                        )}
                     >
-                        <Plus className="w-3.5 h-3.5 md:w-4 md:h-4 mr-2 stroke-[3]" /> Add {directoryTab === 'teachers' ? 'Teacher' : 'Staff'}
+                        <MessageSquare className={cn("w-3.5 h-3.5 md:w-4 md:h-4 mr-2", activeTab === 'queries' ? "text-black" : "text-accent")} />
+                        Staff Queries
                     </Button>
-                )}
+
+                    {activeTab === "directory" && (
+                        <Button
+                            onClick={() => directoryTab === 'teachers' ? setShowTeacherModal(true) : setShowStaffModal(true)}
+                            className="h-10 md:h-12 bg-white text-black hover:bg-zinc-200 rounded-xl font-black uppercase tracking-tighter px-4 md:px-6 shadow-lg shadow-white/10 text-xs md:text-sm"
+                        >
+                            <Plus className="w-3.5 h-3.5 md:w-4 md:h-4 mr-2 stroke-[3]" /> Add {directoryTab === 'teachers' ? 'Teacher' : 'Staff'}
+                        </Button>
+                    )}
+                </div>
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
@@ -73,6 +90,13 @@ function FacultyManagementContent() {
                             <ShieldAlert size={14} className="md:w-4 md:h-4" />
                             <span>Coverage</span>
                         </TabsTrigger>
+                        <TabsTrigger
+                            value="queries"
+                            className="data-[state=active]:bg-white data-[state=active]:text-black rounded-xl py-2 md:py-3 font-bold transition-all text-[10px] md:text-sm flex flex-col md:flex-row items-center gap-1 md:gap-2"
+                        >
+                            <MessageSquare size={14} className="md:w-4 md:h-4" />
+                            <span>Queries</span>
+                        </TabsTrigger>
                     </TabsList>
                 </div>
 
@@ -90,6 +114,10 @@ function FacultyManagementContent() {
 
                     <TabsContent value="coverage" className="outline-none m-0 px-2 md:px-0">
                         <CoverageManager />
+                    </TabsContent>
+
+                    <TabsContent value="queries" className="outline-none m-0 px-2 md:px-0">
+                        <StaffQueriesManager />
                     </TabsContent>
                 </div>
             </Tabs>
