@@ -5,7 +5,7 @@ import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import {
     Lock,
@@ -32,6 +32,23 @@ export default function TeacherProfilePage() {
     const fetchProfile = async () => {
         if (!user?.uid) return;
         try {
+            // 1. Fetch user map to get their schoolId reliably
+            const userMetaRef = doc(db, "users", user.uid);
+            const userMetaSnap = await getDoc(userMetaRef);
+
+            if (userMetaSnap.exists() && userMetaSnap.data().schoolId) {
+                const schoolId = userMetaSnap.data().schoolId;
+                const teacherRef = doc(db, "teachers", schoolId);
+                const teacherSnap = await getDoc(teacherRef);
+
+                if (teacherSnap.exists()) {
+                    const data = teacherSnap.data();
+                    setProfile({ ...data, schoolId: data.schoolId || teacherSnap.id });
+                    return;
+                }
+            }
+
+            // 2. Fallback query if no user map exists
             const q = query(collection(db, "teachers"), where("uid", "==", user.uid));
             const snap = await getDocs(q);
             if (!snap.empty) {
@@ -39,6 +56,8 @@ export default function TeacherProfilePage() {
                 // doc ID is the schoolId (e.g. SHST0001), use as fallback
                 setProfile({ ...data, schoolId: data.schoolId || snap.docs[0].id });
             }
+        } catch (error) {
+            console.error("Error fetching teacher profile:", error);
         } finally {
             setLoading(false);
         }
