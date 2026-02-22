@@ -25,6 +25,9 @@ export function Hero() {
                 setContent(snap.val());
             }
             setLoading(false);
+        }, (error: any) => {
+            console.warn("RTDB Permission (hero):", error.message);
+            setLoading(false);
         });
 
         // Detect mobile for video optimization

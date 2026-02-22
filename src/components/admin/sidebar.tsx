@@ -25,7 +25,8 @@ import {
     ShieldAlert,
     UserCheck,
     ClipboardCheck,
-    Trash2
+    Trash2,
+    MessageSquare
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -41,7 +42,8 @@ const NAV_ITEMS = [
     { label: "Overview", icon: LayoutDashboard, href: "/admin", exact: true },
     { type: "separator", label: "Entities" },
     { label: "Students", icon: GraduationCap, href: "/admin/students" },
-    { label: "Staff & HR", icon: Users, href: "/admin/faculty" },
+    { label: "Staff Section", icon: Users, href: "/admin/faculty" },
+    { label: "Staff Queries", icon: MessageSquare, href: "/admin/faculty/queries" },
     { label: "Groups", icon: Users, href: "/admin/groups" },
     { label: "Attendance", icon: UserCheck, href: "/admin/attendance" },
     { type: "separator", label: "Financials" },
@@ -225,7 +227,7 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
                                         <span className={cn("truncate font-mono text-xs", isActive ? "font-bold" : "")}>
                                             {item.label}
                                         </span>
-                                        {item.label === "Staff & HR" && pendingLeaves > 0 && (
+                                        {item.label === "Staff Section" && pendingLeaves > 0 && (
                                             <motion.span
                                                 initial={{ scale: 0.5, opacity: 0 }}
                                                 animate={{ scale: 1, opacity: 1 }}
@@ -238,7 +240,7 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
                                     </div>
                                 )}
 
-                                {collapsed && !mobile && item.label === "Staff & HR" && pendingLeaves > 0 && (
+                                {collapsed && !mobile && item.label === "Staff Section" && pendingLeaves > 0 && (
                                     <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#0A192F] shadow-[0_0_8px_rgba(239,68,68,0.8)]">
                                         <div className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-40" />
                                     </div>

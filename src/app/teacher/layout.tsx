@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { Loader2, LayoutDashboard, Clock, BookOpen, Bell, Calendar, Wallet, User, LogOut, Lock, Users, Menu, X } from "lucide-react";
+import { Loader2, LayoutDashboard, Clock, BookOpen, Bell, Calendar, Wallet, User, LogOut, Lock, Users, Menu, X, MessageSquare } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { db } from "@/lib/firebase";
@@ -29,6 +29,7 @@ const TEACHER_NAV = [
     { label: "Groups", icon: Users, href: "/teacher/groups" },
     { label: "Holidays", icon: Calendar, href: "/teacher/holidays" },
     { label: "Profile", icon: User, href: "/teacher/profile" },
+    { label: "Help & Queries", icon: MessageSquare, href: "/teacher/queries" },
 ];
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {

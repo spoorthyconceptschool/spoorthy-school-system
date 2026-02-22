@@ -186,6 +186,14 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
 
                 setData(prev => ({ ...prev, academicYears: yearsMap }));
             }
+        }, (error) => {
+            console.warn("Firestore Permission/Error (config/academic_years):", error.message);
+            setData(prev => ({
+                ...prev,
+                academicYears: {
+                    "2025-2026": { id: "2025-2026", name: "2025-2026", active: true, startDate: "", endDate: "" }
+                }
+            }));
         });
 
         return () => unsub();

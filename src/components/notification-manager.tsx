@@ -4,11 +4,15 @@ import { useEffect, useRef } from "react";
 import { collection, query, where, onSnapshot, orderBy, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "@/lib/toast-store";
+import { useAuth } from "@/context/AuthContext";
 
 export function NotificationManager() {
     const isFirstRun = useRef(true);
+    const { user } = useAuth();
 
     useEffect(() => {
+        if (!user) return; // Only listen if authenticated
+
         let unsubscribe: () => void;
 
         const handleSnapshot = (snapshot: any) => {
@@ -81,14 +85,16 @@ export function NotificationManager() {
                     } else {
                         handleSnapshot(s);
                     }
+                }, (fallbackErr: any) => {
+                    console.warn("Notice notification fallback error:", fallbackErr.message);
                 });
             } else {
-                console.error("Notice notification error:", err);
+                console.warn("Notice notification error:", err.message);
             }
         });
 
         return () => unsubscribe?.();
-    }, []);
+    }, [user]);
 
     return null;
 }

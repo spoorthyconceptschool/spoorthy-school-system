@@ -12,16 +12,16 @@ jobs:
     if: ${{ github.event.pull_request.head.repo.full_name == github.repository }}
     runs-on: ubuntu-latest
     env:
-      NEXT_PUBLIC_FIREBASE_API_KEY: "AIzaSyAM6qJVQyW-Dt9VQevxEBxKXewYcXiBCd4"
-      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "spoorthy-school-daa68.firebaseapp.com"
-      NEXT_PUBLIC_FIREBASE_PROJECT_ID: "spoorthy-school-daa68"
-      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "spoorthy-school-daa68.appspot.com"
-      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "44655361000"
-      NEXT_PUBLIC_FIREBASE_APP_ID: "1:44655361000:web:b178f676d7e65c9019825d"
+      NEXT_PUBLIC_FIREBASE_API_KEY: "AIzaSyAOQJJH5sZDP_0SsNmcfHsE5__XwAOIPR0"
+      NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN: "spoorthy-school-live-55917.firebaseapp.com"
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: "spoorthy-school-live-55917"
+      NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET: "spoorthy-school-live-55917.firebasestorage.app"
+      NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID: "740480088621"
+      NEXT_PUBLIC_FIREBASE_APP_ID: "1:740480088621:web:270c47bcfb4194a4ee96a4"
       NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID: "G-RMRPMQXMBL"
-      NEXT_PUBLIC_FIREBASE_DATABASE_URL: "https://spoorthy-school-daa68-default-rtdb.firebaseio.com"
+      NEXT_PUBLIC_FIREBASE_DATABASE_URL: "https://spoorthy-school-live-55917-default-rtdb.firebaseio.com"
       NEXT_PUBLIC_MEDIA_VAULT_URL: "https://vault123.lovable.app/api/media/upload"
-      FIREBASE_CLIENT_EMAIL: "firebase-adminsdk-fbsvc@spoorthy-school-daa68.iam.gserviceaccount.com"
+      FIREBASE_CLIENT_EMAIL: "firebase-adminsdk-fbsvc@spoorthy-school-live-55917.iam.gserviceaccount.com"
       FIREBASE_PRIVATE_KEY: ${{ secrets.FIREBASE_PRIVATE_KEY }}
     steps:
       - uses: actions/checkout@v4
@@ -34,10 +34,10 @@ jobs:
         id: auth
         uses: google-github-actions/auth@v2
         with:
-          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPOORTHY_SCHOOL_DAA68 }}
+          credentials_json: ${{ secrets.FIREBASE_SERVICE_ACCOUNT_SPOORTHY_SCHOOL_LIVE_55917 }}
 
       - name: Deploy to Firebase Hosting Preview
-        run: npx firebase hosting:channel:deploy pr-${{ github.event.pull_request.number }} --expires 7d --non-interactive --project spoorthy-school-daa68 --force
+        run: npx firebase hosting:channel:deploy pr-${{ github.event.pull_request.number }} --expires 7d --non-interactive --project spoorthy-school-live-55917
         env:
           FIREBASE_CLI_EXPERIMENTS: webframeworks
           GOOGLE_APPLICATION_CREDENTIALS: ${{ steps.auth.outputs.credentials_file_path }}

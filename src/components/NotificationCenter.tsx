@@ -48,12 +48,12 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
                     if (!isMounted) return;
                     const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification));
                     updateNotifications(list);
-                }, (err) => {
-                    console.error("Personal notification listener error:", err);
+                }, (err: any) => {
+                    console.warn("Personal notification listener error:", err.message);
                 });
                 unsubscribes.push(unsubPersonal);
-            } catch (e) {
-                console.error("Failed to start personal notification listener", e);
+            } catch (e: any) {
+                console.warn("Failed to start personal notification listener", e.message);
             }
 
             // B. Role-based secondary listeners
@@ -64,7 +64,7 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
                         if (!isMounted) return;
                         const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification));
                         updateNotifications(list);
-                    }, (err) => console.error("Admin notification listener error:", err));
+                    }, (err: any) => console.warn("Admin notification listener error:", err.message));
                     unsubscribes.push(unsubAdmin);
                 } else if (role === "TEACHER") {
                     const tQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
@@ -77,7 +77,7 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
                     const unsubAllFaculty = onSnapshot(qAllFaculty, (snap) => {
                         if (!isMounted) return;
                         updateNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
-                    });
+                    }, (err: any) => console.warn("Faculty notification listener error:", err.message));
                     unsubscribes.push(unsubAllFaculty);
 
                     if (!tSnap.empty) {
@@ -88,7 +88,7 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
                             const unsubSchool = onSnapshot(qSchool, (snap) => {
                                 if (!isMounted) return;
                                 updateNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
-                            });
+                            }, (err: any) => console.warn("School notification listener error:", err.message));
                             unsubscribes.push(unsubSchool);
                         }
                     }
@@ -103,7 +103,7 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
                     const unsubAllStudents = onSnapshot(qAllStudents, (snap) => {
                         if (!isMounted) return;
                         updateNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
-                    });
+                    }, (err: any) => console.warn("Global student notification listener error:", err.message));
                     unsubscribes.push(unsubAllStudents);
 
                     if (!sSnap.empty) {
@@ -117,7 +117,7 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
                             const unsubClass = onSnapshot(qClass, (snap) => {
                                 if (!isMounted) return;
                                 updateNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
-                            }, (err) => console.error("Student notification listener error (class):", err));
+                            }, (err: any) => console.warn("Student notification listener error (class):", err.message));
                             unsubscribes.push(unsubClass);
                         }
 
@@ -128,7 +128,7 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
                             const unsubVillage = onSnapshot(qVillage, (snap) => {
                                 if (!isMounted) return;
                                 updateNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
-                            }, (err) => console.error("Student notification listener error (village):", err));
+                            }, (err: any) => console.warn("Student notification listener error (village):", err.message));
                             unsubscribes.push(unsubVillage);
                         }
 
@@ -138,13 +138,13 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
                             const unsubPersonal = onSnapshot(qPersonal, (snap) => {
                                 if (!isMounted) return;
                                 updateNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
-                            }, (err) => console.error("Student notification listener error (personal):", err));
+                            }, (err: any) => console.warn("Student notification listener error (personal):", err.message));
                             unsubscribes.push(unsubPersonal);
                         }
                     }
                 }
-            } catch (e) {
-                console.error("Error setting up role-based listeners:", e);
+            } catch (e: any) {
+                console.warn("Error setting up role-based listeners:", e.message);
             }
         };
 
@@ -195,7 +195,7 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
             <DropdownMenuContent align="end" className="w-80 bg-[#112240] border-[#64FFDA]/20 text-[#E6F1FF] backdrop-blur-xl p-0 shadow-2xl rounded-xl">
                 <DropdownMenuLabel className="p-4 flex justify-between items-center border-b border-[#64FFDA]/10">
                     <span className="font-bold">Notifications</span>
-                    {unreadCount > 0 && <Badge variant="secondary" className="bg-[#64FFDA]/10 text-[#64FFDA]">{unreadCount} New</Badge>}
+                    {unreadCount > 0 && <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-[#64FFDA]/10 text-[#64FFDA]">{unreadCount} New</span>}
                 </DropdownMenuLabel>
                 <div className="max-h-[400px] overflow-y-auto">
                     {notifications.length === 0 ? (
