@@ -33,7 +33,7 @@ function FacultyManagementContent() {
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2 md:px-0">
                 <div className="space-y-1">
                     <h1 className="text-2xl md:text-5xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic leading-tight">
-                        Staff Section
+                        Staff Members
                     </h1>
                     <p className="text-muted-foreground text-[10px] md:text-sm tracking-tight uppercase font-black opacity-50">
                         Consolidated Management: <span className="text-accent">Staff • Leaves • Coverage</span>
