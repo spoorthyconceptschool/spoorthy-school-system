@@ -57,7 +57,7 @@ const STATIC_FEATURES: SearchIndexItem[] = [
     { id: "nav-students-add", entityId: "nav-students-add", type: "action", title: "Add New Student", subtitle: "Open Admission Form", url: "/admin/students?action=add", keywords: ["add student", "new admission", "register student", "create student"] },
     { id: "nav-students-import", entityId: "nav-students-import", type: "action", title: "Import Students", subtitle: "Bulk Upload via CSV", url: "/admin/students?action=import", keywords: ["import", "bulk", "upload", "csv", "excel", "migrate"] },
 
-    // Staff Section
+    // Staff Members
     { id: "nav-teachers", entityId: "nav-teachers", type: "action", title: "Faculty Registry", subtitle: "Manage Teachers & Staff", url: "/admin/teachers", keywords: ["teacher", "teachers", "staff", "faculty", "employees", "educators", "mentors"] },
     { id: "nav-staff", entityId: "nav-staff", type: "action", title: "Support Staff", subtitle: "Manage Non-Teaching Staff", url: "/admin/staff", keywords: ["staff", "helper", "driver", "cleaner", "security", "admin staff"] },
     { id: "nav-payroll", entityId: "nav-payroll", type: "action", title: "Payroll & Salary", subtitle: "Process Staff Salaries", url: "/admin/salary", keywords: ["salary", "payroll", "pay", "wages", "payslip", "payment", "bank", "account", "ctc"] },
