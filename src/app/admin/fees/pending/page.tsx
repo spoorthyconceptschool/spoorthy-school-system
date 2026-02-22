@@ -59,7 +59,9 @@ export default function FeePendingsPage() {
             const studentMap: Record<string, any> = {};
             studentsSnap.docs.forEach(d => {
                 const sData = d.data();
-                if (sData.schoolId && sData.status === "ACTIVE") studentMap[sData.schoolId] = sData;
+                if (sData.schoolId && sData.status === "ACTIVE") {
+                    studentMap[sData.schoolId] = { ...sData, docId: d.id };
+                }
             });
 
             // 3. Perform Join & Enrichment
@@ -85,6 +87,7 @@ export default function FeePendingsPage() {
 
                 return {
                     ...l,
+                    studentDocId: student.docId,
                     parentName: student.parentName || "N/A",
                     parentMobile: student.parentMobile || "N/A",
                     villageId: student.villageId || "",
@@ -464,7 +467,10 @@ export default function FeePendingsPage() {
                     <div className="flex flex-col gap-1">
                         <Button
                             variant="ghost"
-                            onClick={() => router.push(`/admin/students/${l.studentDocId || l.id}`)}
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                router.push(`/admin/students/${l.studentDocId || l.id}`);
+                            }}
                             className="w-full justify-start gap-2 h-9 text-xs font-bold uppercase tracking-tighter text-red-400 hover:text-white hover:bg-red-500/20"
                         >
                             Collect Fees

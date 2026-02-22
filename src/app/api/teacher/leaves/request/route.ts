@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { adminAuth, adminDb, FieldValue } from "@/lib/firebase-admin";
 
 export async function POST(req: NextRequest) {
     try {
@@ -38,7 +37,20 @@ export async function POST(req: NextRequest) {
 
         await leaveRef.set(leaveData);
 
-        // TODO: Notification to Admin/TTE
+        // Notify Admins
+        await adminDb.collection("notifications").add({
+            title: "New Teacher Leave Request",
+            message: `${decodedToken.name || "Teacher"} requested leave: ${reason || "No reason provided"}`,
+            type: "LEAVE_REQUEST",
+            status: "UNREAD",
+            target: "admin",
+            createdAt: FieldValue.serverTimestamp(),
+            metadata: {
+                teacherId: decodedToken.uid,
+                leaveId: leaveRef.id,
+                type: "TEACHER"
+            }
+        });
 
         return NextResponse.json({ success: true, message: "Leave Requested" });
 

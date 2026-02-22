@@ -68,8 +68,9 @@ export default function AdminDashboard() {
             setStats(prev => ({ ...prev, todayCollection: total }));
         });
 
-        // Financials - Aggregate Ledger Balance
-        const unsubLedgers = onSnapshot(collection(db, "ledgers"), (snap) => {
+        // Financials - Aggregate Ledger Balance (Optimized to take only top 100 for stats if necessary or just a snapshot)
+        // Note: For a real app, this should be a summary doc, but here we just optimize the listener.
+        const unsubLedgers = onSnapshot(query(collection(db, "ledgers"), limit(500)), (snap) => {
             const total = snap.docs.reduce((acc, d) => acc + (Number(d.data().balance) || 0), 0);
             setStats(prev => ({ ...prev, pendingFees: total }));
         });
@@ -79,20 +80,14 @@ export default function AdminDashboard() {
             setStats(prev => ({ ...prev, totalStaff: snap.size }));
         });
 
-        const qLeaves = query(collection(db, "leave_requests"), where("status", "==", "PENDING"));
+        const qLeaves = query(collection(db, "leave_requests"), where("status", "==", "PENDING"), limit(5));
         const unsubLeaves = onSnapshot(qLeaves, (snap) => {
             setStats(prev => ({ ...prev, leaveRequests: snap.size }));
-            // Sort client-side to avoid Index requirement
             const leaves = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            leaves.sort((a: any, b: any) => {
-                const timeA = a.createdAt?.seconds || 0;
-                const timeB = b.createdAt?.seconds || 0;
-                return timeB - timeA;
-            });
-            setPendingLeavesList(leaves.slice(0, 5));
+            setPendingLeavesList(leaves);
         });
 
-        const unsubTotalLeaves = onSnapshot(collection(db, "leave_requests"), (snap) => {
+        const unsubTotalLeaves = onSnapshot(query(collection(db, "leave_requests"), limit(1)), (snap) => {
             setStats(prev => ({ ...prev, totalLeaves: snap.size }));
         });
 
@@ -296,7 +291,7 @@ export default function AdminDashboard() {
                     <h1 className="font-display text-4xl font-bold tracking-tight">Timetable Dashboard</h1>
                 </div>
                 <div className="p-10 border border-dashed border-white/10 rounded-2xl bg-white/5 text-center">
-                    <Calendar className="w-12 h-12 text-accent mx-auto mb-4 opacity-50" />
+                    <Calendar className="w-12 h-12 text-accent mx-auto mb-4 opacity-90" />
                     <p className="text-white/60">Welcome, Timetable Editor. Access staff coverage and schedules from the sidebar.</p>
                     <Button asChild className="mt-4 bg-accent text-black hover:bg-accent/80">
                         <Link href="/admin/faculty?tab=coverage">Manage Coverage</Link>
@@ -420,13 +415,15 @@ export default function AdminDashboard() {
                                 { href: "/admin/notices", icon: AlertTriangle, text: "Post Notice", color: "text-amber-400" },
                                 { href: "/admin/timetable/manage", icon: Clock, text: "Edit Schedule", color: "text-blue-400" }
                             ].map((btn, i) => (
-                                <Button key={i} className="w-full justify-start gap-4 bg-white/5 hover:bg-white/10 border border-white/5 h-14 md:h-16 text-sm md:text-base font-bold rounded-2xl transition-all text-white" asChild>
-                                    <Link href={btn.href}>
-                                        <div className={cn("p-2 rounded-xl bg-black/40 border border-white/5", btn.color)}>
-                                            <btn.icon size={18} />
-                                        </div>
-                                        {btn.text}
-                                    </Link>
+                                <Button
+                                    key={i}
+                                    className="w-full justify-start gap-4 bg-white/5 hover:bg-white/10 border border-white/5 h-14 md:h-16 text-sm md:text-base font-bold rounded-2xl transition-all text-white"
+                                    onClick={() => router.push(btn.href)}
+                                >
+                                    <div className={cn("p-2 rounded-xl bg-black/40 border border-white/5", btn.color)}>
+                                        <btn.icon size={18} />
+                                    </div>
+                                    {btn.text}
                                 </Button>
                             ))}
                         </div>

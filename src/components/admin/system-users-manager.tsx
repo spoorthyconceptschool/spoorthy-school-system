@@ -105,7 +105,7 @@ export function SystemUsersManager() {
                         users.map((u) => (
                             <div key={u.id} className={cn(
                                 "flex items-center justify-between p-4 rounded-xl bg-white/5 border border-white/5 hover:border-white/10 transition-all group",
-                                u.status === "inactive" && "opacity-50 grayscale"
+                                u.status === "inactive" && "opacity-90 grayscale"
                             )}>
                                 <div className="flex items-center gap-3">
                                     <div className="w-10 h-10 rounded-full bg-white/5 flex items-center justify-center border border-white/10 group-hover:border-accent/30 transition-colors">

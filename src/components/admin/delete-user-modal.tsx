@@ -131,7 +131,7 @@ export function DeleteUserModal({
                                 "flex items-center justify-center gap-2 py-2 text-sm font-medium rounded-md transition-all",
                                 mode === "delete"
                                     ? "bg-red-500/20 text-red-500"
-                                    : (!eligibility?.canDelete && !user.isDemo ? "opacity-50 cursor-not-allowed text-zinc-600" : "text-zinc-500 hover:text-zinc-300")
+                                    : (!eligibility?.canDelete && !user.isDemo ? "opacity-90 cursor-not-allowed text-zinc-600" : "text-zinc-500 hover:text-zinc-300")
                             )}
                         >
                             {(!eligibility?.canDelete && !user.isDemo) && <Lock className="w-3 h-3" />} <Trash2 className="w-4 h-4" /> Hard Delete

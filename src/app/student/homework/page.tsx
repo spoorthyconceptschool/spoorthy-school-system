@@ -26,30 +26,27 @@ export default function StudentHomeworkPage() {
     const [useFallback, setUseFallback] = useState(false);
 
     useEffect(() => {
-        if (!user) return;
+        if (!user?.email) return;
 
-        const fetchStudentData = async () => {
-            try {
-                const schoolId = user.email?.split('@')[0].toUpperCase();
-                const studentRef = doc(db, "students", schoolId!);
-                const sSnap = await getDoc(studentRef);
+        const schoolIdFromEmail = user.email.split('@')[0].toUpperCase();
 
-                if (sSnap.exists()) {
-                    setStudentProfile(sSnap.data());
-                } else {
-                    const q = query(collection(db, "students"), where("schoolId", "==", schoolId));
-                    const qs = await getDocs(q);
-                    if (!qs.empty) {
-                        setStudentProfile(qs.docs[0].data());
-                    }
-                }
-            } catch (e) {
-                console.error("Error fetching student profile:", e);
-                setLoading(false);
+        // 1. Listen for Profile (Dual Strategy)
+        const unsubDoc = onSnapshot(doc(db, "students", schoolIdFromEmail), (pSnap) => {
+            if (pSnap.exists()) {
+                setStudentProfile(pSnap.data());
+            } else if (user.uid) {
+                const q = query(collection(db, "students"), where("uid", "==", user.uid));
+                const unsubQuery = onSnapshot(q, (qSnap) => {
+                    if (!qSnap.empty) setStudentProfile(qSnap.docs[0].data());
+                });
+                return () => unsubQuery();
             }
-        };
+        }, (err) => {
+            console.error("Profile sync error:", err);
+            setLoading(false);
+        });
 
-        fetchStudentData();
+        return () => unsubDoc();
     }, [user]);
 
     useEffect(() => {
@@ -117,7 +114,7 @@ export default function StudentHomeworkPage() {
         return Object.keys(config).filter(sid => config[sid]);
     };
 
-    const targetSubjects = getHomeworkGivingSubjects();
+    const targetSubjects = Array.from(new Set([...getHomeworkGivingSubjects(), ...Object.keys(latestHW)]));
 
     return (
         <div className="max-w-6xl mx-auto space-y-6 animate-in fade-in p-4 md:p-6 pb-20">

@@ -292,7 +292,7 @@ export default function PaymentsPage() {
                     <h1 className="text-2xl md:text-5xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic leading-tight">
                         Payments Ledger
                     </h1>
-                    <p className="text-muted-foreground text-[10px] md:text-lg tracking-tight uppercase font-black opacity-50">Tracking <span className="text-white">incoming fee payments</span> and collections</p>
+                    <p className="text-muted-foreground text-[10px] md:text-lg tracking-tight uppercase font-black opacity-100">Tracking <span className="text-white">incoming fee payments</span> and collections</p>
                 </div>
                 {role !== "MANAGER" && (
                     <Dialog open={open} onOpenChange={(val) => {
@@ -457,4 +457,5 @@ export default function PaymentsPage() {
         </div>
     );
 }
+
 

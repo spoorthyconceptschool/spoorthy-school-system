@@ -536,7 +536,7 @@ export default function CMSPage() {
                                         <img src={url} className="w-full h-full object-cover" />
                                     ) : (
                                         <div className="w-full h-full flex flex-col items-center justify-center gap-2 text-zinc-700 bg-zinc-900/50">
-                                            <ImagePlus className="w-8 h-8 opacity-50" />
+                                            <ImagePlus className="w-8 h-8 opacity-90" />
                                             <span className="text-xs font-medium">Empty Slot {idx + 1}</span>
                                         </div>
                                     )}

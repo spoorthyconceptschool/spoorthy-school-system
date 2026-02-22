@@ -39,4 +39,11 @@ const functions = getFunctions(app);
 const storage = getStorage(app);
 const rtdb = getDatabase(app);
 
-export { app, auth, db, functions, storage, rtdb };
+let messaging: any = null;
+if (typeof window !== "undefined") {
+    import("firebase/messaging").then(({ getMessaging }) => {
+        messaging = getMessaging(app);
+    });
+}
+
+export { app, auth, db, functions, storage, rtdb, messaging };

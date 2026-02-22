@@ -1,7 +1,6 @@
 
 import { NextResponse } from "next/server";
-import { adminDb, adminAuth } from "@/lib/firebase-admin";
-import { Timestamp } from "firebase-admin/firestore";
+import { adminDb, adminAuth, Timestamp } from "@/lib/firebase-admin";
 
 export async function POST(req: Request) {
     try {
@@ -93,7 +92,8 @@ export async function POST(req: Request) {
             }
 
             if (shouldNotify) {
-                if (uid) {
+                const targetId = uid || studentId;
+                if (targetId) {
                     const notifRef = adminDb.collection("notifications").doc();
                     const statusText = newStatus === 'P' ? "Present" : "Absent";
 
@@ -103,7 +103,7 @@ export async function POST(req: Request) {
                         : `Your attendance for ${date} has been marked as ${statusText}.`;
 
                     batch.set(notifRef, {
-                        userId: uid,
+                        userId: targetId,
                         title,
                         message,
                         type: "ATTENDANCE",
@@ -114,7 +114,7 @@ export async function POST(req: Request) {
                             date,
                             attendanceId: attId,
                             status: newStatus,
-                            oldStatus: oldStatus || null
+                            oldStatus: oldRecords[studentId] || null
                         }
                     });
                     notifCount++;

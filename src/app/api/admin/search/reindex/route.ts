@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { adminAuth, adminDb, FieldValue } from "@/lib/firebase-admin";
 
 export async function POST(req: NextRequest) {
     try {
@@ -108,6 +107,16 @@ export async function POST(req: NextRequest) {
                     keywords: Array.from(new Set(keywords)),
                     updatedAt: FieldValue.serverTimestamp()
                 });
+
+                // REPAIR LOGIC: Ensure source document has fields required for list visibility
+                if (isStudent && (!data.createdAt || !data.academicYear)) {
+                    const studentRef = adminDb.collection("students").doc(doc.id);
+                    currentBatch.update(studentRef, {
+                        createdAt: data.createdAt || FieldValue.serverTimestamp(),
+                        academicYear: data.academicYear || "2025-2026",
+                        admissionDate: data.admissionDate || new Date().toISOString()
+                    });
+                }
             });
 
             await currentBatch.commit();

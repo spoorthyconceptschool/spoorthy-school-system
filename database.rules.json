@@ -1,0 +1,32 @@
+{
+    "rules": {
+        "master": {
+            ".read": "auth != null",
+            ".write": "auth != null && (auth.token.role == 'ADMIN' || auth.token.role == 'SUPER_ADMIN')"
+        },
+        "siteContent": {
+            ".read": "true",
+            ".write": "auth != null && (auth.token.role == 'ADMIN' || auth.token.role == 'SUPER_ADMIN')"
+        },
+        "notifications": {
+            "$uid": {
+                ".read": "auth != null && auth.uid == $uid",
+                ".write": "auth != null && (auth.token.role == 'ADMIN' || auth.token.role == 'SUPER_ADMIN')"
+            }
+        },
+        "chats": {
+            "$chatId": {
+                ".read": "auth != null && (data.child('participant1').val() == auth.uid || data.child('participant2').val() == auth.uid || auth.token.role == 'ADMIN')",
+                ".write": "auth != null"
+            }
+        },
+        "presence": {
+            "$uid": {
+                ".read": "auth != null",
+                ".write": "auth != null && auth.uid == $uid"
+            }
+        },
+        ".read": "auth != null && (auth.token.role == 'ADMIN' || auth.token.role == 'SUPER_ADMIN')",
+        ".write": "auth != null && (auth.token.role == 'ADMIN' || auth.token.role == 'SUPER_ADMIN')"
+    }
+}

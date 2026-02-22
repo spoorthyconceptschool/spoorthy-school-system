@@ -84,9 +84,8 @@ export async function POST(req: NextRequest) {
 
         const possibleBuckets = [
             process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "",
-            "spoorthy-school-daa68.appspot.com",
-            "spoorthy-school.appspot.com",
-            "spoorthy-school-daa68.firebasestorage.app"
+            "spoorthy-school-live-55917.firebasestorage.app",
+            "spoorthy-school-live-55917.appspot.com",
         ].filter(Boolean);
 
         let lastError = null;

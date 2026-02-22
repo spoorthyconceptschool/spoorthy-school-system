@@ -263,7 +263,7 @@ export default function TeacherDashboard() {
                                         {todaySlots.map(slot => (
                                             <div key={slot.id} className={`p-4 rounded-lg flex items-center justify-between
                                                 ${slot.type === "SUBSTITUTION" ? "bg-yellow-500/10 border border-yellow-500/20" :
-                                                    slot.type === "LEAVE" ? "bg-red-500/5 border border-red-500/10 opacity-50" : "bg-white/5 border border-white/10"}
+                                                    slot.type === "LEAVE" ? "bg-red-500/5 border border-red-500/10 opacity-90" : "bg-white/5 border border-white/10"}
                                             `}>
                                                 <div className="flex items-center gap-3">
                                                     <Badge variant="outline" className="h-8 w-8 flex items-center justify-center rounded-full bg-white/5 border-white/10">

@@ -10,7 +10,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Calendar, FileText, History, Send } from "lucide-react";
 import { db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
+import { doc, collection, query, where, onSnapshot } from "firebase/firestore";
 import { formatDateToDDMMYYYY } from "@/lib/date-utils";
 import { DatePickerInput } from "@/components/ui/date-picker-input";
 
@@ -31,42 +31,44 @@ export default function StudentLeavesPage() {
     });
 
     useEffect(() => {
-        // Helper to get local date YYYY-MM-DD
+        if (!user?.email) return;
+
+        const schoolIdFromEmail = user.email.split('@')[0].toUpperCase();
+
+        // 1. Listen for Profile (Dual Strategy)
+        const unsubDoc = onSnapshot(doc(db, "students", schoolIdFromEmail), (pSnap) => {
+            if (pSnap.exists()) {
+                setProfile(pSnap.data());
+            } else if (user.uid) {
+                const q = query(collection(db, "students"), where("uid", "==", user.uid));
+                const unsubQuery = onSnapshot(q, (qSnap) => {
+                    if (!qSnap.empty) setProfile(qSnap.docs[0].data());
+                });
+                return () => unsubQuery();
+            }
+        }, (err) => {
+            console.error("Profile sync error:", err);
+        });
+
+        // 2. Fetch history
+        fetchLeaves();
+
+        // Helpers...
         const getLocalTodayStr = (offsetDays = 0) => {
             const d = new Date();
             d.setDate(d.getDate() + offsetDays);
-            const year = d.getFullYear();
-            const month = String(d.getMonth() + 1).padStart(2, '0');
-            const day = String(d.getDate()).padStart(2, '0');
-            return `${year}-${month}-${day}`;
+            return d.toISOString().split('T')[0];
         };
 
-        const d = new Date();
-        const currentHour = d.getHours();
-
-        // If it is 7 AM or later, no leave for "Today" allowed. Must apply for tomorrow onwards.
+        const currentHour = new Date().getHours();
         const isPastMorningCutoff = currentHour >= 7;
         const minimumDate = getLocalTodayStr(isPastMorningCutoff ? 1 : 0);
 
         setToday(minimumDate);
-        setForm(prev => ({
-            ...prev,
-            fromDate: minimumDate,
-            toDate: minimumDate
-        }));
+        setForm(prev => ({ ...prev, fromDate: minimumDate, toDate: minimumDate }));
 
-        if (user) {
-            fetchProfile();
-            fetchLeaves();
-        }
+        return () => unsubDoc();
     }, [user]);
-
-    const fetchProfile = async () => {
-        const schoolId = user?.email?.split('@')[0].toUpperCase();
-        if (!schoolId) return;
-        const snap = await getDoc(doc(db, "students", schoolId));
-        if (snap.exists()) setProfile(snap.data());
-    };
 
     const fetchLeaves = async () => {
         setLoading(true);

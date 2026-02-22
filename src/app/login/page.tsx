@@ -1,235 +1,172 @@
 "use client";
 
 import { useState } from "react";
-import Link from "next/link";
-import { motion } from "framer-motion";
+import { useAuth } from "@/context/AuthContext";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { ArrowLeft, Loader2 } from "lucide-react";
-import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "next/navigation";
+import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "@/components/ui/card";
+import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Loader2, LogIn, School } from "lucide-react";
 import { toast } from "@/lib/toast-store";
-import { useMasterData } from "@/context/MasterDataContext";
 import { doc, getDoc } from "firebase/firestore";
-import { db, auth } from "@/lib/firebase";
+import { db } from "@/lib/firebase";
 
 export default function LoginPage() {
-    const { branding } = useMasterData();
+    const [schoolId, setSchoolId] = useState("");
+    const [password, setPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
     const { signIn } = useAuth();
     const router = useRouter();
-
-
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
         setError("");
 
-        // Get values from form
-        const form = e.target as HTMLFormElement;
-        const schoolId = (form.elements.namedItem("schoolId") as HTMLInputElement).value;
-        const password = (form.elements.namedItem("password") as HTMLInputElement).value;
-
-        // Map School ID to Email internally for Firebase Auth
-        let email = schoolId.trim().toLowerCase();
-
-        // 1. Allow full email input (e.g. admin@spoorthy.edu)
-        if (!email.includes('@')) {
-            // 2. Legacy Admin Support: Assuming admins were created with @spoorthy.edu or similar
-            if (email.includes('admin')) {
-                email = `${email}@spoorthy.edu`;
-            } else {
-                // 3. Standard Students/Teachers: Use internal domain
-                email = `${email}@school.local`;
-            }
-        }
-
         try {
+            // Check for specific admin login via email format
+            const adminEmails = ["25r21a05e2@mlrit.ac.in", "25421a05e2@mlrit.ac.in", "admin@school.local"];
+            let email = "";
+
+            if (schoolId.includes("@")) {
+                email = schoolId.toLowerCase();
+            } else {
+                email = `${schoolId}@school.local`.toLowerCase();
+            }
+
+            console.log("[Login] Attempting sign-in for:", email);
             await signIn(email, password);
 
             toast({
-                title: "Welcome Back",
-                description: "Successfully logged in.",
+                title: "Login Successful",
+                description: "Redirecting to your dashboard...",
                 type: "success"
             });
 
-            // 1. Initial Role Assessment based on School ID (Legacy/Root support)
+            // --- REDIRECTION LOGIC ---
             const lowerId = schoolId.toLowerCase();
+            const lowerEmail = email.toLowerCase();
             let targetPath = "/student";
 
-            if (lowerId.includes("admin")) {
+            // 1. Initial heuristic check
+            if (adminEmails.includes(lowerEmail) || lowerId.includes("admin")) {
                 targetPath = "/admin";
             } else if (lowerId.startsWith("shst") || lowerId.startsWith("teacher")) {
                 targetPath = "/teacher";
             }
 
-            // 2. Refine Role from Firestore (For Managers and specific staff)
+            // 2. Database verification (The Source of Truth)
             try {
-                if (auth.currentUser) {
-                    const userDoc = await getDoc(doc(db, "users", auth.currentUser.uid));
-                    if (userDoc.exists()) {
-                        const dbRole = userDoc.data().role;
-                        if (["ADMIN", "MANAGER", "TIMETABLE_EDITOR"].includes(dbRole)) {
-                            targetPath = "/admin";
-                        } else if (dbRole === "TEACHER") {
-                            targetPath = "/teacher";
-                        } else {
-                            targetPath = "/student";
-                        }
+                const userSnapshot = await getDoc(doc(db, "users", (await import("@/lib/firebase")).auth.currentUser?.uid || ""));
+                if (userSnapshot.exists()) {
+                    const userData = userSnapshot.data();
+                    if (["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(userData.role)) {
+                        targetPath = "/admin";
+                    } else if (userData.role === "TEACHER") {
+                        targetPath = "/teacher";
                     }
                 }
-            } catch (roleError) {
-                console.warn("Could not fetch DB role, sticking with ID-based path:", targetPath);
+            } catch (dbErr) {
+                console.warn("[Login] DB Role check failed, using heuristic", dbErr);
             }
 
-            // 3. Final Redirection
+            console.log("[Login] Final Target Path:", targetPath);
             router.push(targetPath);
 
         } catch (err: any) {
+            console.error("[Login] Error:", err);
+            setError(err.message || "Invalid credentials. Please try again.");
             toast({
                 title: "Login Failed",
-                description: "Please check your credentials and try again.",
+                description: err.message || "Please check your school ID and password.",
                 type: "error"
             });
-            // Only log non-authentication errors to avoid console noise
-            if (err?.code && !err.code.includes('auth/')) {
-                console.error(err);
-            }
-            setError("Invalid School ID or password. Please try again.");
         } finally {
             setIsLoading(false);
         }
     };
 
     return (
-        <main className="relative min-h-screen w-full overflow-hidden bg-[#0A0A0B] flex flex-col items-center justify-center p-4">
-            {/* dynamic Background Elements */}
-            <div className="absolute inset-0 z-0">
-                <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-blue-500/10 rounded-full blur-[120px] animate-pulse" />
-                <div className="absolute bottom-[-10%] right-[-10%] w-[40%] h-[40%] bg-purple-600/10 rounded-full blur-[120px] animate-pulse [animation-delay:2s]" />
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-[radial-gradient(circle_at_center,_var(--tw-gradient-stops))] from-blue-500/5 via-transparent to-transparent opacity-50" />
-            </div>
+        <div className="min-h-screen flex items-center justify-center bg-black p-4 relative overflow-hidden">
+            {/* Background Effects */}
+            <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-accent/20 rounded-full blur-[120px] -z-10 animate-pulse" />
+            <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-emerald-500/10 rounded-full blur-[100px] -z-10" />
 
-            {/* Back Button */}
-            <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                className="absolute top-8 left-8 z-20"
-            >
-                <Link
-                    href="/"
-                    className="flex items-center gap-2 text-zinc-400 hover:text-white transition-all group"
-                >
-                    <div className="p-2 rounded-xl bg-white/5 border border-white/10 group-hover:bg-white/10 group-hover:border-white/20 transition-all">
-                        <ArrowLeft className="w-4 h-4" />
+            <Card className="w-full max-w-md bg-black/60 border-white/10 backdrop-blur-2xl shadow-2xl rounded-3xl">
+                <CardHeader className="space-y-4 text-center">
+                    <div className="mx-auto w-16 h-16 bg-accent/10 rounded-2xl flex items-center justify-center border border-accent/20">
+                        <School className="w-8 h-8 text-accent" />
                     </div>
-                    <span className="text-sm font-medium">Back to Home</span>
-                </Link>
-            </motion.div>
-
-            <div className="relative z-10 w-full max-w-md">
-                <motion.div
-                    initial={{ opacity: 0, scale: 0.95 }}
-                    animate={{ opacity: 1, scale: 1 }}
-                    transition={{ duration: 0.5, ease: "easeOut" }}
-                    className="group relative"
-                >
-                    {/* Glow effect behind the card */}
-                    <div className="absolute -inset-0.5 bg-gradient-to-r from-blue-500 to-purple-600 rounded-[2.5rem] opacity-20 group-hover:opacity-30 blur transition duration-1000 group-hover:duration-200" />
-
-                    <div className="relative rounded-[2.5rem] border border-white/10 bg-black/60 backdrop-blur-3xl p-8 md:p-10 shadow-2xl flex flex-col">
-                        <div className="flex flex-col items-center text-center space-y-4 mb-10">
-                            {branding.schoolLogo && (
-                                <motion.div
-                                    whileHover={{ rotate: 5, scale: 1.1 }}
-                                    className="w-24 h-24 rounded-3xl bg-gradient-to-br from-white/10 to-transparent p-4 border border-white/10 shadow-2xl mb-4"
-                                >
-                                    <img src={branding.schoolLogo} alt="School Logo" className="w-full h-full object-contain filter drop-shadow-2xl" />
-                                </motion.div>
-                            )}
-                            <div className="space-y-2">
-                                <h1 className="font-display text-3xl md:text-4xl font-bold tracking-tight text-white">
-                                    {branding.schoolName || "Welcome Back"}
-                                </h1>
-                                <div className="h-1 w-20 bg-gradient-to-r from-blue-500 to-purple-600 mx-auto rounded-full" />
-                                <p className="text-zinc-400 text-xs font-bold tracking-[0.2em] uppercase pt-2">
-                                    Secure Access Portal
-                                </p>
-                            </div>
-                        </div>
-
-                        <form onSubmit={handleSubmit} className="space-y-6">
-                            {error && (
-                                <motion.div
-                                    initial={{ opacity: 0, y: -10 }}
-                                    animate={{ opacity: 1, y: 0 }}
-                                    className="p-4 rounded-2xl bg-red-500/10 border border-red-500/20 text-red-400 text-sm text-center font-medium"
-                                >
+                    <div className="space-y-1">
+                        <CardTitle className="text-3xl font-display italic font-bold text-white uppercase tracking-tight">
+                            Portal Login
+                        </CardTitle>
+                        <CardDescription className="text-muted-foreground font-medium uppercase tracking-widest text-[10px]">
+                            Spoorthy Concept School System
+                        </CardDescription>
+                    </div>
+                </CardHeader>
+                <form onSubmit={handleSubmit}>
+                    <CardContent className="space-y-6 pt-4">
+                        {error && (
+                            <Alert variant="destructive" className="bg-red-500/10 border-red-500/20 text-red-400 rounded-2xl">
+                                <AlertDescription className="font-bold text-xs uppercase tracking-tight italic">
                                     {error}
-                                </motion.div>
-                            )}
-                            <div className="space-y-2">
-                                <Label htmlFor="schoolId" className="text-zinc-300 ml-1">School ID</Label>
-                                <Input
-                                    id="schoolId"
-                                    type="text"
-                                    placeholder="e.g. 2026001"
-                                    className="h-14 bg-white/5 border-white/10 focus:border-blue-500/50 focus:bg-white/10 transition-all font-mono rounded-2xl placeholder:text-zinc-600"
-                                    required
-                                />
-                            </div>
-
-                            <div className="space-y-2">
-                                <div className="flex items-center justify-between ml-1">
-                                    <Label htmlFor="password" title="password color fix" className="text-zinc-300">Password</Label>
-                                    <Link
-                                        href="/forgot-password"
-                                        className="text-xs text-blue-400 hover:text-blue-300 transition-colors font-medium"
-                                    >
-                                        Forgot password?
-                                    </Link>
-                                </div>
-                                <Input
-                                    id="password"
-                                    type="password"
-                                    placeholder="••••••••"
-                                    className="h-14 bg-white/5 border-white/10 focus:border-blue-500/50 focus:bg-white/10 transition-all rounded-2xl placeholder:text-zinc-600"
-                                    required
-                                />
-                            </div>
-
-                            <Button
-                                type="submit"
-                                className="w-full h-14 text-lg bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 text-white font-bold rounded-2xl shadow-[0_0_20px_rgba(37,99,235,0.2)] hover:shadow-[0_0_30px_rgba(37,99,235,0.4)] transition-all duration-300 active:scale-[0.98]"
-                                disabled={isLoading}
-                            >
-                                {isLoading ? (
-                                    <Loader2 className="w-6 h-6 animate-spin" />
-                                ) : (
-                                    "Authenticate"
-                                )}
-                            </Button>
-                        </form>
-
-                        <div className="mt-8 text-center">
-                            <p className="text-sm text-zinc-500">
-                                Need help?{" "}
-                                <Link href="/admissions" className="text-white hover:text-blue-400 font-semibold underline-offset-4 transition-colors">
-                                    Contact Support
-                                </Link>
-                            </p>
+                                </AlertDescription>
+                            </Alert>
+                        )}
+                        <div className="space-y-2">
+                            <Label htmlFor="schoolId" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">
+                                School ID / Email
+                            </Label>
+                            <Input
+                                id="schoolId"
+                                placeholder="e.g. SHSS20001 or admin email"
+                                value={schoolId}
+                                onChange={(e) => setSchoolId(e.target.value)}
+                                required
+                                className="bg-white/5 border-white/10 rounded-2xl h-12 focus:ring-accent focus:border-accent transition-all text-white font-bold"
+                            />
                         </div>
-                    </div>
-                </motion.div>
-            </div>
-
-            {/* Footer decoration */}
-            <div className="mt-12 text-zinc-600 text-[10px] uppercase tracking-[0.3em] font-bold z-10">
-                &copy; {new Date().getFullYear()} Spoorthy Technology Systems
-            </div>
-        </main>
+                        <div className="space-y-2">
+                            <Label htmlFor="password" className="text-[10px] font-black uppercase tracking-widest text-muted-foreground ml-1">
+                                Password
+                            </Label>
+                            <Input
+                                id="password"
+                                type="password"
+                                placeholder="••••••••"
+                                value={password}
+                                onChange={(e) => setPassword(e.target.value)}
+                                required
+                                className="bg-white/5 border-white/10 rounded-2xl h-12 focus:ring-accent focus:border-accent transition-all text-white"
+                            />
+                        </div>
+                    </CardContent>
+                    <CardFooter className="flex flex-col gap-4 pb-8">
+                        <Button
+                            type="submit"
+                            disabled={isLoading}
+                            className="w-full h-14 bg-accent text-accent-foreground hover:bg-accent/90 rounded-2xl font-black text-lg transition-all transform active:scale-[0.98] shadow-lg shadow-accent/20"
+                        >
+                            {isLoading ? (
+                                <Loader2 className="mr-2 h-5 w-5 animate-spin" />
+                            ) : (
+                                <>
+                                    <LogIn className="mr-2 h-5 w-5" />
+                                    AUTHENTICATE
+                                </>
+                            )}
+                        </Button>
+                        <p className="text-[9px] text-center text-muted-foreground font-bold uppercase tracking-widest">
+                            Secure Terminal Access • v1.2.0
+                        </p>
+                    </CardFooter>
+                </form>
+            </Card>
+        </div>
     );
 }

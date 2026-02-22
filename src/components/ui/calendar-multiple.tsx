@@ -114,7 +114,7 @@ export function MultipleCalendar({
                                 isSelected
                                     ? "bg-blue-600 text-white hover:bg-blue-700 shadow-md shadow-blue-900/20"
                                     : "hover:bg-white/10 text-foreground",
-                                disabled && "opacity-30 cursor-not-allowed hover:bg-transparent",
+                                disabled && "opacity-90 cursor-not-allowed hover:bg-transparent",
                                 isToday && !isSelected && "text-blue-400 font-bold bg-blue-400/10 border border-blue-400/20"
                             )}
                         >

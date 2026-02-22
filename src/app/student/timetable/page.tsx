@@ -142,7 +142,7 @@ export default function StudentTimetablePage() {
                 <CardContent>
                     {todayData.isHoliday ? (
                         <div className="py-12 flex flex-col items-center justify-center text-red-400 gap-4">
-                            <Coffee className="w-12 h-12 opacity-50" />
+                            <Coffee className="w-12 h-12 opacity-90" />
                             <div className="text-center">
                                 <h3 className="text-2xl font-bold uppercase tracking-widest">Holiday</h3>
                                 <p className="text-sm text-red-400/60 mt-1">School is closed for today. Enjoy your break!</p>
@@ -245,7 +245,7 @@ export default function StudentTimetablePage() {
                                                     }
 
                                                     if (!slot) return <td key={i} className="p-3"></td>;
-                                                    if (slot.type === "BREAK") return <td key={i} className="p-3 bg-white/5 text-center text-[10px] diagonal-stripe opacity-50"></td>;
+                                                    if (slot.type === "BREAK") return <td key={i} className="p-3 bg-white/5 text-center text-[10px] diagonal-stripe opacity-90"></td>;
                                                     return (
                                                         <td key={i} className="p-3 text-center border-l border-white/5">
                                                             <div className="font-semibold">{slot.subjectId === "leisure" ? "Leisure" : (subjects[slot.subjectId]?.name || slot.subjectId)}</div>

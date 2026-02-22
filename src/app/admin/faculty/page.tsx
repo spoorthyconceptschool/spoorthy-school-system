@@ -34,7 +34,7 @@ function FacultyManagementContent() {
                     <h1 className="text-2xl md:text-5xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic leading-tight">
                         Faculty & HR
                     </h1>
-                    <p className="text-muted-foreground text-[10px] md:text-sm tracking-tight uppercase font-black opacity-50">
+                    <p className="text-muted-foreground text-[10px] md:text-sm tracking-tight uppercase font-black opacity-100">
                         Consolidated Management: <span className="text-accent">Directory • Leaves • Coverage</span>
                     </p>
                 </div>
@@ -107,3 +107,4 @@ export default function FacultyManagementPage() {
         </Suspense>
     );
 }
+

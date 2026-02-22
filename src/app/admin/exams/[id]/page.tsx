@@ -13,7 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Save, Printer, ArrowLeft, Calendar, Clock, FileText } from "lucide-react";
+import { Loader2, Save, Printer, ArrowLeft, Calendar, Clock, FileText, ClipboardCheck } from "lucide-react";
 import { ReportCardGenerator } from "@/components/admin/report-card-generator";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
@@ -198,6 +198,11 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                             <Button size="sm" variant="outline" className="h-6 text-xs bg-white/5 border-white/10" onClick={() => setEditOpen(true)}>
                                 Edit
                             </Button>
+                            <Link href={`/admin/exams/${examId}/marks`}>
+                                <Button size="sm" variant="secondary" className="h-6 text-xs gap-1">
+                                    <ClipboardCheck className="w-3 h-3" /> Enter Marks
+                                </Button>
+                            </Link>
                         </div>
                     </div>
                     <p className="text-muted-foreground flex items-center gap-2">

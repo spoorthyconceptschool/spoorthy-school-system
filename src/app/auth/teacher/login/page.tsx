@@ -138,7 +138,7 @@ export default function TeacherLoginPage() {
                     </form>
                 </div>
 
-                <p className="text-center text-xs text-muted-foreground uppercase tracking-widest opacity-50">
+                <p className="text-center text-xs text-muted-foreground uppercase tracking-widest opacity-90">
                     Spoorthy Concept School • Faculty
                 </p>
             </div>

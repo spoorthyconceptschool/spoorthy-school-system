@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { adminAuth, adminDb, FieldValue } from "@/lib/firebase-admin";
 import { notifyManagerActionServer } from "@/lib/notifications-server";
 
 export async function POST(req: NextRequest) {
@@ -36,9 +35,9 @@ export async function POST(req: NextRequest) {
         const ledgerRef = adminDb.collection("student_fee_ledgers").doc(`${studentId}_${yearId}`);
 
         // 3. Transaction
-        await adminDb.runTransaction(async (t: FirebaseFirestore.Transaction) => {
-            // Explicit cast to unknown then DocumentSnapshot to avoid TS mismatch
-            const doc = await t.get(ledgerRef) as unknown as FirebaseFirestore.DocumentSnapshot;
+        await adminDb.runTransaction(async (t: any) => {
+            // Explicit cast to any to avoid TS mismatch
+            const doc = await t.get(ledgerRef) as any;
             if (!doc.exists) throw new Error("Fee Ledger not found for this student/year.");
 
             const data = doc.data();

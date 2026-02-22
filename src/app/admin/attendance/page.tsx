@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useMasterData } from "@/context/MasterDataContext";
 import AttendanceManager from "@/components/attendance/attendance-manager";
 import TeacherAttendanceManager from "@/components/attendance/teacher-attendance-manager";
@@ -14,21 +14,29 @@ import {
     SelectValue,
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
-import { DatePickerInput } from "@/components/ui/date-picker-input";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 
 export default function AdminAttendancePage() {
     const { classes, classSections, sections } = useMasterData();
     const [selectedClass, setSelectedClass] = useState<string>("");
     const [selectedSection, setSelectedSection] = useState<string>("");
-    const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
+    const [date, setDate] = useState("");
+
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+        setDate(new Date().toISOString().split('T')[0]);
+    }, []);
 
     const fetchedSections = selectedClass
         ? Object.values(classSections || {})
             .filter((cs: any) => cs.classId === selectedClass)
-            .map((cs: any) => sections[cs.sectionId])
+            .map((cs: any) => (sections || {})[cs.sectionId])
             .filter(Boolean)
         : [];
+
+    if (!mounted) return null;
 
     return (
         <div className="max-w-none p-0 space-y-6 animate-in fade-in">
@@ -97,7 +105,7 @@ export default function AdminAttendancePage() {
                         </div>
                     </Card>
 
-                    {selectedClass && selectedSection ? (
+                    {selectedClass && selectedSection && date && (
                         <div key={`${selectedClass}-${selectedSection}-${date}`}>
                             <AttendanceManager
                                 classId={selectedClass}
@@ -105,7 +113,8 @@ export default function AdminAttendancePage() {
                                 defaultDate={date}
                             />
                         </div>
-                    ) : (
+                    )}
+                    {(!selectedClass || !selectedSection) && (
                         <div className="flex flex-col items-center justify-center p-20 border border-dashed border-white/10 rounded-xl bg-white/5">
                             <p className="text-muted-foreground">Please select Class and Section to view student attendance.</p>
                         </div>

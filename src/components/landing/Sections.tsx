@@ -186,13 +186,19 @@ export function Facilities() {
                                         setActiveIndex(idx);
                                     }}
                                 >
-                                    <Image
-                                        src={item.image}
-                                        alt={item.title}
-                                        fill
-                                        className="object-cover"
-                                        priority={isFocused}
-                                    />
+                                    {item.image ? (
+                                        <Image
+                                            src={item.image}
+                                            alt={item.title}
+                                            fill
+                                            className="object-cover"
+                                            priority={isFocused}
+                                        />
+                                    ) : (
+                                        <div className="w-full h-full flex items-center justify-center bg-white/5">
+                                            <span className="text-white/20 text-xs font-mono uppercase tracking-widest">No Image</span>
+                                        </div>
+                                    )}
 
                                     <div className={cn(
                                         "absolute inset-0 bg-gradient-to-t from-[#0A192F] via-[#0A192F]/10 to-transparent transition-opacity duration-1000",

@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import { Timestamp } from "firebase-admin/firestore";
+import { adminAuth, adminDb, Timestamp } from "@/lib/firebase-admin";
 import { notifyManagerActionServer } from "@/lib/notifications-server";
 
 export async function POST(req: NextRequest) {
@@ -16,7 +15,7 @@ export async function POST(req: NextRequest) {
                 const decoded = await adminAuth.verifyIdToken(token);
                 actorUid = decoded.uid;
                 const userDoc = await adminDb.collection("users").doc(decoded.uid).get();
-                if (userDoc.exists()) {
+                if (userDoc.exists) {
                     actorRole = userDoc.data()?.role || "ADMIN";
                     actorName = userDoc.data()?.name || decoded.name || "Manager";
                 }

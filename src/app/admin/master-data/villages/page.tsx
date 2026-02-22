@@ -87,20 +87,26 @@ export default function VillagesPage() {
 
     const toggleStatus = async (v: any) => {
         try {
-            await update(ref(rtdb, `master/villages/${v.id}`), {
-                active: !v.active
-            });
-        } catch (e) { console.error(e); }
+            // Optimistic update via RTDB
+            const villageRef = ref(rtdb, `master/villages/${v.id}`);
+            await update(villageRef, { active: !v.active });
+        } catch (e) {
+            console.error(e);
+            alert("Failed to update status");
+        }
     };
 
     const columns = [
         { key: "name", header: "Village Name", render: (v: any) => <span className="font-bold">{v.name}</span> },
-        { key: "code", header: "Code", render: (v: any) => <span className="font-mono text-xs">{v.code}</span> },
+        { key: "code", header: "Code", render: (v: any) => <span className="font-mono text-xs opacity-50">{v.code}</span> },
         {
             key: "active", header: "Status", render: (v: any) => (
-                <span className={`px-2 py-0.5 rounded text-xs ${v.active ? 'bg-green-500/10 text-green-500' : 'bg-red-500/10 text-red-500'}`}>
+                <button
+                    onClick={() => toggleStatus(v)}
+                    className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider transition-all hover:scale-105 ${v.active ? 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20' : 'bg-red-500/10 text-red-500 hover:bg-red-500/20'}`}
+                >
                     {v.active ? 'Active' : 'Inactive'}
-                </span>
+                </button>
             )
         },
     ];
@@ -108,17 +114,21 @@ export default function VillagesPage() {
     return (
         <div className="space-y-6 animate-in fade-in">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 sm:gap-0">
-                <h1 className="text-3xl font-display font-bold">Villages</h1>
+                <div className="space-y-1">
+                    <h1 className="text-2xl md:text-3xl font-display font-bold">Villages & Transport Points</h1>
+                    <p className="text-sm text-muted-foreground">Manage service areas for student transport.</p>
+                </div>
+
                 <Dialog open={open} onOpenChange={o => { setOpen(o); if (!o) { setEditingId(null); setFormData({ name: "", code: "" }); } }}>
                     <DialogTrigger asChild>
-                        <Button className="w-full sm:w-auto bg-accent text-accent-foreground"><Plus size={16} className="mr-2" /> Add Village</Button>
+                        <Button className="bg-accent text-accent-foreground font-bold"><Plus size={16} className="mr-2" /> Add Village</Button>
                     </DialogTrigger>
-                    <DialogContent>
-                        <DialogHeader><DialogTitle>{editingId ? "Edit Village" : "Add Village"}</DialogTitle></DialogHeader>
-                        <form onSubmit={handleSubmit} className="space-y-4">
-                            <div><label>Name</label><Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} /></div>
-                            <div><label>Code (Short)</label><Input required value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} maxLength={4} /></div>
-                            <Button type="submit" disabled={submitting} className="w-full">{submitting ? <Loader2 className="animate-spin" /> : "Save"}</Button>
+                    <DialogContent className="bg-zinc-950 border-white/10 text-white">
+                        <DialogHeader><DialogTitle>{editingId ? "Edit Village" : "Add New Village"}</DialogTitle></DialogHeader>
+                        <form onSubmit={handleSubmit} className="space-y-4 pt-4">
+                            <div className="space-y-2"><label className="text-xs uppercase font-bold text-muted-foreground">Village Name</label><Input required value={formData.name} onChange={e => setFormData({ ...formData, name: e.target.value })} className="bg-white/5 border-white/10" placeholder="e.g. Rampally" /></div>
+                            <div className="space-y-2"><label className="text-xs uppercase font-bold text-muted-foreground">Short Code</label><Input required value={formData.code} onChange={e => setFormData({ ...formData, code: e.target.value })} maxLength={4} className="bg-white/5 border-white/10" placeholder="RMPL" /></div>
+                            <Button type="submit" disabled={submitting} className="w-full bg-accent text-accent-foreground font-bold">{submitting ? <Loader2 className="animate-spin" /> : "Save Changes"}</Button>
                         </form>
                     </DialogContent>
                 </Dialog>
@@ -129,10 +139,14 @@ export default function VillagesPage() {
                 columns={columns}
                 isLoading={loading}
                 actions={(v) => (
-                    <>
-                        <Button size="sm" variant="ghost" onClick={() => handleEdit(v)}><Edit2 size={14} className="mr-2" /> Rename</Button>
-                        <Button size="sm" variant="ghost" className="text-red-500" onClick={() => toggleStatus(v)}><Archive size={14} className="mr-2" /> {v.active ? "Deactivate" : "Activate"}</Button>
-                    </>
+                    <div className="flex justify-end gap-1">
+                        <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-white/10" onClick={() => handleEdit(v)} title="Edit">
+                            <Edit2 size={14} className="text-muted-foreground" />
+                        </Button>
+                        <Button size="icon" variant="ghost" className="h-8 w-8 hover:bg-red-500/10" onClick={() => toggleStatus(v)} title="Toggle Status">
+                            <Archive size={14} className={v.active ? "text-red-400" : "text-emerald-400"} />
+                        </Button>
+                    </div>
                 )}
             />
         </div>

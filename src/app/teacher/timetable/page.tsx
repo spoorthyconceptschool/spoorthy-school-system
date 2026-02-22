@@ -139,7 +139,7 @@ export default function TeacherTimetablePage() {
                 <CardContent>
                     {todayData.isHoliday ? (
                         <div className="py-12 flex flex-col items-center justify-center text-red-400 gap-4">
-                            <Calendar className="w-12 h-12 opacity-50" />
+                            <Calendar className="w-12 h-12 opacity-90" />
                             <div className="text-center">
                                 <h3 className="text-2xl font-bold uppercase tracking-widest">Holiday</h3>
                                 <p className="text-sm text-red-400/60 mt-1">School is closed for today. Enjoy your rest!</p>

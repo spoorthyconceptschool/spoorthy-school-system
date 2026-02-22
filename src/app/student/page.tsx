@@ -26,70 +26,107 @@ export default function StudentDashboard() {
     const [useHomeworkFallback, setUseHomeworkFallback] = useState(false);
     const [recentHomework, setRecentHomework] = useState<any[]>([]);
 
-    const schoolId = user?.email?.split('@')[0].toUpperCase();
 
     useEffect(() => {
-        // Load Razorpay Script
+        if (!user?.uid) return;
+
+        // 1. Load Razorpay Script
         const script = document.createElement("script");
         script.src = "https://checkout.razorpay.com/v1/checkout.js";
         script.async = true;
         document.body.appendChild(script);
 
-        const fetchData = async () => {
-            if (!schoolId) return;
-            try {
-                const [configSnap, profileSnap, ledgerSnap] = await Promise.all([
-                    getDoc(doc(db, "config", "razorpay")),
-                    getDoc(doc(db, "students", schoolId)),
-                    getDoc(doc(db, "student_fee_ledgers", `${schoolId}_2025-2026`))
-                ]);
+        // A. Listen to Student Profile
+        // Strategy: Try direct Doc ID first (based on email), then fallback to UID query
+        const schoolIdFromEmail = user?.email?.split('@')[0]?.toUpperCase();
+        if (!schoolIdFromEmail) {
+            console.warn("[Dashboard] Could not derive schoolId from email:", user?.email);
+            setIsLoading(false);
+            return;
+        }
 
-                if (configSnap.exists()) setConfig(configSnap.data() as { keyId: string });
-                if (profileSnap.exists()) setProfile(profileSnap.data());
+        let unsubLedger: (() => void) | null = null;
 
-                if (ledgerSnap.exists()) {
-                    const lData = ledgerSnap.data();
-                    setLedger(lData);
-                    setPaymentStatus(lData.status === "PAID" ? "paid" : "pending");
+        const processProfileSnap = (pData: any, docId: string) => {
+            setProfile(pData);
+            const sId = pData.schoolId || docId;
 
-                    // Default Selection Logic
-                    const initialSelected = new Set<string>();
-                    const initialAmounts: { [key: string]: string } = {};
+            if (sId) {
+                if (unsubLedger) unsubLedger();
+                const yearId = "2025-2026";
+                unsubLedger = onSnapshot(doc(db, "student_fee_ledgers", `${sId}_${yearId}`), (lSnap) => {
+                    if (lSnap.exists()) {
+                        const lData = lSnap.data();
+                        setLedger(lData);
+                        setPaymentStatus(lData.status === "PAID" ? "paid" : "pending");
 
-                    const rawItems = lData.items || [];
-                    const totalReduction = rawItems.filter((i: any) => i.amount < 0).reduce((s: number, i: any) => s + Math.abs(i.amount - (i.paidAmount || 0)), 0);
-                    let reductionRemaining = totalReduction;
+                        const initialSelected = new Set<string>();
+                        const initialAmounts: { [key: string]: string } = {};
+                        const rawItems = lData.items || [];
+                        const totalReduction = rawItems.filter((i: any) => i.amount < 0).reduce((s: number, i: any) => s + Math.abs(i.amount - (i.paidAmount || 0)), 0);
+                        let reductionRemaining = totalReduction;
 
-                    rawItems.filter((i: any) => i.amount > 0).forEach((item: any) => {
-                        const remaining = item.amount - (item.paidAmount || 0);
-                        const discountForThisItem = Math.min(remaining, reductionRemaining);
-                        const netRemaining = remaining - discountForThisItem;
-                        reductionRemaining -= discountForThisItem;
+                        rawItems.filter((i: any) => i.amount > 0).forEach((item: any) => {
+                            const remaining = item.amount - (item.paidAmount || 0);
+                            const discountForThisItem = Math.min(remaining, reductionRemaining);
+                            const netRemaining = remaining - discountForThisItem;
+                            reductionRemaining -= discountForThisItem;
 
-                        if (netRemaining > 0) {
-                            initialSelected.add(item.id);
-                            initialAmounts[item.id] = netRemaining.toString();
-                        }
-                    });
-
-                    setSelectedItems(initialSelected);
-                    setPaymentAmounts(initialAmounts);
-                }
-            } catch (err) {
-                console.error("Dashboard Fetch Error", err);
-            } finally {
+                            if (netRemaining > 0) {
+                                initialSelected.add(item.id);
+                                initialAmounts[item.id] = netRemaining.toString();
+                            }
+                        });
+                        setSelectedItems(initialSelected);
+                        setPaymentAmounts(initialAmounts);
+                    }
+                    setIsLoading(false);
+                }, (err) => {
+                    console.error("[Dashboard] Ledger sync error:", err);
+                    setIsLoading(false);
+                });
+            } else {
                 setIsLoading(false);
             }
         };
 
-        fetchData();
+        // Primary Listener: Direct Document Access
+        const unsubProfile = onSnapshot(doc(db, "students", schoolIdFromEmail), (pSnap) => {
+            if (pSnap.exists()) {
+                processProfileSnap(pSnap.data(), pSnap.id);
+            } else {
+                // Secondary Fallback: UID Query (in case doc ID is not schoolId)
+                const qProfile = query(collection(db, "students"), where("uid", "==", user.uid));
+                onSnapshot(qProfile, (qSnap) => {
+                    if (!qSnap.empty) {
+                        processProfileSnap(qSnap.docs[0].data(), qSnap.docs[0].id);
+                    } else {
+                        console.warn("[Dashboard] Student profile not found in any form.");
+                        setIsLoading(false);
+                    }
+                });
+            }
+        }, (err) => {
+            console.error("[Dashboard] Profile sync error:", err);
+            setIsLoading(false);
+        });
+
+        // Razorpay Config
+        const unsubConfig = onSnapshot(doc(db, "config", "razorpay"), (snap) => {
+            if (snap.exists()) setConfig(snap.data() as { keyId: string });
+        });
 
         return () => {
+            unsubProfile();
+            if (unsubLedger) unsubLedger();
+            unsubConfig();
             if (script && document.body.contains(script)) {
                 document.body.removeChild(script);
             }
         };
-    }, [schoolId]);
+    }, [user]);
+
+    const displaySchoolId = profile?.schoolId || user?.email?.split('@')[0].toUpperCase();
 
     // Homework Real-time Listener for Dashboard
     useEffect(() => {
@@ -294,7 +331,7 @@ export default function StudentDashboard() {
                                 </div>
                                 <div className="space-y-1">
                                     <span className="text-muted-foreground uppercase text-[10px] tracking-widest font-bold">School ID</span>
-                                    <p className="text-lg font-mono font-bold">{schoolId}</p>
+                                    <p className="text-lg font-mono font-bold">{displaySchoolId}</p>
                                 </div>
                                 <div className="space-y-1">
                                     <span className="text-muted-foreground uppercase text-[10px] tracking-widest font-bold">Grade / Class</span>
@@ -521,7 +558,7 @@ export default function StudentDashboard() {
                                     )}
                                 </Button>
 
-                                <p className="text-[9px] text-center text-muted-foreground mt-4 font-bold tracking-widest uppercase opacity-50">
+                                <p className="text-[9px] text-center text-muted-foreground mt-4 font-bold tracking-widest uppercase opacity-90">
                                     🔒 Secure Payment powered by Razorpay
                                 </p>
                             </div>

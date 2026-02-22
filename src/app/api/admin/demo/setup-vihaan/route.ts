@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { adminDb, adminAuth, FieldValue, Timestamp } from "@/lib/firebase-admin";
 
 export async function GET(req: NextRequest) {
     try {
@@ -30,7 +29,7 @@ export async function GET(req: NextRequest) {
 
         if (!vihaanSnap.empty) {
             vihaanId = vihaanSnap.docs[0].id;
-            vihaanUid = vihaanSnap.docs[0].data().uid;
+            vihaanUid = vihaanSnap.docs[0].data()?.uid;
         } else {
             const newRef = adminDb.collection("teachers").doc();
             vihaanId = newRef.id;

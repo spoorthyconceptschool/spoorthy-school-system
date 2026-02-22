@@ -29,6 +29,8 @@ export function AddStudentModal({ onSuccess }: { onSuccess?: () => void }) {
         villageId: "",
         classId: "",
         sectionId: "",
+        dateOfBirth: "",
+        gender: "select",
         transportRequired: false
     });
 
@@ -67,6 +69,8 @@ export function AddStudentModal({ onSuccess }: { onSuccess?: () => void }) {
                 className: selectedClass,
                 sectionId: formData.sectionId,
                 sectionName: selectedSection,
+                dateOfBirth: formData.dateOfBirth,
+                gender: formData.gender,
                 transportRequired: formData.transportRequired
             };
 
@@ -78,12 +82,21 @@ export function AddStudentModal({ onSuccess }: { onSuccess?: () => void }) {
                 body: JSON.stringify(payload)
             });
 
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
+            let data;
+            const resText = await res.text();
+            try {
+                data = JSON.parse(resText);
+            } catch (pE) {
+                console.error("Failed to parse response as JSON:", resText);
+                throw new Error(`[HTTP ${res.status}] Server error. Body snippet: ${resText.substring(0, 200)}`);
+            }
+
+            if (!res.ok) throw new Error(data.error || data.message || "Admission failed on server");
 
             toast({ title: "Admission Successful", type: "success" });
-            setSuccessData({ schoolId: data.data.schoolId, studentName: formData.studentName, className: selectedClass || "N/A" });
-            setFormData({ studentName: "", parentName: "", parentPhone: "", villageId: "", classId: "", sectionId: "", transportRequired: false });
+            const finalSchoolId = data.data?.schoolId || data.schoolId;
+            setSuccessData({ schoolId: finalSchoolId, studentName: formData.studentName, className: selectedClass || "N/A" });
+            setFormData({ studentName: "", parentName: "", parentPhone: "", villageId: "", classId: "", sectionId: "", dateOfBirth: "", gender: "select", transportRequired: false });
             onSuccess?.();
         } catch (error: any) {
             toast({ title: "Admission Failed", description: error.message, type: "error" });
@@ -125,13 +138,15 @@ export function AddStudentModal({ onSuccess }: { onSuccess?: () => void }) {
                                         const ledger = snap.docs[0].data();
                                         printStudentFeeStructure({
                                             studentName: successData.studentName,
-                                            schoolId: successData.schoolId,
+                                            schoolId: successData.schoolId, // Use successData.schoolId not ledger.schoolId just in case
                                             className: successData.className,
                                             items: ledger.items || [],
                                             totalPaid: ledger.totalPaid || 0,
                                             schoolLogo: branding?.schoolLogo,
                                             schoolName: branding?.schoolName
                                         });
+                                    } else {
+                                        toast({ title: "Fee Structure Not Found", description: "The fee ledger for this student hasn't been generated yet. Please try syncing from the Fees page.", type: "warning" });
                                     }
                                     setLoading(false);
                                 }}
@@ -184,6 +199,24 @@ export function AddStudentModal({ onSuccess }: { onSuccess?: () => void }) {
                                     <SelectTrigger><SelectValue placeholder="Section" /></SelectTrigger>
                                     <SelectContent>
                                         {availableSections.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Date of Birth</Label>
+                                <Input type="date" value={formData.dateOfBirth} onChange={e => setFormData({ ...formData, dateOfBirth: e.target.value })} className="block w-full bg-black/50 border-white/10" />
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Gender</Label>
+                                <Select value={formData.gender} onValueChange={val => setFormData({ ...formData, gender: val })}>
+                                    <SelectTrigger className="bg-black/50 border-white/10"><SelectValue placeholder="Select Gender" /></SelectTrigger>
+                                    <SelectContent className="bg-black border-white/10">
+                                        <SelectItem value="male">Male</SelectItem>
+                                        <SelectItem value="female">Female</SelectItem>
+                                        <SelectItem value="other">Other</SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>

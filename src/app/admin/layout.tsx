@@ -10,11 +10,35 @@ import { TopBar } from "@/components/admin/topbar";
 export default function AdminLayout({ children }: { children: React.ReactNode }) {
     const { user, loading } = useAuth();
     const router = useRouter();
+    const [checking, setChecking] = useState(true);
 
     useEffect(() => {
         if (!loading && !user) {
             router.push("/login?redirect=" + encodeURIComponent(window.location.pathname));
+            return;
         }
+
+        if (loading) return;
+
+        const checkRole = async () => {
+            const { doc, getDoc } = await import("firebase/firestore");
+            const { db } = await import("@/lib/firebase");
+            try {
+                const userDoc = await getDoc(doc(db, "users", user!.uid));
+                if (userDoc.exists()) {
+                    const r = userDoc.data().role;
+                    if (r === "TEACHER") {
+                        router.replace("/teacher");
+                        return;
+                    } else if (r === "STUDENT") {
+                        router.replace("/student");
+                        return;
+                    }
+                }
+            } catch (err) { }
+            setChecking(false);
+        };
+        checkRole();
     }, [user, loading, router]);
 
     // Show shell immediately, only block the content if definitely not logged in
@@ -33,7 +57,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <TopBar />
                 <main className="flex-1 p-1 md:p-2 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20">
                     <div className="max-w-none space-y-4 md:space-y-6 px-1 md:px-2">
-                        {(!user && loading) ? (
+                        {(!user && loading) || checking ? (
                             <div className="flex items-center justify-center h-[60vh]">
                                 <Loader2 className="w-8 h-8 animate-spin text-accent" />
                             </div>

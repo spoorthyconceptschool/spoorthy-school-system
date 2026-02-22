@@ -1,6 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
-import { FieldValue } from "firebase-admin/firestore";
+import { adminAuth, adminDb, FieldValue } from "@/lib/firebase-admin";
 
 export async function POST(req: NextRequest) {
     try {
@@ -47,6 +46,21 @@ export async function POST(req: NextRequest) {
             status: "PENDING", // PENDING, APPROVED, REJECTED
             createdAt: FieldValue.serverTimestamp(),
             uid: decodedToken.uid
+        });
+
+        // Notify Admins
+        await adminDb.collection("notifications").add({
+            title: "New Student Leave Request",
+            message: `${studentName} (${schoolId}) requested leave: ${reason}`,
+            type: "LEAVE_REQUEST",
+            status: "UNREAD",
+            target: "admin",
+            createdAt: FieldValue.serverTimestamp(),
+            metadata: {
+                studentId: schoolId,
+                leaveId: leaveRef.id,
+                type: "STUDENT"
+            }
         });
 
         return NextResponse.json({ success: true, message: "Leave request submitted successfully" });

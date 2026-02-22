@@ -125,7 +125,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                         <h1 className="text-2xl md:text-5xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic leading-tight">
                             Faculty Registry
                         </h1>
-                        <p className="text-muted-foreground text-[10px] md:text-lg tracking-tight uppercase font-black opacity-50">Managing <span className="text-white">{teachers.length + staff.length} professional staff</span> members</p>
+                        <p className="text-muted-foreground text-[10px] md:text-lg tracking-tight uppercase font-black opacity-90">Managing <span className="text-white">{teachers.length + staff.length} professional staff</span> members</p>
                     </div>
 
                     <div className="flex items-center gap-2">

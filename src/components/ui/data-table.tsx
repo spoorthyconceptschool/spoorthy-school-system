@@ -34,7 +34,7 @@ interface DataTableProps<T> {
     actions?: (item: T) => React.ReactNode; // Extra kebab menu actions
 }
 
-export function DataTable<T extends { id: string }>({ data, columns, isLoading, onRowClick, actions }: DataTableProps<T>) {
+export function DataTable<T>({ data, columns, isLoading, onRowClick, actions }: DataTableProps<T>) {
     if (isLoading) {
         return (
             <div className="w-full h-48 flex items-center justify-center bg-white/5 rounded-xl animate-pulse">
@@ -74,7 +74,7 @@ export function DataTable<T extends { id: string }>({ data, columns, isLoading, 
                         ) : (
                             data.map((item, index) => (
                                 <TableRow
-                                    key={item.id || index}
+                                    key={(item as any).id || index}
                                     className={cn(
                                         "border-white/5 transition-all duration-300 hover:bg-[#64FFDA]/5 group cursor-default",
                                         onRowClick && "cursor-pointer"
@@ -83,7 +83,7 @@ export function DataTable<T extends { id: string }>({ data, columns, isLoading, 
                                 >
                                     {columns.map((col) => (
                                         <TableCell
-                                            key={`${item.id}-${col.key}`}
+                                            key={`${(item as any).id || index}-${col.key}`}
                                             className={cn(
                                                 "py-2 md:py-4 px-2 md:px-6 font-medium whitespace-nowrap text-[10px] md:text-sm",
                                                 col.cellClassName
@@ -130,10 +130,10 @@ export function DataTable<T extends { id: string }>({ data, columns, isLoading, 
                     Scope: <span className="text-white ml-1">{data.length} items</span>
                 </div>
                 <div className="flex gap-1 md:gap-2">
-                    <Button variant="ghost" size="sm" disabled className="h-6 md:h-8 px-2 md:px-4 text-[8px] md:text-[10px] font-black uppercase tracking-widest border border-white/10 opacity-50">
+                    <Button variant="ghost" size="sm" disabled className="h-6 md:h-8 px-2 md:px-4 text-[8px] md:text-[10px] font-black uppercase tracking-widest border border-white/10 opacity-90">
                         Prev
                     </Button>
-                    <Button variant="ghost" size="sm" disabled className="h-6 md:h-8 px-2 md:px-4 text-[8px] md:text-[10px] font-black uppercase tracking-widest border border-white/10 opacity-50">
+                    <Button variant="ghost" size="sm" disabled className="h-6 md:h-8 px-2 md:px-4 text-[8px] md:text-[10px] font-black uppercase tracking-widest border border-white/10 opacity-90">
                         Next
                     </Button>
                 </div>
