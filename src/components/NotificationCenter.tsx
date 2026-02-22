@@ -77,7 +77,7 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
                     const unsubAllFaculty = onSnapshot(qAllFaculty, (snap) => {
                         if (!isMounted) return;
                         updateNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
-                    });
+                    }, (err) => console.error("Faculty notification listener error:", err));
                     unsubscribes.push(unsubAllFaculty);
 
                     if (!tSnap.empty) {
@@ -88,7 +88,7 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
                             const unsubSchool = onSnapshot(qSchool, (snap) => {
                                 if (!isMounted) return;
                                 updateNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
-                            });
+                            }, (err) => console.error("School notification listener error:", err));
                             unsubscribes.push(unsubSchool);
                         }
                     }
@@ -103,7 +103,7 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
                     const unsubAllStudents = onSnapshot(qAllStudents, (snap) => {
                         if (!isMounted) return;
                         updateNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
-                    });
+                    }, (err) => console.error("Global student notification listener error:", err));
                     unsubscribes.push(unsubAllStudents);
 
                     if (!sSnap.empty) {
