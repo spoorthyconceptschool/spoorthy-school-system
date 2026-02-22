@@ -40,14 +40,30 @@ function FacultyManagementContent() {
                     </p>
                 </div>
 
-                {activeTab === "directory" && (
+                <div className="flex items-center gap-2 md:gap-3">
                     <Button
-                        onClick={() => directoryTab === 'teachers' ? setShowTeacherModal(true) : setShowStaffModal(true)}
-                        className="h-10 md:h-12 bg-white text-black hover:bg-zinc-200 rounded-xl font-black uppercase tracking-tighter px-4 md:px-6 shadow-lg shadow-white/10 text-xs md:text-sm"
+                        onClick={() => setActiveTab("queries")}
+                        variant="outline"
+                        className={cn(
+                            "h-10 md:h-12 border-white/10 rounded-xl font-black uppercase tracking-tighter px-4 md:px-6 text-xs md:text-sm transition-all shadow-xl",
+                            activeTab === 'queries'
+                                ? "bg-accent text-black border-accent"
+                                : "bg-white/5 text-white hover:bg-white/10"
+                        )}
                     >
-                        <Plus className="w-3.5 h-3.5 md:w-4 md:h-4 mr-2 stroke-[3]" /> Add {directoryTab === 'teachers' ? 'Teacher' : 'Staff'}
+                        <MessageSquare className={cn("w-3.5 h-3.5 md:w-4 md:h-4 mr-2", activeTab === 'queries' ? "text-black" : "text-accent")} />
+                        Staff Queries
                     </Button>
-                )}
+
+                    {activeTab === "directory" && (
+                        <Button
+                            onClick={() => directoryTab === 'teachers' ? setShowTeacherModal(true) : setShowStaffModal(true)}
+                            className="h-10 md:h-12 bg-white text-black hover:bg-zinc-200 rounded-xl font-black uppercase tracking-tighter px-4 md:px-6 shadow-lg shadow-white/10 text-xs md:text-sm"
+                        >
+                            <Plus className="w-3.5 h-3.5 md:w-4 md:h-4 mr-2 stroke-[3]" /> Add {directoryTab === 'teachers' ? 'Teacher' : 'Staff'}
+                        </Button>
+                    )}
+                </div>
             </div>
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
