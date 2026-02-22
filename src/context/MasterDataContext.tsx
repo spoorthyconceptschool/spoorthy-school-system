@@ -106,7 +106,9 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
             setData(prev => ({ ...prev, ...newState }));
         };
 
-        onValue(dataRef, callback);
+        onValue(dataRef, callback, (error) => {
+            console.error("RTDB Error (master):", error);
+        });
         return () => off(dataRef, "value", callback);
     }, []);
 
@@ -167,6 +169,14 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
 
                 setData(prev => ({ ...prev, academicYears: yearsMap }));
             }
+        }, (error) => {
+            console.error("Firestore Error (config/academic_years):", error);
+            setData(prev => ({
+                ...prev,
+                academicYears: {
+                    "2025-2026": { id: "2025-2026", name: "2025-2026", active: true, startDate: "", endDate: "" }
+                }
+            }));
         });
 
         return () => unsub();

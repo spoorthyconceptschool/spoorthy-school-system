@@ -60,6 +60,8 @@ export function Facilities() {
                     setActiveIndex(list.length); // Start in the middle set
                 }
             }
+        }, (error) => {
+            console.error("RTDB Error (facilities):", error);
         });
         return () => unsub();
     }, []);
@@ -256,6 +258,8 @@ export function Leadership() {
     useEffect(() => {
         const unsub = onValue(ref(rtdb, 'siteContent/home/leadership'), (snap) => {
             if (snap.exists()) setLeaders((prev: any) => ({ ...prev, ...snap.val() }));
+        }, (error) => {
+            console.error("RTDB Error (leadership):", error);
         });
         return () => unsub();
     }, []);
@@ -391,6 +395,8 @@ export function GalleryPreview() {
     useEffect(() => {
         const unsub = onValue(ref(rtdb, 'siteContent/home/gallery'), (snap) => {
             if (snap.exists() && Array.isArray(snap.val())) setImages(snap.val());
+        }, (error) => {
+            console.error("RTDB Error (gallery):", error);
         });
         return () => unsub();
     }, []);

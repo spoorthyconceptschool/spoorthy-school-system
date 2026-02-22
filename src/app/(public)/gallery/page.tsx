@@ -45,6 +45,10 @@ export default function SmoothParallaxGallery() {
             const mixed = [...realImages, ...DEMO_IMAGES].slice(0, 20);
             setImages(mixed);
             setLoading(false);
+        }, (error) => {
+            console.error("RTDB Error (gallery page):", error);
+            setImages(DEMO_IMAGES.slice(0, 20)); // Fallback to demo images
+            setLoading(false);
         });
         return () => unsub();
     }, []);

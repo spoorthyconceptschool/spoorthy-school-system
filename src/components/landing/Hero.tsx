@@ -25,6 +25,9 @@ export function Hero() {
                 setContent(snap.val());
             }
             setLoading(false);
+        }, (error) => {
+            console.error("RTDB Error (hero):", error);
+            setLoading(false);
         });
 
         // Detect mobile for video optimization
