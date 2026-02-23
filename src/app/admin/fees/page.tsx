@@ -35,7 +35,7 @@ export default function FeeDashboard() {
     const modules = [
         {
             title: "Manage Fee Types",
-            description: "Configure standard academic term fees and installment plans for all classes.",
+            description: "Configure standard academic fee payment and installment plans for all classes.",
             icon: Settings2,
             href: "/admin/fees/config",
             color: "text-blue-400",

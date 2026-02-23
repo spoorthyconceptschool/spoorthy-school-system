@@ -320,7 +320,7 @@ export function FeeSlipGenerator({ students }: FeeSlipGeneratorProps) {
                     {step === "SELECT" && (
                         <div className="space-y-4">
                             <div className="bg-amber-500/5 border border-amber-500/10 p-3 rounded-lg text-xs text-amber-200/70">
-                                Select the classes you want to generate slips for. Only students with pending term fees will be included.
+                                Select the classes you want to generate slips for. Only students with pending fee payment will be included.
                             </div>
 
                             <div className="flex justify-between items-center px-1">

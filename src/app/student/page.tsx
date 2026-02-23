@@ -362,7 +362,7 @@ export default function StudentDashboard() {
                                         </div>
                                         <div>
                                             <h3 className="font-bold text-green-400 text-sm italic uppercase tracking-widest">Active Scholarships & Credits</h3>
-                                            <p className="text-[10px] text-green-400/60 font-bold uppercase">These benefits are automatically deducted from your term fees below.</p>
+                                            <p className="text-[10px] text-green-400/60 font-bold uppercase">These benefits are automatically deducted from your fee payment below.</p>
                                         </div>
                                     </div>
                                     <div className="text-right">
@@ -378,7 +378,7 @@ export default function StudentDashboard() {
                                 {/* Term Fees */}
                                 <div className="glass-panel rounded-3xl overflow-hidden border-white/5 shadow-2xl">
                                     <div className="bg-white/5 px-6 py-4 flex justify-between items-center border-b border-white/10">
-                                        <h3 className="font-bold text-accent tracking-wide uppercase text-xs">Term Fees</h3>
+                                        <h3 className="font-bold text-accent tracking-wide uppercase text-xs">Fee Payment</h3>
                                         <span className="text-[10px] text-muted-foreground bg-white/5 px-2 py-1 rounded">MANDATORY</span>
                                     </div>
                                     <div className="p-2">
@@ -442,7 +442,7 @@ export default function StudentDashboard() {
                                                         </div>
                                                     </div>
                                                 );
-                                            }) : <p className="p-8 text-center text-muted-foreground text-sm">No term fees assigned or all paid.</p>;
+                                            }) : <p className="p-8 text-center text-muted-foreground text-sm">No fee payment assigned or all paid.</p>;
                                         })()}
                                     </div>
                                 </div>
