@@ -179,7 +179,7 @@ export default function StudentFeesPage() {
     return (
         <div className="max-w-6xl mx-auto space-y-8 pb-10">
             <div className="flex justify-between items-center">
-                <h1 className="text-3xl font-bold text-[#E6F1FF]">Fees & Payments</h1>
+                <h1 className="text-3xl font-bold text-[#E6F1FF]">Fee Payment</h1>
                 <Badge variant={totalDue <= 0 ? "default" : "destructive"} className={totalDue <= 0 ? "bg-green-500/20 text-green-400" : ""}>
                     {totalDue <= 0 ? "All Dues Cleared" : "Payment Pending"}
                 </Badge>
@@ -208,7 +208,7 @@ export default function StudentFeesPage() {
                                 disabled={paying}
                                 className="w-full bg-[#3B82F6] hover:bg-[#2563EB] text-white font-bold h-12 text-lg shadow-[0_0_20px_-5px_#3B82F6]"
                             >
-                                {paying ? <Loader2 className="animate-spin mr-2" /> : "Pay Fees Now"}
+                                {paying ? <Loader2 className="animate-spin mr-2" /> : "Make Payment Now"}
                             </Button>
                         ) : (
                             <div className="flex items-center justify-center p-4 bg-green-500/10 rounded-lg text-green-400 font-medium">
@@ -269,7 +269,7 @@ export default function StudentFeesPage() {
             <Card className="bg-[#112240] border-[#64FFDA]/10">
                 <CardHeader>
                     <CardTitle className="text-[#E6F1FF] flex items-center gap-2">
-                        <FileText className="w-5 h-5" /> Fee Breakdown
+                        <FileText className="w-5 h-5" /> Fee Payment Breakdown
                     </CardTitle>
                 </CardHeader>
                 <CardContent>

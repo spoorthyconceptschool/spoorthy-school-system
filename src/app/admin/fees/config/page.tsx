@@ -141,13 +141,13 @@ export default function FeesPage() {
         <div className="space-y-6 animate-in fade-in duration-500 pb-20">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                 <div>
-                    <h1 className="font-display text-2xl md:text-3xl font-bold">Fee Management</h1>
+                    <h1 className="font-display text-2xl md:text-3xl font-bold">Fee Payment Management</h1>
                     <p className="text-sm text-muted-foreground">Configure fee payment for each class and transportation.</p>
                 </div>
                 <div className="flex flex-wrap gap-2">
                     <Button asChild variant="secondary" className="flex-1 sm:flex-none h-9 border-white/10 bg-white/10 hover:bg-white/20 text-white">
                         <Link href="/admin/fees/custom">
-                            Custom Fees
+                            Custom Fee Payment
                         </Link>
                     </Button>
                     <Button onClick={handleSyncAll} disabled={syncing || saving} variant="outline" className="flex-1 sm:flex-none gap-2 border-emerald-500/20 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20">

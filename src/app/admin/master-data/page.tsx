@@ -190,7 +190,7 @@ export default function MasterDataPage() {
                 <div className="space-y-2 md:space-y-3 relative z-10 text-center md:text-left">
                     <h3 className="text-xl md:text-3xl font-bold text-white italic">Architecture Sync</h3>
                     <p className="text-xs md:text-base text-muted-foreground max-w-2xl font-medium">
-                        Changes to Master Data automatically propagate across Attendance, Fees, and Exams.
+                        Changes to Master Data automatically propagate across Attendance, Fee Payment, and Exams.
                         Ensure all grades and subjects are mapped correctly for seamless operations.
                     </p>
                 </div>

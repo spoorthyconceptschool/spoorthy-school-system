@@ -349,7 +349,7 @@ export default function StudentDashboard() {
                     <div className="space-y-6">
                         <h2 className="text-2xl font-bold flex items-center gap-3 italic">
                             <Wallet className="w-6 h-6 text-accent" />
-                            Fee Breakdown & Selection
+                            Fee Payment Breakdown & Selection
                         </h2>
 
                         {/* Applied Benefits Header (Non-selectable) */}

@@ -204,10 +204,10 @@ export default function AdminDashboard() {
                         onClick={() => router.push("/admin/payments")}
                     />
                     <KPICard
-                        title="Outstanding Dues"
+                        title="Outstanding Fee Payment"
                         value={`₹${stats.pendingFees.toLocaleString()}`}
                         icon={<Database className="w-4 h-4 text-rose-400" />}
-                        trend="Fee Recovery"
+                        trend="Fee Payment Recovery"
                         className="bg-rose-500/5 border-rose-500/10 cursor-pointer hover:bg-rose-500/10 transition-all"
                         onClick={() => router.push("/admin/fees/pending")}
                     />
@@ -378,7 +378,7 @@ export default function AdminDashboard() {
                     )}
                 />
                 <KPICard
-                    title="Fee Balance"
+                    title="Fee Payment Balance"
                     value={`₹${stats.pendingFees}`}
                     icon={<Database className="w-4 h-4 text-purple-400" />}
                     trend="Outstanding"
