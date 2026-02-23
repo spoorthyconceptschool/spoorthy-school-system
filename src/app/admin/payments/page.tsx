@@ -286,7 +286,7 @@ export default function PaymentsPage() {
     const cashCollection = payments.filter(p => p.method === "cash").reduce((sum, p) => sum + p.amount, 0);
 
     return (
-        <div className="space-y-4 md:space-y-6 animate-in fade-in duration-500 max-w-none p-0 pb-20">
+        <div className="space-y-4 md:space-y-6 animate-in fade-in duration-200 max-w-none p-0 pb-20">
             <div className="flex flex-col md:flex-row md:items-center md:justify-between pt-2 md:pt-4 gap-4 md:gap-6 px-2 md:px-0">
                 <div className="space-y-0.5 md:space-y-1">
                     <h1 className="text-2xl md:text-5xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic leading-tight">
@@ -432,19 +432,25 @@ export default function PaymentsPage() {
                 <div className="bg-black/20 border border-white/5 backdrop-blur-sm p-3 md:p-6 rounded-xl flex flex-col md:flex-row md:items-center justify-between text-center md:text-left">
                     <div>
                         <p className="text-[8px] md:text-sm text-muted-foreground uppercase font-black tracking-widest">Total</p>
-                        <h3 className="text-sm md:text-2xl font-bold mt-0.5 md:mt-1 text-white italic truncate">₹ {totalCollection.toLocaleString()}</h3>
+                        <h3 className="text-sm md:text-2xl font-bold mt-0.5 md:mt-1 text-white italic truncate">
+                            {loading ? <div className="h-8 w-20 bg-white/5 animate-pulse rounded" /> : `₹ ${totalCollection.toLocaleString()}`}
+                        </h3>
                     </div>
                 </div>
                 <div className="bg-black/20 border border-white/5 backdrop-blur-sm p-3 md:p-6 rounded-xl flex flex-col md:flex-row md:items-center justify-between text-center md:text-left">
                     <div>
                         <p className="text-[8px] md:text-sm text-muted-foreground uppercase font-black tracking-widest">Online</p>
-                        <h3 className="text-sm md:text-2xl font-bold mt-0.5 md:mt-1 text-blue-400 italic truncate">₹ {onlineCollection.toLocaleString()}</h3>
+                        <h3 className="text-sm md:text-2xl font-bold mt-0.5 md:mt-1 text-blue-400 italic truncate">
+                            {loading ? <div className="h-8 w-20 bg-white/5 animate-pulse rounded" /> : `₹ ${onlineCollection.toLocaleString()}`}
+                        </h3>
                     </div>
                 </div>
                 <div className="bg-black/20 border border-white/5 backdrop-blur-sm p-3 md:p-6 rounded-xl flex flex-col md:flex-row md:items-center justify-between text-center md:text-left">
                     <div>
                         <p className="text-[8px] md:text-sm text-muted-foreground uppercase font-black tracking-widest">Cash</p>
-                        <h3 className="text-sm md:text-2xl font-bold mt-0.5 md:mt-1 text-emerald-400 italic truncate">₹ {cashCollection.toLocaleString()}</h3>
+                        <h3 className="text-sm md:text-2xl font-bold mt-0.5 md:mt-1 text-emerald-400 italic truncate">
+                            {loading ? <div className="h-8 w-20 bg-white/5 animate-pulse rounded" /> : `₹ ${cashCollection.toLocaleString()}`}
+                        </h3>
                     </div>
                 </div>
             </div>

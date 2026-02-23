@@ -17,6 +17,7 @@ function Navbar() {
     const { branding } = useMasterData();
     const [scrolled, setScrolled] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [imageError, setImageError] = useState(false);
     const { scrollY } = useScroll();
 
     useMotionValueEvent(scrollY, "change", (latest) => {
@@ -51,12 +52,13 @@ function Navbar() {
 
                         {/* Brand Identity */}
                         <Link href="/" className="flex items-center gap-3 md:gap-4 group z-50 relative shrink-0">
-                            {branding.schoolLogo ? (
-                                <div className="relative w-10 h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 overflow-hidden rounded-xl bg-white/5 p-1 group-hover:scale-105 transition-transform duration-500 border border-white/10 shadow-lg shrink-0">
+                            {branding.schoolLogo && !imageError ? (
+                                <div className="relative w-10 h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 overflow-hidden rounded-xl bg-white/5 p-1 group-hover:scale-105 transition-transform duration-500 border border-white/10 shadow-lg shrink-0 flex items-center justify-center">
                                     <img
                                         src={branding.schoolLogo}
                                         alt={branding.schoolName}
                                         className="w-full h-full object-contain filter drop-shadow-md"
+                                        onError={() => setImageError(true)}
                                     />
                                 </div>
                             ) : null}
@@ -151,7 +153,7 @@ function Navbar() {
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
     return (
-        <ReactLenis root options={{ lerp: 0.1, duration: 1.0, smoothWheel: true, wheelMultiplier: 4, touchMultiplier: 3 }}>
+        <ReactLenis root options={{ lerp: 0.1, duration: 1.0, smoothWheel: true, wheelMultiplier: 1.2, touchMultiplier: 1.2 }}>
             <div className="min-h-screen bg-[#0A192F] text-white font-sans selection:bg-accent selection:text-black">
                 <Navbar />
                 <main className="relative z-10">

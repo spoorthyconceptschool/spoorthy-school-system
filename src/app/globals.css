@@ -222,4 +222,19 @@
   --chart-4: #FCA311;
   --chart-5: #E71D36;
   --radius: 0.5rem;
+
+  /* Custom Animations */
+  @keyframes marquee {
+    0% {
+      transform: translateX(0);
+    }
+
+    100% {
+      transform: translateX(-50%);
+    }
+  }
+}
+
+.animate-marquee {
+  animation: marquee 40s linear infinite;
 }

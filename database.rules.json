@@ -1,7 +1,7 @@
 {
     "rules": {
         "master": {
-            ".read": "auth != null",
+            ".read": "true",
             ".write": "auth != null && (auth.token.role == 'ADMIN' || auth.token.role == 'SUPER_ADMIN')"
         },
         "siteContent": {

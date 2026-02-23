@@ -108,25 +108,25 @@ export function Facilities() {
     };
 
     const getDim = (idx: number) => {
-        // Calculate distance considering the circular nature for scaling logic
         const dist = Math.abs(idx - activeIndex);
         const isMobile = typeof window !== 'undefined' ? window.innerWidth < 768 : false;
 
         if (dist === 0) return {
             w: isMobile ? 280 : 520, h: isMobile ? 280 : 520,
-            opacity: 1, grayscale: 0, blur: 0, scale: 1, z: 40
+            opacity: 1, scale: 1, z: 40, filter: "grayscale(0) blur(0px)"
         };
         if (dist === 1) return {
             w: isMobile ? 120 : 260, h: isMobile ? 180 : 400,
-            opacity: 0.6, grayscale: 0.8, blur: 2, scale: 0.94, z: 30
+            opacity: 0.6, scale: 0.94, z: 30, filter: "grayscale(0.8) blur(2px)"
         };
+        // Simplified for performance: No blur/grayscale beyond dist 1
         if (dist === 2) return {
             w: isMobile ? 100 : 200, h: isMobile ? 140 : 320,
-            opacity: 0.3, grayscale: 1, blur: 4, scale: 0.88, z: 20
+            opacity: 0.3, scale: 0.88, z: 20, filter: "grayscale(1) blur(0px)"
         };
         return {
             w: isMobile ? 80 : 160, h: isMobile ? 110 : 240,
-            opacity: 0.1, grayscale: 1, blur: 8, scale: 0.8, z: 10
+            opacity: 0.1, scale: 0.8, z: 10, filter: "grayscale(1) blur(0px)"
         };
     };
 
@@ -176,9 +176,10 @@ export function Facilities() {
                                         height: dim.h,
                                         opacity: dim.opacity,
                                         scale: dim.scale,
-                                        filter: `grayscale(${dim.grayscale}) blur(${dim.blur}px)`,
+                                        filter: dim.filter,
                                     }}
                                     transition={isJumping ? { duration: 0 } : { type: "spring", stiffness: 80, damping: 20 }}
+                                    style={{ willChange: "width, height, transform, opacity, filter" }}
                                     className={cn(
                                         "relative rounded-[2.5rem] md:rounded-[4.5rem] overflow-hidden cursor-pointer bg-[#112240]",
                                         isFocused ? "z-40 ring-4 ring-[#64FFDA]/20 shadow-[0_0_100px_-20px_rgba(100,255,218,0.4)]" : "z-10"

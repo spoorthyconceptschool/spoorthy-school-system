@@ -68,9 +68,9 @@ interface SidebarProps {
 export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
-    const { user, signOut } = useAuth();
+    const { user, role, signOut } = useAuth();
     const { branding } = useMasterData();
-    const [role, setRole] = useState<string | null>(null);
+    const [imageError, setImageError] = useState(false);
     const [pendingLeaves, setPendingLeaves] = useState(0);
 
     useEffect(() => {
@@ -87,26 +87,6 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
         });
 
         return () => unsubLeaves();
-    }, [user]);
-
-    useEffect(() => {
-        if (!user) {
-            setRole(null);
-            return;
-        }
-
-        const cachedRole = sessionStorage.getItem(`role_${user.uid}`);
-        if (cachedRole) setRole(cachedRole);
-
-        const unsub = onSnapshot(doc(db, "users", user.uid), (d: any) => {
-            if (d.exists()) {
-                const newRole = d.data().role;
-                setRole(newRole);
-                sessionStorage.setItem(`role_${user.uid}`, newRole);
-            }
-        });
-
-        return () => unsub();
     }, [user]);
 
     const filteredNav = NAV_ITEMS.filter(item => {
@@ -148,18 +128,14 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
                         className="flex items-center gap-3 select-none overflow-hidden"
                     >
                         <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl bg-white flex items-center justify-center p-1.5 border border-white/20 shadow-lg relative overflow-hidden">
-                            {branding.schoolLogo ? (
+                            {branding.schoolLogo && !imageError ? (
                                 <img
                                     src={branding.schoolLogo}
                                     alt="Logo"
                                     className="w-full h-full object-contain"
-                                    onError={(e) => {
-                                        (e.currentTarget as HTMLImageElement).parentElement?.classList.add('broken-image');
-                                        e.currentTarget.style.display = 'none';
-                                    }}
+                                    onError={() => setImageError(true)}
                                 />
-                            ) : null}
-                            {(!branding.schoolLogo || typeof window !== 'undefined' && document.querySelector('.broken-image')) && (
+                            ) : (
                                 <div className="absolute inset-0 w-full h-full bg-[#64FFDA]/10 flex items-center justify-center text-[#64FFDA] font-bold font-mono text-xl">S</div>
                             )}
                         </div>

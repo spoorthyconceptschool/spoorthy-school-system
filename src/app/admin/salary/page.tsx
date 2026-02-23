@@ -66,7 +66,7 @@ export default function SalaryPage() {
                 };
             });
 
-            const allEmployees = [...teachers, ...staff].sort((a: any, b: any) => a.name.localeCompare(b.name));
+            const allEmployees = [...teachers, ...staff].sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
             setEmployees(allEmployees);
 
             // 3. Fetch Payments
@@ -142,10 +142,9 @@ export default function SalaryPage() {
         setIsPayModalOpen(true);
     };
 
-    // Filter Logic
     const filteredEmployees = employees.filter(emp => {
-        const matchesSearch = emp.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
-            (emp.schoolId && emp.schoolId.toLowerCase().includes(searchTerm.toLowerCase()));
+        const matchesSearch = (emp.name || "").toLowerCase().includes(searchTerm.toLowerCase()) ||
+            (emp.schoolId && (emp.schoolId || "").toLowerCase().includes(searchTerm.toLowerCase()));
 
         const matchesRole = filterRole === "ALL" || emp.personType === filterRole;
 

@@ -1,14 +1,14 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Check, X, Save, UserX, Search, Download, Printer } from "lucide-react";
+import { Loader2, Check, X, Save, UserX, Search, Download, Printer, Users } from "lucide-react";
 import { toast } from "@/lib/toast-store";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -24,7 +24,9 @@ export default function TeacherAttendanceManager({
     defaultDate?: string;
 }) {
     const { user } = useAuth();
-    const { branding } = useMasterData();
+    const { branding, teachers: globalTeachers } = useMasterData();
+
+    // Memoize the mapped teacher list to prevent unnecessary re-renders/re-fetches
     const [teachers, setTeachers] = useState<any[]>([]);
     const [attendance, setAttendance] = useState<Record<string, 'P' | 'A'>>({});
     const [loading, setLoading] = useState(true);
@@ -40,25 +42,21 @@ export default function TeacherAttendanceManager({
 
     const date = defaultDate || new Date().toISOString().split('T')[0];
 
-    useEffect(() => {
-        if (viewStats) {
-            fetchStats();
-        } else {
-            fetchData();
-        }
-    }, [date, viewStats, statsMonth]);
-
     const fetchStats = async () => {
         setLoading(true);
         try {
-            // Re-fetch teachers
-            const tQuery = query(collection(db, "teachers"), where("status", "==", "ACTIVE"));
-            const tSnap = await getDocs(tQuery);
+            // 1. Fetch Teachers first
+            const tQ = query(collection(db, "teachers"), where("status", "==", "ACTIVE"));
+            const tSnap = await getDocs(tQ);
             const tList = tSnap.docs.map(d => ({
-                id: d.id, schoolId: d.data().schoolId || d.id, name: d.data().name
+                id: d.id,
+                schoolId: d.data().schoolId || d.id,
+                name: d.data().name,
+                uid: d.data().uid
             })).sort((a, b) => a.name.localeCompare(b.name));
+            setTeachers(tList);
 
-            // Fetch Attendance in range
+            // 2. Fetch Attendance in range
             const currentYear = new Date().getFullYear();
             let startKey, endKey;
 
@@ -67,14 +65,6 @@ export default function TeacherAttendanceManager({
                 endKey = `TEACHERS_${currentYear}-12-31`;
             } else {
                 startKey = `TEACHERS_${currentYear}-${statsMonth}-01`;
-                // For months with 30 days, this will still work as Firebase range queries are inclusive.
-                // For Feb, it will also work. The key is that the end date is always the last day of the month.
-                // We can simplify by just using the month and letting Firebase handle the range.
-                // However, to be precise for the last day, we can calculate it.
-                // For simplicity, using -31 as a general upper bound for the month part of the key.
-                // Firebase will match up to the actual last day of the month if the key format is consistent.
-                // A more robust way would be to calculate the actual last day of the month.
-                // For now, -31 is a safe upper bound for the day part of the key.
                 endKey = `TEACHERS_${currentYear}-${statsMonth}-31`;
             }
 
@@ -109,7 +99,6 @@ export default function TeacherAttendanceManager({
                 };
             });
             setStatsData(data);
-            setTeachers(tList);
         } catch (error: any) {
             console.error("Stats error", error);
             toast({ title: "Error", description: "Failed to load stats", type: "error" });
@@ -196,37 +185,39 @@ export default function TeacherAttendanceManager({
         win?.document.close();
     };
 
-    const fetchData = async () => {
+    const fetchDailyData = async () => {
         setLoading(true);
         try {
-            // 1. Fetch Active Teachers
-            const tQuery = query(
-                collection(db, "teachers"),
-                where("status", "==", "ACTIVE")
-            );
-            const tSnap = await getDocs(tQuery);
-            const tList = tSnap.docs.map(d => {
-                const data = d.data();
-                return {
-                    id: d.id, // usually the schoolId if set properly, or auto-id
-                    schoolId: data.schoolId || d.id, // Reliable ID for attendance
-                    name: data.name,
-                    uid: data.uid
-                };
-            }).sort((a, b) => a.name.localeCompare(b.name));
-
+            // 1. Fetch Teachers locally
+            const tQ = query(collection(db, "teachers"), where("status", "==", "ACTIVE"));
+            const tSnap = await getDocs(tQ);
+            const tList = tSnap.docs.map(d => ({
+                id: d.id,
+                schoolId: d.data().schoolId || d.id,
+                name: d.data().name,
+                uid: d.data().uid
+            })).sort((a, b) => a.name.localeCompare(b.name));
             setTeachers(tList);
 
-            // 2. Fetch Approved Leaves for this date
-            // Note: leave_requests stores teacherId as UID usually.
+            if (tList.length === 0) {
+                setLoading(false);
+                return;
+            }
+
+            // 2. Fetch Leaves and Attendance
             const lQuery = query(
                 collection(db, "leave_requests"),
                 where("status", "==", "APPROVED")
             );
-            const lSnap = await getDocs(lQuery);
-            const leaveMap: Record<string, boolean> = {}; // using schoolId as key
 
-            // Create UID -> SchoolID map
+            const attId = `TEACHERS_${date}`;
+
+            const [lSnap, attSnap] = await Promise.all([
+                getDocs(lQuery),
+                getDoc(doc(db, "attendance", attId))
+            ]);
+
+            const leaveMap: Record<string, boolean> = {}; // using schoolId as key
             const uidToSchoolId: Record<string, string> = {};
             tList.forEach(t => { if (t.uid) uidToSchoolId[t.uid] = t.schoolId; });
 
@@ -234,16 +225,10 @@ export default function TeacherAttendanceManager({
                 const l = doc.data();
                 if (l.fromDate <= date && l.toDate >= date) {
                     const sid = uidToSchoolId[l.teacherId];
-                    if (sid) {
-                        leaveMap[sid] = true;
-                    }
+                    if (sid) leaveMap[sid] = true;
                 }
             });
             setLeavesMap(leaveMap);
-
-            // 3. Fetch Existing Attendance
-            const attId = `TEACHERS_${date}`;
-            const attSnap = await getDoc(doc(db, "attendance", attId));
 
             if (attSnap.exists()) {
                 setAlreadyMarked(true);
@@ -264,6 +249,14 @@ export default function TeacherAttendanceManager({
             setLoading(false);
         }
     };
+
+    useEffect(() => {
+        if (viewStats) {
+            fetchStats();
+        } else {
+            fetchDailyData();
+        }
+    }, [date, viewStats, statsMonth]);
 
     const toggleStatus = (schoolId: string) => {
         setAttendance(prev => ({
@@ -316,11 +309,9 @@ export default function TeacherAttendanceManager({
 
     // Filter Teachers
     const filteredTeachers = teachers.filter(t =>
-        t.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        t.schoolId.toLowerCase().includes(searchQuery.toLowerCase())
+        (t.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (t.schoolId || "").toLowerCase().includes(searchQuery.toLowerCase())
     );
-
-    if (loading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin" /></div>;
 
     const stats = {
         total: teachers.length,
@@ -329,25 +320,25 @@ export default function TeacherAttendanceManager({
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-in fade-in duration-200">
             {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card className="bg-black/20 border-white/10 overflow-hidden">
                     <div className="p-4 flex items-center justify-between">
                         <div>
-                            <div className="text-xs text-muted-foreground uppercase">Total Teachers</div>
-                            <div className="text-2xl font-bold">{stats.total}</div>
+                            <div className="text-xs text-muted-foreground uppercase font-black opacity-50 tracking-tighter">Total Teachers</div>
+                            <div className="text-2xl font-bold">{loading ? <div className="h-8 w-12 bg-white/5 animate-pulse rounded" /> : stats.total}</div>
                         </div>
                         <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
-                            <Check className="w-5 h-5" />
+                            <Users className="w-5 h-5" />
                         </div>
                     </div>
                 </Card>
                 <Card className="bg-black/20 border-white/10 overflow-hidden">
                     <div className="p-4 flex items-center justify-between border-l-4 border-emerald-500">
                         <div>
-                            <div className="text-xs text-muted-foreground uppercase">Present</div>
-                            <div className="text-2xl font-bold text-emerald-500">{stats.present}</div>
+                            <div className="text-xs text-muted-foreground uppercase font-black opacity-50 tracking-tighter">Present</div>
+                            <div className="text-2xl font-bold text-emerald-500">{loading ? <div className="h-8 w-12 bg-white/5 animate-pulse rounded" /> : stats.present}</div>
                         </div>
                         <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
                             <Check className="w-5 h-5" />
@@ -357,8 +348,8 @@ export default function TeacherAttendanceManager({
                 <Card className="bg-black/20 border-white/10 overflow-hidden">
                     <div className="p-4 flex items-center justify-between border-l-4 border-red-500">
                         <div>
-                            <div className="text-xs text-muted-foreground uppercase">Absent</div>
-                            <div className="text-2xl font-bold text-red-500">{stats.absent}</div>
+                            <div className="text-xs text-muted-foreground uppercase font-black opacity-50 tracking-tighter">Absent</div>
+                            <div className="text-2xl font-bold text-red-500">{loading ? <div className="h-8 w-12 bg-white/5 animate-pulse rounded" /> : stats.absent}</div>
                         </div>
                         <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
                             <X className="w-5 h-5" />

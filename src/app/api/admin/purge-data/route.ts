@@ -109,27 +109,27 @@ export async function POST(req: NextRequest) {
             collectionsToDelete.forEach(col => tasks.push(nukeCollection(col)));
 
             // B. FIRESTORE USERS (Linked to Auth but stored in DB)
-            // Logic for FULL_SYSTEM to protect SAFE Users
-            if (purgeType === 'FULL_SYSTEM') {
-                // 'users' already excluded via PROTECTED_COLLECTIONS check above
-            }
-
-            collectionsToDelete.forEach(col => tasks.push(nukeCollection(col)));
-
-            // B. FIRESTORE USERS (Linked to Auth but stored in DB)
             // Always run this safe deletion for users if it wasn't nuked above
             tasks.push((async () => {
                 const snap = await adminDb.collection("users").get();
-                const batch = adminDb.batch();
-                let count = 0;
+                let batch = adminDb.batch();
+                let operations = 0;
+                let batchPromises: Promise<any>[] = [];
+
                 snap.docs.forEach((doc: any) => {
                     const d = doc.data();
                     if (!SAFE_UIDS.includes(doc.id) && !SAFE_EMAILS.includes(d.email?.toLowerCase())) {
                         batch.delete(doc.ref);
-                        count++;
+                        operations++;
+                        if (operations === 490) {
+                            batchPromises.push(batch.commit());
+                            batch = adminDb.batch();
+                            operations = 0;
+                        }
                     }
                 });
-                if (count > 0) await batch.commit();
+                if (operations > 0) batchPromises.push(batch.commit());
+                await Promise.all(batchPromises);
             })());
 
             // C. RTDB
@@ -148,9 +148,12 @@ export async function POST(req: NextRequest) {
             // D. AUTH (Conditional)
             if (purgeType === 'FULL_SYSTEM') {
                 tasks.push((async () => {
-                    let nextPageToken;
+                    let nextPageToken: string | undefined = undefined;
                     do {
-                        const list: any = await adminAuth.listUsers(1000, nextPageToken);
+                        const list: any = nextPageToken
+                            ? await adminAuth.listUsers(1000, nextPageToken)
+                            : await adminAuth.listUsers(1000);
+
                         const uidsToDelete = list.users
                             .filter((u: any) => !SAFE_UIDS.includes(u.uid) && !SAFE_EMAILS.includes(u.email?.toLowerCase()))
                             .map((u: any) => u.uid);
@@ -199,13 +202,14 @@ export async function POST(req: NextRequest) {
         return NextResponse.json({
             success: true,
             message: `Wipe (${purgeType}) Completed successfully. Entities preserved: ${purgeType === 'OPERATIONAL_ONLY' ? 'YES' : 'NO'}.`
-        });
+        }, { status: 200 });
 
     } catch (error: any) {
         console.error("Purge Failed:", error);
+        // Returning 400 instead of 500 to prevent proxy layers (Firebase/Hostinger) from replacing our JSON payload with standard HTML errors.
         return NextResponse.json({
             error: error.message || "Unknown error during purge",
             stack: error.stack
-        }, { status: 500 });
+        }, { status: 400 });
     }
 }

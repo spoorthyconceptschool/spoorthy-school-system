@@ -9,11 +9,11 @@ import { rtdb } from "@/lib/firebase";
 
 export function Hero() {
     const [content, setContent] = useState<any>({
-        title: "The Future of Learning.",
-        subtitle: "Where curiosity meets innovation in a world-class campus.",
-        videoUrl: null,       // Desktop Video
-        mobileVideoUrl: null, // Mobile Video
-        posterUrl: "/hero-poster.jpg"
+        title: "Education for Tomorrow.",
+        subtitle: "Innovation meets tradition.",
+        videoUrl: "https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Fhero-bg.mp4?alt=media", // Default immediate video
+        mobileVideoUrl: null,
+        posterUrl: "https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Fhero-poster.jpg?alt=media"
     });
 
     const [loading, setLoading] = useState(true);
@@ -98,6 +98,7 @@ export function Hero() {
                         muted
                         loop
                         playsInline
+                        preload="auto"
                         className="w-full h-full object-cover transition-opacity duration-1000 opacity-100"
                         poster={content.posterUrl}
                     />

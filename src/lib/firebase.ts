@@ -17,21 +17,28 @@ const firebaseConfig = {
     databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL
 };
 
-// Initialize Firebase
-let app: FirebaseApp;
+// Initialize Firebase app
+const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
+
 let db: Firestore;
 
-if (getApps().length) {
-    app = getApp();
-    db = getFirestore(app);
+// Initialize Firestore with modern persistent cache settings (v10+)
+// We only enable persistence in the browser environment
+if (typeof window !== "undefined") {
+    try {
+        db = initializeFirestore(app, {
+            localCache: persistentLocalCache({
+                tabManager: persistentMultipleTabManager()
+            })
+        });
+        console.log("Firestore Persistence Enabled (Multi-Tab)");
+    } catch (error: any) {
+        // If already initialized with different settings or settings were already applied
+        db = getFirestore(app);
+    }
 } else {
-    app = initializeApp(firebaseConfig);
-    // Initialize Firestore with modern persistent cache settings (v10+)
-    db = initializeFirestore(app, {
-        localCache: persistentLocalCache({
-            tabManager: persistentMultipleTabManager()
-        })
-    });
+    // Server-side: Use standard Firestore without persistence
+    db = getFirestore(app);
 }
 
 const auth = getAuth(app);

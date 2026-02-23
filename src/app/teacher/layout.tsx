@@ -33,13 +33,11 @@ const TEACHER_NAV = [
 ];
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {
-    const { user, loading, signOut } = useAuth();
+    const { user, userData, loading, signOut } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
-    const [checking, setChecking] = useState(true);
 
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [userRole, setUserRole] = useState("Loading...");
 
     useEffect(() => {
         if (loading) return;
@@ -48,46 +46,34 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
             return;
         }
 
+        if (!userData) return;
+
         // Verify Rule: Must Change Password and Role
-        const checkSecurity = async () => {
-            try {
-                const userDoc = await getDoc(doc(db, "users", user.uid));
-                if (userDoc.exists()) {
-                    const userData = userDoc.data();
-                    const actualRole = userData.role || "";
-                    setUserRole(actualRole);
+        const actualRole = userData.role || "";
 
-                    if (["ADMIN", "SUPER_ADMIN", "MANAGER", "DEVELOPER", "OWNER"].includes(actualRole)) {
-                        router.replace("/admin");
-                        return;
-                    }
-                    if (actualRole === "STUDENT") {
-                        router.replace("/student");
-                        return;
-                    }
+        if (["ADMIN", "SUPER_ADMIN", "MANAGER", "DEVELOPER", "OWNER"].includes(actualRole)) {
+            router.replace("/admin");
+            return;
+        }
+        if (actualRole === "STUDENT") {
+            router.replace("/student");
+            return;
+        }
 
-                    if (userData.mustChangePassword && pathname !== "/teacher/change-password") {
-                        router.push("/teacher/change-password");
-                        setChecking(false);
-                        return;
-                    }
-                } else {
-                    setUserRole("Teacher");
-                }
-            } catch (e) {
-                console.error("Security check failed", e);
-                setUserRole("Teacher");
-            }
-            setChecking(false);
-        };
+        if (userData.mustChangePassword && pathname !== "/teacher/change-password") {
+            router.push("/teacher/change-password");
+            return;
+        }
 
-        checkSecurity();
+    }, [user, userData, loading, pathname, router]);
 
-    }, [user, loading, pathname, router]);
+    const isAuthenticating = loading || (user && !userData);
 
-    if (loading || checking) {
+    if (isAuthenticating) {
         return <div className="h-screen w-full flex items-center justify-center bg-[#0A192F] text-[#10B981]"><Loader2 className="animate-spin" /></div>;
     }
+
+    const userRole = userData?.role || "Teacher";
 
     // If on Change Password page, show simplified layout
     if (pathname === "/teacher/change-password") {

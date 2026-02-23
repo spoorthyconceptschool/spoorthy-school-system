@@ -1,9 +1,11 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useMemo } from "react";
 import { ref, onValue, off } from "firebase/database";
 import { doc, onSnapshot } from "firebase/firestore";
 import { rtdb, db } from "@/lib/firebase";
+import { useAuth } from "./AuthContext";
+import { collection, query, limit, orderBy } from "firebase/firestore";
 
 interface MasterDataState {
     villages: Record<string, any>;
@@ -24,6 +26,9 @@ interface MasterDataState {
     academicYears: Record<string, { id: string, name: string, active: boolean, startDate: string, endDate: string }>;
     selectedYear: string;
     setSelectedYear: (year: string) => void;
+    students: any[];
+    teachers: any[];
+    staff: any[];
     loading: boolean;
 }
 
@@ -46,6 +51,9 @@ const initialState: MasterDataState = {
     academicYears: {},
     selectedYear: "2025-2026",
     setSelectedYear: () => { },
+    students: [],
+    teachers: [],
+    staff: [],
     loading: true
 };
 
@@ -107,7 +115,7 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
         };
 
         const errorCallback = (error: any) => {
-            console.error("RTDB Sync Error:", error);
+            console.warn("RTDB Sync Error (possibly unauthenticated):", error.message);
             setData(prev => ({ ...prev, loading: false }));
         };
 
@@ -121,7 +129,7 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
         // Safety timeout to prevent infinite loading
         const timer = setTimeout(() => {
             setData(prev => ({ ...prev, loading: false }));
-        }, 1500); // Fast fallback
+        }, 500); // Aggressive fallback for instant feel
 
         return () => {
             off(dataRef, "value", callback);
@@ -199,17 +207,34 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
         return () => unsub();
     }, []);
 
+    // 3. Authenticated State Management
+    const { role, user } = useAuth();
+    useEffect(() => {
+        if (!user || (role !== "ADMIN" && role !== "MANAGER")) {
+            if (data.students.length > 0) setData(prev => ({ ...prev, students: [], teachers: [], staff: [] }));
+            return;
+        }
+
+        // NOTE: Large datasets (Students/Teachers) are no longer synced globally to prevent 
+        // browser memory overload and long initial load times. 
+        // Use local page hooks with limit() and pagination instead.
+        setData(prev => ({ ...prev, loading: false }));
+
+    }, [user, role]);
+
     const handleSetSelectedYear = (year: string) => {
         setSelectedYear(year);
         localStorage.setItem("spoorthy_academic_year", year);
     };
 
+    const contextValue = useMemo(() => ({
+        ...data,
+        selectedYear,
+        setSelectedYear: handleSetSelectedYear
+    }), [data, selectedYear]);
+
     return (
-        <MasterDataContext.Provider value={{
-            ...data,
-            selectedYear,
-            setSelectedYear: handleSetSelectedYear
-        }}>
+        <MasterDataContext.Provider value={contextValue}>
             {children}
         </MasterDataContext.Provider>
     );

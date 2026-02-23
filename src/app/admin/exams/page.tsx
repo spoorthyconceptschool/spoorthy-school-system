@@ -28,8 +28,6 @@ export default function ExamsListPage() {
         endDate: ""
     });
 
-    const [students, setStudents] = useState<any[]>([]);
-
     const fetchExams = async () => {
         try {
             const q = query(collection(db, "exams"), orderBy("createdAt", "desc"));
@@ -43,12 +41,6 @@ export default function ExamsListPage() {
     };
 
     useEffect(() => {
-        const fetchStudents = async () => {
-            const q = query(collection(db, "students"), where("status", "==", "ACTIVE"));
-            const snap = await getDocs(q);
-            setStudents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-        };
-        fetchStudents();
         fetchExams();
     }, []);
 
@@ -71,11 +63,9 @@ export default function ExamsListPage() {
         }
     };
 
-    if (loading) return <div className="flex justify-center p-20"><Loader2 className="animate-spin" /></div>;
-
     return (
-        <div className="space-y-8 max-w-7xl mx-auto p-4 md:p-8 animate-in fade-in duration-500">
-            {/* Header / Hero Section */}
+        <div className="space-y-8 max-w-7xl mx-auto p-4 md:p-8 animate-in fade-in duration-200">
+            {/* Header / Hero Section - Always Visible immediately */}
             <div className="relative overflow-hidden rounded-3xl bg-[#0F172A] border border-white/5 p-6 md:p-10 shadow-2xl">
                 <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-blue-500/10 blur-[100px] rounded-full -mr-20 -mt-20 px-4" />
                 <div className="absolute bottom-0 left-0 w-[200px] h-[200px] bg-emerald-500/5 blur-[80px] rounded-full -ml-10 -mb-10" />
@@ -97,7 +87,7 @@ export default function ExamsListPage() {
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto mt-4 md:mt-0">
-                        <HallTicketGenerator students={students} />
+                        <HallTicketGenerator />
                         <Button
                             onClick={() => setCreateOpen(true)}
                             className="bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest text-[10px] h-12 px-8 rounded-xl shadow-[0_0_20px_-5px_theme(colors.emerald.500/0.5)] transition-all hover:scale-[1.02] active:scale-[0.98]"
@@ -114,7 +104,7 @@ export default function ExamsListPage() {
                     <div className="flex items-center gap-4">
                         <h2 className="text-lg font-bold text-white flex items-center gap-2">
                             Active Assessments
-                            <Badge variant="outline" className="bg-white/5 border-white/10 text-white/40 text-[10px] py-0">{exams.length}</Badge>
+                            {!loading && <Badge variant="outline" className="bg-white/5 border-white/10 text-white/40 text-[10px] py-0">{exams.length}</Badge>}
                         </h2>
                     </div>
                     <div className="flex items-center gap-2">
@@ -126,53 +116,59 @@ export default function ExamsListPage() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                    {exams.map(exam => (
-                        <Link key={exam.id} href={`/admin/exams/${exam.id}`}>
-                            <Card className="group relative bg-[#1E293B]/40 hover:bg-[#1E293B]/60 border-white/5 hover:border-blue-500/30 transition-all duration-300 backdrop-blur-xl overflow-hidden rounded-3xl shadow-xl h-full flex flex-col">
-                                {/* Status Glow Background */}
-                                <div className={cn(
-                                    "absolute top-0 right-0 w-32 h-32 blur-[60px] rounded-full -mr-10 -mt-10 transition-opacity opacity-20 group-hover:opacity-40",
-                                    exam.status === "ACTIVE" ? "bg-emerald-500" : "bg-blue-500"
-                                )} />
+                    {loading ? (
+                        [1, 2, 3].map(i => (
+                            <div key={i} className="h-[250px] rounded-3xl bg-white/5 animate-pulse border border-white/5" />
+                        ))
+                    ) : (
+                        exams.map(exam => (
+                            <Link key={exam.id} href={`/admin/exams/${exam.id}`}>
+                                <Card className="group relative bg-[#1E293B]/40 hover:bg-[#1E293B]/60 border-white/5 hover:border-blue-500/30 transition-all duration-300 backdrop-blur-xl overflow-hidden rounded-3xl shadow-xl h-full flex flex-col">
+                                    {/* Status Glow Background */}
+                                    <div className={cn(
+                                        "absolute top-0 right-0 w-32 h-32 blur-[60px] rounded-full -mr-10 -mt-10 transition-opacity opacity-20 group-hover:opacity-40",
+                                        exam.status === "ACTIVE" ? "bg-emerald-500" : "bg-blue-500"
+                                    )} />
 
-                                <CardHeader className="relative z-10 pb-2">
-                                    <div className="flex justify-between items-start">
-                                        <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-500/20 group-hover:scale-110 transition-all duration-300">
-                                            <ClipboardCheck className="w-6 h-6" />
+                                    <CardHeader className="relative z-10 pb-2">
+                                        <div className="flex justify-between items-start">
+                                            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-500/20 group-hover:scale-110 transition-all duration-300">
+                                                <ClipboardCheck className="w-6 h-6" />
+                                            </div>
+                                            <Badge
+                                                variant="outline"
+                                                className={cn(
+                                                    "text-[8px] font-black uppercase tracking-widest px-3 py-1 rounded-full border-none",
+                                                    exam.status === "ACTIVE"
+                                                        ? "bg-emerald-500/10 text-emerald-400"
+                                                        : "bg-blue-500/10 text-blue-400"
+                                                )}
+                                            >
+                                                <Sparkle className="w-2.5 h-2.5 mr-1 animate-pulse" /> {exam.status}
+                                            </Badge>
                                         </div>
-                                        <Badge
-                                            variant="outline"
-                                            className={cn(
-                                                "text-[8px] font-black uppercase tracking-widest px-3 py-1 rounded-full border-none",
-                                                exam.status === "ACTIVE"
-                                                    ? "bg-emerald-500/10 text-emerald-400"
-                                                    : "bg-blue-500/10 text-blue-400"
-                                            )}
-                                        >
-                                            <Sparkle className="w-2.5 h-2.5 mr-1 animate-pulse" /> {exam.status}
-                                        </Badge>
-                                    </div>
-                                    <CardTitle className="mt-6 text-xl md:text-2xl font-black text-white group-hover:text-blue-400 transition-colors tracking-tight">
-                                        {exam.name}
-                                    </CardTitle>
-                                    <CardDescription className="flex items-center gap-2 text-[#8892B0] font-medium text-xs mt-1">
-                                        <Calendar className="w-3.5 h-3.5" />
-                                        {new Date(exam.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {new Date(exam.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                    </CardDescription>
-                                </CardHeader>
-                                <CardContent className="relative z-10 mt-auto pt-6 border-t border-white/5 bg-white/[0.02]">
-                                    <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-white/40 group-hover:text-white transition-colors">
-                                        <span>System Node v1.0</span>
-                                        <div className="flex items-center gap-2">
-                                            Manage <ChevronRight className="w-4 h-4 text-blue-500 group-hover:translate-x-1 transition-transform" />
+                                        <CardTitle className="mt-6 text-xl md:text-2xl font-black text-white group-hover:text-blue-400 transition-colors tracking-tight">
+                                            {exam.name}
+                                        </CardTitle>
+                                        <CardDescription className="flex items-center gap-2 text-[#8892B0] font-medium text-xs mt-1">
+                                            <Calendar className="w-3.5 h-3.5" />
+                                            {new Date(exam.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {new Date(exam.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
+                                        </CardDescription>
+                                    </CardHeader>
+                                    <CardContent className="relative z-10 mt-auto pt-6 border-t border-white/5 bg-white/[0.02]">
+                                        <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-white/40 group-hover:text-white transition-colors">
+                                            <span>System Node v1.0</span>
+                                            <div className="flex items-center gap-2">
+                                                Manage <ChevronRight className="w-4 h-4 text-blue-500 group-hover:translate-x-1 transition-transform" />
+                                            </div>
                                         </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </Link>
-                    ))}
+                                    </CardContent>
+                                </Card>
+                            </Link>
+                        ))
+                    )}
 
-                    {exams.length === 0 && (
+                    {!loading && exams.length === 0 && (
                         <div className="col-span-full">
                             <div className="group relative overflow-hidden bg-black/20 border border-dashed border-white/10 rounded-[32px] p-20 flex flex-col items-center text-center transition-all hover:bg-black/30 hover:border-blue-500/20">
                                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-full h-full bg-blue-500/5 blur-[120px] rounded-full" />

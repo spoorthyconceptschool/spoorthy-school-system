@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
+import { useMasterData } from "@/context/MasterDataContext";
 
 interface Teacher {
     id: string;
@@ -93,22 +94,24 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
     const [salaryUser, setSalaryUser] = useState<{ id: string, name: string, schoolId: string, role: "TEACHER" | "STAFF", currentSalary: number, roleCode?: string } | null>(null);
     const [isSalaryModalOpen, setIsSalaryModalOpen] = useState(false);
 
+    const { teachers: globalTeachers, staff: globalStaff } = useMasterData();
+
     useEffect(() => {
-        // Real-time Teachers
-        const qT = query(collection(db, "teachers"), orderBy("schoolId"));
-        const unsubscribeTeachers = onSnapshot(qT, (snap) => {
-            setTeachers(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Teacher)));
+        if (globalTeachers) {
+            setTeachers(globalTeachers as Teacher[]);
             setLoading(false);
-        });
+        }
+    }, [globalTeachers]);
 
-        // Real-time Staff
-        const qS = query(collection(db, "staff"), orderBy("schoolId"));
-        const unsubscribeStaff = onSnapshot(qS, (snap) => {
-            setStaff(snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff)));
+    useEffect(() => {
+        if (globalStaff) {
+            setStaff(globalStaff as Staff[]);
             setLoading(false);
-        });
+        }
+    }, [globalStaff]);
 
-        // Real-time Roles
+    useEffect(() => {
+        // Real-time Roles (RTDB/Firestore)
         const qR = query(collection(db, "master_staff_roles"), orderBy("name"));
         const unsubscribeRoles = onSnapshot(qR, (snap) => {
             const loadedRoles = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -117,8 +120,6 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
         });
 
         return () => {
-            unsubscribeTeachers();
-            unsubscribeStaff();
             unsubscribeRoles();
         };
     }, []);
