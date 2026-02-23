@@ -45,7 +45,7 @@ const NAV_ITEMS = [
     { label: "Groups", icon: Users, href: "/admin/groups" },
     { label: "Attendance", icon: UserCheck, href: "/admin/attendance" },
     { type: "separator", label: "Financials" },
-    { label: "Fees", icon: Banknote, href: "/admin/fees" },
+    { label: "Fee Payment", icon: Banknote, href: "/admin/fees" },
     { label: "Payroll", icon: Wallet, href: "/admin/salary" },
     { type: "separator", label: "Operations" },
     { label: "Schedules", icon: Clock, href: "/admin/timetable/manage" },

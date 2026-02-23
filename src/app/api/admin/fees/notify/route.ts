@@ -57,7 +57,7 @@ export async function POST(req: NextRequest) {
                         id: notifRef.id,
                         userId: uid,
                         title: "Fee Payment Reminder",
-                        message: `Dear Parent, you have outstanding Term Fees and Custom Fees (Dues) for ${ledger.studentName}. Please clear the balance of ₹${(ledger.totalFee - ledger.totalPaid).toLocaleString()} at the earliest.`,
+                        message: `Dear Parent, you have outstanding Fee Payment and Custom Fee Payment for ${ledger.studentName}. Please clear the balance of ₹${(ledger.totalFee - ledger.totalPaid).toLocaleString()} at the earliest.`,
                         type: "FEE_ALERT",
                         status: "UNREAD",
                         createdAt: FieldValue.serverTimestamp()

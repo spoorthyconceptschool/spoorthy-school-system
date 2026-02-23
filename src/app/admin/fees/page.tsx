@@ -35,7 +35,7 @@ export default function FeeDashboard() {
     const modules = [
         {
             title: "Manage Fee Types",
-            description: "Configure standard academic term fees and installment plans for all classes.",
+            description: "Configure standard academic fee payment and installment plans for all classes.",
             icon: Settings2,
             href: "/admin/fees/config",
             color: "text-blue-400",
@@ -44,7 +44,7 @@ export default function FeeDashboard() {
             hoverBg: "hover:bg-blue-500/10"
         },
         {
-            title: "Custom Fees",
+            title: "Custom Fee Payment",
             description: "Assign special fees like Bus Fee, Uniform, or Contributions to specific groups.",
             icon: Layers,
             href: "/admin/fees/custom",
@@ -54,7 +54,7 @@ export default function FeeDashboard() {
             hoverBg: "hover:bg-purple-500/10"
         },
         {
-            title: "Fee Structures",
+            title: "Fee Payment Structures",
             description: "View master reports of fee allocations and billing details for all students.",
             icon: Users,
             href: "/admin/fees/structures",
@@ -88,7 +88,7 @@ export default function FeeDashboard() {
     return (
         <div className="space-y-6 md:space-y-10 p-3 md:p-6 animate-in fade-in slide-in-from-bottom-4 duration-700">
             <div className="space-y-1">
-                <h1 className="text-2xl md:text-4xl font-display font-bold tracking-tight text-white italic">Fee Center</h1>
+                <h1 className="text-2xl md:text-4xl font-display font-bold tracking-tight text-white italic">Fee Payment Center</h1>
                 <p className="text-muted-foreground text-xs md:text-lg">Comprehensive financial oversight and student billing management.</p>
             </div>
 
@@ -122,7 +122,7 @@ export default function FeeDashboard() {
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3 md:gap-6">
                 {modules.filter(m => {
                     if (role === "MANAGER") {
-                        return ["Pending Dues", "Payment Details", "Fee Structures"].includes(m.title);
+                        return ["Pending Dues", "Payment Details", "Fee Payment Structures"].includes(m.title);
                     }
                     return true;
                 }).map((module, i) => (

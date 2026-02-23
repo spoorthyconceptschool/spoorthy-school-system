@@ -105,7 +105,7 @@ export default function FeePendingsPage() {
     });
 
     const exportToCSV = (targetData: any[]) => {
-        const headers = ["School ID", "Student Name", "Parent Name", "Mobile", "Village", "Class", "Term Fee", "Transport Fee", "Custom Fee", "Total Fee", "Paid", "Pending Balance"];
+        const headers = ["School ID", "Student Name", "Parent Name", "Mobile", "Village", "Class", "Standard Fee Payment", "Transport Fee", "Custom Fee", "Total Fee", "Paid", "Pending Balance"];
         const rows = targetData.map(l => [
             l.studentId,
             l.studentName,
@@ -262,7 +262,7 @@ export default function FeePendingsPage() {
                     <h1 className="text-3xl md:text-5xl font-display font-bold bg-gradient-to-r from-red-500 to-orange-400 bg-clip-text text-transparent italic leading-tight">
                         Pending Dues
                     </h1>
-                    <p className="text-muted-foreground text-sm md:text-lg tracking-tight">Recovering <span className="text-white font-bold">outstanding school fees</span></p>
+                    <p className="text-muted-foreground text-sm md:text-lg tracking-tight">Recovering <span className="text-white font-bold">outstanding school fee payment</span></p>
                 </div>
 
                 <div className="flex flex-wrap items-center gap-2 md:gap-3">
@@ -452,7 +452,7 @@ export default function FeePendingsPage() {
                             }}
                             className="w-full justify-start gap-2 h-9 text-xs font-bold uppercase tracking-tighter text-red-400 hover:text-white hover:bg-red-500/20"
                         >
-                            Collect Fees
+                            Collect Fee Payment
                         </Button>
                     </div>
                 )}

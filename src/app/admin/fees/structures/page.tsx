@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
-export default function FeeStructuresPage() {
+export default function FeePaymentStructuresPage() {
     const [ledgers, setLedgers] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [search, setSearch] = useState("");
@@ -137,7 +137,7 @@ export default function FeeStructuresPage() {
                                 <th>School ID</th>
                                 <th>Name</th>
                                 <th>Class</th>
-                                <th>Term Fee</th>
+                                <th>Standard Fee Payment</th>
                                 <th>Transport</th>
                                 <th>Total Fee</th>
                                 <th>Paid</th>
@@ -196,7 +196,7 @@ export default function FeeStructuresPage() {
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between pt-4 gap-6 px-2 md:px-0">
                 <div>
                     <h1 className="text-3xl md:text-5xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic leading-tight">
-                        Fee Structures
+                        Fee Payment Structures
                     </h1>
                     <p className="text-muted-foreground text-sm md:text-lg tracking-tight">Master record of all <span className="text-white font-bold">student fee allocations</span></p>
                 </div>
@@ -218,7 +218,7 @@ export default function FeeStructuresPage() {
                     <div className="text-3xl font-mono font-black text-white">₹{totalExpected.toLocaleString()}</div>
                 </div>
                 <div className="bg-blue-500/5 border border-blue-500/10 p-5 rounded-2xl backdrop-blur-sm shadow-xl">
-                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-400 mb-2 italic">Collected Fees</p>
+                    <p className="text-[10px] font-black uppercase tracking-widest text-blue-400 mb-2 italic">Collected Fee Payment</p>
                     <div className="text-3xl font-mono font-black text-white">₹{totalCollected.toLocaleString()}</div>
                 </div>
                 <div className="bg-orange-500/5 border border-orange-500/10 p-5 rounded-2xl backdrop-blur-sm shadow-xl">
@@ -300,8 +300,8 @@ export default function FeeStructuresPage() {
                         )
                     },
                     {
-                        key: "termFee",
-                        header: "Term Fee",
+                        key: "standardFeePayment",
+                        header: "Standard Fee Payment",
                         headerClassName: "text-right",
                         cellClassName: "text-right",
                         render: (l: any) => {

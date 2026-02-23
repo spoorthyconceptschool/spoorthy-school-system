@@ -20,7 +20,7 @@ import { NotificationCenter } from "@/components/NotificationCenter";
 
 const STUDENT_NAV = [
     { label: "Dashboard", icon: LayoutDashboard, href: "/student", exact: true },
-    { label: "Fees & Payments", icon: Wallet, href: "/student/fees" },
+    { label: "Fee Payment", icon: Wallet, href: "/student/fees" },
     { label: "Homework", icon: BookOpen, href: "/student/homework" },
     { label: "Notices", icon: Bell, href: "/student/notices" },
     { label: "Leaves", icon: FileText, href: "/student/leaves" },
