@@ -3,7 +3,8 @@
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 import { ref, onValue, off } from "firebase/database";
 import { doc, onSnapshot } from "firebase/firestore";
-import { rtdb, db } from "@/lib/firebase";
+import { onAuthStateChanged } from "firebase/auth";
+import { rtdb, db, auth } from "@/lib/firebase";
 
 interface MasterDataState {
     villages: Record<string, any>;
@@ -77,54 +78,70 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
     });
     const [selectedYear, setSelectedYear] = useState("2025-2026");
 
-    // 1. RTDB Sync for Master Data
+    // 1. RTDB Sync for Master Data & Branding
     useEffect(() => {
-        const dataRef = ref(rtdb, 'master');
+        // Public Branding Sync
+        const brandingRef = ref(rtdb, 'siteContent/branding');
+        const brandingUnsub = onValue(brandingRef, (snap) => {
+            if (snap.exists()) {
+                setData(prev => ({
+                    ...prev,
+                    branding: { ...initialState.branding, ...snap.val() }
+                }));
+            }
+        });
 
-        const callback = (snapshot: any) => {
-            const rawData = snapshot.val() || {};
+        // Protected Master Data Sync (Authenticated only)
+        let masterUnsub: any = null;
 
-            const newState: Partial<MasterDataState> = {
-                loading: false,
-                branding: rawData.branding || initialState.branding
-            };
+        const authUnsub = onAuthStateChanged(auth, (user) => {
+            if (user) {
+                const dataRef = ref(rtdb, 'master');
+                masterUnsub = onValue(dataRef, (snapshot) => {
+                    const rawData = snapshot.val() || {};
+                    const newState: Partial<MasterDataState> = {
+                        loading: false,
+                    };
 
-            const keys: (keyof Omit<MasterDataState, 'loading' | 'selectedYear' | 'setSelectedYear' | 'branding' | 'academicYears'>)[] =
-                ['villages', 'classes', 'sections', 'subjects', 'classSections', 'classSubjects', 'subjectTeachers', 'homeworkSubjects', 'roles'];
-
-            keys.forEach(key => {
-                const val = rawData[key] || {};
-                const processed = { ...val };
-                Object.keys(processed).forEach(id => {
-                    if (typeof processed[id] === 'object' && processed[id] !== null) {
-                        processed[id].id = id;
+                    // Only update branding from master if siteContent/branding is empty
+                    if (rawData.branding) {
+                        newState.branding = { ...initialState.branding, ...rawData.branding };
                     }
+
+                    const keys: (keyof Omit<MasterDataState, 'loading' | 'selectedYear' | 'setSelectedYear' | 'branding' | 'academicYears'>)[] =
+                        ['villages', 'classes', 'sections', 'subjects', 'classSections', 'classSubjects', 'subjectTeachers', 'homeworkSubjects', 'roles'];
+
+                    keys.forEach(key => {
+                        const val = rawData[key] || {};
+                        const processed = { ...val };
+                        Object.keys(processed).forEach(id => {
+                            if (typeof processed[id] === 'object' && processed[id] !== null) {
+                                processed[id].id = id;
+                            }
+                        });
+                        (newState as any)[key] = processed;
+                    });
+
+                    setData(prev => ({ ...prev, ...newState }));
+                }, (error) => {
+                    console.warn("RTDB Sync restricted (master):", error.message);
+                    setData(prev => ({ ...prev, loading: false }));
                 });
-                (newState as any)[key] = processed;
-            });
+            } else {
+                // If logged out, stop listening to master
+                if (masterUnsub) off(ref(rtdb, 'master'));
+                setData(prev => ({ ...prev, loading: false }));
+            }
+        });
 
-            setData(prev => ({ ...prev, ...newState }));
-        };
-
-        const errorCallback = (error: any) => {
-            console.error("RTDB Sync Error:", error);
-            setData(prev => ({ ...prev, loading: false }));
-        };
-
-        onValue(dataRef, callback, errorCallback);
-
-        // Debug: Log the RTDB instance
-        if (typeof window !== 'undefined') {
-            console.log("[MasterData] Connecting to RTDB...", (rtdb as any)._repoInternal?.repoInfo_?.host);
-        }
-
-        // Safety timeout to prevent infinite loading
         const timer = setTimeout(() => {
             setData(prev => ({ ...prev, loading: false }));
-        }, 1500); // Fast fallback
+        }, 2000);
 
         return () => {
-            off(dataRef, "value", callback);
+            brandingUnsub();
+            authUnsub();
+            if (masterUnsub) off(ref(rtdb, 'master'));
             clearTimeout(timer);
         };
     }, []);

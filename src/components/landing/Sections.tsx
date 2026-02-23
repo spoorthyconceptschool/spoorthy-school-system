@@ -385,16 +385,26 @@ export function WhyUs() {
 
 // === GALLERY (Mosaic Grid) ===
 export function GalleryPreview() {
-    const [images, setImages] = useState<string[]>([
-        "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?q=80&w=2070&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1509062522246-3755977927d7?q=80&w=2670&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1588072432836-e10032774350?q=80&w=2070&auto=format&fit=crop",
-        "https://images.unsplash.com/photo-1577896851231-70ef18881754?q=80&w=2070&auto=format&fit=crop"
+    const [activities, setActivities] = useState<any[]>([
+        { title: "Science Discovery", category: "Academics", src: "https://images.unsplash.com/photo-1532094349884-543bc11b234d?q=80&w=1600&auto=format&fit=crop" },
+        { title: "Sports Tournament", category: "Athletics", src: "https://images.unsplash.com/photo-1526676037777-05a232554f77?q=80&w=1600&auto=format&fit=crop" },
+        { title: "Cultural Festival", category: "Arts", src: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?q=80&w=1600&auto=format&fit=crop" },
+        { title: "Digital Literacy", category: "Tech", src: "https://images.unsplash.com/photo-1531482615713-2afd69097998?q=80&w=1600&auto=format&fit=crop" }
     ]);
 
     useEffect(() => {
         const unsub = onValue(ref(rtdb, 'siteContent/home/gallery'), (snap) => {
-            if (snap.exists() && Array.isArray(snap.val())) setImages(snap.val());
+            if (snap.exists() && Array.isArray(snap.val())) {
+                const data = snap.val();
+                if (data.length > 0) {
+                    // Map RTDB strings to objects if they aren't already
+                    const mapped = data.map((item: any, i: number) => {
+                        if (typeof item === 'string') return { title: `Activity ${i + 1}`, category: "Gallery", src: item };
+                        return item;
+                    });
+                    setActivities(mapped);
+                }
+            }
         }, (error: any) => {
             console.warn("RTDB Permission (gallery):", error.message);
         });
@@ -406,14 +416,14 @@ export function GalleryPreview() {
             <div className="container mx-auto px-6 mb-8 md:mb-16 flex justify-between items-end">
                 <SectionHeader title="Campus Life." subtitle="Gallery" />
                 <Link href="/gallery" className="flex mb-2 md:mb-0">
-                    <button className="flex items-center gap-2 hover:text-accent transition-colors text-white/60 font-bold uppercase tracking-widest text-[10px] md:text-xs">
+                    <button className="flex items-center gap-2 hover:text-accent transition-colors text-white/60 font-bold uppercase tracking-widest text-[10px] md:text-sm">
                         View All <ExternalLink size={14} />
                     </button>
                 </Link>
             </div>
 
-            <div className="grid grid-cols-2 md:grid-cols-4 h-[80vh] w-full gap-2 p-2">
-                {images.slice(0, 4).map((src, i) => (
+            <div className="grid grid-cols-2 md:grid-cols-4 h-[60vh] md:h-[80vh] w-full gap-2 p-2">
+                {activities.slice(0, 4).map((item, i) => (
                     <motion.div
                         key={i}
                         className={`relative group overflow-hidden bg-[#112240]/40 backdrop-blur-sm rounded-2xl ${i === 0 ? 'col-span-2 row-span-2' : ''}`}
@@ -421,11 +431,32 @@ export function GalleryPreview() {
                         whileInView={{ opacity: 1, scale: 1 }}
                         transition={{ duration: 0.8, delay: i * 0.1 }}
                         viewport={{ margin: "-100px", once: true }}
-                        whileHover={{ scale: 0.98 }} // Spotify "Press" effect
+                        whileHover={{ scale: 0.98 }}
                     >
-                        {src && (src.startsWith('http') || src.startsWith('/')) && <Image src={src} alt="Gallery" fill className="object-cover transition-transform duration-700 group-hover:scale-110 opacity-70 group-hover:opacity-100" />}
-                        <div className="absolute inset-0 bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
-                            <div className="px-6 py-3 bg-black/80 backdrop-blur-md rounded-full text-xs font-bold uppercase tracking-widest text-white border border-white/10">View</div>
+                        {item.src && (item.src.startsWith('http') || item.src.startsWith('/')) && (
+                            <Image
+                                src={item.src}
+                                alt={item.title || "Gallery"}
+                                fill
+                                unoptimized
+                                className="object-cover transition-transform duration-700 group-hover:scale-110 opacity-70 group-hover:opacity-100"
+                            />
+                        )}
+
+                        {/* Always visible title for better accessibility/UX if image lazy loads */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/20 to-transparent p-6 md:p-10 flex flex-col justify-end">
+                            <p className="text-accent font-mono text-[8px] md:text-xs uppercase tracking-widest mb-2 opacity-60 group-hover:opacity-100 transition-opacity">
+                                {item.category || "Moment"}
+                            </p>
+                            <h3 className="text-white font-black text-xl md:text-4xl uppercase italic tracking-tighter leading-none group-hover:text-accent transition-colors uppercase">
+                                {item.title || "Campus Activity"}
+                            </h3>
+
+                            <div className="mt-4 opacity-0 group-hover:opacity-100 transition-all duration-500 translate-y-4 group-hover:translate-y-0">
+                                <div className="px-5 py-2 md:px-8 md:py-3 bg-white text-black text-[10px] md:text-xs font-black uppercase tracking-widest rounded-full w-fit">
+                                    View Moment
+                                </div>
+                            </div>
                         </div>
                     </motion.div>
                 ))}
