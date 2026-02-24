@@ -100,8 +100,9 @@ export async function POST(req: NextRequest) {
         }
 
         // Initial Ledger
-        await adminDb.collection("student_fee_ledgers").doc(`${schoolId}_2025-2026`).set({
-            studentId: schoolId, academicYear: "2025-2026", items: [], totalPaid: 0, updatedAt: new Date().toISOString()
+        const ledgerYear = body.academicYear || "2025-2026";
+        await adminDb.collection("student_fee_ledgers").doc(`${schoolId}_${ledgerYear}`).set({
+            studentId: schoolId, academicYear: ledgerYear, items: [], totalPaid: 0, updatedAt: new Date().toISOString()
         });
 
         return NextResponse.json({

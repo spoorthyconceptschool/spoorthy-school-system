@@ -126,7 +126,7 @@ export default function StudentsPage() {
         // Filter by Academic Year
         if (selectedYear) {
             result = result.filter(s => {
-                const sYear = (s as any).academicYear || "2025-2026";
+                const sYear = (s as any).academicYear || selectedYear || "2025-2026";
                 return sYear === selectedYear;
             });
         }
