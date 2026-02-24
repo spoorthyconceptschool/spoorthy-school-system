@@ -47,9 +47,8 @@ interface DashboardStats {
 }
 
 export default function AdminDashboard() {
-    const { user } = useAuth();
+    const { user, role: authRole } = useAuth();
     const router = useRouter();
-    const [role, setRole] = useState<string>("");
 
     // Admin State
     const [applications, setApplications] = useState<Application[]>([]);
@@ -69,75 +68,66 @@ export default function AdminDashboard() {
     useEffect(() => {
         if (!user) return;
 
-        // Get Role
-        const unsubUser = onSnapshot(doc(db, "users", user.uid), (d) => {
-            const r = d.exists() ? d.data().role : "";
-            setRole(r);
+        // Role is already provided by useAuth context for instant access
+
+
+        // Optimized stats fetching - Avoid full snapshots of large collections
+        const unsubStudents = onSnapshot(query(collection(db, "students"), limit(1)), (snap) => {
+            // Since we can't get size without full fetch in onSnapshot, we'll use a local count or metadata doc in future
+            // For now, we fetch just the size but without the data if possible, or use a cached value
+            // To truly fix this, we'd need a counter document. As a quick fix, we'll just use a non-realtime getCount once
         });
 
-        // Live stats for dashboard
-        const unsubStudents = onSnapshot(collection(db, "students"), (snap) => {
-            setStats((prev: DashboardStats) => ({ ...prev, totalStudents: snap.size }));
-            setLoading(false);
+        // Use getCountFromServer for large counts (One-time fetch for performance)
+        import("firebase/firestore").then(({ getCountFromServer }) => {
+            getCountFromServer(collection(db, "students")).then(s => setStats(p => ({ ...p, totalStudents: s.data().count })));
+            getCountFromServer(collection(db, "teachers")).then(s => setStats(p => ({ ...p, totalStaff: s.data().count })));
+            getCountFromServer(collection(db, "leave_requests")).then(s => setStats(p => ({ ...p, totalLeaves: s.data().count })));
         });
 
-        // Financials - Today's Collection
+        // Financials - Today's Collection (Keep real-time as it's typically small volume per day)
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
         const startTimestamp = Timestamp.fromDate(startOfDay);
 
         const qTodayPayments = query(
             collection(db, "payments"),
-            where("date", ">=", startTimestamp)
+            where("date", ">=", startTimestamp),
+            limit(100) // Safety limit
         );
         const unsubTodayPayments = onSnapshot(qTodayPayments, (snap) => {
             const total = snap.docs.reduce((acc, d) => acc + (d.data().amount || 0), 0);
             setStats((prev: DashboardStats) => ({ ...prev, todayCollection: total }));
+            setLoading(false);
         });
 
-        // Financials - Aggregate Ledger Balance (Optimized to take only top 100 for stats if necessary or just a snapshot)
-        // Note: For a real app, this should be a summary doc, but here we just optimize the listener.
-        const unsubLedgers = onSnapshot(query(collection(db, "ledgers"), limit(500)), (snap) => {
+        // Financials - Aggregate Ledger Balance 
+        // NOTE: In production, this MUST come from a pre-calculated summary document.
+        // Fetching 500 ledgers on every dashboard load is still heavy.
+        const unsubLedgers = onSnapshot(query(collection(db, "ledgers"), limit(100)), (snap) => {
             const total = snap.docs.reduce((acc, d) => acc + (Number(d.data().balance) || 0), 0);
             setStats((prev: DashboardStats) => ({ ...prev, pendingFees: total }));
-        });
-
-        // Faculty Presence
-        const unsubTeachers = onSnapshot(collection(db, "teachers"), (snap) => {
-            setStats((prev: DashboardStats) => ({ ...prev, totalStaff: snap.size }));
         });
 
         const qLeaves = query(collection(db, "leave_requests"), where("status", "==", "PENDING"), limit(5));
         const unsubLeaves = onSnapshot(qLeaves, (snap) => {
             setStats((prev: DashboardStats) => ({ ...prev, leaveRequests: snap.size }));
-            // Sort client-side to avoid Index requirement
             const leaves = snap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveRequest));
-            leaves.sort((a, b) => {
-                const timeA = a.createdAt?.seconds || 0;
-                const timeB = b.createdAt?.seconds || 0;
-                return timeB - timeA;
-            });
-            setPendingLeavesList(leaves.slice(0, 5));
-        });
-
-        const unsubTotalLeaves = onSnapshot(collection(db, "leave_requests"), (snap) => {
-            setStats((prev: DashboardStats) => ({ ...prev, totalLeaves: snap.size }));
+            leaves.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+            setPendingLeavesList(leaves);
         });
 
         return () => {
-            unsubUser();
             unsubStudents();
             unsubTodayPayments();
             unsubLedgers();
-            unsubTeachers();
             unsubLeaves();
-            unsubTotalLeaves();
         };
     }, [user]);
 
     // Applications Listener
     useEffect(() => {
-        if (!user || role === "TIMETABLE_EDITOR") return;
+        if (!user || authRole === "TIMETABLE_EDITOR") return;
 
         const appQ = query(collection(db, "applications"), orderBy("submittedAt", "desc"), limit(10));
         const unsubscribe = onSnapshot(appQ, (snapshot) => {
@@ -145,7 +135,7 @@ export default function AdminDashboard() {
         });
 
         return () => unsubscribe();
-    }, [user, role]);
+    }, [user, authRole]);
 
     // === SHARED UI ELEMENTS ===
     const columns = [
@@ -176,9 +166,9 @@ export default function AdminDashboard() {
     ];
 
     // === MANAGER DASHBOARD VIEW ===
-    if (role === "MANAGER") {
+    if (authRole === "MANAGER") {
         return (
-            <div className="space-y-6 md:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-700 pb-10">
+            <div className="space-y-6 md:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-200 pb-10">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2 md:px-0">
                     <div className="space-y-1">
                         <h1 className="text-2xl sm:text-3xl md:text-6xl font-display font-bold bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent italic leading-tight">
@@ -317,9 +307,9 @@ export default function AdminDashboard() {
     }
 
     // === TIMETABLE EDITOR VIEW ===
-    if (role === "TIMETABLE_EDITOR") {
+    if (authRole === "TIMETABLE_EDITOR") {
         return (
-            <div className="space-y-8 animate-in fade-in duration-500">
+            <div className="space-y-8 animate-in fade-in duration-200">
                 <div className="flex flex-col gap-2">
                     <h1 className="font-display text-4xl font-bold tracking-tight">Timetable Dashboard</h1>
                 </div>
@@ -336,7 +326,7 @@ export default function AdminDashboard() {
 
     // === ADMIN VIEW ===
     return (
-        <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500 pb-10 px-2 md:px-0">
+        <div className="space-y-6 md:space-y-8 animate-in fade-in duration-200 pb-10 px-2 md:px-0">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="font-display text-3xl md:text-5xl font-bold tracking-tighter italic pb-1 text-white">

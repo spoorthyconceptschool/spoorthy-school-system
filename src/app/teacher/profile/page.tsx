@@ -21,40 +21,35 @@ import {
 import Link from "next/link";
 
 export default function TeacherProfilePage() {
-    const { user } = useAuth();
+    const { user, userData } = useAuth();
     const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
     useEffect(() => {
-        if (user) fetchProfile();
-    }, [user]);
+        if (userData?.schoolId) {
+            fetchProfile(userData.schoolId);
+        } else if (user) {
+            // Fallback for cases where userData isn't fully ready yet but user is
+            setLoading(true);
+        }
+    }, [user, userData]);
 
-    const fetchProfile = async () => {
-        if (!user?.uid) return;
+    const fetchProfile = async (schoolId: string) => {
         try {
-            // 1. Fetch user map to get their schoolId reliably
-            const userMetaRef = doc(db, "users", user.uid);
-            const userMetaSnap = await getDoc(userMetaRef);
+            const teacherRef = doc(db, "teachers", schoolId);
+            const teacherSnap = await getDoc(teacherRef);
 
-            if (userMetaSnap.exists() && userMetaSnap.data().schoolId) {
-                const schoolId = userMetaSnap.data().schoolId;
-                const teacherRef = doc(db, "teachers", schoolId);
-                const teacherSnap = await getDoc(teacherRef);
-
-                if (teacherSnap.exists()) {
-                    const data = teacherSnap.data();
-                    setProfile({ ...data, schoolId: data.schoolId || teacherSnap.id });
-                    return;
+            if (teacherSnap.exists()) {
+                const data = teacherSnap.data();
+                setProfile({ ...data, schoolId: data.schoolId || teacherSnap.id });
+            } else {
+                // Final fallback
+                const q = query(collection(db, "teachers"), where("uid", "==", user?.uid));
+                const snap = await getDocs(q);
+                if (!snap.empty) {
+                    const data = snap.docs[0].data();
+                    setProfile({ ...data, schoolId: data.schoolId || snap.docs[0].id });
                 }
-            }
-
-            // 2. Fallback query if no user map exists
-            const q = query(collection(db, "teachers"), where("uid", "==", user.uid));
-            const snap = await getDocs(q);
-            if (!snap.empty) {
-                const data = snap.docs[0].data();
-                // doc ID is the schoolId (e.g. SHST0001), use as fallback
-                setProfile({ ...data, schoolId: data.schoolId || snap.docs[0].id });
             }
         } catch (error) {
             console.error("Error fetching teacher profile:", error);

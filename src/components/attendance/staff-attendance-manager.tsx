@@ -23,7 +23,7 @@ export default function StaffAttendanceManager({
     defaultDate?: string;
 }) {
     const { user } = useAuth();
-    const { branding } = useMasterData();
+    const { branding, staff: globalStaff } = useMasterData();
     const [staff, setStaff] = useState<any[]>([]);
     const [attendance, setAttendance] = useState<Record<string, 'P' | 'A'>>({});
     const [loading, setLoading] = useState(true);
@@ -44,19 +44,25 @@ export default function StaffAttendanceManager({
         } else {
             fetchData();
         }
-    }, [date, viewStats, statsMonth]);
+    }, [date, viewStats, statsMonth, staff]); // Added staff as dependency to trigger re-fetch when staff data arrives
+
+    useEffect(() => {
+        if (globalStaff?.length > 0) {
+            const list = globalStaff.map(d => ({
+                id: d.id,
+                schoolId: d.id,
+                name: d.name,
+                role: d.roleName || "Staff"
+            })).sort((a, b) => a.name.localeCompare(b.name));
+            setStaff(list);
+        }
+    }, [globalStaff]);
 
     const fetchStats = async () => {
         setLoading(true);
         try {
-            // Re-fetch staff
-            const sSnap = await getDocs(collection(db, "staff"));
-            const sList = sSnap.docs.map(d => {
-                const data = d.data();
-                return {
-                    id: d.id, schoolId: d.id, name: data.name, role: data.roleName || "Staff"
-                };
-            }).sort((a, b) => a.name.localeCompare(b.name));
+            // Use local staff list synced from global
+            const sList = staff;
 
             // Fetch Attendance in range
             const currentYear = new Date().getFullYear();
@@ -101,7 +107,6 @@ export default function StaffAttendanceManager({
                 };
             });
             setStatsData(data);
-            setStaff(sList);
         } catch (error: any) {
             console.error("Stats error", error);
             toast({ title: "Error", description: "Failed to load stats", type: "error" });
@@ -191,24 +196,9 @@ export default function StaffAttendanceManager({
     const fetchData = async () => {
         setLoading(true);
         try {
-            // 1. Fetch Active Staff
-            // active status might be field 'status' or just existence. Assuming 'status' == 'active' based on other files.
-            // checking salary page, it fetched collection "staff" without filter. But let's check field.
-            // Salary page: const sSnap = await getDocs(collection(db, "staff")); 
-            // It didn't filter by status. I'll fetch all.
-
-            const sSnap = await getDocs(collection(db, "staff"));
-            const sList = sSnap.docs.map(d => {
-                const data = d.data();
-                return {
-                    id: d.id,
-                    schoolId: d.id, // Using Doc ID as School ID equivalent for Staff
-                    name: data.name,
-                    role: data.roleName || "Staff"
-                };
-            }).sort((a, b) => a.name.localeCompare(b.name));
-
-            setStaff(sList);
+            // 1. Use existing staff list (already synced from global)
+            const sList = staff;
+            if (sList.length === 0) return; // Wait for staff to load
 
             // 2. Fetch Existing Attendance
             const attId = `STAFF_${date}`;
@@ -284,8 +274,8 @@ export default function StaffAttendanceManager({
 
     // Filter Staff
     const filteredStaff = staff.filter(s =>
-        s.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        s.role.toLowerCase().includes(searchQuery.toLowerCase())
+        (s.name || "").toLowerCase().includes(searchQuery.toLowerCase()) ||
+        (s.role || "").toLowerCase().includes(searchQuery.toLowerCase())
     );
 
     if (loading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin" /></div>;

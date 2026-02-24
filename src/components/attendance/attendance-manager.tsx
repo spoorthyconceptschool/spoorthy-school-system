@@ -1,7 +1,7 @@
 
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
 import { collection, query, where, getDocs, doc, getDoc, documentId, onSnapshot } from "firebase/firestore";
@@ -9,7 +9,7 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
-import { Loader2, Check, X, Save, Search, Printer } from "lucide-react";
+import { Loader2, Check, X, Save, Search, Printer, Users } from "lucide-react";
 import { toast } from "@/lib/toast-store";
 import { useMasterData } from "@/context/MasterDataContext";
 import { Input } from "@/components/ui/input";
@@ -27,7 +27,8 @@ export default function AttendanceManager({
     defaultDate?: string;
 }) {
     const { user } = useAuth();
-    const { classes, branding } = useMasterData();
+    const { classes, branding, students: globalStudents } = useMasterData();
+
     const [students, setStudents] = useState<any[]>([]);
     const [attendance, setAttendance] = useState<Record<string, 'P' | 'A'>>({});
     const [loading, setLoading] = useState(true);
@@ -41,26 +42,23 @@ export default function AttendanceManager({
 
     const date = defaultDate || new Date().toISOString().split('T')[0];
 
-
-
     const fetchStats = async () => {
+        if (!classId || !sectionId) return;
         setLoading(true);
         try {
-            // Re-fetch students
-            const qS = query(
+            // 1. Fetch Students for this class/section first
+            const sQ = query(
                 collection(db, "students"),
                 where("classId", "==", classId),
-                where("sectionId", "==", sectionId)
+                where("sectionId", "==", sectionId),
+                where("status", "==", "ACTIVE")
             );
-            const sSnap = await getDocs(qS);
-            const sList = sSnap.docs.map(doc => ({
-                id: doc.id,
-                studentName: doc.data().studentName, // Changed from 'name' to 'studentName' to match existing data structure
-                rollNumber: doc.data().rollNumber,
-                schoolId: doc.data().schoolId // Added schoolId for display
-            })).sort((a, b) => (a.rollNumber || 0) - (b.rollNumber || 0)); // Changed sort to number
+            const sSnap = await getDocs(sQ);
+            const sList = sSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+                .sort((a, b) => (a.rollNumber || 0) - (b.rollNumber || 0));
+            setStudents(sList);
 
-            // Fetch Attendance in range
+            // 2. Fetch Attendance in range
             const currentYear = new Date().getFullYear();
             let startKey, endKey;
 
@@ -68,14 +66,8 @@ export default function AttendanceManager({
                 startKey = `${currentYear}-01-01_${classId}_${sectionId}`;
                 endKey = `${currentYear}-12-31_${classId}_${sectionId}`;
             } else {
-                // Assuming attendance doc IDs are like YYYY-MM-DD_classId_sectionId
-                // To query by month, we need to construct the start and end of the month for the document ID.
-                // Firestore queries on documentId() are lexicographical.
-                // So, for a month, we need to ensure the date part is within the month.
-                // The structure is `date_classId_sectionId`.
-                // For example, `2023-01-01_class1_sectionA` to `2023-01-31_class1_sectionA`
                 startKey = `${currentYear}-${statsMonth}-01_${classId}_${sectionId}`;
-                endKey = `${currentYear}-${statsMonth}-31_${classId}_${sectionId}`; // This assumes all months have 31 days, which is fine for lexicographical comparison as it will stop at the actual end of the month.
+                endKey = `${currentYear}-${statsMonth}-31_${classId}_${sectionId}`;
             }
 
             const q = query(
@@ -88,12 +80,6 @@ export default function AttendanceManager({
 
             snap.docs.forEach((doc) => {
                 const data = doc.data();
-                // Ensure the document belongs to the correct class and section, as documentId() query is broad.
-                // The documentId() filter is on the full ID, so it should already be specific enough.
-                // However, if the ID structure is different, this check might be needed:
-                // const [docDate, docClassId, docSectionId] = doc.id.split('_');
-                // if (docClassId !== classId || docSectionId !== sectionId) return;
-
                 if (data.records) {
                     Object.entries(data.records).forEach(([sid, status]: [string, any]) => {
                         if (!studentStats[sid]) studentStats[sid] = { total: 0, present: 0 };
@@ -115,7 +101,6 @@ export default function AttendanceManager({
                 };
             });
             setStatsData(data);
-            setStudents(sList);
         } catch (error: any) {
             console.error("Stats error", error);
             toast({ title: "Error", description: "Failed to load stats", type: "error" });
@@ -218,24 +203,33 @@ export default function AttendanceManager({
         const fetchData = async () => {
             setLoading(true);
             try {
-                const sQuery = query(
+                // 1. Fetch Students for this class/section locally
+                const sQ = query(
                     collection(db, "students"),
                     where("classId", "==", classId),
                     where("sectionId", "==", sectionId),
                     where("status", "==", "ACTIVE")
                 );
-                const sSnap = await getDocs(sQuery);
-                const sList = sSnap.docs.map(d => ({ id: d.id, ...d.data() } as any))
+                const sSnap = await getDocs(sQ);
+                const sList = sSnap.docs.map(d => ({ id: d.id, ...d.data() }))
                     .sort((a, b) => (a.rollNumber || 0) - (b.rollNumber || 0));
 
-                if (!isMounted) return;
-                setStudents(sList);
+                if (isMounted) setStudents(sList);
 
+                if (sList.length === 0) {
+                    setLoading(false);
+                    return;
+                }
+
+                // 2. Fetch Leaves
                 const lQuery = query(
                     collection(db, "student_leaves"),
                     where("classId", "==", classId),
                     where("status", "==", "APPROVED")
                 );
+
+                const attId = `${date}_${classId}_${sectionId}`;
+
                 const lSnap = await getDocs(lQuery);
                 const absentIds = new Set<string>();
                 lSnap.forEach(ld => {
@@ -247,7 +241,6 @@ export default function AttendanceManager({
                     }
                 });
 
-                const attId = `${date}_${classId}_${sectionId}`;
                 unsubAttendance = onSnapshot(doc(db, "attendance", attId), (attSnap) => {
                     if (!isMounted) return;
                     if (attSnap.exists()) {
@@ -343,8 +336,6 @@ export default function AttendanceManager({
         (s.rollNumber && String(s.rollNumber).includes(searchQuery))
     );
 
-    if (loading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin" /></div>;
-
     const stats = {
         total: students.length,
         present: Object.values(attendance).filter(v => v === 'P').length,
@@ -352,25 +343,25 @@ export default function AttendanceManager({
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 animate-in fade-in duration-200">
             {/* Stats */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card className="bg-black/20 border-white/10 overflow-hidden">
                     <div className="p-4 flex items-center justify-between">
                         <div>
-                            <div className="text-xs text-muted-foreground uppercase">Total</div>
-                            <div className="text-2xl font-bold">{stats.total}</div>
+                            <div className="text-xs text-muted-foreground uppercase font-black tracking-widest opacity-50">Total Students</div>
+                            <div className="text-2xl font-bold">{loading ? <div className="h-8 w-12 bg-white/5 animate-pulse rounded" /> : stats.total}</div>
                         </div>
                         <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
-                            <Check className="w-5 h-5" />
+                            <Users className="w-5 h-5" />
                         </div>
                     </div>
                 </Card>
                 <Card className="bg-black/20 border-white/10 overflow-hidden">
                     <div className="p-4 flex items-center justify-between border-l-4 border-emerald-500">
                         <div>
-                            <div className="text-xs text-muted-foreground uppercase">Present</div>
-                            <div className="text-2xl font-bold text-emerald-500">{stats.present}</div>
+                            <div className="text-xs text-muted-foreground uppercase font-black tracking-widest opacity-50">Present</div>
+                            <div className="text-2xl font-bold text-emerald-500">{loading ? <div className="h-8 w-12 bg-white/5 animate-pulse rounded" /> : stats.present}</div>
                         </div>
                         <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
                             <Check className="w-5 h-5" />
@@ -380,8 +371,8 @@ export default function AttendanceManager({
                 <Card className="bg-black/20 border-white/10 overflow-hidden">
                     <div className="p-4 flex items-center justify-between border-l-4 border-red-500">
                         <div>
-                            <div className="text-xs text-muted-foreground uppercase">Absent</div>
-                            <div className="text-2xl font-bold text-red-500">{stats.absent}</div>
+                            <div className="text-xs text-muted-foreground uppercase font-black tracking-widest opacity-50">Absent</div>
+                            <div className="text-2xl font-bold text-red-500">{loading ? <div className="h-8 w-12 bg-white/5 animate-pulse rounded" /> : stats.absent}</div>
                         </div>
                         <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
                             <X className="w-5 h-5" />

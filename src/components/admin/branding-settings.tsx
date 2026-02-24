@@ -31,13 +31,24 @@ export function BrandingSettings() {
     const [manualSig, setManualSig] = useState(false);
 
     useEffect(() => {
-        if (branding) {
-            setSchoolName(branding.schoolName || "");
-            setAddress(branding.address || "");
-            setLogoUrl(branding.schoolLogo || "");
-            setSignatureUrl(branding.principalSignature || "");
+        // Only initialize form from DB if we aren't currently saving
+        // AND if the form hasn't been touched yet (all fields empty)
+        // or if we explicitly want to refresh data
+        const isFormPristine = !schoolName && !address && !logoUrl && !signatureUrl;
+
+        if (branding && (isFormPristine || !saving)) {
+            // If the user hasn't typed anything yet, or we're not saving, sync from DB
+            // However, to prevent overwriting WIP typing, we only do this when branding actually CHANGES
+            // and we're not focused on the fields. 
+            // For simplicity: only initialize if fields are empty
+            if (isFormPristine) {
+                setSchoolName(branding.schoolName || "");
+                setAddress(branding.address || "");
+                setLogoUrl(branding.schoolLogo || "");
+                setSignatureUrl(branding.principalSignature || "");
+            }
         }
-    }, [branding]);
+    }, [branding, saving, schoolName, address, logoUrl, signatureUrl]);
 
     // SMARTER UPLOAD: Uses internal API which fallbacks between MediaVault and Firebase
     const performSafeUpload = async (file: File, type: string) => {

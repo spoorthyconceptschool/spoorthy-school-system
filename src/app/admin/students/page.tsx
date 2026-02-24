@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
 import { collection, onSnapshot, query, limit, orderBy, getDocs, where, doc, updateDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -49,29 +49,30 @@ import { StudentLeavesManager } from "@/components/admin/student-leaves-manager"
 
 export default function StudentsPage() {
     const router = useRouter();
-    const { user } = useAuth();
-    const { villages: villagesData, classes: classesData, selectedYear } = useMasterData();
-    const [role, setRole] = useState<string>("");
+    const { user, role } = useAuth();
+    const { villages: villagesData, classes: classesData, loading: masterLoading, selectedYear } = useMasterData();
+    const [students, setStudents] = useState<Student[]>([]);
+    const [localLoading, setLocalLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<"directory" | "leaves">("directory");
 
+    // Replace master data sync with local fetch
     useEffect(() => {
-        if (!user) return;
-        const unsub = onSnapshot(doc(db, "users", user.uid), (d) => {
-            if (d.exists()) setRole(d.data().role);
+        const q = query(collection(db, "students"), orderBy("createdAt", "desc"), limit(1000));
+        const unsub = onSnapshot(q, (snap) => {
+            setStudents(snap.docs.map(d => ({ id: d.id, studentDocId: d.id, ...d.data() } as Student)));
+            setLocalLoading(false);
         });
         return () => unsub();
-    }, [user]);
-
-    // Data State
-    const [students, setStudents] = useState<Student[]>([]);
-    const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
-    const [loading, setLoading] = useState(true);
+    }, []);
 
     // Filter State
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [villageFilter, setVillageFilter] = useState("all");
     const [classFilter, setClassFilter] = useState("all");
+
+    // Derive loading - Unified state
+    const loading = masterLoading || localLoading;
 
     const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name })).sort((a, b) => a.name.localeCompare(b.name));
     const classes = Object.values(classesData || {}).map((c: any) => ({ id: c.id, name: c.name, order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
@@ -82,45 +83,8 @@ export default function StudentsPage() {
     const [resetUser, setResetUser] = useState<{ uid: string, schoolId: string, name: string, role: string } | null>(null);
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
-    const [useFallback, setUseFallback] = useState(false);
-
-    useEffect(() => {
-        let isMounted = true;
-        const q = useFallback
-            ? query(collection(db, "students"), limit(1000))
-            : query(collection(db, "students"), orderBy("createdAt", "desc"), limit(1000));
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            if (!isMounted) return;
-            let loaded = snapshot.docs.map(doc => ({
-                id: doc.id,
-                studentDocId: doc.id,
-                ...doc.data()
-            })) as Student[];
-
-            if (useFallback) {
-                loaded = loaded.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-            }
-
-            setStudents(loaded);
-            setLoading(false);
-        }, (err) => {
-            if (!isMounted) return;
-            if (err.message.includes("index") && !useFallback) {
-                setUseFallback(true);
-            } else {
-                console.error("Student list error:", err);
-                setLoading(false);
-            }
-        });
-
-        return () => {
-            isMounted = false;
-            unsubscribe();
-        };
-    }, [useFallback]);
-
-    useEffect(() => {
+    // Filtered Students - Computed synchronously during render
+    const filteredStudents = useMemo(() => {
         let result = students;
 
         // Filter by Academic Year
@@ -153,11 +117,11 @@ export default function StudentsPage() {
             );
         }
 
-        setFilteredStudents(result);
-    }, [searchQuery, statusFilter, villageFilter, classFilter, students, selectedYear]);
+        return result;
+    }, [students, selectedYear, statusFilter, classFilter, villageFilter, searchQuery]);
 
     return (
-        <div className="space-y-4 md:space-y-6 animate-in fade-in duration-500 max-w-7xl mx-auto p-1 md:p-6 pb-20">
+        <div className="space-y-4 md:space-y-6 animate-in fade-in duration-200 max-w-7xl mx-auto p-1 md:p-6 pb-20">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between pt-2 md:pt-4 gap-4 md:gap-6 px-1 md:px-0">
                 <div className="space-y-0.5 md:space-y-1">
@@ -205,8 +169,7 @@ export default function StudentsPage() {
 
             {activeTab === "directory" ? (
                 <>
-
-                    {/* Filters */}
+                    {/* Filters - Always Rendered for Instant Interaction */}
                     <div className="bg-black/20 p-3 md:p-5 rounded-xl md:rounded-2xl border border-white/10 backdrop-blur-md space-y-3 md:space-y-4 shadow-2xl mx-0">
                         <div className="relative w-full">
                             <SearchIcon className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 md:w-4 md:h-4 text-muted-foreground" />
@@ -266,121 +229,118 @@ export default function StudentsPage() {
                         </div>
                     </div>
 
-                    {/* Content View */}
-                    {loading ? (
-                        <div className="flex justify-center p-20 animate-pulse"><Loader2 className="w-12 h-12 animate-spin text-accent" /></div>
-                    ) : (
-                        <div className="space-y-4">
-                            <DataTable
-                                data={filteredStudents}
-                                isLoading={loading}
-                                onRowClick={(s) => router.push(`/admin/students/${s.schoolId}`)}
-                                columns={[
-                                    {
-                                        key: "studentInfo",
-                                        header: "Student Info",
-                                        render: (s) => (
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center border border-white/10 group-hover:border-accent/40 transition-colors">
-                                                    <User size={16} className="text-white/60 group-hover:text-accent transition-colors" />
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="font-bold text-sm text-white group-hover:text-accent transition-colors leading-tight">{s.studentName}</span>
-                                                    <span className="text-[10px] font-mono text-white/50 tracking-tighter uppercase">ID: {s.schoolId}</span>
-                                                </div>
+                    {/* Content View - Non-blocking Table */}
+                    <div className="relative min-h-[400px]">
+                        <DataTable
+                            data={filteredStudents}
+                            isLoading={loading}
+                            onRowClick={(s) => router.push(`/admin/students/${s.schoolId}`)}
+                            columns={[
+                                {
+                                    key: "studentInfo",
+                                    header: "Student Info",
+                                    render: (s) => (
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center border border-white/10 group-hover:border-accent/40 transition-colors">
+                                                <User size={16} className="text-white/60 group-hover:text-accent transition-colors" />
                                             </div>
-                                        )
-                                    },
-                                    {
-                                        key: "classPlacement",
-                                        header: "Class & Placement",
-                                        render: (s) => (
-                                            <div className="flex flex-col gap-1">
-                                                <span className="text-[10px] uppercase font-black text-white/60 tracking-tighter bg-white/5 px-2 py-0.5 rounded border border-white/5 w-fit">{s.className}</span>
-                                                <div className="flex items-center gap-1.5 text-[10px] text-white/30">
-                                                    <MapPin size={10} className="opacity-40" />
-                                                    <span className="truncate max-w-[120px]">{s.villageName}</span>
-                                                </div>
+                                            <div className="flex flex-col">
+                                                <span className="font-bold text-sm text-white group-hover:text-accent transition-colors leading-tight">{s.studentName}</span>
+                                                <span className="text-[10px] font-mono text-white/50 tracking-tighter uppercase">ID: {s.schoolId}</span>
                                             </div>
-                                        )
-                                    },
-                                    {
-                                        key: "parentDetails",
-                                        header: "Parent Details",
-                                        render: (s) => (
-                                            <div className="flex flex-col gap-0.5">
-                                                <span className="text-xs font-bold text-white/80">{s.parentName}</span>
-                                                <div className="flex items-center gap-1.5 text-[10px] text-white/40">
-                                                    <Phone size={10} className="opacity-40" />
-                                                    <span className="font-mono">{s.parentMobile}</span>
-                                                </div>
+                                        </div>
+                                    )
+                                },
+                                {
+                                    key: "classPlacement",
+                                    header: "Class & Placement",
+                                    render: (s) => (
+                                        <div className="flex flex-col gap-1">
+                                            <span className="text-[10px] uppercase font-black text-white/60 tracking-tighter bg-white/5 px-2 py-0.5 rounded border border-white/5 w-fit">{s.className}</span>
+                                            <div className="flex items-center gap-1.5 text-[10px] text-white/30">
+                                                <MapPin size={10} className="opacity-40" />
+                                                <span className="truncate max-w-[120px]">{s.villageName}</span>
                                             </div>
-                                        )
-                                    },
-                                    {
-                                        key: "credentials",
-                                        header: "Login Credentials",
-                                        render: (s) => (
-                                            <div className="flex flex-col gap-0.5">
-                                                <div className="flex items-center gap-1.5 text-[10px] text-amber-400 font-bold">
-                                                    <Key size={10} className="opacity-60" />
-                                                    <span className="uppercase tracking-tighter">Pass: {s.recoveryPassword || s.parentMobile}</span>
-                                                </div>
+                                        </div>
+                                    )
+                                },
+                                {
+                                    key: "parentDetails",
+                                    header: "Parent Details",
+                                    render: (s) => (
+                                        <div className="flex flex-col gap-0.5">
+                                            <span className="text-xs font-bold text-white/80">{s.parentName}</span>
+                                            <div className="flex items-center gap-1.5 text-[10px] text-white/40">
+                                                <Phone size={10} className="opacity-40" />
+                                                <span className="font-mono">{s.parentMobile}</span>
                                             </div>
-                                        )
-                                    },
-                                    {
-                                        key: "status",
-                                        header: "Status",
-                                        cellClassName: "text-center",
-                                        render: (s) => (
-                                            <Badge className={cn(
-                                                "text-[9px] font-black uppercase tracking-tighter py-0 h-5 border-none transition-all",
-                                                s.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
-                                            )}>
-                                                {s.status}
-                                            </Badge>
-                                        )
-                                    },
-                                    {
-                                        key: "management",
-                                        header: "Management",
-                                        cellClassName: "text-right",
-                                        render: (s) => (
-                                            <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
-                                                {(role === "ADMIN" || role === "MANAGER") && (
-                                                    <DropdownMenu>
-                                                        <DropdownMenuTrigger asChild>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-white/10">
-                                                                <MoreHorizontal size={14} />
-                                                            </Button>
-                                                        </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end" className="bg-zinc-900 border-white/10 text-white min-w-[160px] p-1.5 rounded-xl shadow-2xl">
+                                        </div>
+                                    )
+                                },
+                                {
+                                    key: "credentials",
+                                    header: "Login Credentials",
+                                    render: (s) => (
+                                        <div className="flex flex-col gap-0.5">
+                                            <div className="flex items-center gap-1.5 text-[10px] text-amber-400 font-bold">
+                                                <Key size={10} className="opacity-60" />
+                                                <span className="uppercase tracking-tighter">Pass: {s.recoveryPassword || s.parentMobile}</span>
+                                            </div>
+                                        </div>
+                                    )
+                                },
+                                {
+                                    key: "status",
+                                    header: "Status",
+                                    cellClassName: "text-center",
+                                    render: (s) => (
+                                        <Badge className={cn(
+                                            "text-[9px] font-black uppercase tracking-tighter py-0 h-5 border-none transition-all",
+                                            s.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
+                                        )}>
+                                            {s.status}
+                                        </Badge>
+                                    )
+                                },
+                                {
+                                    key: "management",
+                                    header: "Management",
+                                    cellClassName: "text-right",
+                                    render: (s) => (
+                                        <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
+                                            {(role === "ADMIN" || role === "MANAGER") && (
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-white/10">
+                                                            <MoreHorizontal size={14} />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" className="bg-zinc-900 border-white/10 text-white min-w-[160px] p-1.5 rounded-xl shadow-2xl">
+                                                        <DropdownMenuItem onClick={() => {
+                                                            if (!s.uid) { alert("UID Missing"); return; }
+                                                            setResetUser({ uid: s.uid, schoolId: s.schoolId, name: s.studentName, role: "STUDENT" });
+                                                            setIsResetModalOpen(true);
+                                                        }} className="rounded-lg gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors">
+                                                            <Key size={14} /> Reset Password
+                                                        </DropdownMenuItem>
+                                                        {role === "ADMIN" && (
                                                             <DropdownMenuItem onClick={() => {
-                                                                if (!s.uid) { alert("UID Missing"); return; }
-                                                                setResetUser({ uid: s.uid, schoolId: s.schoolId, name: s.studentName, role: "STUDENT" });
-                                                                setIsResetModalOpen(true);
-                                                            }} className="rounded-lg gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors">
-                                                                <Key size={14} /> Reset Password
+                                                                setSelectedStudent(s);
+                                                                setIsDeleteModalOpen(true);
+                                                            }} className="rounded-lg gap-2 text-xs font-bold text-red-500 hover:text-red-400 transition-colors">
+                                                                <Trash2 size={14} /> Delete Student
                                                             </DropdownMenuItem>
-                                                            {role === "ADMIN" && (
-                                                                <DropdownMenuItem onClick={() => {
-                                                                    setSelectedStudent(s);
-                                                                    setIsDeleteModalOpen(true);
-                                                                }} className="rounded-lg gap-2 text-xs font-bold text-red-500 hover:text-red-400 transition-colors">
-                                                                    <Trash2 size={14} /> Delete Student
-                                                                </DropdownMenuItem>
-                                                            )}
-                                                        </DropdownMenuContent>
-                                                    </DropdownMenu>
-                                                )}
-                                            </div>
-                                        )
-                                    }
-                                ]}
-                            />
-                        </div>
-                    )}
+                                                        )}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            )}
+                                        </div>
+                                    )
+                                }
+                            ]}
+                        />
+                    </div>
+
 
                     <AdminChangePasswordModal
                         isOpen={isResetModalOpen}

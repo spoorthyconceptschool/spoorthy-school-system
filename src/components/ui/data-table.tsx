@@ -1,3 +1,4 @@
+import { useState } from "react";
 import {
     Table,
     TableBody,
@@ -32,9 +33,18 @@ interface DataTableProps<T> {
     isLoading?: boolean;
     onRowClick?: (item: T) => void;
     actions?: (item: T) => React.ReactNode; // Extra kebab menu actions
+    pageSize?: number;
 }
 
-export function DataTable<T>({ data, columns, isLoading, onRowClick, actions }: DataTableProps<T>) {
+export function DataTable<T>({ data, columns, isLoading, onRowClick, actions, pageSize = 20 }: DataTableProps<T>) {
+    const [currentPage, setCurrentPage] = useState(1);
+
+    // Pagination Logic
+    const totalItems = data.length;
+    const totalPages = Math.ceil(totalItems / pageSize);
+    const startIndex = (currentPage - 1) * pageSize;
+    const paginatedData = data.slice(startIndex, startIndex + pageSize);
+
     if (isLoading) {
         return (
             <div className="w-full h-48 flex items-center justify-center bg-white/5 rounded-xl animate-pulse">
@@ -45,7 +55,6 @@ export function DataTable<T>({ data, columns, isLoading, onRowClick, actions }: 
 
     return (
         <div className="w-full space-y-3">
-            {/* Unified Table View - Optimized for Zero Scroll */}
             <div className="overflow-x-auto rounded-xl md:rounded-2xl border border-white/10 bg-black/20 backdrop-blur-md custom-scrollbar">
                 <Table className="w-full">
                     <TableHeader className="bg-white/5">
@@ -65,14 +74,14 @@ export function DataTable<T>({ data, columns, isLoading, onRowClick, actions }: 
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {data.length === 0 ? (
+                        {paginatedData.length === 0 ? (
                             <TableRow>
                                 <TableCell colSpan={columns.length + (actions ? 1 : 0)} className="h-24 md:h-32 text-center text-muted-foreground border-white/10 whitespace-nowrap text-[10px] md:text-sm italic">
                                     No results found.
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            data.map((item, index) => (
+                            paginatedData.map((item, index) => (
                                 <TableRow
                                     key={(item as any).id || index}
                                     className={cn(
@@ -124,16 +133,27 @@ export function DataTable<T>({ data, columns, isLoading, onRowClick, actions }: 
                 </Table>
             </div>
 
-            {/* Simple Pagination - More compact on mobile */}
             <div className="flex items-center justify-between py-2 md:py-4 px-3 md:px-6 bg-white/5 border border-white/10 rounded-xl md:rounded-2xl">
                 <div className="text-[8px] md:text-xs font-black uppercase tracking-widest text-muted-foreground italic">
-                    Scope: <span className="text-white ml-1">{data.length} items</span>
+                    Showing <span className="text-white">{Math.min(startIndex + 1, totalItems)} - {Math.min(startIndex + pageSize, totalItems)}</span> of <span className="text-white">{totalItems} items</span>
                 </div>
                 <div className="flex gap-1 md:gap-2">
-                    <Button variant="ghost" size="sm" disabled className="h-6 md:h-8 px-2 md:px-4 text-[8px] md:text-[10px] font-black uppercase tracking-widest border border-white/10 opacity-90">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={currentPage === 1}
+                        onClick={() => setCurrentPage(curr => Math.max(1, curr - 1))}
+                        className="h-6 md:h-8 px-2 md:px-4 text-[8px] md:text-[10px] font-black uppercase tracking-widest border border-white/10 opacity-90 disabled:opacity-30"
+                    >
                         Prev
                     </Button>
-                    <Button variant="ghost" size="sm" disabled className="h-6 md:h-8 px-2 md:px-4 text-[8px] md:text-[10px] font-black uppercase tracking-widest border border-white/10 opacity-90">
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        disabled={currentPage === totalPages || totalPages === 0}
+                        onClick={() => setCurrentPage(curr => Math.min(totalPages, curr + 1))}
+                        className="h-6 md:h-8 px-2 md:px-4 text-[8px] md:text-[10px] font-black uppercase tracking-widest border border-white/10 opacity-90 disabled:opacity-30"
+                    >
                         Next
                     </Button>
                 </div>

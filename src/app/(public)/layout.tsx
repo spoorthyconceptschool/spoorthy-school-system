@@ -17,6 +17,7 @@ function Navbar() {
     const { branding } = useMasterData();
     const [scrolled, setScrolled] = useState(false);
     const [mobileOpen, setMobileOpen] = useState(false);
+    const [imageError, setImageError] = useState(false);
     const { scrollY } = useScroll();
 
     useMotionValueEvent(scrollY, "change", (latest) => {
@@ -50,18 +51,21 @@ function Navbar() {
                         )}
 
                         {/* Brand Identity */}
-                        <Link href="/" className="flex items-center gap-3 md:gap-4 group z-50 relative shrink-0">
-                            {branding.schoolLogo ? (
-                                <div className="relative w-10 h-10 md:w-12 md:h-12 lg:w-14 lg:h-14 overflow-hidden rounded-xl bg-white/5 p-1 group-hover:scale-105 transition-transform duration-500 border border-white/10 shadow-lg shrink-0">
+                        <Link href="/" className="flex items-center gap-3 md:gap-4 group z-50 relative shrink-0 min-w-0">
+                            <div className="relative w-10 h-10 min-w-[40px] md:w-12 md:min-w-[48px] md:h-12 lg:w-14 lg:h-14 lg:min-w-[56px] overflow-hidden rounded-xl bg-white p-1 group-hover:scale-105 transition-transform duration-500 shadow-xl shrink-0 flex items-center justify-center">
+                                {!imageError ? (
                                     <img
-                                        src={branding.schoolLogo}
-                                        alt={branding.schoolName}
-                                        className="w-full h-full object-contain filter drop-shadow-md"
+                                        src={branding.schoolLogo || "https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Flogo.png?alt=media"}
+                                        alt={branding.schoolName || "Logo"}
+                                        className="w-full h-full object-contain filter drop-shadow-sm"
+                                        onError={() => setImageError(true)}
                                     />
-                                </div>
-                            ) : null}
-                            <div className="flex flex-col justify-center overflow-hidden">
-                                <span className="font-premium text-lg md:text-2xl lg:text-3xl tracking-tight text-white group-hover:text-accent transition-colors leading-tight truncate">
+                                ) : (
+                                    <div className="w-full h-full bg-[#64FFDA]/10 flex items-center justify-center text-[#0A192F] font-bold font-display text-xl">S</div>
+                                )}
+                            </div>
+                            <div className="flex flex-col justify-center overflow-hidden min-w-0">
+                                <span className="font-display font-black text-lg md:text-2xl lg:text-3xl tracking-tight text-white group-hover:text-accent transition-colors leading-tight truncate">
                                     {branding.schoolName || "Spoorthy Concept School"}
                                 </span>
                             </div>
@@ -151,7 +155,7 @@ function Navbar() {
 
 export default function PublicLayout({ children }: { children: React.ReactNode }) {
     return (
-        <ReactLenis root options={{ lerp: 0.1, duration: 1.0, smoothWheel: true, wheelMultiplier: 4, touchMultiplier: 3 }}>
+        <ReactLenis root options={{ lerp: 0.1, duration: 1.0, smoothWheel: true, wheelMultiplier: 1.2, touchMultiplier: 1.2 }}>
             <div className="min-h-screen bg-[#0A192F] text-white font-sans selection:bg-accent selection:text-black">
                 <Navbar />
                 <main className="relative z-10">

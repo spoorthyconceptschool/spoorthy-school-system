@@ -142,14 +142,12 @@ function SelectionDialog({
 
 export function GroupsManager() {
     const { user } = useAuth();
-    const { branding } = useMasterData();
+    const { branding, students: globalStudents, teachers: globalTeachers, loading: masterLoading } = useMasterData();
     // Data State
     const [groups, setGroups] = useState<Group[]>([]);
     const [loading, setLoading] = useState(true);
     const [students, setStudents] = useState<any[]>([]);
-    const [studentsLoading, setStudentsLoading] = useState(false);
     const [teachers, setTeachers] = useState<any[]>([]);
-    const [teachersLoading, setTeachersLoading] = useState(false);
 
     // Modal State
     const [isCreateOpen, setIsCreateOpen] = useState(false);
@@ -172,14 +170,6 @@ export function GroupsManager() {
     const [members, setMembers] = useState<any[]>([]);
     const [membersLoading, setMembersLoading] = useState(false);
     const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
-
-    useEffect(() => {
-        if (user) {
-            fetchGroups();
-            fetchStudentsLite();
-            fetchTeachers();
-        }
-    }, [user]);
 
     const handleImageUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
         if (!e.target.files || !e.target.files[0]) return;
@@ -223,40 +213,6 @@ export function GroupsManager() {
         }
     };
 
-    const fetchTeachers = async () => {
-        setTeachersLoading(true);
-        try {
-            const snap = await getDocs(collection(db, "teachers"));
-            const list: any[] = [];
-            snap.forEach(d => {
-                const data = d.data();
-                if (data.status === 'active') {
-                    list.push({ id: d.id, name: data.name, email: data.email });
-                }
-            });
-            list.sort((a, b) => a.name.localeCompare(b.name));
-            setTeachers(list);
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setTeachersLoading(false);
-        }
-    };
-
-    const fetchGroups = async () => {
-        setLoading(true);
-        try {
-            const snap = await getDocs(collection(db, "groups"));
-            const list: Group[] = [];
-            snap.forEach(d => list.push({ id: d.id, ...d.data() } as Group));
-            setGroups(list);
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const fetchMembers = async (groupId: string) => {
         setMembersLoading(true);
         try {
@@ -278,21 +234,49 @@ export function GroupsManager() {
         fetchMembers(g.id);
     };
 
-    const fetchStudentsLite = async () => {
-        setStudentsLoading(true);
-        try {
-            const snap = await getDocs(collection(db, "students"));
-            const list: any[] = [];
-            snap.forEach(d => {
-                const data = d.data();
-                list.push({ id: d.id, name: data.studentName, class: data.className, section: data.sectionName });
-            });
+    useEffect(() => {
+        if (user) {
+            fetchGroups();
+        }
+    }, [user]);
+
+    // Sync Students & Teachers from Global Cache
+    useEffect(() => {
+        if (globalStudents?.length > 0) {
+            const list = globalStudents.map(s => ({
+                id: s.id,
+                name: s.studentName,
+                class: s.className,
+                section: s.sectionName
+            }));
             list.sort((a, b) => a.name.localeCompare(b.name));
             setStudents(list);
+        }
+    }, [globalStudents]);
+
+    useEffect(() => {
+        if (globalTeachers?.length > 0) {
+            const list = globalTeachers.filter(t => t.status === 'active').map(t => ({
+                id: t.id,
+                name: t.name,
+                email: t.email
+            }));
+            list.sort((a, b) => a.name.localeCompare(b.name));
+            setTeachers(list);
+        }
+    }, [globalTeachers]);
+
+    const fetchGroups = async () => {
+        setLoading(true);
+        try {
+            const snap = await getDocs(collection(db, "groups"));
+            const list: Group[] = [];
+            snap.forEach(d => list.push({ id: d.id, ...d.data() } as Group));
+            setGroups(list);
         } catch (e) {
             console.error(e);
         } finally {
-            setStudentsLoading(false);
+            setLoading(false);
         }
     };
 
@@ -811,6 +795,7 @@ export function GroupsManager() {
                         if (selectionType === 'captain') setFormCaptain(val as string);
                         if (selectionType === 'viceCaptain') setFormViceCaptain(val as string);
                         if (selectionType === 'incharge') setFormIncharges(val as string[]);
+                        setSelectionType(null);
                     }}
                 />
             )}

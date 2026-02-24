@@ -45,6 +45,7 @@ export default function FeePendingsPage() {
             // 1. Fetch ledgers with pending status
             const q = query(collection(db, "student_fee_ledgers"), where("status", "==", "PENDING"));
             const snap = await getDocs(q);
+
             const rawLedgers: any[] = snap.docs.map(d => {
                 const data = d.data();
                 return {
@@ -54,31 +55,9 @@ export default function FeePendingsPage() {
                 };
             }).filter(l => l.pendingAmount > 0);
 
-            // 2. Fetch all students to join rich data (parent info, village, etc)
-            const studentsSnap = await getDocs(collection(db, "students"));
-            const studentMap: Record<string, any> = {};
-            studentsSnap.docs.forEach(d => {
-                const sData = d.data();
-                if (sData.schoolId && sData.status === "ACTIVE") {
-                    studentMap[sData.schoolId] = { ...sData, docId: d.id };
-                }
-            });
-
-            // 3. Perform Join & Enrichment
+            // 2. Perform Join & Enrichment using denormalized data in ledgers
             const joined = rawLedgers.map(l => {
-                const student = studentMap[l.studentId];
-                if (!student) return null; // Skip non-active students
-
-                // Calculate breakdowns
-                let termPending = 0;
-                let transportPending = 0;
-                let customPending = 0;
-
-                // Simple logic: if totalPaid > 0, we deduct from term first, then transport, then custom
-                // But a better way is to check the ledger items if we had individual paid status.
-                // Since our system currently tracks totalPaid vs totalFee, we'll show the items totals for now.
-                // Or better: show "Total Pending" but also show what items exist.
-
+                // Denormalized fields check
                 const transportItem = l.items?.find((i: any) => i.type === "TRANSPORT");
                 const transportFee = transportItem?.amount || 0;
 
@@ -87,18 +66,18 @@ export default function FeePendingsPage() {
 
                 return {
                     ...l,
-                    studentDocId: student.docId,
-                    parentName: student.parentName || "N/A",
-                    parentMobile: student.parentMobile || "N/A",
-                    villageId: student.villageId || "",
-                    villageName: student.villageName || "N/A",
-                    sectionName: student.sectionName || "",
+                    studentDocId: l.studentId, // We use schoolId as key usually, or document link
+                    parentName: l.parentName || "N/A",
+                    parentMobile: l.parentMobile || "N/A",
+                    villageId: l.villageId || "",
+                    villageName: l.villageName || "N/A",
+                    sectionName: l.sectionName || "",
                     transportFee,
                     customFee
                 };
-            }).filter(Boolean).sort((a, b) => b!.pendingAmount - a!.pendingAmount);
+            }).sort((a, b) => b.pendingAmount - a.pendingAmount);
 
-            setLedgers(joined as any[]);
+            setLedgers(joined);
         } catch (e) {
             console.error("Fetch Pendings Error:", e);
         } finally {

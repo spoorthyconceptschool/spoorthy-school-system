@@ -20,13 +20,16 @@ export default function AdminAttendancePage() {
     const { classes, classSections, sections } = useMasterData();
     const [selectedClass, setSelectedClass] = useState<string>("");
     const [selectedSection, setSelectedSection] = useState<string>("");
-    const [date, setDate] = useState("");
-
-    const [mounted, setMounted] = useState(false);
+    // Initialize date synchronously to avoid first-render flicker
+    const [date, setDate] = useState(() => {
+        if (typeof window === "undefined") return "2026-02-23"; // Fallback for SSR using current user time
+        return new Date().toISOString().split('T')[0];
+    });
 
     useEffect(() => {
-        setMounted(true);
-        setDate(new Date().toISOString().split('T')[0]);
+        // Double check on client side to handle overnight sessions
+        const today = new Date().toISOString().split('T')[0];
+        if (date !== today) setDate(today);
     }, []);
 
     const fetchedSections = selectedClass
@@ -35,8 +38,6 @@ export default function AdminAttendancePage() {
             .map((cs: any) => (sections || {})[cs.sectionId])
             .filter(Boolean)
         : [];
-
-    if (!mounted) return null;
 
     return (
         <div className="max-w-none p-0 space-y-6 animate-in fade-in">
@@ -75,7 +76,7 @@ export default function AdminAttendancePage() {
                                         <SelectValue placeholder="Select Class" />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        {Object.values(classes).map((c: any) => (
+                                        {Object.values(classes || {}).map((c: any) => (
                                             <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                                         ))}
                                     </SelectContent>
@@ -106,7 +107,7 @@ export default function AdminAttendancePage() {
                     </Card>
 
                     {selectedClass && selectedSection && date && (
-                        <div key={`${selectedClass}-${selectedSection}-${date}`}>
+                        <div>
                             <AttendanceManager
                                 classId={selectedClass}
                                 sectionId={selectedSection}

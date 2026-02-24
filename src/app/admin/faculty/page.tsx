@@ -27,7 +27,7 @@ function FacultyManagementContent() {
     }, [searchParams]);
 
     return (
-        <div className="space-y-6 md:space-y-10 animate-in fade-in duration-500 pb-20">
+        <div className="space-y-6 md:space-y-10 animate-in fade-in duration-200 pb-20">
             {/* Unified Header */}
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2 md:px-0">
                 <div className="space-y-1">
@@ -104,9 +104,21 @@ function FacultyManagementContent() {
 
 export default function FacultyManagementPage() {
     return (
-        <Suspense fallback={<div className="flex items-center justify-center h-screen"><Loader2 className="animate-spin text-accent" /></div>}>
+        <Suspense fallback={
+            <div className="space-y-6 md:space-y-10 p-1 md:p-6">
+                <div className="h-12 w-48 bg-white/5 animate-pulse rounded-xl" />
+                <div className="h-14 w-full bg-white/5 animate-pulse rounded-2xl" />
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+                    <div className="h-40 bg-white/5 animate-pulse rounded-3xl" />
+                    <div className="h-40 bg-white/5 animate-pulse rounded-3xl" />
+                    <div className="h-40 bg-white/5 animate-pulse rounded-3xl" />
+                </div>
+            </div>
+        }>
             <FacultyManagementContent />
         </Suspense>
     );
 }
+
+
 

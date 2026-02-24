@@ -1,46 +1,40 @@
-import { Firestore, collection, doc, getDoc, getDocs, query, setDoc, where, writeBatch } from "firebase/firestore";
+import { adminDb, Timestamp } from "@/lib/firebase-admin";
 
-export async function syncAllStudentLedgers(db: Firestore) {
-    // 1. Fetch Necessary Data in Parallel
-    const [studentsSnap, customFeesSnap, configSnap, classesSnap, ledgersSnap] = await Promise.all([
-        getDocs(query(collection(db, "students"), where("status", "==", "ACTIVE"))),
-        getDocs(query(collection(db, "custom_fees"), where("status", "==", "ACTIVE"))),
-        getDoc(doc(db, "config", "fees")),
-        getDocs(query(collection(db, "master_classes"))),
-        getDocs(collection(db, "student_fee_ledgers"))
-    ]);
+export async function syncAllStudentLedgersAdmin() {
+    // 1. Fetch Necessary Data
+    const studentsSnap = await adminDb.collection("students").where("status", "==", "ACTIVE").get();
+    const customFeesSnap = await adminDb.collection("custom_fees").where("status", "==", "ACTIVE").get();
+    const configSnap = await adminDb.collection("config").doc("fees").get();
+    const classesSnap = await adminDb.collection("master_classes").get();
+    const ledgersSnap = await adminDb.collection("student_fee_ledgers").get();
 
-    const students = studentsSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
-    const activeCustomFees = customFeesSnap.docs.map(d => ({ id: d.id, ...d.data() } as any));
-    const feeConfig = configSnap.exists() ? configSnap.data() : { terms: [], transportFees: {} };
+    const students = studentsSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as any));
+    const activeCustomFees = customFeesSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as any));
+    const feeConfig = configSnap.exists ? configSnap.data() : { terms: [], transportFees: {} };
     const activeTerms = (feeConfig?.terms || []).filter((t: any) => t.isActive);
 
-    // Map existing ledgers for O(1) lookup
     const existingLedgersMap = new Map();
-    ledgersSnap.docs.forEach(d => existingLedgersMap.set(d.id, d.data()));
+    ledgersSnap.docs.forEach((d: any) => existingLedgersMap.set(d.id, d.data()));
 
-    // Map Class ID to Name
     const classMap = new Map();
-    classesSnap.docs.forEach(doc => {
+    classesSnap.docs.forEach((doc: any) => {
         classMap.set(doc.id, doc.data().name);
     });
 
     let updatedCount = 0;
     const currentYearId = "2025-2026";
 
-    // Firestore batch limit is 500. We'll use batches of 400 to be safe.
-    let batch = writeBatch(db);
+    let batch = adminDb.batch();
     let batchCount = 0;
 
     for (const student of students) {
         const ledgerId = `${student.schoolId}_${currentYearId}`;
-        const ledgerRef = doc(db, "student_fee_ledgers", ledgerId);
+        const ledgerRef = adminDb.collection("student_fee_ledgers").doc(ledgerId);
         const existingLedger = existingLedgersMap.get(ledgerId);
 
         let existingItems = existingLedger?.items || [];
         let totalPaid = existingLedger?.totalPaid || 0;
 
-        // CALCULATION LOGIC
         const targetClassId = student.classId;
         const targetClassName = classMap.get(targetClassId) || student.className || "Class 1";
 
@@ -125,25 +119,22 @@ export async function syncAllStudentLedgers(db: Firestore) {
             totalPaid,
             status: totalPaid >= totalFee ? "PAID" : "PENDING",
             items: mergedItems,
-            updatedAt: new Date().toISOString()
+            updatedAt: Timestamp.now()
         }, { merge: true });
 
         batchCount++;
         updatedCount++;
 
-        // Commit batch if it reaches limit
         if (batchCount >= 400) {
             await batch.commit();
-            batch = writeBatch(db);
+            batch = adminDb.batch();
             batchCount = 0;
         }
     }
 
-    // Final commit
     if (batchCount > 0) {
         await batch.commit();
     }
 
     return updatedCount;
 }
-

@@ -6,18 +6,21 @@ import { ArrowRight, Play, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { ref, onValue } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
+import { cn } from "@/lib/utils";
 
 export function Hero() {
     const [content, setContent] = useState<any>({
-        title: "The Future of Learning.",
-        subtitle: "Where curiosity meets innovation in a world-class campus.",
-        videoUrl: null,       // Desktop Video
-        mobileVideoUrl: null, // Mobile Video
-        posterUrl: "/hero-poster.jpg"
+        title: "Learn Today Lead Tommorrow",
+        subtitle: "Innovation meets tradition.",
+        videoUrl: "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/51d8a5ee-ebad-48e0-9617-b96d7911ac8b.mp4",
+        mobileVideoUrl: null,
+        posterUrl: "https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Fhero-poster.jpg?alt=media"
     });
 
     const [loading, setLoading] = useState(true);
     const [isMobile, setIsMobile] = useState(false);
+
+    const [videoLoaded, setVideoLoaded] = useState(false);
 
     useEffect(() => {
         const unsub = onValue(ref(rtdb, 'siteContent/home/hero'), (snap) => {
@@ -86,10 +89,18 @@ export function Hero() {
 
             {/* Cinematic Background Layer */}
             <motion.div
-                style={{ opacity: opacityVideo, y: yVideo }}
+                style={{
+                    opacity: opacityVideo,
+                    y: yVideo,
+                    backgroundImage: content.posterUrl ? `url(${content.posterUrl})` : 'none',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                }}
                 className="absolute inset-0 z-0 bg-[#0A192F]"
             >
-                {/* Immediate Video Rendering - No blocking spinner */}
+                {/* 
+                  Video Layer - High priority rendering.
+                */}
                 {activeVideoUrl && (
                     <video
                         key={activeVideoUrl}
@@ -98,8 +109,12 @@ export function Hero() {
                         muted
                         loop
                         playsInline
-                        className="w-full h-full object-cover transition-opacity duration-1000 opacity-100"
-                        poster={content.posterUrl}
+                        preload="auto"
+                        onLoadedData={() => setVideoLoaded(true)}
+                        className={cn(
+                            "w-full h-full object-cover transition-opacity duration-1000",
+                            videoLoaded ? "opacity-100" : "opacity-0"
+                        )}
                     />
                 )}
 

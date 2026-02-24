@@ -68,10 +68,15 @@ interface SidebarProps {
 export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
-    const { user, signOut } = useAuth();
+    const { user, role, signOut } = useAuth();
     const { branding } = useMasterData();
-    const [role, setRole] = useState<string | null>(null);
+    const [imageError, setImageError] = useState(false);
     const [pendingLeaves, setPendingLeaves] = useState(0);
+
+    // Reset image error when branding changes
+    useEffect(() => {
+        setImageError(false);
+    }, [branding.schoolLogo]);
 
     useEffect(() => {
         if (!user) return;
@@ -87,26 +92,6 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
         });
 
         return () => unsubLeaves();
-    }, [user]);
-
-    useEffect(() => {
-        if (!user) {
-            setRole(null);
-            return;
-        }
-
-        const cachedRole = sessionStorage.getItem(`role_${user.uid}`);
-        if (cachedRole) setRole(cachedRole);
-
-        const unsub = onSnapshot(doc(db, "users", user.uid), (d: any) => {
-            if (d.exists()) {
-                const newRole = d.data().role;
-                setRole(newRole);
-                sessionStorage.setItem(`role_${user.uid}`, newRole);
-            }
-        });
-
-        return () => unsub();
     }, [user]);
 
     const filteredNav = NAV_ITEMS.filter(item => {
@@ -148,18 +133,14 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
                         className="flex items-center gap-3 select-none overflow-hidden"
                     >
                         <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl bg-white flex items-center justify-center p-1.5 border border-white/20 shadow-lg relative overflow-hidden">
-                            {branding.schoolLogo ? (
+                            {!imageError ? (
                                 <img
-                                    src={branding.schoolLogo}
+                                    src={branding.schoolLogo || "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png"}
                                     alt="Logo"
                                     className="w-full h-full object-contain"
-                                    onError={(e) => {
-                                        (e.currentTarget as HTMLImageElement).parentElement?.classList.add('broken-image');
-                                        e.currentTarget.style.display = 'none';
-                                    }}
+                                    onError={() => setImageError(true)}
                                 />
-                            ) : null}
-                            {(!branding.schoolLogo || typeof window !== 'undefined' && document.querySelector('.broken-image')) && (
+                            ) : (
                                 <div className="absolute inset-0 w-full h-full bg-[#64FFDA]/10 flex items-center justify-center text-[#64FFDA] font-bold font-mono text-xl">S</div>
                             )}
                         </div>
@@ -167,7 +148,7 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
                             <span className="font-black text-[10px] tracking-[0.2em] text-[#64FFDA] uppercase truncate leading-none mb-1">
                                 Control Center
                             </span>
-                            <span className="font-bold text-sm tracking-tight text-white md:truncate md:max-w-[140px]">
+                            <span className="font-display font-black text-sm tracking-tight text-white md:truncate md:max-w-[140px]">
                                 {branding.schoolName || "Spoorthy School"}
                             </span>
                         </div>

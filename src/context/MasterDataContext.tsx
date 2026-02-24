@@ -1,10 +1,12 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useMemo } from "react";
 import { ref, onValue, off } from "firebase/database";
 import { doc, onSnapshot } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { rtdb, db, auth } from "@/lib/firebase";
+import { useAuth } from "./AuthContext";
+import { collection, query, limit, orderBy } from "firebase/firestore";
 
 interface MasterDataState {
     villages: Record<string, any>;
@@ -23,8 +25,15 @@ interface MasterDataState {
         principalSignature: string;
     };
     academicYears: Record<string, { id: string, name: string, active: boolean, startDate: string, endDate: string }>;
+    systemConfig: {
+        testingMode: boolean;
+        developerMaintenance: boolean;
+    };
     selectedYear: string;
     setSelectedYear: (year: string) => void;
+    students: any[];
+    teachers: any[];
+    staff: any[];
     loading: boolean;
 }
 
@@ -41,12 +50,19 @@ const initialState: MasterDataState = {
     branding: {
         schoolName: "Spoorthy Concept School",
         address: "",
-        schoolLogo: "",
+        schoolLogo: "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png",
         principalSignature: ""
     },
     academicYears: {},
+    systemConfig: {
+        testingMode: false,
+        developerMaintenance: false,
+    },
     selectedYear: "2025-2026",
     setSelectedYear: () => { },
+    students: [],
+    teachers: [],
+    staff: [],
     loading: true
 };
 
@@ -80,35 +96,35 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
 
     // 1. RTDB Sync for Master Data & Branding
     useEffect(() => {
-        // Public Branding Sync
+        let masterUnsub: (() => void) | null = null;
+        let brandingUnsub: (() => void) | null = null;
+
+        // Public Branding Sync - THE source of truth for identity
         const brandingRef = ref(rtdb, 'siteContent/branding');
-        const brandingUnsub = onValue(brandingRef, (snap) => {
+        brandingUnsub = onValue(brandingRef, (snap) => {
             if (snap.exists()) {
-                setData(prev => ({
-                    ...prev,
-                    branding: { ...initialState.branding, ...snap.val() }
-                }));
+                const brandingData = snap.val();
+                setData(prev => {
+                    const nextBranding = { ...initialState.branding, ...brandingData };
+                    // Only update if actually different
+                    if (JSON.stringify(prev.branding) === JSON.stringify(nextBranding)) return prev;
+                    return { ...prev, branding: nextBranding };
+                });
             }
         });
 
         // Protected Master Data Sync (Authenticated only)
-        let masterUnsub: any = null;
-
         const authUnsub = onAuthStateChanged(auth, (user) => {
+            if (masterUnsub) { masterUnsub(); masterUnsub = null; }
+
             if (user) {
                 const dataRef = ref(rtdb, 'master');
-                masterUnsub = onValue(dataRef, (snapshot) => {
+                const onMasterValue = onValue(dataRef, (snapshot) => {
                     const rawData = snapshot.val() || {};
-                    const newState: Partial<MasterDataState> = {
-                        loading: false,
-                    };
+                    const updates: Partial<MasterDataState> = { loading: false };
 
-                    // Only update branding from master if siteContent/branding is empty
-                    if (rawData.branding) {
-                        newState.branding = { ...initialState.branding, ...rawData.branding };
-                    }
-
-                    const keys: (keyof Omit<MasterDataState, 'loading' | 'selectedYear' | 'setSelectedYear' | 'branding' | 'academicYears'>)[] =
+                    // 1. Master Data Keys (Villages, Classes, etc.)
+                    const keys: (keyof Omit<MasterDataState, 'loading' | 'selectedYear' | 'setSelectedYear' | 'branding' | 'academicYears' | 'students' | 'teachers' | 'staff'>)[] =
                         ['villages', 'classes', 'sections', 'subjects', 'classSections', 'classSubjects', 'subjectTeachers', 'homeworkSubjects', 'roles'];
 
                     keys.forEach(key => {
@@ -119,29 +135,36 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
                                 processed[id].id = id;
                             }
                         });
-                        (newState as any)[key] = processed;
+                        (updates as any)[key] = processed;
                     });
 
-                    setData(prev => ({ ...prev, ...newState }));
+                    // 2. Note: Branding fallback removed to prevent split-brain flicker. 
+                    // siteContent/branding is now the absolute source.
+
+                    setData(prev => {
+                        const nextState = { ...prev, ...updates };
+                        if (JSON.stringify(prev) === JSON.stringify(nextState)) return prev;
+                        return nextState;
+                    });
                 }, (error) => {
-                    console.warn("RTDB Sync restricted (master):", error.message);
+                    console.warn("RTDB Permission (master):", error.message);
                     setData(prev => ({ ...prev, loading: false }));
                 });
+
+                masterUnsub = () => off(dataRef, 'value', onMasterValue);
             } else {
-                // If logged out, stop listening to master
-                if (masterUnsub) off(ref(rtdb, 'master'));
                 setData(prev => ({ ...prev, loading: false }));
             }
         });
 
         const timer = setTimeout(() => {
             setData(prev => ({ ...prev, loading: false }));
-        }, 2000);
+        }, 3000);
 
         return () => {
-            brandingUnsub();
+            if (brandingUnsub) brandingUnsub();
             authUnsub();
-            if (masterUnsub) off(ref(rtdb, 'master'));
+            if (masterUnsub) masterUnsub();
             clearTimeout(timer);
         };
     }, []);
@@ -216,17 +239,60 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
         return () => unsub();
     }, []);
 
+    // 3. Firestore Sync for System Config (Testing Mode, etc.)
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, "config", "system"), (docSnap) => {
+            if (docSnap.exists()) {
+                const config = docSnap.data();
+                setData(prev => ({
+                    ...prev,
+                    systemConfig: {
+                        testingMode: !!config.testingMode,
+                        developerMaintenance: !!config.developerMaintenance
+                    }
+                }));
+            } else {
+                // Initialize if doesn't exist (safety)
+                setData(prev => ({
+                    ...prev,
+                    systemConfig: { ...initialState.systemConfig }
+                }));
+            }
+        }, (error) => {
+            console.warn("Firestore Permission/Error (config/system):", error.message);
+        });
+
+        return () => unsub();
+    }, []);
+
+    // 4. Authenticated State Management
+    const { role, user } = useAuth();
+    useEffect(() => {
+        if (!user || (role !== "ADMIN" && role !== "MANAGER")) {
+            if (data.students.length > 0) setData(prev => ({ ...prev, students: [], teachers: [], staff: [] }));
+            return;
+        }
+
+        // NOTE: Large datasets (Students/Teachers) are no longer synced globally to prevent 
+        // browser memory overload and long initial load times. 
+        // Use local page hooks with limit() and pagination instead.
+        setData(prev => ({ ...prev, loading: false }));
+
+    }, [user, role]);
+
     const handleSetSelectedYear = (year: string) => {
         setSelectedYear(year);
         localStorage.setItem("spoorthy_academic_year", year);
     };
 
+    const contextValue = useMemo(() => ({
+        ...data,
+        selectedYear,
+        setSelectedYear: handleSetSelectedYear
+    }), [data, selectedYear]);
+
     return (
-        <MasterDataContext.Provider value={{
-            ...data,
-            selectedYear,
-            setSelectedYear: handleSetSelectedYear
-        }}>
+        <MasterDataContext.Provider value={contextValue}>
             {children}
         </MasterDataContext.Provider>
     );

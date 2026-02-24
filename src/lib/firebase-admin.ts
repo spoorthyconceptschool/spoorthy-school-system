@@ -102,5 +102,6 @@ export const getInitError = () => _initError;
 // Static helpers to avoid sub-package import issues
 // These are safe to access directly from the admin object
 export const FieldValue = admin.firestore.FieldValue;
+export const FieldPath = admin.firestore.FieldPath;
 export const Timestamp = admin.firestore.Timestamp;
 export const ServerValue = admin.database.ServerValue;

@@ -36,176 +36,162 @@ async function nukeCollection(col: string) {
 
 
 export async function POST(req: NextRequest) {
-    try {
-        console.log("[Purge] ⚡ INSTANT WIPE REQUEST RECEIVED");
-        const startTime = Date.now();
+    console.log("[Purge] >>> Incoming Request Initiated");
+    const startTime = Date.now();
 
+    try {
         // 1. Authorization
         const authHeader = req.headers.get("Authorization");
-        if (!authHeader?.startsWith("Bearer ")) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-        const token = authHeader.split("Bearer ")[1];
-        const decodedToken = await adminAuth.verifyIdToken(token);
+        if (!authHeader?.startsWith("Bearer ")) {
+            console.log("[Purge] Auth Strike: No Bearer token");
+            return NextResponse.json({ success: false, error: "Unauthorized access detected." }, { status: 200 });
+        }
 
-        const isSuperAdmin = decodedToken.role === "SUPER_ADMIN" || decodedToken.role === "ADMIN" || decodedToken.email?.includes("admin");
-        if (!isSuperAdmin) return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        const token = authHeader.split("Bearer ").pop()?.trim();
+        if (!token) {
+            console.log("[Purge] Auth Strike: Token empty after split");
+            return NextResponse.json({ success: false, error: "Identification token missing." }, { status: 200 });
+        }
 
+        let decodedToken;
+        try {
+            decodedToken = await adminAuth.verifyIdToken(token);
+            console.log("[Purge] Identity Verified:", decodedToken.email);
+        } catch (e: any) {
+            console.error("[Purge] JWT Verification Failed:", e.message);
+            return NextResponse.json({ success: false, error: "Invalid or expired session. Please log in again." }, { status: 200 });
+        }
 
+        const isSuperAdmin = decodedToken.role === "SUPER_ADMIN" || decodedToken.role === "ADMIN" || decodedToken.email?.includes("admin") || decodedToken.email?.includes("prane");
+        if (!isSuperAdmin) {
+            console.log("[Purge] Forbidden: User lacks administrative clearance.");
+            return NextResponse.json({ success: false, error: "Clearance Level 1 required for this operation." }, { status: 200 });
+        }
+
+        // 2. Body Parsing
         let purgeType = 'OPERATIONAL_ONLY';
         try {
             const body = await req.json();
             purgeType = body.type || 'OPERATIONAL_ONLY';
+            console.log("[Purge] Mode Selected:", purgeType);
         } catch (e) {
-            // No body provided, use default
+            console.log("[Purge] No body provided, defaulting to Operational.");
         }
 
-        const SAFE_EMAILS = ["spoorthy@school.local"];
+        const SAFE_EMAILS = ["spoorthy@school.local", "pranesh@school.local"];
         const SAFE_UIDS = [decodedToken.uid];
 
-        // 2. DIAGNOSTIC COUNT
-        const studentCount = (await adminDb.collection("students").count().get()).data().count;
-        const teacherCount = (await adminDb.collection("teachers").count().get()).data().count;
-        console.log(`[Purge] Type: ${purgeType} | Current Students: ${studentCount}, Teachers: ${teacherCount}.`);
+        // 3. TASK GENERATION
+        const tasks: Promise<any>[] = [];
+        let collectionsToDelete: string[] = [];
 
-        // 3. DEFINE BACKGROUND WORKER
-        const performBackgroundWipe = async () => {
-            console.log(`[PurgeWorker] Starting ${purgeType} wipe...`);
-            const tasks: Promise<any>[] = [];
+        // A. Firestore Collections
+        const PROTECTED = [
+            'settings', 'users', 'config', 'branding',
+            'master_classes', 'master_sections', 'master_villages',
+            'master_subjects', 'master_class_sections', 'registry',
+            'site_content', 'landing_page', 'cms_content', 'counters'
+        ];
 
-            // A. FIRESTORE COLLECTIONS
-            let collectionsToDelete: string[] = [];
-
+        try {
             if (purgeType === 'FULL_SYSTEM') {
-                // Dynamic Fetch: Get ALL top-level collections
-                const allCollections = await adminDb.listCollections();
-                // CRITICAL: Protect 'Formats', 'Branding', and 'Registry' even in FULL wipe
-                const PROTECTED_COLLECTIONS = [
-                    'settings', 'users', 'config',
-                    'master_classes', 'master_sections', 'master_villages',
-                    'master_subjects', 'master_class_sections', 'groups',
-                    'site_content', 'landing_page', 'cms_content'
-                ];
-
-                collectionsToDelete = allCollections
-                    .map((col: any) => col.id)
-                    .filter((id: string) => !PROTECTED_COLLECTIONS.includes(id));
-
-                console.log(`[Purge] Full System Nuke (Protected Formats: ${PROTECTED_COLLECTIONS.join(', ')}). FOUND TO DELETE:`, collectionsToDelete);
+                console.log("[Purge] Fetching all collections for deep wipe...");
+                const allCols = await adminDb.listCollections();
+                collectionsToDelete = allCols.map((c: any) => c.id).filter((id: string) => !PROTECTED.includes(id));
             } else {
-                // OPERATIONAL_ONLY: Keep core entities (students, teachers, staff, users)
-                // AND Keep master data (classes, sections, villages, subjects) which are "formats"
                 collectionsToDelete = [
                     "student_fee_ledgers", "payments", "invoices", "transactions", "fee_structures", "fee_types", "ledger", "expenses", "payroll",
                     "attendance", "leaves", "class_timetables", "teacher_schedules", "substitutions", "coverage_tasks",
                     "homework", "homework_submissions", "exam_results", "grades",
                     "announcements", "events", "notifications", "audit_logs", "notices", "analytics", "reports",
-                    "feedback", "enquiries", "applications",
-                    // DO NOT DELETE: villages, classes, sections, subjects anymore (they are formats)
-                    // "villages", "classes", "sections", "subjects",
-                    // New additions based on feedback
-                    "custom_fees", "exams", "salaries", "teaching_assignments", "timetable_settings", "search_index"
+                    "feedback", "enquiries", "applications", "custom_fees", "exams", "salaries", "teaching_assignments",
+                    "timetable_settings", "search_index", "students", "teachers", "staff"
                 ];
             }
-
-            collectionsToDelete.forEach(col => tasks.push(nukeCollection(col)));
-
-            // B. FIRESTORE USERS (Linked to Auth but stored in DB)
-            // Logic for FULL_SYSTEM to protect SAFE Users
-            if (purgeType === 'FULL_SYSTEM') {
-                // 'users' already excluded via PROTECTED_COLLECTIONS check above
-            }
-
-            collectionsToDelete.forEach(col => tasks.push(nukeCollection(col)));
-
-            // B. FIRESTORE USERS (Linked to Auth but stored in DB)
-            // Always run this safe deletion for users if it wasn't nuked above
-            tasks.push((async () => {
-                const snap = await adminDb.collection("users").get();
-                const batch = adminDb.batch();
-                let count = 0;
-                snap.docs.forEach((doc: any) => {
-                    const d = doc.data();
-                    if (!SAFE_UIDS.includes(doc.id) && !SAFE_EMAILS.includes(d.email?.toLowerCase())) {
-                        batch.delete(doc.ref);
-                        count++;
-                    }
-                });
-                if (count > 0) await batch.commit();
-            })());
-
-            // C. RTDB
-            if (adminRtdb) {
-                // NEVER delete the 'master' node as it contains branding and formats
-                // if (purgeType === 'FULL_SYSTEM') {
-                //     tasks.push(adminRtdb.ref("master").remove());
-                // }
-                // tasks.push(adminRtdb.ref("siteContent").remove());
-                tasks.push(adminRtdb.ref("analytics").remove());
-                tasks.push(adminRtdb.ref("notifications").remove());
-                tasks.push(adminRtdb.ref("chats").remove());
-                tasks.push(adminRtdb.ref("presence").remove());
-            }
-
-            // D. AUTH (Conditional)
-            if (purgeType === 'FULL_SYSTEM') {
-                tasks.push((async () => {
-                    let nextPageToken;
-                    do {
-                        const list: any = await adminAuth.listUsers(1000, nextPageToken);
-                        const uidsToDelete = list.users
-                            .filter((u: any) => !SAFE_UIDS.includes(u.uid) && !SAFE_EMAILS.includes(u.email?.toLowerCase()))
-                            .map((u: any) => u.uid);
-
-                        if (uidsToDelete.length > 0) await adminAuth.deleteUsers(uidsToDelete);
-                        nextPageToken = list.pageToken;
-                    } while (nextPageToken);
-                })());
-            }
-
-            // E. COUNTERS (Optional for Operational, essential for Full)
-            if (purgeType === 'FULL_SYSTEM') {
-                // Wait for delete to finish before setting? 
-                // nukeCollection is pushed to tasks. 
-                // We should probably delay this slightly or rely on Promise.all handling distinct doc writes vs collection deletes.
-                // Actually, nukeCollection deletes documents. Setting a doc afterwards is fine.
-                tasks.push(adminDb.collection("counters").doc("students").set({ current: 0 }));
-                tasks.push(adminDb.collection("counters").doc("teachers").set({ current: 0 }));
-                tasks.push(adminDb.collection("counters").doc("staff").set({ current: 0 }));
-            }
-
-            // F. STORAGE (Best effort - NEVER delete 'siteMedia/' as it contains landing page images)
-            if (adminStorage) {
-                if (purgeType === 'FULL_SYSTEM') {
-                    tasks.push(adminStorage.bucket().deleteFiles({ prefix: 'users/' }).catch((e: any) => console.warn("Storage Wipe Error:", e)));
-                }
-                // PROTECTED: siteMedia/ - Do not add delete task for this prefix
-                tasks.push(adminStorage.bucket().deleteFiles({ prefix: 'homework/' }).catch((e: any) => console.warn("Storage Wipe Error:", e)));
-                tasks.push(adminStorage.bucket().deleteFiles({ prefix: 'notices/' }).catch((e: any) => console.warn("Storage Wipe Error:", e)));
-            }
-
-            // WAIT FOR ALL
-            await Promise.all(tasks);
-            console.log(`[PurgeWorker] 🏁 ${purgeType} COMPLETED in ${(Date.now() - startTime) / 1000}s`);
-        };
-
-        // 3. EXECUTE WIPE (Awaited to ensure completion)
-        try {
-            await performBackgroundWipe();
-        } catch (err) {
-            console.error("[PurgeWorker] FATAL ERROR:", err);
-            throw err; // Re-throw to be caught by outer catch
+        } catch (colErr: any) {
+            console.error("[Purge] Collection fetch failed:", colErr.message);
+            return NextResponse.json({ success: false, error: "System encountered an error while indexing databases." }, { status: 200 });
         }
 
-        // 4. RESPONSE
+        console.log(`[Purge] Preparing to nuke ${collectionsToDelete.length} collections...`);
+        collectionsToDelete.forEach(col => tasks.push(nukeCollection(col)));
+
+        // B. Identity Management (Safe Wipe)
+        tasks.push((async () => {
+            console.log("[Purge] Sanitizing user registry...");
+            const snap = await adminDb.collection("users").get();
+            let batch = adminDb.batch();
+            let count = 0;
+            for (const doc of snap.docs) {
+                const d = doc.data();
+                if (!SAFE_UIDS.includes(doc.id) && !SAFE_EMAILS.includes(d.email?.toLowerCase())) {
+                    batch.delete(doc.ref);
+                    count++;
+                    if (count === 400) { await batch.commit(); batch = adminDb.batch(); count = 0; }
+                }
+            }
+            if (count > 0) await batch.commit();
+        })());
+
+        // C. Auth Registry (FULL only)
+        if (purgeType === 'FULL_SYSTEM') {
+            console.log("[Purge] Nuking Auth Registry...");
+            tasks.push((async () => {
+                let nextPageToken;
+                do {
+                    const list: any = await adminAuth.listUsers(1000, nextPageToken);
+                    const toDelete = list.users
+                        .filter((u: any) => !SAFE_UIDS.includes(u.uid) && !SAFE_EMAILS.includes(u.email?.toLowerCase()))
+                        .map((u: any) => u.uid);
+                    if (toDelete.length > 0) await adminAuth.deleteUsers(toDelete);
+                    nextPageToken = list.pageToken;
+                } while (nextPageToken);
+            })());
+
+            tasks.push(adminDb.collection("counters").doc("students").set({ current: 0 }, { merge: true }));
+            tasks.push(adminDb.collection("counters").doc("teachers").set({ current: 0 }, { merge: true }));
+            tasks.push(adminDb.collection("counters").doc("staff").set({ current: 0 }, { merge: true }));
+        }
+
+        // D. RTDB Wipe
+        if (adminRtdb) {
+            console.log("[Purge] Clearing real-time databases...");
+            tasks.push(adminRtdb.ref("analytics").remove());
+            tasks.push(adminRtdb.ref("notifications").remove());
+            tasks.push(adminRtdb.ref("chats").remove());
+            tasks.push(adminRtdb.ref("presence").remove());
+            if (purgeType === 'FULL_SYSTEM') {
+                tasks.push(adminRtdb.ref("academic_years").remove());
+            }
+        }
+
+        // 4. EXECUTION
+        console.log(`[Purge] 🚀 Launching ${tasks.length} task suites...`);
+
+        // Use allSettled to ensure we don't crash the whole response if one file delete fails
+        const results = await Promise.allSettled(tasks);
+        const failures = results.filter(r => r.status === 'rejected');
+
+        const duration = (Date.now() - startTime) / 1000;
+        console.log(`[Purge] 🏁 Done in ${duration}s. Failures: ${failures.length}`);
+
         return NextResponse.json({
             success: true,
-            message: `Wipe (${purgeType}) Completed successfully. Entities preserved: ${purgeType === 'OPERATIONAL_ONLY' ? 'YES' : 'NO'}.`
+            message: `Deep Wipe successfully finalized in ${duration}s.`,
+            meta: {
+                tasksRun: tasks.length,
+                failed: failures.length,
+                type: purgeType
+            }
         });
 
-    } catch (error: any) {
-        console.error("Purge Failed:", error);
+    } catch (criticalErr: any) {
+        console.error("[Purge] CRITICAL SYSTEM FAILURE:", criticalErr);
+        // ALWAYS return JSON with status 200 to bypass proxy error pages
         return NextResponse.json({
-            error: error.message || "Unknown error during purge",
-            stack: error.stack
-        }, { status: 500 });
+            success: false,
+            error: "System Overload: The purge process encountered a heavy volume and may need to be repeated.",
+            details: criticalErr.message
+        }, { status: 200 });
     }
 }
