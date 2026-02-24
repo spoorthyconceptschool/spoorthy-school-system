@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb, FieldValue, adminMessaging } from "@/lib/firebase-admin";
+import { adminAuth, adminDb, FieldValue, adminMessaging, FieldPath } from "@/lib/firebase-admin";
 import { createServerNotification, notifyManagerActionServer } from "@/lib/notifications-server";
 
 export async function POST(req: NextRequest) {
@@ -85,7 +85,7 @@ export async function POST(req: NextRequest) {
             }
 
             const studentSnap = await studentQuery.get();
-            const studentUids = studentSnap.docs.map(doc => doc.data().uid).filter(Boolean);
+            const studentUids = studentSnap.docs.map((doc: any) => doc.data().uid).filter(Boolean);
 
             if (studentUids.length > 0) {
                 // Fetch User Tokens (Batching if needed, but for now simple loop or chunks)
@@ -101,8 +101,8 @@ export async function POST(req: NextRequest) {
 
                 let allTokens: string[] = [];
                 for (const chunk of chunks) {
-                    const userSnap = await adminDb.collection("users").where(FieldValue.documentId(), "in", chunk).get();
-                    userSnap.forEach(doc => {
+                    const userSnap = await adminDb.collection("users").where(FieldPath.documentId(), "in", chunk).get();
+                    userSnap.forEach((doc: any) => {
                         const data = doc.data();
                         if (data.fcmTokens && Array.isArray(data.fcmTokens)) {
                             allTokens.push(...data.fcmTokens);

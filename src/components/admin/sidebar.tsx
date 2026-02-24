@@ -73,6 +73,11 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
     const [imageError, setImageError] = useState(false);
     const [pendingLeaves, setPendingLeaves] = useState(0);
 
+    // Reset image error when branding changes
+    useEffect(() => {
+        setImageError(false);
+    }, [branding.schoolLogo]);
+
     useEffect(() => {
         if (!user) return;
 
@@ -128,9 +133,9 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
                         className="flex items-center gap-3 select-none overflow-hidden"
                     >
                         <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl bg-white flex items-center justify-center p-1.5 border border-white/20 shadow-lg relative overflow-hidden">
-                            {branding.schoolLogo && !imageError ? (
+                            {!imageError ? (
                                 <img
-                                    src={branding.schoolLogo}
+                                    src={branding.schoolLogo || "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png"}
                                     alt="Logo"
                                     className="w-full h-full object-contain"
                                     onError={() => setImageError(true)}
@@ -143,7 +148,7 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
                             <span className="font-black text-[10px] tracking-[0.2em] text-[#64FFDA] uppercase truncate leading-none mb-1">
                                 Control Center
                             </span>
-                            <span className="font-bold text-sm tracking-tight text-white md:truncate md:max-w-[140px]">
+                            <span className="font-display font-black text-sm tracking-tight text-white md:truncate md:max-w-[140px]">
                                 {branding.schoolName || "Spoorthy School"}
                             </span>
                         </div>

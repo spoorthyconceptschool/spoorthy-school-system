@@ -25,15 +25,21 @@ import { cn } from "@/lib/utils";
 
 export function TopBar() {
     const { user, signOut } = useAuth();
-    const { academicYears, selectedYear, setSelectedYear } = useMasterData();
+    const { academicYears, selectedYear, setSelectedYear, branding } = useMasterData();
     const { history, clearHistory, removeFromHistory } = useToastStore();
     const [scrolled, setScrolled] = useState(false);
+    const [imageError, setImageError] = useState(false);
     const { role } = useAuth();
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
         setMounted(true);
     }, []);
+
+    // Reset image error when branding changes
+    useEffect(() => {
+        setImageError(false);
+    }, [branding?.schoolLogo]);
 
     // Add scroll listener to main content
     useEffect(() => {
@@ -55,10 +61,29 @@ export function TopBar() {
                 : "bg-[#0A192F] md:bg-transparent"
                 }`}
         >
-            <MobileSidebar />
+            <div className="flex items-center gap-2">
+                <MobileSidebar />
+                <div className="lg:hidden flex items-center gap-2 shrink-0">
+                    <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center p-1 overflow-hidden shrink-0 shadow-md">
+                        {!imageError ? (
+                            <img
+                                src={branding?.schoolLogo || "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png"}
+                                alt="Logo"
+                                className="w-full h-full object-contain"
+                                onError={() => setImageError(true)}
+                            />
+                        ) : (
+                            <div className="w-full h-full bg-[#64FFDA]/10 flex items-center justify-center text-[#0A192F] font-bold font-display text-xs">S</div>
+                        )}
+                    </div>
+                    <span className="font-display font-black text-white text-sm tracking-tight truncate max-w-[120px] xs:max-w-[150px]">
+                        {branding?.schoolName || "Spoorthy School"}
+                    </span>
+                </div>
+            </div>
 
             {/* Search - Pill shaped, integrated */}
-            <div className="flex-1 min-w-0 max-w-[140px] xs:max-w-[180px] sm:max-w-xl mx-1 md:mx-4">
+            <div className="flex-1 min-w-0 max-w-[140px] xs:max-w-[180px] sm:max-w-xl mx-2 md:mx-4 hidden sm:block">
                 <UniversalSearch />
             </div>
 

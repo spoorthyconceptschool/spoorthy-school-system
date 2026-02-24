@@ -33,19 +33,33 @@ export default function CMSPage() {
 
     useEffect(() => {
         const unsub = onValue(ref(rtdb, 'siteContent/home'), (snap) => {
-            if (snap.exists()) {
+            if (snap.exists() && !isPublishing) {
                 const val = snap.val();
-                setData({
-                    ...val,
-                    facilities: val.facilities || {},
-                    why: val.why || [],
-                    gallery: val.gallery ? (Array.isArray(val.gallery) ? val.gallery : Object.values(val.gallery)) : []
+
+                setData((prev: any) => {
+                    // Check if anything has been modified locally
+                    // We compare current state with the incoming value
+                    // If we are already 'dirty' or 'uploading', skip the sync
+                    if (isPublishing || isUploading) return prev;
+
+                    // If the local state is still the default/empty state, allow sync
+                    const isInitial = !prev.hero.title && !prev.hero.videoUrl && Object.keys(prev.facilities).length === 0;
+                    if (isInitial) {
+                        return {
+                            ...val,
+                            facilities: val.facilities || {},
+                            why: val.why || [],
+                            gallery: val.gallery ? (Array.isArray(val.gallery) ? val.gallery : Object.values(val.gallery)) : []
+                        };
+                    }
+
+                    return prev;
                 });
             }
             setLoading(false);
         });
         return () => unsub();
-    }, []);
+    }, [isPublishing, isUploading]);
 
     const handleSave = async () => {
         console.log("[CMS] Publish Sequence Initiated");

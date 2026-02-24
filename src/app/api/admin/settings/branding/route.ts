@@ -32,8 +32,9 @@ export async function POST(req: NextRequest) {
         const promises = [
             // Firestore
             adminDb.collection("settings").doc("branding").set(updateData, { merge: true }),
-            // RTDB
-            adminRtdb.ref("master/branding").update(updateData)
+            // RTDB - Sync to both legacy and new locations
+            adminRtdb.ref("master/branding").update(updateData),
+            adminRtdb.ref("siteContent/branding").update(updateData)
         ];
 
         await Promise.all(promises);

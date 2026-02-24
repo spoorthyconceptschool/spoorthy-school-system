@@ -30,16 +30,28 @@ export default function manifest(): MetadataRoute.Manifest {
         prefer_related_applications: false,
         icons: [
             {
-                src: 'https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Flogo.png?alt=media',
+                src: '/icons/icon-192x192.png',
+                sizes: '192x192',
+                type: 'image/png',
+                purpose: 'any',
+            },
+            {
+                src: '/icons/icon-192x192.png',
+                sizes: '192x192',
+                type: 'image/png',
+                purpose: 'maskable',
+            },
+            {
+                src: '/icons/icon-512x512.png',
                 sizes: '512x512',
                 type: 'image/png',
                 purpose: 'any',
             },
             {
-                src: 'https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Flogo.png?alt=media',
-                sizes: '192x192',
+                src: '/icons/icon-512x512.png',
+                sizes: '512x512',
                 type: 'image/png',
-                purpose: 'any',
+                purpose: 'maskable',
             },
         ],
     }

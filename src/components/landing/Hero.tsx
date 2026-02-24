@@ -9,9 +9,9 @@ import { rtdb } from "@/lib/firebase";
 
 export function Hero() {
     const [content, setContent] = useState<any>({
-        title: "Education for Tomorrow.",
+        title: "Learn Today Lead Tommorrow",
         subtitle: "Innovation meets tradition.",
-        videoUrl: "https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Fhero-bg.mp4?alt=media", // Default immediate video
+        videoUrl: "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/51d8a5ee-ebad-48e0-9617-b96d7911ac8b.mp4",
         mobileVideoUrl: null,
         posterUrl: "https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Fhero-poster.jpg?alt=media"
     });

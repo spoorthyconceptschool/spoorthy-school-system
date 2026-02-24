@@ -46,7 +46,7 @@ const initialState: MasterDataState = {
     branding: {
         schoolName: "Spoorthy Concept School",
         address: "",
-        schoolLogo: "",
+        schoolLogo: "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png",
         principalSignature: ""
     },
     academicYears: {},
@@ -88,35 +88,35 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
 
     // 1. RTDB Sync for Master Data & Branding
     useEffect(() => {
-        // Public Branding Sync
+        let masterUnsub: (() => void) | null = null;
+        let brandingUnsub: (() => void) | null = null;
+
+        // Public Branding Sync - THE source of truth for identity
         const brandingRef = ref(rtdb, 'siteContent/branding');
-        const brandingUnsub = onValue(brandingRef, (snap) => {
+        brandingUnsub = onValue(brandingRef, (snap) => {
             if (snap.exists()) {
-                setData(prev => ({
-                    ...prev,
-                    branding: { ...initialState.branding, ...snap.val() }
-                }));
+                const brandingData = snap.val();
+                setData(prev => {
+                    const nextBranding = { ...initialState.branding, ...brandingData };
+                    // Only update if actually different
+                    if (JSON.stringify(prev.branding) === JSON.stringify(nextBranding)) return prev;
+                    return { ...prev, branding: nextBranding };
+                });
             }
         });
 
         // Protected Master Data Sync (Authenticated only)
-        let masterUnsub: any = null;
-
         const authUnsub = onAuthStateChanged(auth, (user) => {
+            if (masterUnsub) { masterUnsub(); masterUnsub = null; }
+
             if (user) {
                 const dataRef = ref(rtdb, 'master');
-                masterUnsub = onValue(dataRef, (snapshot) => {
+                const onMasterValue = onValue(dataRef, (snapshot) => {
                     const rawData = snapshot.val() || {};
-                    const newState: Partial<MasterDataState> = {
-                        loading: false,
-                    };
+                    const updates: Partial<MasterDataState> = { loading: false };
 
-                    // Only update branding from master if siteContent/branding is empty
-                    if (rawData.branding) {
-                        newState.branding = { ...initialState.branding, ...rawData.branding };
-                    }
-
-                    const keys: (keyof Omit<MasterDataState, 'loading' | 'selectedYear' | 'setSelectedYear' | 'branding' | 'academicYears'>)[] =
+                    // 1. Master Data Keys (Villages, Classes, etc.)
+                    const keys: (keyof Omit<MasterDataState, 'loading' | 'selectedYear' | 'setSelectedYear' | 'branding' | 'academicYears' | 'students' | 'teachers' | 'staff'>)[] =
                         ['villages', 'classes', 'sections', 'subjects', 'classSections', 'classSubjects', 'subjectTeachers', 'homeworkSubjects', 'roles'];
 
                     keys.forEach(key => {
@@ -127,29 +127,36 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
                                 processed[id].id = id;
                             }
                         });
-                        (newState as any)[key] = processed;
+                        (updates as any)[key] = processed;
                     });
 
-                    setData(prev => ({ ...prev, ...newState }));
+                    // 2. Note: Branding fallback removed to prevent split-brain flicker. 
+                    // siteContent/branding is now the absolute source.
+
+                    setData(prev => {
+                        const nextState = { ...prev, ...updates };
+                        if (JSON.stringify(prev) === JSON.stringify(nextState)) return prev;
+                        return nextState;
+                    });
                 }, (error) => {
-                    console.warn("RTDB Sync restricted (master):", error.message);
+                    console.warn("RTDB Permission (master):", error.message);
                     setData(prev => ({ ...prev, loading: false }));
                 });
+
+                masterUnsub = () => off(dataRef, 'value', onMasterValue);
             } else {
-                // If logged out, stop listening to master
-                if (masterUnsub) off(ref(rtdb, 'master'));
                 setData(prev => ({ ...prev, loading: false }));
             }
         });
 
         const timer = setTimeout(() => {
             setData(prev => ({ ...prev, loading: false }));
-        }, 2000);
+        }, 3000);
 
         return () => {
-            brandingUnsub();
+            if (brandingUnsub) brandingUnsub();
             authUnsub();
-            if (masterUnsub) off(ref(rtdb, 'master'));
+            if (masterUnsub) masterUnsub();
             clearTimeout(timer);
         };
     }, []);
