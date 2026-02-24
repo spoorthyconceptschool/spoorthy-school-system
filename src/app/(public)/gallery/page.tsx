@@ -10,30 +10,30 @@ import Image from "next/image";
 
 // --- SEED DATA: 20 HIGH QUALITY IMAGES ---
 const DEMO_IMAGES = [
-    "https://images.unsplash.com/photo-1523050854058-8df90110c9f1?w=800&q=80",
-    "https://images.unsplash.com/photo-1544531586-fde5298cdd40?w=800&q=80",
-    "https://images.unsplash.com/photo-1596496053493-27f272c72b9a?w=800&q=80",
-    "https://images.unsplash.com/photo-1509062522246-3755977927d7?w=800&q=80",
-    "https://images.unsplash.com/photo-1427504494785-3a9ca7044f45?w=800&q=80",
-    "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?w=800&q=80",
-    "https://images.unsplash.com/photo-1560785496-3c9d27877182?w=800&q=80",
-    "https://images.unsplash.com/photo-1510531704581-5b2870972060?w=800&q=80",
-    "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?w=800&q=80",
-    "https://images.unsplash.com/photo-1511629091441-ee46146481b6?w=800&q=80",
-    "https://images.unsplash.com/photo-1588072432836-e10032774350?w=800&q=80",
-    "https://images.unsplash.com/photo-1571260899304-42d98b60d713?w=800&q=80",
-    "https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?w=800&q=80",
-    "https://images.unsplash.com/photo-1519389950473-47ba0277781c?w=800&q=80",
-    "https://images.unsplash.com/photo-1501504905252-473c47e087f8?w=800&q=80",
-    "https://images.unsplash.com/photo-1491841573634-28140fc95912?w=800&q=80",
-    "https://images.unsplash.com/photo-1629904853716-6b03d2e1f771?w=800&q=80",
-    "https://images.unsplash.com/photo-1524311583145-d51d9d4d5a7d?w=800&q=80",
-    "https://images.unsplash.com/photo-1577896338042-327704b77134?w=800&q=80",
-    "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?w=800&q=80"
+    { title: "Science Discovery", category: "Academics", src: "https://images.unsplash.com/photo-1532094349884-543bc11b234d?q=80&w=1600&auto=format&fit=crop" },
+    { title: "Morning Assembly", category: "Tradition", src: "https://images.unsplash.com/photo-1544531586-fde5298cdd40?q=80&w=1600&auto=format&fit=crop" },
+    { title: "Art & Creativity", category: "Hobbies", src: "https://images.unsplash.com/photo-1513364776144-60967b0f800f?q=80&w=1600&auto=format&fit=crop" },
+    { title: "Reading Room", category: "Academics", src: "https://images.unsplash.com/photo-1509062522246-3755977927d7?q=80&w=1600&auto=format&fit=crop" },
+    { title: "Soccer Practice", category: "Sports", src: "https://images.unsplash.com/photo-1526676037777-05a232554f77?q=80&w=1600&auto=format&fit=crop" },
+    { title: "Music Class", category: "Arts", src: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?q=80&w=1600&auto=format&fit=crop" },
+    { title: "Basketball Game", category: "Sports", src: "https://images.unsplash.com/photo-1519861531473-9200262188bf?q=80&w=1600&auto=format&fit=crop" },
+    { title: "Group Discussion", category: "Learning", src: "https://images.unsplash.com/photo-1510531704581-5b2870972060?q=80&w=1600&auto=format&fit=crop" },
+    { title: "Library Deep Dive", category: "Resources", src: "https://images.unsplash.com/photo-1497633762265-9d179a990aa6?q=80&w=1600&auto=format&fit=crop" },
+    { title: "Annual Day", category: "Celebration", src: "https://images.unsplash.com/photo-1511629091441-ee46146481b6?q=80&w=1600&auto=format&fit=crop" },
+    { title: "School Corridor", category: "Campus", src: "https://images.unsplash.com/photo-1588072432836-e10032774350?q=80&w=1600&auto=format&fit=crop" },
+    { title: "Math Workshop", category: "Academics", src: "https://images.unsplash.com/photo-1571260899304-42d98b60d713?q=80&w=1600&auto=format&fit=crop" },
+    { title: "Technology Lab", category: "Digital", src: "https://images.unsplash.com/photo-1531482615713-2afd69097998?q=80&w=1600&auto=format&fit=crop" },
+    { title: "Collaborative Study", category: "Learning", src: "https://images.unsplash.com/photo-1519389950473-47ba0277781c?q=80&w=1600&auto=format&fit=crop" },
+    { title: "Laboratory Work", category: "Science", src: "https://images.unsplash.com/photo-1501504905252-473c47e087f8?q=80&w=1600&auto=format&fit=crop" },
+    { title: "Class Project", category: "Academics", src: "https://images.unsplash.com/photo-1524178232363-1fb2b075b655?q=80&w=1600&auto=format&fit=crop" },
+    { title: "Lunch Break", category: "Social", src: "https://images.unsplash.com/photo-1511631231751-2292419a32c2?q=80&w=1600&auto=format&fit=crop" },
+    { title: "Outdoor Learning", category: "Nature", src: "https://images.unsplash.com/photo-1503676260728-1c00da094a0b?q=80&w=1600&auto=format&fit=crop" },
+    { title: "Chemistry Lab", category: "Academics", src: "https://images.unsplash.com/photo-1577896338042-327704b77134?q=80&w=1600&auto=format&fit=crop" },
+    { title: "School Gathering", category: "Tradition", src: "https://images.unsplash.com/photo-1516321318423-f06f85e504b3?q=80&w=1600&auto=format&fit=crop" }
 ];
 
 export default function SmoothParallaxGallery() {
-    const [images, setImages] = useState<string[]>([]);
+    const [activities, setActivities] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedImg, setSelectedImg] = useState<string | null>(null);
 
@@ -41,32 +41,29 @@ export default function SmoothParallaxGallery() {
     useEffect(() => {
         const unsub = onValue(ref(rtdb, "siteContent/home/gallery"), (snap) => {
             const realImages = snap.exists() && Array.isArray(snap.val()) ? snap.val().filter(Boolean) : [];
-            // Ensure we represent 20 images total for the demo feel
-            const mixed = [...realImages, ...DEMO_IMAGES].slice(0, 20);
-            setImages(mixed);
+            const mappedReal = realImages.map((s: any, i: number) => {
+                if (typeof s === 'string') return { src: s, title: `Activity ${i + 1}`, category: "Gallery" };
+                return s;
+            });
+            const mixed = [...mappedReal, ...DEMO_IMAGES].slice(0, 20);
+            setActivities(mixed);
             setLoading(false);
         }, (error: any) => {
             console.warn("RTDB Permission (gallery page):", error.message);
-            setImages(DEMO_IMAGES.slice(0, 20)); // Fallback to demo images
+            setActivities(DEMO_IMAGES.slice(0, 20));
             setLoading(false);
         });
         return () => unsub();
     }, []);
 
-    // --- PARALLAX ENGINE ---
-    // Switched to global window scroll to avoid Ref hydration issues in Next.js 13+
     const { scrollY } = useScroll();
 
-    // We split images into 3 columns for parallax differentiation
-    // This is much more performant than per-image 3D transforms
-    const col1 = images.filter((_, i) => i % 3 === 0);
-    const col2 = images.filter((_, i) => i % 3 === 1);
-    const col3 = images.filter((_, i) => i % 3 === 2);
+    const col1 = activities.filter((_, i) => i % 3 === 0);
+    const col2 = activities.filter((_, i) => i % 3 === 1);
+    const col3 = activities.filter((_, i) => i % 3 === 2);
 
-    // Different movement speeds for columns to create depth
-    // Mapping scroll pixels directly to offset pixels for consistent feel
     const y1 = useTransform(scrollY, [0, 2000], [0, -200]);
-    const y2 = useTransform(scrollY, [0, 2000], [0, -400]); // Moves faster (appears closer/further)
+    const y2 = useTransform(scrollY, [0, 2000], [0, -400]);
     const y3 = useTransform(scrollY, [0, 2000], [0, -100]);
 
     if (loading) return (
@@ -77,18 +74,12 @@ export default function SmoothParallaxGallery() {
 
     return (
         <main className="bg-[#050b14] min-h-screen overflow-x-hidden selection:bg-indigo-500/30">
-
-            {/* Header Removed - Managed by Layout */}
-
-            {/* Content Container */}
             <div className="container mx-auto max-w-7xl px-4 pt-32 pb-32">
-
-                {/* Intro Text */}
                 <div className="mb-20 px-2 md:px-8">
                     <motion.h1
                         initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        className="text-5xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-white/20 tracking-tighter mb-6"
+                        className="text-5xl md:text-8xl font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-white to-white/20 tracking-tighter mb-6 uppercase italic"
                     >
                         Moments<br />In Motion.
                     </motion.h1>
@@ -98,38 +89,31 @@ export default function SmoothParallaxGallery() {
                         transition={{ delay: 0.2 }}
                         className="text-zinc-400 max-w-xl text-lg font-light leading-relaxed border-l-2 border-indigo-500 pl-6"
                     >
-                        A cinematic journey through our campus life. Experience the atmosphere, the people, and the legacy.
+                        Explore the vibrant tapestry of school life. From academic breakthroughs to championship wins, witness the journey of Spoorthy Concept School.
                     </motion.p>
                 </div>
 
-                {/* Parallax Grid - Dense 3 Columns for Mobile (Min 6 visible) */}
                 <div className="grid grid-cols-3 md:grid-cols-3 gap-2 md:gap-8 items-start relative h-full">
-
-                    {/* FAST COLUMN */}
                     <motion.div style={{ y: y1 }} className="flex flex-col gap-2 md:gap-12 relative top-0 md:-top-20">
-                        {col1.map((src, i) => (
-                            <ParallaxImage key={`c1-${i}`} src={src} index={i} onClick={() => setSelectedImg(src)} speed="Fast" />
+                        {col1.map((item, i) => (
+                            <ParallaxImage key={`c1-${i}`} item={item} index={i} onClick={() => setSelectedImg(item.src)} speed="Fast" />
                         ))}
                     </motion.div>
 
-                    {/* SLOW COLUMN */}
                     <motion.div style={{ y: y2 }} className="flex flex-col gap-2 md:gap-12 pt-12 md:pt-32">
-                        {col2.map((src, i) => (
-                            <ParallaxImage key={`c2-${i}`} src={src} index={i} onClick={() => setSelectedImg(src)} speed="Slow" priority />
+                        {col2.map((item, i) => (
+                            <ParallaxImage key={`c2-${i}`} item={item} index={i} onClick={() => setSelectedImg(item.src)} speed="Slow" priority />
                         ))}
                     </motion.div>
 
-                    {/* MEDIUM COLUMN */}
                     <motion.div style={{ y: y3 }} className="flex flex-col gap-2 md:gap-12 pt-4 md:pt-10">
-                        {col3.map((src, i) => (
-                            <ParallaxImage key={`c3-${i}`} src={src} index={i} onClick={() => setSelectedImg(src)} speed="Mid" />
+                        {col3.map((item, i) => (
+                            <ParallaxImage key={`c3-${i}`} item={item} index={i} onClick={() => setSelectedImg(item.src)} speed="Mid" />
                         ))}
                     </motion.div>
                 </div>
-
             </div>
 
-            {/* Lightbox / Modal */}
             {selectedImg && (
                 <div
                     className="fixed inset-0 z-[100] bg-black/95 backdrop-blur-2xl flex items-center justify-center p-4 animate-in fade-in duration-300"
@@ -165,11 +149,10 @@ export default function SmoothParallaxGallery() {
 }
 
 // Optimized Image Component
-function ParallaxImage({ src, index, onClick, speed, priority = false }: { src: string, index: number, onClick: () => void, speed: string, priority?: boolean }) {
+function ParallaxImage({ item, index, onClick, speed, priority = false }: { item: any, index: number, onClick: () => void, speed: string, priority?: boolean }) {
     const ref = useRef(null);
     const isInView = useInView(ref, { once: true, margin: "-10% 0px" });
 
-    // Subtle hover effect instead of heavy 3D transforms
     return (
         <motion.div
             ref={ref}
@@ -180,19 +163,24 @@ function ParallaxImage({ src, index, onClick, speed, priority = false }: { src: 
             onClick={onClick}
         >
             <div className="overflow-hidden rounded-xl bg-zinc-900 shadow-2xl relative">
-                {/* 3:4 Aspect Ratio Container */}
                 <div className="relative aspect-[3/4] w-full">
-                    <Image
-                        src={src}
-                        alt="Gallery Image"
-                        fill
-                        className="object-cover transition-transform duration-700 will-change-transform group-hover:scale-110"
-                        sizes="(max-width: 768px) 100vw, 33vw"
-                        priority={priority}
-                    />
+                    {item.src && (
+                        <Image
+                            src={item.src}
+                            alt={item.title || "Gallery Image"}
+                            fill
+                            unoptimized
+                            className="object-cover transition-transform duration-700 will-change-transform group-hover:scale-110 opacity-90 group-hover:opacity-100"
+                            sizes="(max-width: 768px) 100vw, 33vw"
+                            priority={priority}
+                        />
+                    )}
 
-                    {/* Cinematic Gradient Overlay */}
-                    <div className="absolute inset-0 bg-gradient-to-t from-black/60 via-transparent to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500" />
+                    {/* Activity Overlay */}
+                    <div className="absolute inset-0 bg-gradient-to-t from-[#050b14] via-transparent to-transparent flex flex-col justify-end p-6 md:p-8 opacity-0 group-hover:opacity-100 transition-opacity duration-500">
+                        <span className="text-indigo-400 font-mono text-[10px] uppercase tracking-widest mb-1">{item.category}</span>
+                        <h4 className="text-white font-black text-xl md:text-2xl italic tracking-tighter leading-none">{item.title}</h4>
+                    </div>
                 </div>
             </div>
 

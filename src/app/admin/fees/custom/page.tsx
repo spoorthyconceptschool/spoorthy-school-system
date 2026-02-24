@@ -140,7 +140,7 @@ export default function CustomFeesPage() {
     };
 
     const handleDelete = async (id: string) => {
-        if (!confirm("Are you sure you want to delete this custom fee? It will be removed from all student ledgers where it is currently unpaid.")) return;
+        if (!confirm("Are you sure you want to delete this custom fee payment? It will be removed from all student ledgers where it is currently unpaid.")) return;
         setLoading(true);
         try {
             const { deleteDoc, doc } = await import("firebase/firestore");
@@ -180,7 +180,7 @@ export default function CustomFeesPage() {
         <div className="space-y-6 max-w-7xl mx-auto p-6 animate-in fade-in duration-500">
             <div className="flex justify-between items-center">
                 <div>
-                    <h1 className="text-3xl font-display font-bold">Custom Fees</h1>
+                    <h1 className="text-3xl font-display font-bold">Custom Fee Payment</h1>
                     <p className="text-muted-foreground">Create and assign special fees to specific groups.</p>
                 </div>
                 <Button onClick={() => setIsWizardOpen(true)} className="bg-emerald-600 hover:bg-emerald-700 text-white">
@@ -236,7 +236,7 @@ export default function CustomFeesPage() {
             }}>
                 <DialogContent className="bg-black/95 border-white/10 text-white sm:max-w-[600px]">
                     <DialogHeader>
-                        <DialogTitle>{editingFeeId ? "Edit Custom Fee" : "Assign New Fee"} (Step {step}/2)</DialogTitle>
+                        <DialogTitle>{editingFeeId ? "Edit Custom Fee Payment" : "Assign New Fee Payment"} (Step {step}/2)</DialogTitle>
                     </DialogHeader>
 
                     {step === 1 ? (

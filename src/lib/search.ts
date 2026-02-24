@@ -64,10 +64,10 @@ const STATIC_FEATURES: SearchIndexItem[] = [
     { id: "nav-leaves", entityId: "nav-leaves", type: "action", title: "Leave Management", subtitle: "Approve/Reject Requests", url: "/admin/leaves", keywords: ["leave", "request", "approve", "reject", "permission", "vacation", "sick", "casual", "application"] },
 
     // Fee Management
-    { id: "nav-fees", entityId: "nav-fees", type: "action", title: "Fee Management", subtitle: "Fee Dashboard & Collection", url: "/admin/fees", keywords: ["fees", "fee", "payment", "collection", "finance", "accounts", "revenue"] },
-    { id: "nav-fees-structures", entityId: "nav-fees-structures", type: "action", title: "Fee Structures", subtitle: "Configure Class Fees", url: "/admin/fees/structures", keywords: ["structure", "fee set", "tuition", "term", "setup fees", "amount"] },
+    { id: "nav-fees", entityId: "nav-fees", type: "action", title: "Fee Payment Management", subtitle: "Fee Payment Dashboard & Collection", url: "/admin/fees", keywords: ["fees", "fee", "payment", "collection", "finance", "accounts", "revenue"] },
+    { id: "nav-fees-structures", entityId: "nav-fees-structures", type: "action", title: "Fee Payment Structures", subtitle: "Configure Class Fee Payment", url: "/admin/fees/structures", keywords: ["structure", "fee set", "tuition", "term", "setup fees", "amount"] },
     { id: "nav-fees-pending", entityId: "nav-fees-pending", type: "action", title: "Pending Dues Report", subtitle: "View Defaulters & Arrears", url: "/admin/fees/pending", keywords: ["pending", "due", "dues", "arrears", "defaulters", "unpaid", "balance", "outstanding", "remind"] },
-    { id: "nav-fees-custom", entityId: "nav-fees-custom", type: "action", title: "Custom Fees (Transport)", subtitle: "Manage Village/Transport Fees", url: "/admin/fees/custom", keywords: ["custom", "transport", "bus", "van", "village", "route", "charges", "optional"] },
+    { id: "nav-fees-custom", entityId: "nav-fees-custom", type: "action", title: "Custom Fee Payment (Transport)", subtitle: "Manage Village/Transport Fee Payment", url: "/admin/fees/custom", keywords: ["custom", "transport", "bus", "van", "village", "route", "charges", "optional"] },
 
     // Academics
     { id: "nav-timetable", entityId: "nav-timetable", type: "action", title: "Class Timetables", subtitle: "Manage Schedules & Periods", url: "/admin/timetable", keywords: ["timetable", "schedule", "routine", "period", "class time", "subject plan"] },
@@ -180,10 +180,10 @@ function searchStaticFeatures(queryText: string): SearchIndexItem[] {
                 id: `intent-fees-${className}`,
                 entityId: `intent-fees-${className}`,
                 type: "action",
-                title: `Fee Status: Class ${className}`,
-                subtitle: `View fee reports for Class ${className}`,
+                title: `Fee Payment Status: Class ${className}`,
+                subtitle: `View fee payment reports for Class ${className}`,
                 url: `/admin/fees?class=${className}`, // Assuming fees page supports ?class= filter
-                keywords: ["fee", "class", className]
+                keywords: ["fee payment", "class", className]
             });
         }
     }

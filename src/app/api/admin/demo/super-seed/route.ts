@@ -177,6 +177,7 @@ export async function GET(req: NextRequest) {
             mainBatch.set(adminDb.collection("users").doc(uid), { schoolId: s.id, role: "STUDENT", status: "ACTIVE", displayName: s.name, email: s.email });
         }
 
+        logs.push("... Committing Firestore Batch...");
         await mainBatch.commit();
         const duration = (Date.now() - startTime) / 1000;
         logs.push(`SUCCESS: Ecosystem rebuild in ${duration}s.`);
@@ -184,6 +185,7 @@ export async function GET(req: NextRequest) {
 
     } catch (error: any) {
         console.error("Super Seed Error:", error);
-        return NextResponse.json({ success: false, error: error.message, logs }, { status: 500 });
+        const errorMessage = error instanceof Error ? error.message : String(error);
+        return NextResponse.json({ success: false, error: errorMessage, logs: logs.slice(-50) }, { status: 500 });
     }
 }
