@@ -6,6 +6,7 @@ import { ArrowRight, Play, ChevronDown } from "lucide-react";
 import Link from "next/link";
 import { ref, onValue } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
+import { cn } from "@/lib/utils";
 
 export function Hero() {
     const [content, setContent] = useState<any>({
@@ -18,6 +19,8 @@ export function Hero() {
 
     const [loading, setLoading] = useState(true);
     const [isMobile, setIsMobile] = useState(false);
+
+    const [videoLoaded, setVideoLoaded] = useState(false);
 
     useEffect(() => {
         const unsub = onValue(ref(rtdb, 'siteContent/home/hero'), (snap) => {
@@ -96,10 +99,9 @@ export function Hero() {
                 className="absolute inset-0 z-0 bg-[#0A192F]"
             >
                 {/* 
-                  Only render video if we have a URL and NOT on mobile (or if mobile video exists specifically).
-                  If mobile is true and no specific mobile video, we stick to the poster background for clean performance.
+                  Video Layer - High priority rendering.
                 */}
-                {activeVideoUrl && (!isMobile || content.mobileVideoUrl) && (
+                {activeVideoUrl && (
                     <video
                         key={activeVideoUrl}
                         src={activeVideoUrl}
@@ -108,10 +110,11 @@ export function Hero() {
                         loop
                         playsInline
                         preload="auto"
-                        onLoadedData={(e) => {
-                            (e.target as HTMLVideoElement).classList.add('opacity-100');
-                        }}
-                        className="w-full h-full object-cover transition-opacity duration-1000 opacity-0"
+                        onLoadedData={() => setVideoLoaded(true)}
+                        className={cn(
+                            "w-full h-full object-cover transition-opacity duration-1000",
+                            videoLoaded ? "opacity-100" : "opacity-0"
+                        )}
                     />
                 )}
 
