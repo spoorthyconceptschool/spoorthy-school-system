@@ -4,6 +4,7 @@
 import { AcademicYearManager } from "@/components/admin/academic-year-manager";
 import { BrandingSettings } from "@/components/admin/branding-settings";
 import { SystemUsersManager } from "@/components/admin/system-users-manager";
+import { SystemToggles } from "@/components/admin/system-toggles";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -90,8 +91,9 @@ export default function AdminSettingsPage() {
                     <SystemUsersManager />
                 </div>
 
-                {/* Right Panel: Academic Years */}
-                <div className="w-full">
+                {/* Right Panel: Academic Years & System Control */}
+                <div className="w-full space-y-4 md:space-y-8">
+                    <SystemToggles />
                     <AcademicYearManager />
                 </div>
             </div>

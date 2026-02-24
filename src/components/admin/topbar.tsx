@@ -25,7 +25,7 @@ import { cn } from "@/lib/utils";
 
 export function TopBar() {
     const { user, signOut } = useAuth();
-    const { academicYears, selectedYear, setSelectedYear, branding } = useMasterData();
+    const { academicYears, selectedYear, setSelectedYear, branding, systemConfig } = useMasterData();
     const { history, clearHistory, removeFromHistory } = useToastStore();
     const [scrolled, setScrolled] = useState(false);
     const [imageError, setImageError] = useState(false);
@@ -123,7 +123,7 @@ export function TopBar() {
                         </DropdownMenuContent>
                     </DropdownMenu>
 
-                    <SeedDataButton />
+                    {systemConfig.testingMode && <SeedDataButton />}
                     {/* Pill Action Button */}
                     <Button variant="outline" size="sm" className="h-9 gap-2 rounded-full border-[#64FFDA]/20 hover:bg-[#64FFDA]/10 hover:text-[#64FFDA] px-4 bg-[#0A192F]/40 text-[#64FFDA]/80">
                         <Plus size={16} />

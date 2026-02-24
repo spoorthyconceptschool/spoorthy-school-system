@@ -25,6 +25,10 @@ interface MasterDataState {
         principalSignature: string;
     };
     academicYears: Record<string, { id: string, name: string, active: boolean, startDate: string, endDate: string }>;
+    systemConfig: {
+        testingMode: boolean;
+        developerMaintenance: boolean;
+    };
     selectedYear: string;
     setSelectedYear: (year: string) => void;
     students: any[];
@@ -50,6 +54,10 @@ const initialState: MasterDataState = {
         principalSignature: ""
     },
     academicYears: {},
+    systemConfig: {
+        testingMode: false,
+        developerMaintenance: false,
+    },
     selectedYear: "2025-2026",
     setSelectedYear: () => { },
     students: [],
@@ -231,7 +239,33 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
         return () => unsub();
     }, []);
 
-    // 3. Authenticated State Management
+    // 3. Firestore Sync for System Config (Testing Mode, etc.)
+    useEffect(() => {
+        const unsub = onSnapshot(doc(db, "config", "system"), (docSnap) => {
+            if (docSnap.exists()) {
+                const config = docSnap.data();
+                setData(prev => ({
+                    ...prev,
+                    systemConfig: {
+                        testingMode: !!config.testingMode,
+                        developerMaintenance: !!config.developerMaintenance
+                    }
+                }));
+            } else {
+                // Initialize if doesn't exist (safety)
+                setData(prev => ({
+                    ...prev,
+                    systemConfig: { ...initialState.systemConfig }
+                }));
+            }
+        }, (error) => {
+            console.warn("Firestore Permission/Error (config/system):", error.message);
+        });
+
+        return () => unsub();
+    }, []);
+
+    // 4. Authenticated State Management
     const { role, user } = useAuth();
     useEffect(() => {
         if (!user || (role !== "ADMIN" && role !== "MANAGER")) {

@@ -86,11 +86,20 @@ export function Hero() {
 
             {/* Cinematic Background Layer */}
             <motion.div
-                style={{ opacity: opacityVideo, y: yVideo }}
+                style={{
+                    opacity: opacityVideo,
+                    y: yVideo,
+                    backgroundImage: content.posterUrl ? `url(${content.posterUrl})` : 'none',
+                    backgroundSize: 'cover',
+                    backgroundPosition: 'center'
+                }}
                 className="absolute inset-0 z-0 bg-[#0A192F]"
             >
-                {/* Immediate Video Rendering - No blocking spinner */}
-                {activeVideoUrl && (
+                {/* 
+                  Only render video if we have a URL and NOT on mobile (or if mobile video exists specifically).
+                  If mobile is true and no specific mobile video, we stick to the poster background for clean performance.
+                */}
+                {activeVideoUrl && (!isMobile || content.mobileVideoUrl) && (
                     <video
                         key={activeVideoUrl}
                         src={activeVideoUrl}
@@ -99,8 +108,10 @@ export function Hero() {
                         loop
                         playsInline
                         preload="auto"
-                        className="w-full h-full object-cover transition-opacity duration-1000 opacity-100"
-                        poster={content.posterUrl}
+                        onLoadedData={(e) => {
+                            (e.target as HTMLVideoElement).classList.add('opacity-100');
+                        }}
+                        className="w-full h-full object-cover transition-opacity duration-1000 opacity-0"
                     />
                 )}
 
