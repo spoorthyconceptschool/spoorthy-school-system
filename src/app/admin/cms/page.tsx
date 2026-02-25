@@ -379,6 +379,15 @@ export default function CMSPage() {
                                                     }}
                                                     className="bg-zinc-950/50 border-white/5 focus:border-indigo-500/30 text-xs md:text-sm h-9 md:h-10"
                                                 />
+                                                <Input
+                                                    placeholder="Or paste Image URL..."
+                                                    value={item.image || ""}
+                                                    onChange={(e) => {
+                                                        const updated = { ...data.facilities, [key]: { ...item, image: e.target.value } };
+                                                        setData({ ...data, facilities: updated });
+                                                    }}
+                                                    className="bg-zinc-950/50 border-white/5 focus:border-indigo-500/30 text-xs md:text-sm h-9 md:h-10 text-zinc-500 font-mono focus:text-white"
+                                                />
                                             </div>
 
                                             <div className="shrink-0 relative group/img w-16 h-16 md:w-20 md:h-20 rounded-lg overflow-hidden border border-white/10 bg-black">
@@ -477,6 +486,15 @@ export default function CMSPage() {
                                                     onChange={e => setData({ ...data, leadership: { ...data.leadership, [role]: { ...data.leadership[role], title: e.target.value } } })}
                                                     className="bg-zinc-950/50 border-white/10 focus:border-indigo-500/30 text-sm h-10"
                                                     placeholder="e.g. Founder & Chairman"
+                                                />
+                                            </div>
+                                            <div className="space-y-1">
+                                                <Label className="text-[10px] text-zinc-500 uppercase tracking-widest font-bold">Or Paste Photo URL</Label>
+                                                <Input
+                                                    value={data.leadership?.[role]?.photo || ""}
+                                                    onChange={e => setData({ ...data, leadership: { ...data.leadership, [role]: { ...data.leadership[role], photo: e.target.value } } })}
+                                                    className="bg-zinc-950/50 border-white/10 focus:border-indigo-500/30 text-xs h-9 font-mono text-zinc-500 focus:text-white"
+                                                    placeholder="https://..."
                                                 />
                                             </div>
                                         </div>
