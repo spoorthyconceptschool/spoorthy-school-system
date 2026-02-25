@@ -40,10 +40,10 @@ export function DataTable<T>({ data, columns, isLoading, onRowClick, actions, pa
     const [currentPage, setCurrentPage] = useState(1);
 
     // Pagination Logic
-    const totalItems = data.length;
+    const totalItems = Array.isArray(data) ? data.length : 0;
     const totalPages = Math.ceil(totalItems / pageSize);
     const startIndex = (currentPage - 1) * pageSize;
-    const paginatedData = data.slice(startIndex, startIndex + pageSize);
+    const paginatedData = Array.isArray(data) ? data.slice(startIndex, startIndex + pageSize) : [];
 
     if (isLoading) {
         return (

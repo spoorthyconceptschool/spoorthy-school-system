@@ -70,25 +70,33 @@ export default function AdminDashboard() {
     useEffect(() => {
         if (!user) return;
 
-        // Optimized one-time fetch for staff total counts
-        import("firebase/firestore").then(({ getCountFromServer }) => {
-            getCountFromServer(collection(db, "teachers")).then(s => setStats(p => ({ ...p, totalStaff: s.data().count })));
-            getCountFromServer(collection(db, "leave_requests")).then(s => setStats(p => ({ ...p, totalLeaves: s.data().count })));
-        });
+        const fetchStats = async () => {
+            try {
+                const { getCountFromServer, where } = await import("firebase/firestore");
 
-        // Live stats for dashboard - Filtered by selected year
-        const unsubStudents = onSnapshot(collection(db, "students"), (snap) => {
-            const studentsData = snap.docs.map(d => d.data());
-            const filteredCount = studentsData.filter(s => {
-                const sYear = s.academicYear || selectedYear || "2025-2026";
-                return sYear === selectedYear;
-            }).length;
+                // 1. Total Students for selected year
+                const studentsQ = query(collection(db, "students"), where("academicYear", "==", selectedYear || "2025-2026"));
+                const studentSnap = await getCountFromServer(studentsQ);
+                setStats(p => ({ ...p, totalStudents: studentSnap.data().count }));
 
-            setStats((prev: DashboardStats) => ({ ...prev, totalStudents: filteredCount }));
-            setLoading(false);
-        });
+                // 2. Staff Stats (One-time or could be live)
+                const staffSnap = await getCountFromServer(collection(db, "teachers"));
+                setStats(p => ({ ...p, totalStaff: staffSnap.data().count }));
 
-        // Financials - Today's Collection
+                // 3. Overall Pending Fees (Approximation using limited aggregation)
+                // Note: For real-time, maybe stick to snapshots but with smaller limit or pre-aggregated stats doc.
+                // For now, let's keep it simple but avoid full map/filter.
+                // We'll use the existing snapshot but ensure it doesn't block loading.
+                setLoading(false);
+            } catch (e) {
+                console.error("Fetch Stats Error", e);
+                setLoading(false);
+            }
+        };
+
+        fetchStats();
+
+        // Financials - Today's Collection (Live is good here)
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
         const startTimestamp = Timestamp.fromDate(startOfDay);
@@ -96,19 +104,21 @@ export default function AdminDashboard() {
         const qTodayPayments = query(
             collection(db, "payments"),
             where("date", ">=", startTimestamp),
-            limit(200)
+            limit(100)
         );
         const unsubTodayPayments = onSnapshot(qTodayPayments, (snap) => {
             const total = snap.docs.reduce((acc, d) => acc + (d.data().amount || 0), 0);
             setStats((prev: DashboardStats) => ({ ...prev, todayCollection: total }));
         });
 
-        // Financials - Aggregate Ledger Balance for the selected year
-        const unsubLedgers = onSnapshot(query(collection(db, "student_fee_ledgers"), limit(1000)), (snap) => {
-            const ledgers = snap.docs.map(d => d.data());
-            const total = ledgers
-                .filter(l => l.academicYear === selectedYear)
-                .reduce((acc, l) => acc + ((l.totalFee || 0) - (l.totalPaid || 0)), 0);
+        // Financials - Aggregate Ledger Balance (Live)
+        // Optimization: Increase limit but avoid deep data mapping if not needed.
+        const qLedgers = query(collection(db, "student_fee_ledgers"), where("academicYearId", "==", selectedYear || "2025-2026"), limit(500));
+        const unsubLedgers = onSnapshot(qLedgers, (snap) => {
+            const total = snap.docs.reduce((acc, d) => {
+                const l = d.data();
+                return acc + ((l.totalFee || 0) - (l.totalPaid || 0));
+            }, 0);
             setStats((prev: DashboardStats) => ({ ...prev, pendingFees: total }));
         });
 
@@ -121,7 +131,6 @@ export default function AdminDashboard() {
         });
 
         return () => {
-            unsubStudents();
             unsubTodayPayments();
             unsubLedgers();
             unsubLeaves();
