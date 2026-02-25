@@ -61,6 +61,9 @@ export default function StudentsPage() {
         const unsub = onSnapshot(q, (snap) => {
             setStudents(snap.docs.map(d => ({ id: d.id, studentDocId: d.id, ...d.data() } as Student)));
             setLocalLoading(false);
+        }, (error) => {
+            console.error("Firebase Students onSnapshot Error:", error);
+            setLocalLoading(false);
         });
         return () => unsub();
     }, []);
@@ -160,7 +163,10 @@ export default function StudentsPage() {
                         {role !== "MANAGER" && (
                             <>
                                 <StudentImportModal onSuccess={() => { window.location.reload(); }} />
-                                <AddStudentModal />
+                                <AddStudentModal onSuccess={() => {
+                                    // Give onSnapshot a moment to trigger, then force refresh just in case caching hides it.
+                                    setTimeout(() => window.location.reload(), 2000);
+                                }} />
                             </>
                         )}
                     </div>

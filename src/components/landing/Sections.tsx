@@ -395,9 +395,12 @@ export function GalleryPreview() {
 
     useEffect(() => {
         const unsub = onValue(ref(rtdb, 'siteContent/home/gallery'), (snap) => {
-            if (snap.exists() && Array.isArray(snap.val())) {
-                const data = snap.val();
-                if (data.length > 0) {
+            if (snap.exists()) {
+                let data = snap.val();
+                if (!Array.isArray(data)) {
+                    data = Object.values(data);
+                }
+                if (data && data.length > 0) {
                     // Map RTDB strings to objects if they aren't already
                     const mapped = data.map((item: any, i: number) => {
                         if (typeof item === 'string') return { title: `Activity ${i + 1}`, category: "Gallery", src: item };

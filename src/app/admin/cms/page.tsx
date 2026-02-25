@@ -108,6 +108,13 @@ export default function CMSPage() {
 
     const handleLocalUpload = async (file: File, pathPrefix: string, onUpload: (url: string) => void) => {
         try {
+            // Check file size to prevent Next.js API payload crash (typically 4.5MB limit, set to max 5MB)
+            const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5 MB
+            if (file.size > MAX_FILE_SIZE) {
+                alert(`File is too large (${(file.size / 1024 / 1024).toFixed(2)} MB). Maximum allowed size is 5 MB. Please compress your file or paste a URL directly.`);
+                return;
+            }
+
             setIsUploading(true);
             const token = await user?.getIdToken();
             if (!token) throw new Error("Not authenticated");
