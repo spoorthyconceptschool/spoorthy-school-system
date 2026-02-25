@@ -106,7 +106,7 @@ export function TopBar() {
                         <DropdownMenuContent align="end" className="bg-[#0A192F]/95 backdrop-blur-xl border border-[#64FFDA]/20 text-white min-w-[150px]">
                             <DropdownMenuLabel className="text-[10px] uppercase tracking-widest opacity-90">Academic Session</DropdownMenuLabel>
                             <DropdownMenuSeparator className="bg-white/10" />
-                            {Object.values(academicYears).sort((a, b) => b.id.localeCompare(a.id)).map((y: any) => (
+                            {Object.values(academicYears || {}).sort((a: any, b: any) => String(b.id || "").localeCompare(String(a.id || ""))).map((y: any) => (
                                 <DropdownMenuItem
                                     key={y.id}
                                     onClick={() => setSelectedYear(y.id)}

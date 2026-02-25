@@ -185,7 +185,7 @@ export function AcademicYearManager() {
 
     const activeYear = years.find(y => y.isActive);
     const upcomingYears = years.filter(y => y.isUpcoming);
-    const pastYears = years.filter(y => !y.isActive && !y.isUpcoming).sort((a, b) => b.year.localeCompare(a.year));
+    const pastYears = years.filter(y => !y.isActive && !y.isUpcoming).sort((a, b) => String(b.year || "").localeCompare(String(a.year || "")));
 
     return (
         <div className="space-y-4 md:space-y-6">

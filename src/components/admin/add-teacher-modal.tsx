@@ -77,7 +77,7 @@ export function AddTeacherModal({ isOpen, onClose, onSuccess }: AddTeacherModalP
             // Populate subjects from Master Data context
             const activeSubjects = Object.values(masterSubjects || {})
                 .filter((s: any) => s.isActive !== false)
-                .sort((a: any, b: any) => a.name.localeCompare(b.name));
+                .sort((a: any, b: any) => String(a.name || "").localeCompare(String(b.name || "")));
             setSubjects(activeSubjects);
         }
     }, [isOpen, masterSubjects]);

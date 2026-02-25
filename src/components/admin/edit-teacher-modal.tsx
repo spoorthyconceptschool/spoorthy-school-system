@@ -74,7 +74,7 @@ export function EditTeacherModal({ isOpen, onClose, teacher, onSuccess }: EditTe
             // Populate subjects from Master Data context
             const activeSubjects = Object.values(masterSubjects || {})
                 .filter((s: any) => s.isActive !== false)
-                .sort((a: any, b: any) => a.name.localeCompare(b.name));
+                .sort((a: any, b: any) => String(a.name || "").localeCompare(String(b.name || "")));
             setSubjects(activeSubjects);
         }
     }, [isOpen, teacher, masterSubjects]);
@@ -196,7 +196,7 @@ export function EditTeacherModal({ isOpen, onClose, teacher, onSuccess }: EditTe
                                     <SelectTrigger className="bg-white/5 border-white/10 text-xs"><SelectValue placeholder="Class" /></SelectTrigger>
                                     <SelectContent className="bg-black border-white/10 text-white">
                                         <SelectItem value="NONE">None</SelectItem>
-                                        {Object.values(masterClasses).sort((a: any, b: any) => a.order - b.order).map((c: any) => (
+                                        {Object.values(masterClasses || {}).sort((a: any, b: any) => (a.order || 99) - (b.order || 99)).map((c: any) => (
                                             <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
                                         ))}
                                     </SelectContent>

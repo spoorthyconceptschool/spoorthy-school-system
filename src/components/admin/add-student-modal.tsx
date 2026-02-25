@@ -34,16 +34,16 @@ export function AddStudentModal({ onSuccess }: { onSuccess?: () => void }) {
         transportRequired: false
     });
 
-    const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name })).sort((a, b) => a.name.localeCompare(b.name));
-    const classesList = Object.values(classesData || {}).map((c: any) => ({ id: c.id, name: c.name, order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
+    const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name || "Unknown Village" })).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    const classesList = Object.values(classesData || {}).map((c: any) => ({ id: c.id, name: c.name || "Unknown Class", order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
 
     const availableSections = formData.classId
         ? Object.values(classSections || {})
             .filter((cs: any) => cs.classId === formData.classId)
             .map((cs: any) => sectionsData[cs.sectionId])
             .filter(Boolean)
-            .map((s: any) => ({ id: s.id, name: s.name }))
-            .sort((a, b) => a.name.localeCompare(b.name))
+            .map((s: any) => ({ id: s.id, name: s.name || "Unknown Section" }))
+            .sort((a, b) => String(a.name).localeCompare(String(b.name)))
         : [];
 
     const handleSubmit = async (e: React.FormEvent) => {

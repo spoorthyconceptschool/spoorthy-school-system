@@ -38,7 +38,7 @@ export default function FeePendingsPage() {
 
     const { classes: classesData, villages: villagesData, branding } = useMasterData();
     const classes = Object.values(classesData || {}).map((c: any) => ({ id: c.id, name: c.name, order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
-    const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name })).sort((a: any, b: any) => a.name.localeCompare(b.name));
+    const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name || "Unknown Village" })).sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)));
 
     const fetchPendings = async () => {
         try {

@@ -37,7 +37,7 @@ export default function FeesPage() {
     const [syncing, setSyncing] = useState(false);
 
     // Convert master data objects to arrays
-    const classes = Object.values(classesData).map((c: any) => ({ id: c.id, name: c.name, order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
+    const classes = Object.values(classesData || {}).map((c: any) => ({ id: c.id, name: c.name || "Unknown Class", order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
 
     useEffect(() => {
         const fetchData = async () => {
@@ -243,7 +243,7 @@ function TransportFeeConfig({ transportFees, setTransportFees, saving }: {
     saving: boolean
 }) {
     const { villages } = useMasterData();
-    const sortedVillages = Object.values(villages).sort((a: any, b: any) => a.name.localeCompare(b.name));
+    const sortedVillages = Object.values(villages || {}).sort((a: any, b: any) => String(a.name || "").localeCompare(String(b.name || "")));
 
     const updateFee = (villageId: string, amount: string) => {
         setTransportFees({

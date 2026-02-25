@@ -83,7 +83,7 @@ export default function CustomFeesPage() {
     const villages = Object.entries(masterVillages || {})
         .map(([id, data]: any) => ({ id, ...data }))
         .filter((v: any) => v.isActive !== false)
-        .sort((a: any, b: any) => a.name.localeCompare(b.name));
+        .sort((a: any, b: any) => String(a.name || "").localeCompare(String(b.name || "")));
 
     const handleSave = async () => {
         if (!formData.name || !formData.amount || !formData.dueDate || formData.targetIds.length === 0) return;

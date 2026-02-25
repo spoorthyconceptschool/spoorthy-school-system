@@ -53,7 +53,7 @@ export default function TeacherAttendanceManager({
                 schoolId: d.data().schoolId || d.id,
                 name: d.data().name,
                 uid: d.data().uid
-            })).sort((a, b) => a.name.localeCompare(b.name));
+            })).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
             setTeachers(tList);
 
             // 2. Fetch Attendance in range
@@ -196,7 +196,7 @@ export default function TeacherAttendanceManager({
                 schoolId: d.data().schoolId || d.id,
                 name: d.data().name,
                 uid: d.data().uid
-            })).sort((a, b) => a.name.localeCompare(b.name));
+            })).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
             setTeachers(tList);
 
             if (tList.length === 0) {

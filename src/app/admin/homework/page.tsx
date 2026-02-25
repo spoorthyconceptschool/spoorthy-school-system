@@ -16,8 +16,8 @@ export default function AdminHomeworkPage() {
     const { user } = useAuth();
     const { classes, sections, subjects, classSections } = useMasterData();
 
-    const classList = Object.values(classes || {}).sort((a: any, b: any) => a.order - b.order);
-    const subjectList = Object.values(subjects || {}).sort((a: any, b: any) => a.name.localeCompare(b.name));
+    const classList = Object.values(classes || {}).sort((a: any, b: any) => (a.order || 99) - (b.order || 99));
+    const subjectList = Object.values(subjects || {}).sort((a: any, b: any) => String(a.name || "").localeCompare(String(b.name || "")));
 
     const [classId, setClassId] = useState("");
     const [sectionId, setSectionId] = useState("");
