@@ -2,13 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { doc, getDoc, collection, query, where, getDocs, deleteDoc, updateDoc, addDoc, Timestamp, orderBy, setDoc, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, deleteDoc, updateDoc, addDoc, Timestamp, orderBy, setDoc, onSnapshot, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { ArrowLeft, Edit, Trash2, Save, X, Loader2, CreditCard, ShieldAlert, History, Settings2, Lock, RefreshCw, Download, Printer } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Save, X, Loader2, CreditCard, ShieldAlert, History, Settings2, Lock, RefreshCw, Download, Printer, FileText } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -155,8 +156,8 @@ export default function StudentDetailsPage() {
                 const loadedPayments = pSnap.docs.map(d => ({ id: d.id, ...d.data() } as Payment));
                 // Client-side sort
                 setPayments(loadedPayments.sort((a, b) => {
-                    const dateA = a.date?.toDate ? a.date.toDate() : new Date(a.date);
-                    const dateB = b.date?.toDate ? b.date.toDate() : new Date(b.date);
+                    const dateA = a.date?.toDate ? a.date.toDate().getTime() : (a.date ? new Date(a.date).getTime() : 0);
+                    const dateB = b.date?.toDate ? b.date.toDate().getTime() : (b.date ? new Date(b.date).getTime() : 0);
                     return dateB - dateA;
                 }));
 
@@ -347,16 +348,18 @@ export default function StudentDetailsPage() {
         });
 
         let remainingToDistribute = totalPaid;
-        const processed = sortedItems.map(item => {
-            const paid = Math.min(remainingToDistribute, item.amount);
+        const processed = sortedItems.map((item: any) => {
+            const amt = Number(item.amount) || 0;
+            const paid = Math.min(remainingToDistribute, amt);
             remainingToDistribute -= paid;
-            const due = item.amount - paid;
+            const due = amt - paid;
             let status: "PAID" | "PENDING" | "PARTIAL" = "PENDING";
-            if (paid >= item.amount) status = "PAID";
+            if (paid >= amt) status = "PAID";
             else if (paid > 0) status = "PARTIAL";
 
             return {
                 ...item,
+                amount: amt,
                 distributedPaid: paid,
                 distributedDue: due,
                 distributedStatus: status
@@ -836,9 +839,9 @@ export default function StudentDetailsPage() {
                                         <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5 hover:border-accent/10 transition-colors">
                                             <div className="flex flex-col">
                                                 <span className="text-[10px] md:text-sm font-bold text-emerald-400">₹{p.amount?.toLocaleString()}</span>
-                                                <span className="text-[8px] md:text-[10px] text-white/40 uppercase font-black">{p.method} • {p.date?.toDate ? p.date.toDate().toLocaleDateString() : new Date(p.date).toLocaleDateString()}</span>
+                                                <span className="text-[8px] md:text-[10px] text-white/40 uppercase font-black">{p.method} • {p.date?.toDate ? p.date.toDate().toLocaleDateString() : (p.date ? new Date(p.date).toLocaleDateString() : 'N/A')}</span>
                                             </div>
-                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-emerald-500/10 text-emerald-400/60" onClick={() => student && printPaymentReceipt({ studentName: student.studentName, schoolId: student.schoolId, className: student.className, amount: p.amount, method: p.method, date: p.date, remarks: p.remarks, schoolLogo: branding?.schoolLogo, schoolName: branding?.schoolName })}>
+                                            <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-emerald-500/10 text-emerald-400/60" onClick={() => student && printPaymentReceipt({ payment: p, student: student, ledger: ledger, schoolLogo: branding?.schoolLogo, schoolName: branding?.schoolName })}>
                                                 <Printer className="w-3 h-3" />
                                             </Button>
                                         </div>
@@ -903,7 +906,7 @@ export default function StudentDetailsPage() {
                                             <div className="text-[8px] md:text-[10px] font-black text-rose-500/60 uppercase mb-1">Due Balance</div>
                                             <div className="text-sm md:text-2xl font-mono font-bold text-red-500">₹{dueAmount.toLocaleString()}</div>
                                         </div>
-                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-400 hover:bg-rose-500/10" onClick={() => printPendingFeeReport({ studentName: student?.studentName || 'Student', schoolId: student?.schoolId || '', className: student?.className || '', items: breakdown.pending, totalDue: dueAmount, schoolLogo: branding?.schoolLogo, schoolName: branding?.schoolName })}>
+                                        <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-400 hover:bg-rose-500/10" onClick={() => printPendingFeeReport({ studentName: student?.studentName || 'Student', schoolId: student?.schoolId || '', className: student?.className || '', items: breakdown.items, totalPaid: totalPaid, schoolLogo: branding?.schoolLogo, schoolName: branding?.schoolName })}>
                                             <Download className="w-4 h-4" />
                                         </Button>
                                     </div>
@@ -918,7 +921,7 @@ export default function StudentDetailsPage() {
                                 <FileText size={14} /> Documentation
                             </h3>
                             <div className="grid gap-2">
-                                <Button variant="outline" className="w-full justify-start h-12 rounded-xl border-white/5 bg-white/5 hover:bg-white/10 font-bold gap-3 text-xs" onClick={() => ledger && student && exportSingleStudentFee(student, ledger)}>
+                                <Button variant="outline" className="w-full justify-start h-12 rounded-xl border-white/5 bg-white/5 hover:bg-white/10 font-bold gap-3 text-xs" onClick={() => ledger && student && exportSingleStudentFee({ studentName: student.studentName, schoolId: student.schoolId, className: student.className, items: breakdown.items, totalPaid })}>
                                     <Download size={14} className="text-blue-400" /> Export Excel
                                 </Button>
                             </div>
@@ -985,8 +988,8 @@ export default function StudentDetailsPage() {
                     studentId={student.schoolId}
                     academicYearId={selectedYear}
                     currentLedger={ledger}
-                    onSuccess={(newLedger) => {
-                        setLedger(newLedger);
+                    onSuccess={() => {
+                        window.location.reload();
                     }}
                 />
             )}
