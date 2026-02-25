@@ -43,13 +43,7 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <TopBar />
                 <main className="flex-1 p-1 md:p-2 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20">
                     <div className="max-w-none space-y-4 md:space-y-6 px-1 md:px-2">
-                        {isAuthenticating ? (
-                            <div className="flex items-center justify-center h-[60vh]">
-                                <Loader2 className="w-8 h-8 animate-spin text-accent" />
-                            </div>
-                        ) : !user ? null : (
-                            children
-                        )}
+                        {children}
                     </div>
                 </main>
             </div>

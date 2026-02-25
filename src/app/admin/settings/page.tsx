@@ -15,37 +15,13 @@ import { Button } from "@/components/ui/button";
 import Link from "next/link";
 
 export default function AdminSettingsPage() {
-    const { user } = useAuth();
+    const { user, userData, loading } = useAuth();
     const router = useRouter();
-    const [role, setRole] = useState<string | null>(null);
-    const [loadingRole, setLoadingRole] = useState(true);
-
     const [error, setError] = useState<string | null>(null);
 
-    useEffect(() => {
-        let isMounted = true;
-        if (!user) return;
+    // No local useEffect needed, useAuth handles it via cache and sync
 
-        const unsub = onSnapshot(doc(db, "users", user.uid),
-            (d) => {
-                if (!isMounted) return;
-                setRole(d.exists() ? d.data().role : null);
-                setLoadingRole(false);
-            },
-            (err) => {
-                console.error("Settings role verification error:", err);
-                if (!isMounted) return;
-                setError("Failed to verify access level.");
-                setLoadingRole(false);
-            }
-        );
-        return () => {
-            isMounted = false;
-            unsub();
-        };
-    }, [user]);
-
-    if (loadingRole) return (
+    if (loading && !userData) return (
         <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
             <Loader2 className="w-8 h-8 animate-spin text-accent" />
             <p className="text-muted-foreground animate-pulse">Verifying credentials...</p>
@@ -60,7 +36,7 @@ export default function AdminSettingsPage() {
         </div>
     );
 
-    const activeRole = role?.toString().toUpperCase() || "";
+    const activeRole = userData?.role?.toString().toUpperCase() || "";
 
     if (!["ADMIN", "SUPER_ADMIN", "OWNER", "DEVELOPER", "MANAGER"].includes(activeRole)) return (
         <div className="flex flex-col items-center justify-center h-[60vh] gap-6 text-center animate-in zoom-in-95 duration-500">

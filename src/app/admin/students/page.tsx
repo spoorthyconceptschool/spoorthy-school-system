@@ -80,8 +80,8 @@ export default function StudentsPage() {
     const [villageFilter, setVillageFilter] = useState("all");
     const [classFilter, setClassFilter] = useState("all");
 
-    // Derive loading - Unified state
-    const loading = masterLoading || localLoading;
+    // Unified loading state for the table ONLY
+    const isTableLoading = masterLoading || localLoading;
 
     const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name || "Unknown Village" })).sort((a, b) => String(a.name).localeCompare(String(b.name)));
     const classes = Object.values(classesData || {}).map((c: any) => ({ id: c.id, name: c.name || "Unknown Class", order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
@@ -239,7 +239,7 @@ export default function StudentsPage() {
                     <div className="relative min-h-[400px]">
                         <DataTable
                             data={filteredStudents}
-                            isLoading={loading}
+                            isLoading={isTableLoading}
                             onRowClick={(s) => router.push(`/admin/students/${s.schoolId}`)}
                             columns={[
                                 {

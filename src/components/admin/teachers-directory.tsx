@@ -51,16 +51,7 @@ interface TeachersDirectoryProps {
 
 export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersDirectoryProps) {
     const router = useRouter();
-    const { user } = useAuth();
-    const [role, setRole] = useState<string>("");
-
-    useEffect(() => {
-        if (!user) return;
-        const unsub = onSnapshot(doc(db, "users", user.uid), (d) => {
-            if (d.exists()) setRole(d.data().role);
-        });
-        return () => unsub();
-    }, [user]);
+    const { user, role } = useAuth(); // Use role from global context
 
     const [activeTab, setActiveTab] = useState("teachers");
 
