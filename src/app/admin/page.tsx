@@ -5,6 +5,7 @@ import { collection, onSnapshot, query, orderBy, where, doc, limit, Timestamp } 
 import { db } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
+import { useMasterData } from "@/context/MasterDataContext";
 import { KPICard } from "@/components/ui/kpi-card";
 import { DataTable } from "@/components/ui/data-table";
 import { Button } from "@/components/ui/button";
@@ -48,6 +49,7 @@ interface DashboardStats {
 
 export default function AdminDashboard() {
     const { user, role: authRole } = useAuth();
+    const { selectedYear } = useMasterData();
     const router = useRouter();
 
     // Admin State
@@ -68,24 +70,25 @@ export default function AdminDashboard() {
     useEffect(() => {
         if (!user) return;
 
-        // Role is already provided by useAuth context for instant access
-
-
-        // Optimized stats fetching - Avoid full snapshots of large collections
-        const unsubStudents = onSnapshot(query(collection(db, "students"), limit(1)), (snap) => {
-            // Since we can't get size without full fetch in onSnapshot, we'll use a local count or metadata doc in future
-            // For now, we fetch just the size but without the data if possible, or use a cached value
-            // To truly fix this, we'd need a counter document. As a quick fix, we'll just use a non-realtime getCount once
-        });
-
-        // Use getCountFromServer for large counts (One-time fetch for performance)
+        // Optimized one-time fetch for staff total counts
         import("firebase/firestore").then(({ getCountFromServer }) => {
-            getCountFromServer(collection(db, "students")).then(s => setStats(p => ({ ...p, totalStudents: s.data().count })));
             getCountFromServer(collection(db, "teachers")).then(s => setStats(p => ({ ...p, totalStaff: s.data().count })));
             getCountFromServer(collection(db, "leave_requests")).then(s => setStats(p => ({ ...p, totalLeaves: s.data().count })));
         });
 
-        // Financials - Today's Collection (Keep real-time as it's typically small volume per day)
+        // Live stats for dashboard - Filtered by selected year
+        const unsubStudents = onSnapshot(collection(db, "students"), (snap) => {
+            const studentsData = snap.docs.map(d => d.data());
+            const filteredCount = studentsData.filter(s => {
+                const sYear = s.academicYear || selectedYear || "2025-2026";
+                return sYear === selectedYear;
+            }).length;
+
+            setStats((prev: DashboardStats) => ({ ...prev, totalStudents: filteredCount }));
+            setLoading(false);
+        });
+
+        // Financials - Today's Collection
         const startOfDay = new Date();
         startOfDay.setHours(0, 0, 0, 0);
         const startTimestamp = Timestamp.fromDate(startOfDay);
@@ -93,19 +96,19 @@ export default function AdminDashboard() {
         const qTodayPayments = query(
             collection(db, "payments"),
             where("date", ">=", startTimestamp),
-            limit(100) // Safety limit
+            limit(200)
         );
         const unsubTodayPayments = onSnapshot(qTodayPayments, (snap) => {
             const total = snap.docs.reduce((acc, d) => acc + (d.data().amount || 0), 0);
             setStats((prev: DashboardStats) => ({ ...prev, todayCollection: total }));
-            setLoading(false);
         });
 
-        // Financials - Aggregate Ledger Balance 
-        // NOTE: In production, this MUST come from a pre-calculated summary document.
-        // Fetching 500 ledgers on every dashboard load is still heavy.
-        const unsubLedgers = onSnapshot(query(collection(db, "ledgers"), limit(100)), (snap) => {
-            const total = snap.docs.reduce((acc, d) => acc + (Number(d.data().balance) || 0), 0);
+        // Financials - Aggregate Ledger Balance for the selected year
+        const unsubLedgers = onSnapshot(query(collection(db, "student_fee_ledgers"), limit(1000)), (snap) => {
+            const ledgers = snap.docs.map(d => d.data());
+            const total = ledgers
+                .filter(l => l.academicYear === selectedYear)
+                .reduce((acc, l) => acc + ((l.totalFee || 0) - (l.totalPaid || 0)), 0);
             setStats((prev: DashboardStats) => ({ ...prev, pendingFees: total }));
         });
 
@@ -123,7 +126,7 @@ export default function AdminDashboard() {
             unsubLedgers();
             unsubLeaves();
         };
-    }, [user]);
+    }, [user, selectedYear]);
 
     // Applications Listener
     useEffect(() => {
