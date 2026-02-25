@@ -24,7 +24,7 @@ export function StudentExportModal({ students }: StudentExportModalProps) {
     const [groupBy, setGroupBy] = useState<"none" | "class" | "village">("none");
 
     const classes = Object.values(classesData || {}).map((c: any) => ({ id: c.id, name: c.name, order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
-    const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name })).sort((a: any, b: any) => a.name.localeCompare(b.name));
+    const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name || "Unknown Village" })).sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)));
 
     const selectAllClasses = () => setSelectedClasses(classes.map(c => c.id));
     const clearClasses = () => setSelectedClasses([]);
@@ -57,7 +57,7 @@ export function StudentExportModal({ students }: StudentExportModalProps) {
         if (targetStudents.length === 0) { alert("No students selected"); return; }
 
         // Sort students alphabetically by name
-        targetStudents.sort((a, b) => (a.studentName || "").localeCompare(b.studentName || ""));
+        targetStudents.sort((a, b) => String(a.studentName || "").localeCompare(String(b.studentName || "")));
 
         const printWindow = window.open('', '_blank');
         if (!printWindow) return;

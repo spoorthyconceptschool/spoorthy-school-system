@@ -34,7 +34,7 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
     const classes = Object.values(classesData).map((c: any) => ({ id: c.id, name: c.name, order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
     const allSubjects = Object.values(subjectsData)
         .filter((s: any) => s.isActive !== false)
-        .sort((a: any, b: any) => a.name.localeCompare(b.name));
+        .sort((a: any, b: any) => String(a.name || "").localeCompare(String(b.name || "")));
 
     const fetchExam = async () => {
         try {

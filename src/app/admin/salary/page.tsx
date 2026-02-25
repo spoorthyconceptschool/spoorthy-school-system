@@ -66,7 +66,7 @@ export default function SalaryPage() {
                 };
             });
 
-            const allEmployees = [...teachers, ...staff].sort((a: any, b: any) => (a.name || "").localeCompare(b.name || ""));
+            const allEmployees = [...teachers, ...staff].sort((a: any, b: any) => String(a.name || "").localeCompare(String(b.name || "")));
             setEmployees(allEmployees);
 
             // 3. Fetch Payments

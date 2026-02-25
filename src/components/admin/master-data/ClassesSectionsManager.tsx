@@ -111,7 +111,7 @@ export function ClassesSectionsManager() {
                     classTeacher: teachers.find(t => t.id === cs.classTeacherId)?.name || "N/A",
                     subjects: assignedSubjects
                 };
-            }).sort((a, b) => a.className.localeCompare(b.className) || a.sectionName.localeCompare(b.sectionName));
+            }).sort((a, b) => String(a.className || "").localeCompare(String(b.className || "")) || String(a.sectionName || "").localeCompare(String(b.sectionName || "")));
     };
 
     const handleExport = (ids: string[]) => {
@@ -232,7 +232,7 @@ export function ClassesSectionsManager() {
                                     const cA = classes[a.classId]?.order || 0;
                                     const cB = classes[b.classId]?.order || 0;
                                     if (cA !== cB) return cA - cB;
-                                    return (sections[a.sectionId]?.name || "").localeCompare(sections[b.sectionId]?.name || "");
+                                    return String(sections[a.sectionId]?.name || "").localeCompare(String(sections[b.sectionId]?.name || ""));
                                 }).map((cs: any) => {
                                     const isSelected = selectedIds.includes(cs.id);
                                     return (

@@ -97,7 +97,7 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
             studentList.sort((a: any, b: any) => {
                 const rA = parseInt(a.rollNo) || 9999;
                 const rB = parseInt(b.rollNo) || 9999;
-                return rA - rB || a.studentName.localeCompare(b.studentName);
+                return rA - rB || String(a.studentName || "").localeCompare(String(b.studentName || ""));
             });
 
             setStudents(studentList);

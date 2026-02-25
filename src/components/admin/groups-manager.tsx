@@ -249,7 +249,7 @@ export function GroupsManager() {
                 class: s.className,
                 section: s.sectionName
             }));
-            list.sort((a, b) => a.name.localeCompare(b.name));
+            list.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
             setStudents(list);
         }
     }, [globalStudents]);
@@ -261,7 +261,7 @@ export function GroupsManager() {
                 name: t.name,
                 email: t.email
             }));
-            list.sort((a, b) => a.name.localeCompare(b.name));
+            list.sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
             setTeachers(list);
         }
     }, [globalTeachers]);
@@ -411,7 +411,7 @@ export function GroupsManager() {
         sortedClasses.forEach(cls => {
             groupedMembers[cls] = filteredMembers
                 .filter(m => m.className === cls)
-                .sort((a, b) => a.studentName.localeCompare(b.studentName));
+                .sort((a, b) => String(a.studentName || "").localeCompare(String(b.studentName || "")));
         });
 
         const inchargesList = viewingGroup.incharges

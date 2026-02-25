@@ -85,7 +85,7 @@ export default function TeacherDashboard() {
                 setSubstitutionsToday(subs.filter((s: any) => s.date === todayKey && s.role === "SUBSTITUTE"));
 
                 // Upcoming Coverage (Next 7 days excluding today)
-                setUpcomingSubs(subs.filter((s: any) => s.role === "SUBSTITUTE" && s.date > todayKey).sort((a: any, b: any) => a.date.localeCompare(b.date)));
+                setUpcomingSubs(subs.filter((s: any) => s.role === "SUBSTITUTE" && s.date > todayKey).sort((a: any, b: any) => String(a.date || "").localeCompare(String(b.date || ""))));
             }
             // 2. Process Leaves
             // @ts-ignore - catch block handles real errors, this is safe fallback

@@ -39,7 +39,7 @@ export default function TeachingAssignmentsPage() {
         // Keep subjects synced with Master Data RTDB
         const activeSubjects = Object.values(masterSubjects || {})
             .filter((s: any) => s.isActive !== false) // Default to true if not present
-            .sort((a: any, b: any) => a.name.localeCompare(b.name));
+            .sort((a: any, b: any) => String(a.name || "").localeCompare(String(b.name || "")));
         setSubjects(activeSubjects);
     }, [masterSubjects]);
 

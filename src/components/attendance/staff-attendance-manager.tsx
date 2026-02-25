@@ -53,7 +53,7 @@ export default function StaffAttendanceManager({
                 schoolId: d.id,
                 name: d.name,
                 role: d.roleName || "Staff"
-            })).sort((a, b) => a.name.localeCompare(b.name));
+            })).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
             setStaff(list);
         }
     }, [globalStaff]);

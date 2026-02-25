@@ -357,7 +357,7 @@ export default function StudentDetailsPage() {
 
         const safeItems = Array.isArray(ledger.items) ? ledger.items : Object.values(ledger.items || {});
         // Use FIFO distribution for display: payments cover oldest items first
-        const sortedItems = [...safeItems].sort((a, b) => {
+        const sortedItems = [...safeItems].sort((a: any, b: any) => {
             const dateA = a.dueDate ? safeDateParse(a.dueDate) : 0;
             const dateB = b.dueDate ? safeDateParse(b.dueDate) : 0;
             return dateA - dateB;
@@ -1003,7 +1003,7 @@ export default function StudentDetailsPage() {
                     onClose={() => setIsAdjustModalOpen(false)}
                     studentId={student.schoolId}
                     academicYearId={selectedYear}
-                    currentLedger={ledger}
+                    ledgerItems={ledger.items || []}
                     onSuccess={() => {
                         window.location.reload();
                     }}

@@ -95,7 +95,7 @@ export function TeacherGroupManager() {
                 snap.forEach(d => list.push({ id: d.id, ...d.data() } as Student));
 
                 // Sort by Name
-                list.sort((a, b) => a.studentName.localeCompare(b.studentName));
+                list.sort((a, b) => String(a.studentName || "").localeCompare(String(b.studentName || "")));
                 setStudents(list);
                 setSelectedStudentIds([]); // clear selection on refetch
             } catch (error) {

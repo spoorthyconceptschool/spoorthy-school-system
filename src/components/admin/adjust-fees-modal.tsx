@@ -14,11 +14,12 @@ interface AdjustFeesModalProps {
     isOpen: boolean;
     onClose: () => void;
     studentId: string;
+    academicYearId: string;
     ledgerItems: any[];
     onSuccess: () => void;
 }
 
-export function AdjustFeesModal({ isOpen, onClose, studentId, ledgerItems, onSuccess }: AdjustFeesModalProps) {
+export function AdjustFeesModal({ isOpen, onClose, studentId, academicYearId, ledgerItems, onSuccess }: AdjustFeesModalProps) {
     const [selectedItemId, setSelectedItemId] = useState<string>("");
     const [adjType, setAdjType] = useState<"DISCOUNT" | "OVERRIDE">("DISCOUNT");
     const [value, setValue] = useState("");
@@ -51,6 +52,7 @@ export function AdjustFeesModal({ isOpen, onClose, studentId, ledgerItems, onSuc
                 },
                 body: JSON.stringify({
                     studentId,
+                    yearId: academicYearId,
                     adjustments: [{
                         id: selectedItemId,
                         type: adjType,
