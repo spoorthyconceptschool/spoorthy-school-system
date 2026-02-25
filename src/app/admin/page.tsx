@@ -177,12 +177,17 @@ export default function AdminDashboard() {
                         <h1 className="text-2xl sm:text-3xl md:text-6xl font-display font-bold bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent italic leading-tight">
                             Operations Central
                         </h1>
-                        <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground text-[8px] md:text-sm tracking-wider uppercase font-black opacity-60 leading-tight md:leading-relaxed">
-                            <span>Financial Health</span>
-                            <span className="text-blue-500">•</span>
-                            <span>Operational Efficiency</span>
-                            <span className="text-blue-500">•</span>
-                            <span>Growth Analytics</span>
+                        <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground text-[8px] md:text-sm tracking-wider uppercase font-black opacity-60 leading-tight md:leading-relaxed">
+                                <span>Financial Health</span>
+                                <span className="text-blue-500">•</span>
+                                <span>Operational Efficiency</span>
+                                <span className="text-blue-500">•</span>
+                                <span>Growth Analytics</span>
+                            </div>
+                            <Badge variant="outline" className="text-[10px] border-white/5 bg-white/5 text-muted-foreground ml-2">
+                                Last Synced: {new Date().toLocaleTimeString()}
+                            </Badge>
                         </div>
                     </div>
                 </div>
