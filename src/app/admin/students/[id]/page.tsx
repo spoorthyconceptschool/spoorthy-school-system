@@ -23,6 +23,24 @@ import { useMasterData } from "@/context/MasterDataContext";
 import { useAuth } from "@/context/AuthContext";
 import { notifyManagerAction } from "@/lib/notifications";
 
+const safeDateParse = (d: any): number => {
+    if (!d) return 0;
+    if (d?.toDate) return d.toDate().getTime();
+    if (typeof d === 'object' && d.seconds) return d.seconds * 1000;
+    const t = new Date(d).getTime();
+    return isNaN(t) ? 0 : t;
+};
+
+const safeDateString = (d: any): string => {
+    try {
+        const time = safeDateParse(d);
+        if (time === 0) return "N/A";
+        return new Date(time).toLocaleDateString();
+    } catch {
+        return "N/A";
+    }
+};
+
 interface Student {
     id: string; // Document ID (usually same as schoolId)
     uid?: string; // Auth UID
@@ -95,9 +113,9 @@ export default function StudentDetailsPage() {
     const { villages: villagesData, classes: classesData, sections: sectionsData, classSections, branding, selectedYear } = useMasterData();
 
     // Derived Master Data
-    const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name })).sort((a, b) => a.name.localeCompare(b.name));
-    const classes = Object.values(classesData || {}).map((c: any) => ({ id: c.id, name: c.name, order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
-    const sections = Object.values(sectionsData || {}).map((s: any) => ({ id: s.id, name: s.name })).sort((a, b) => a.name.localeCompare(b.name));
+    const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name || "Unknown Village" })).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    const classes = Object.values(classesData || {}).map((c: any) => ({ id: c.id, name: c.name || "Unknown Class", order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
+    const sections = Object.values(sectionsData || {}).map((s: any) => ({ id: s.id, name: s.name || "Unknown Section" })).sort((a, b) => String(a.name).localeCompare(String(b.name)));
 
     // Fee Collection State
     const [isFeeModalOpen, setIsFeeModalOpen] = useState(false);
@@ -156,9 +174,7 @@ export default function StudentDetailsPage() {
                 const loadedPayments = pSnap.docs.map(d => ({ id: d.id, ...d.data() } as Payment));
                 // Client-side sort
                 setPayments(loadedPayments.sort((a, b) => {
-                    const dateA = a.date?.toDate ? a.date.toDate().getTime() : (a.date ? new Date(a.date).getTime() : 0);
-                    const dateB = b.date?.toDate ? b.date.toDate().getTime() : (b.date ? new Date(b.date).getTime() : 0);
-                    return dateB - dateA;
+                    return safeDateParse(b.date) - safeDateParse(a.date);
                 }));
 
                 // 3. Fetch Fee Ledger (New)
@@ -839,7 +855,7 @@ export default function StudentDetailsPage() {
                                         <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5 hover:border-accent/10 transition-colors">
                                             <div className="flex flex-col">
                                                 <span className="text-[10px] md:text-sm font-bold text-emerald-400">₹{p.amount?.toLocaleString()}</span>
-                                                <span className="text-[8px] md:text-[10px] text-white/40 uppercase font-black">{p.method} • {p.date?.toDate ? p.date.toDate().toLocaleDateString() : (p.date ? new Date(p.date).toLocaleDateString() : 'N/A')}</span>
+                                                <span className="text-[8px] md:text-[10px] text-white/40 uppercase font-black">{p.method} • {safeDateString(p.date)}</span>
                                             </div>
                                             <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-emerald-500/10 text-emerald-400/60" onClick={() => student && printPaymentReceipt({ payment: p, student: student, ledger: ledger, schoolLogo: branding?.schoolLogo, schoolName: branding?.schoolName })}>
                                                 <Printer className="w-3 h-3" />

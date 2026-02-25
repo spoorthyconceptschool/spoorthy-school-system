@@ -77,8 +77,8 @@ export default function StudentsPage() {
     // Derive loading - Unified state
     const loading = masterLoading || localLoading;
 
-    const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name })).sort((a, b) => a.name.localeCompare(b.name));
-    const classes = Object.values(classesData || {}).map((c: any) => ({ id: c.id, name: c.name, order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
+    const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name || "Unknown Village" })).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+    const classes = Object.values(classesData || {}).map((c: any) => ({ id: c.id, name: c.name || "Unknown Class", order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
 
     // Modal State
     const [selectedStudent, setSelectedStudent] = useState<Student | null>(null);
