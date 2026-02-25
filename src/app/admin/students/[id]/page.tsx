@@ -105,10 +105,14 @@ export default function StudentDetailsPage() {
     const [feeForm, setFeeForm] = useState({
         amount: "",
         method: "cash",
-        date: new Date().toISOString().split('T')[0],
+        date: "",
         remarks: ""
     });
     const [collectingFee, setCollectingFee] = useState(false);
+
+    useEffect(() => {
+        setFeeForm(prev => ({ ...prev, date: new Date().toISOString().split('T')[0] }));
+    }, []);
 
     // Initial Fetch
     useEffect(() => {
@@ -326,7 +330,7 @@ export default function StudentDetailsPage() {
 
     // Calculations
     const totalPaid = payments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
-    const totalFee = ledger ? ledger.items.reduce((sum, i) => sum + i.amount, 0) : 0;
+    const totalFee = ledger ? (ledger.items || []).reduce((sum, i) => sum + (Number(i.amount) || 0), 0) : 0;
     const dueAmount = totalFee - totalPaid;
     const paymentProgress = totalFee > 0 ? Math.min((totalPaid / totalFee) * 100, 100) : 0;
 
@@ -334,9 +338,12 @@ export default function StudentDetailsPage() {
     const getBreakdown = () => {
         if (!ledger) return { items: [], termsPaid: 0, termsTotal: 0, customPaid: 0, customTotal: 0, pending: [], termsPending: 0, customPending: 0 };
 
+        const safeItems = ledger.items || [];
         // Use FIFO distribution for display: payments cover oldest items first
-        const sortedItems = [...ledger.items].sort((a, b) => {
-            return new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime();
+        const sortedItems = [...safeItems].sort((a, b) => {
+            const dateA = a.dueDate ? new Date(a.dueDate).getTime() : 0;
+            const dateB = b.dueDate ? new Date(b.dueDate).getTime() : 0;
+            return dateA - dateB;
         });
 
         let remainingToDistribute = totalPaid;
