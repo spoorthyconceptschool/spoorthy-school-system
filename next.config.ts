@@ -37,6 +37,10 @@ const nextConfig: NextConfig = {
       {
         protocol: 'https',
         hostname: 'fn7hnjxmkfxii.mocha.app',
+      },
+      {
+        protocol: 'https',
+        hostname: 'vault123.lovable.app',
       }
     ],
   },
