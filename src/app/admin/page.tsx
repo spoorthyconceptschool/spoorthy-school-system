@@ -106,7 +106,7 @@ export default function AdminDashboard() {
         return () => {
             unsubLeaves();
         };
-    }, [user]);
+    }, [user, selectedYear]);
 
     // Applications Listener
     useEffect(() => {
