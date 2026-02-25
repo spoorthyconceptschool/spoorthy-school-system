@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "private": true,
   "engines": {
-    "node": "20"
+    "node": ">=20"
   },
   "scripts": {
     "dev": "next dev",
@@ -55,7 +55,7 @@
     "three": "^0.182.0",
     "xlsx": "^0.18.5",
     "zod": "^4.3.5",
-    "zustand": "^5.0.10"
+    "zustand": "^5.0.11"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
