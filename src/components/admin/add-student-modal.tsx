@@ -17,7 +17,7 @@ import { exportSingleStudentFee, printStudentFeeStructure } from "@/lib/export-u
 
 export function AddStudentModal({ onSuccess }: { onSuccess?: () => void }) {
     const { user } = useAuth();
-    const { villages: villagesData, classes: classesData, sections: sectionsData, classSections, branding, loading: masterDataLoading } = useMasterData();
+    const { villages: villagesData, classes: classesData, sections: sectionsData, classSections, branding, loading: masterDataLoading, selectedYear } = useMasterData();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [successData, setSuccessData] = useState<{ schoolId: string, studentName: string, className: string } | null>(null);
@@ -71,7 +71,8 @@ export function AddStudentModal({ onSuccess }: { onSuccess?: () => void }) {
                 sectionName: selectedSection,
                 dateOfBirth: formData.dateOfBirth,
                 gender: formData.gender,
-                transportRequired: formData.transportRequired
+                transportRequired: formData.transportRequired,
+                academicYear: selectedYear || "2025-2026"
             };
 
             console.log("Creating student with payload:", payload);

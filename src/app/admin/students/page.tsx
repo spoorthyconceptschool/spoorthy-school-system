@@ -164,8 +164,7 @@ export default function StudentsPage() {
                             <>
                                 <StudentImportModal onSuccess={() => { window.location.reload(); }} />
                                 <AddStudentModal onSuccess={() => {
-                                    // Give onSnapshot a moment to trigger, then force refresh just in case caching hides it.
-                                    setTimeout(() => window.location.reload(), 2000);
+                                    console.log("Student added, onSnapshot should render it instantly.");
                                 }} />
                             </>
                         )}
