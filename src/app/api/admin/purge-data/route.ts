@@ -88,8 +88,7 @@ export async function POST(req: NextRequest) {
         // A. Firestore Collections
         const PROTECTED = [
             'settings', 'users', 'config', 'branding',
-            'master_classes', 'master_sections', 'master_villages',
-            'master_subjects', 'master_class_sections', 'registry',
+            'registry',
             'site_content', 'landing_page', 'cms_content', 'counters'
         ];
 
@@ -162,6 +161,8 @@ export async function POST(req: NextRequest) {
             tasks.push(adminRtdb.ref("presence").remove());
             if (purgeType === 'FULL_SYSTEM') {
                 tasks.push(adminRtdb.ref("academic_years").remove());
+                tasks.push(adminRtdb.ref("master").remove());
+                tasks.push(adminRtdb.ref("timetables").remove());
             }
         }
 
