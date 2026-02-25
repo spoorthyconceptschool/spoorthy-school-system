@@ -81,6 +81,19 @@ export default function CMSPage() {
         }
     };
 
+    const handleForceAppUpdate = async () => {
+        // This triggers the LiveUpdatePrompt on all connected mobile apps
+        try {
+            await update(ref(rtdb, 'system'), {
+                liveVersion: Date.now()
+            });
+            alert("Update command sent! All connected mobile apps will now prompt users to refresh.");
+        } catch (e: any) {
+            console.error(e);
+            alert("Failed to send update command.");
+        }
+    };
+
     // Image Pipeline Handler
     const handleFacilityImage = async (key: string, url: string) => {
         if (!url) return;
@@ -137,14 +150,23 @@ export default function CMSPage() {
                     <h1 className="text-3xl md:text-5xl font-display font-bold text-white tracking-tight">Website CMS</h1>
                     <p className="text-zinc-400 mt-2 text-sm md:text-lg font-medium">Manage public landing page content and media.</p>
                 </div>
-                <Button
-                    onClick={handleSave}
-                    disabled={isPublishing || isUploading}
-                    className="bg-indigo-600 hover:bg-indigo-500 text-white w-full md:w-auto px-8 py-6 rounded-xl shadow-xl shadow-indigo-500/10 active:scale-95 transition-all text-base font-bold"
-                >
-                    {isPublishing ? <Loader2 className="animate-spin mr-2 w-5 h-5" /> : <CheckCircle className="mr-2 w-5 h-5" />}
-                    {isPublishing ? "Publishing..." : "Publish Changes"}
-                </Button>
+                <div className="flex flex-col sm:flex-row gap-3 w-full md:w-auto">
+                    <Button
+                        onClick={handleForceAppUpdate}
+                        variant="outline"
+                        className="border-indigo-500/30 text-indigo-400 hover:bg-indigo-500/10 hover:text-white px-6 py-6 rounded-xl shadow-xl transition-all font-bold group"
+                    >
+                        Push App Update to Phones
+                    </Button>
+                    <Button
+                        onClick={handleSave}
+                        disabled={isPublishing || isUploading}
+                        className="bg-indigo-600 hover:bg-indigo-500 text-white w-full sm:w-auto px-8 py-6 rounded-xl shadow-xl shadow-indigo-500/10 active:scale-95 transition-all text-base font-bold"
+                    >
+                        {isPublishing ? <Loader2 className="animate-spin mr-2 w-5 h-5" /> : <CheckCircle className="mr-2 w-5 h-5" />}
+                        {isPublishing ? "Publishing..." : "Publish Changes"}
+                    </Button>
+                </div>
             </div>
 
             <Tabs defaultValue="hero" className="w-full">

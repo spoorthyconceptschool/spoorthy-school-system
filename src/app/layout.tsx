@@ -8,6 +8,7 @@ import { Toaster } from "@/components/ui/toaster";
 import { NotificationManager } from "@/components/notification-manager";
 import { FCMTokenManager } from "@/components/fcm-token-manager";
 import { InstallPrompt } from "@/components/install-prompt";
+import { LiveUpdatePrompt } from "@/components/live-update-prompt";
 
 const inter = Inter({
   subsets: ['latin'],
@@ -66,6 +67,7 @@ export default function RootLayout({
             <NotificationManager />
             <FCMTokenManager />
             <InstallPrompt />
+            <LiveUpdatePrompt />
           </MasterDataProvider>
           <Toaster />
         </AuthProvider>
