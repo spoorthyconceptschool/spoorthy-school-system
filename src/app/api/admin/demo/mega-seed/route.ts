@@ -68,7 +68,7 @@ export async function GET(req: NextRequest) {
             salary: 20000 + (i * 1000),
             phone: `9100000${100 + i}`
         }));
-        staffPool.push({ id: "admin@school.local", name: "Principal Administrator", email: "admin@school.local", role: "ADMIN", subjects: [], salary: 60000, phone: "9999999999" });
+        staffPool.push({ id: "admin", name: "Principal Administrator", email: "admin@school.local", role: "ADMIN", subjects: [], salary: 60000, phone: "9999999999" });
 
         const classSections: Record<string, any> = {};
         const subjectTeachers: Record<string, any> = {};
@@ -94,6 +94,34 @@ export async function GET(req: NextRequest) {
         });
 
         await adminRtdb.ref("master").set({ villages, classes, sections, subjects, classSections, classSubjects, subjectTeachers, branding: { schoolName: "Spoorthy Concept School", address: "Hyderabad Campus" } });
+
+        // Save teachers and staff directly to Firestore
+        const facultyBatch = adminDb.batch();
+        staffPool.forEach(person => {
+            if (person.role === "TEACHER") {
+                facultyBatch.set(adminDb.collection("teachers").doc(person.id), {
+                    schoolId: person.id,
+                    name: person.name,
+                    mobile: person.phone,
+                    status: "ACTIVE",
+                    salary: person.salary,
+                    subjects: person.subjects,
+                    createdAt: Timestamp.now()
+                });
+            } else {
+                facultyBatch.set(adminDb.collection("staff").doc(person.id), {
+                    schoolId: person.id,
+                    name: person.name,
+                    mobile: person.phone,
+                    status: "ACTIVE",
+                    baseSalary: person.salary,
+                    roleCode: person.role,
+                    email: person.email,
+                    createdAt: Timestamp.now()
+                });
+            }
+        });
+        await facultyBatch.commit();
 
         // --- PHASE 3: FEE CONFIG ---
         logs.push("3. Configuring Fees (Terms, Transport, Custom)...");

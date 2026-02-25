@@ -94,21 +94,26 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
     const [salaryUser, setSalaryUser] = useState<{ id: string, name: string, schoolId: string, role: "TEACHER" | "STAFF", currentSalary: number, roleCode?: string } | null>(null);
     const [isSalaryModalOpen, setIsSalaryModalOpen] = useState(false);
 
-    const { teachers: globalTeachers, staff: globalStaff } = useMasterData();
-
     useEffect(() => {
-        if (globalTeachers) {
-            setTeachers(globalTeachers as Teacher[]);
+        const qTeachers = query(collection(db, "teachers"), orderBy("createdAt", "desc"));
+        const unsubTeachers = onSnapshot(qTeachers, (snap) => {
+            const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Teacher));
+            setTeachers(list);
             setLoading(false);
-        }
-    }, [globalTeachers]);
+        });
 
-    useEffect(() => {
-        if (globalStaff) {
-            setStaff(globalStaff as Staff[]);
+        const qStaff = query(collection(db, "staff"), orderBy("createdAt", "desc"));
+        const unsubStaff = onSnapshot(qStaff, (snap) => {
+            const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff));
+            setStaff(list);
             setLoading(false);
-        }
-    }, [globalStaff]);
+        });
+
+        return () => {
+            unsubTeachers();
+            unsubStaff();
+        };
+    }, []);
 
     useEffect(() => {
         // Real-time Roles (RTDB/Firestore)
