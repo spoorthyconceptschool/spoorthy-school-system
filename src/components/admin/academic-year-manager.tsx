@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
-import { Calendar, ArrowRight, CheckCircle, AlertTriangle, Play, Loader2, Plus, Edit, Pencil, History, TrendingUp, Users } from "lucide-react";
+import { Calendar, ArrowRight, CheckCircle, AlertTriangle, Play, Loader2, Plus, Edit, Pencil, History, TrendingUp, Users, Trash2 } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
@@ -183,6 +183,31 @@ export function AcademicYearManager() {
         }
     };
 
+    const handleDeleteYear = async (year: string) => {
+        if (!confirm(`Are you sure you want to delete the academic year ${year}? This only removes the configuration entry, but linked data like students or fees might remain orphaned.`)) return;
+
+        try {
+            const token = await user?.getIdToken();
+            const res = await fetch("/api/admin/academic-years/delete", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ yearLabel: year })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                fetchYears();
+            } else {
+                alert(data.error);
+            }
+        } catch (e: any) {
+            alert("Delete failed: " + e.message);
+        }
+    };
+
     const activeYear = years.find(y => y.isActive);
     const upcomingYears = years.filter(y => y.isUpcoming);
     const pastYears = years.filter(y => !y.isActive && !y.isUpcoming).sort((a, b) => String(b.year || "").localeCompare(String(a.year || "")));
@@ -286,14 +311,24 @@ export function AcademicYearManager() {
                                         <p className="text-[9px] text-zinc-500 hidden md:block">Scheduled for future deployment</p>
                                     </div>
                                 </div>
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="h-7 w-7 text-zinc-600 hover:text-zinc-300 hover:bg-white/5 rounded-lg"
-                                    onClick={() => openEditModal(year)}
-                                >
-                                    <Pencil className="w-3.5 h-3.5" />
-                                </Button>
+                                <div className="flex items-center gap-1">
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 text-zinc-600 hover:text-zinc-300 hover:bg-white/5 rounded-lg"
+                                        onClick={() => openEditModal(year)}
+                                    >
+                                        <Pencil className="w-3.5 h-3.5" />
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="icon"
+                                        className="h-7 w-7 text-zinc-600 hover:text-red-500 hover:bg-red-500/10 rounded-lg"
+                                        onClick={() => handleDeleteYear(year.year)}
+                                    >
+                                        <Trash2 className="w-3.5 h-3.5" />
+                                    </Button>
+                                </div>
                             </div>
                         )) : (
                             <div className="p-6 border border-dashed border-zinc-800 rounded-xl text-center">
@@ -326,14 +361,24 @@ export function AcademicYearManager() {
                                             <div className="text-xs font-bold text-zinc-400 group-hover:text-emerald-400 transition-colors">{year.stats?.promoted || 0}</div>
                                         </div>
                                     </div>
-                                    <Button
-                                        variant="ghost"
-                                        size="icon"
-                                        className="h-7 w-7 text-zinc-700 hover:text-white hover:bg-white/5 rounded-lg"
-                                        onClick={() => openEditModal(year)}
-                                    >
-                                        <Pencil className="w-3.5 h-3.5" />
-                                    </Button>
+                                    <div className="flex items-center gap-1">
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 text-zinc-700 hover:text-white hover:bg-white/5 rounded-lg"
+                                            onClick={() => openEditModal(year)}
+                                        >
+                                            <Pencil className="w-3.5 h-3.5" />
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 text-zinc-700 hover:text-red-500 hover:bg-red-500/10 rounded-lg"
+                                            onClick={() => handleDeleteYear(year.year)}
+                                        >
+                                            <Trash2 className="w-3.5 h-3.5" />
+                                        </Button>
+                                    </div>
                                 </div>
                             </div>
                         ))}

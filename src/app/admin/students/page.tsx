@@ -57,7 +57,13 @@ export default function StudentsPage() {
 
     // Replace master data sync with local fetch
     useEffect(() => {
-        const q = query(collection(db, "students"), orderBy("createdAt", "desc"), limit(1000));
+        if (!selectedYear) return;
+        setLocalLoading(true);
+        const q = query(
+            collection(db, "students"),
+            where("academicYear", "==", selectedYear),
+            limit(1000)
+        );
         const unsub = onSnapshot(q, (snap) => {
             setStudents(snap.docs.map(d => ({ id: d.id, studentDocId: d.id, ...d.data() } as Student)));
             setLocalLoading(false);
@@ -66,7 +72,7 @@ export default function StudentsPage() {
             setLocalLoading(false);
         });
         return () => unsub();
-    }, []);
+    }, [selectedYear]);
 
     // Filter State
     const [searchQuery, setSearchQuery] = useState("");
@@ -90,13 +96,8 @@ export default function StudentsPage() {
     const filteredStudents = useMemo(() => {
         let result = students;
 
-        // Filter by Academic Year
-        if (selectedYear) {
-            result = result.filter(s => {
-                const sYear = (s as any).academicYear || selectedYear || "2025-2026";
-                return sYear === selectedYear;
-            });
-        }
+        // Note: Primary academic year filtering now happens in the useEffect query.
+        // This useMemo handles search, class, and village filters.
 
         if (statusFilter !== "all") {
             result = result.filter(s => s.status === statusFilter);

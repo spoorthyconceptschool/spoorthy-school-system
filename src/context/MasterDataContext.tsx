@@ -225,6 +225,14 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
                 }
 
                 setData(prev => ({ ...prev, academicYears: yearsMap }));
+
+                // Ensure selectedYear is still valid
+                const currentSelected = localStorage.getItem("spoorthy_academic_year") || selectedYear;
+                if (Object.keys(yearsMap).length > 0 && !yearsMap[currentSelected]) {
+                    const fallback = config.currentYear || Object.keys(yearsMap)[0];
+                    setSelectedYear(fallback);
+                    localStorage.setItem("spoorthy_academic_year", fallback);
+                }
             }
         }, (error) => {
             console.warn("Firestore Permission/Error (config/academic_years):", error.message);
