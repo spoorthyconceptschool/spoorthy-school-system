@@ -7,6 +7,7 @@ import { Input } from "@/components/ui/input";
 import { Loader2, Upload, FileSpreadsheet, Download, AlertCircle, CheckCircle } from "lucide-react";
 import * as XLSX from "xlsx";
 import { useMasterData } from "@/context/MasterDataContext";
+import { useAuth } from "@/context/AuthContext";
 
 interface StudentImportModalProps {
     onSuccess: () => void;
@@ -18,7 +19,8 @@ export function StudentImportModal({ onSuccess }: StudentImportModalProps) {
     const [parsedData, setParsedData] = useState<any[]>([]);
     const [uploading, setUploading] = useState(false);
     const [results, setResults] = useState<{ success: number, failed: number, errors: string[] } | null>(null);
-    const { classes } = useMasterData();
+    const { classes, selectedYear } = useMasterData();
+    const { user } = useAuth();
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const selectedFile = e.target.files?.[0];
@@ -48,10 +50,11 @@ export function StudentImportModal({ onSuccess }: StudentImportModalProps) {
             // Optional: Filter out invalid classes or just warn?
             // The API handles validation too.
 
+            const token = await user?.getIdToken();
             const res = await fetch("/api/admin/students/import", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ students: parsedData })
+                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                body: JSON.stringify({ students: parsedData, academicYear: selectedYear || "2025-2026" })
             });
 
             const data = await res.json();

@@ -26,7 +26,8 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Insufficient Permissions" }, { status: 403 });
         }
 
-        const { students } = await req.json();
+        const { students, academicYear } = await req.json();
+        const currentYearId = academicYear || "2025-2026";
 
         if (!students || !Array.isArray(students)) {
             return NextResponse.json({ error: "Invalid data format" }, { status: 400 });
@@ -41,7 +42,6 @@ export async function POST(req: NextRequest) {
         const feeConfigSnap = await db.collection("config").doc("fees").get();
         const feeConfig = feeConfigSnap.data();
         const feeTerms = (feeConfig?.terms || []).filter((t: any) => t.isActive);
-        const currentYearId = "2025-2026";
 
         // 2. Fetch Custom Fees
         const customFeesSnap = await db.collection("custom_fees").where("isActive", "==", true).get();
@@ -133,6 +133,7 @@ export async function POST(req: NextRequest) {
                     sectionName,
                     sectionId: student.sectionId || "",
                     status: "ACTIVE",
+                    academicYear: currentYearId,
                     createdAt: FieldValue.serverTimestamp(),
                     email: syntheticEmail,
                     recoveryPassword: String(initialPassword),
