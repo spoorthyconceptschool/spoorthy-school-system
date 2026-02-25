@@ -88,11 +88,36 @@ export function useSubjectName(id: string) {
     return subjects[id]?.name || id;
 }
 
+const MASTER_CACHE_KEY = "spoorthy_master_cache";
+
 export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
-    const [data, setData] = useState<Omit<MasterDataState, 'selectedYear' | 'setSelectedYear'>>({
-        ...initialState,
+    const [data, setData] = useState<Omit<MasterDataState, 'selectedYear' | 'setSelectedYear'>>(() => {
+        if (typeof window !== "undefined") {
+            const cached = localStorage.getItem(MASTER_CACHE_KEY);
+            if (cached) {
+                try {
+                    return { ...JSON.parse(cached), loading: false };
+                } catch (e) {
+                    return { ...initialState };
+                }
+            }
+        }
+        return { ...initialState };
     });
-    const [selectedYear, setSelectedYear] = useState("2025-2026");
+
+    const [selectedYear, setSelectedYear] = useState(() => {
+        if (typeof window !== "undefined") {
+            return localStorage.getItem("spoorthy_academic_year") || "2025-2026";
+        }
+        return "2025-2026";
+    });
+
+    // Helper to persist data
+    useEffect(() => {
+        if (typeof window !== "undefined" && !data.loading) {
+            localStorage.setItem(MASTER_CACHE_KEY, JSON.stringify(data));
+        }
+    }, [data.branding, data.classes, data.sections, data.villages, data.subjects]);
 
     // 1. RTDB Sync for Master Data & Branding
     useEffect(() => {

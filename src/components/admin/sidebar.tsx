@@ -29,7 +29,7 @@ import {
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { useState, useEffect } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useAuth } from "@/context/AuthContext";
 import { doc, onSnapshot, query, collection, where } from "firebase/firestore";
@@ -94,26 +94,28 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
         return () => unsubLeaves();
     }, [user]);
 
-    const filteredNav = NAV_ITEMS.filter(item => {
-        const allowedPaths = (role === "MANAGER")
-            ? ["/admin", "/admin/students", "/admin/attendance", "/admin/fees", "/admin/exams", "/admin/faculty", "/admin/master-data", "/admin/timetable/manage"]
-            : (role === "TIMETABLE_EDITOR")
-                ? ["/admin", "/admin/timetable/manage", "/admin/faculty", "/admin/master-data/subjects", "/admin/master-data/classes-sections"]
-                : null;
+    const filteredNav = useMemo(() => {
+        return NAV_ITEMS.filter(item => {
+            const allowedPaths = (role === "MANAGER")
+                ? ["/admin", "/admin/students", "/admin/attendance", "/admin/fees", "/admin/exams", "/admin/faculty", "/admin/master-data", "/admin/timetable/manage"]
+                : (role === "TIMETABLE_EDITOR")
+                    ? ["/admin", "/admin/timetable/manage", "/admin/faculty", "/admin/master-data/subjects", "/admin/master-data/classes-sections"]
+                    : null;
 
-        if (role === "MANAGER" && item.type === "separator") {
-            const forbiddenSeparators = ["System Control"];
-            if (forbiddenSeparators.includes(item.label || "")) return false;
-        }
+            if (role === "MANAGER" && item.type === "separator") {
+                const forbiddenSeparators = ["System Control"];
+                if (forbiddenSeparators.includes(item.label || "")) return false;
+            }
 
-        if (item.type === "separator") return true;
+            if (item.type === "separator") return true;
 
-        if (allowedPaths) {
-            return allowedPaths.some(prefix => item.href === prefix || (prefix !== "/admin" && item.href?.startsWith(prefix)));
-        }
+            if (allowedPaths) {
+                return allowedPaths.some(prefix => item.href === prefix || (prefix !== "/admin" && item.href?.startsWith(prefix)));
+            }
 
-        return true;
-    });
+            return true;
+        });
+    }, [role]);
 
     return (
         <motion.aside
@@ -127,11 +129,7 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
             {/* Header - Real-time Branding */}
             <div className="h-24 flex items-center justify-between px-4 pt-4 border-b border-[#64FFDA]/5">
                 {(!collapsed || mobile) && (
-                    <motion.div
-                        initial={{ opacity: 0 }}
-                        animate={{ opacity: 1 }}
-                        className="flex items-center gap-3 select-none overflow-hidden"
-                    >
+                    <div className="flex items-center gap-3 select-none overflow-hidden">
                         <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl bg-white flex items-center justify-center p-1.5 border border-white/20 shadow-lg relative overflow-hidden">
                             {!imageError ? (
                                 <img
@@ -152,7 +150,7 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
                                 {branding.schoolName || "Spoorthy School"}
                             </span>
                         </div>
-                    </motion.div>
+                    </div>
                 )}
                 {!mobile && (
                     <button
@@ -181,7 +179,7 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
                         : (item.href && pathname.startsWith(item.href));
 
                     return (
-                        <Link key={item.href} href={item.href!} onClick={() => onItemClick?.()}>
+                        <Link key={item.href} href={item.href!} prefetch={true} onClick={() => onItemClick?.()}>
                             <div className={cn(
                                 "flex items-center gap-4 px-3 py-3 rounded-md transition-all duration-200 group relative font-medium text-sm border border-transparent",
                                 isActive
