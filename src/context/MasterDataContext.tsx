@@ -91,26 +91,27 @@ export function useSubjectName(id: string) {
 const MASTER_CACHE_KEY = "spoorthy_master_cache";
 
 export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
-    const [data, setData] = useState<Omit<MasterDataState, 'selectedYear' | 'setSelectedYear'>>(() => {
+    const [data, setData] = useState<Omit<MasterDataState, 'selectedYear' | 'setSelectedYear'>>({
+        ...initialState,
+    });
+
+    const [selectedYear, setSelectedYear] = useState("2025-2026");
+
+    useEffect(() => {
+        // Hydration-safe cache loading
         if (typeof window !== "undefined") {
             const cached = localStorage.getItem(MASTER_CACHE_KEY);
             if (cached) {
                 try {
-                    return { ...JSON.parse(cached), loading: false };
+                    setData(prev => ({ ...JSON.parse(cached), loading: false }));
                 } catch (e) {
-                    return { ...initialState };
+                    console.warn("Master cache parse failed");
                 }
             }
+            const savedYear = localStorage.getItem("spoorthy_academic_year");
+            if (savedYear) setSelectedYear(savedYear);
         }
-        return { ...initialState };
-    });
-
-    const [selectedYear, setSelectedYear] = useState(() => {
-        if (typeof window !== "undefined") {
-            return localStorage.getItem("spoorthy_academic_year") || "2025-2026";
-        }
-        return "2025-2026";
-    });
+    }, []);
 
     // Helper to persist data
     useEffect(() => {

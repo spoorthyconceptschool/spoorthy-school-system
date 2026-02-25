@@ -26,22 +26,28 @@ const STORAGE_KEY = "spoorthy_user_cache";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
-    const [userData, setUserData] = useState<any>(() => {
-        // Instant bootstrap from cache
-        if (typeof window !== "undefined") {
-            const cached = localStorage.getItem(STORAGE_KEY);
-            return cached ? JSON.parse(cached) : null;
-        }
-        return null;
-    });
+    const [userData, setUserData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const router = useRouter();
 
     useEffect(() => {
+        // Hydration-safe cache loading
+        if (typeof window !== "undefined") {
+            const cached = localStorage.getItem(STORAGE_KEY);
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    setUserData(parsed);
+                } catch (e) {
+                    localStorage.removeItem(STORAGE_KEY);
+                }
+            }
+        }
+
         const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
             if (authUser) {
                 setUser(authUser);
-                // Even if we have cache, refresh it in the background
+                // Background refresh
                 try {
                     const userDoc = await getDoc(doc(db, "users", authUser.uid));
                     if (userDoc.exists()) {
@@ -65,7 +71,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const signIn = async (email: string, pass: string) => {
         const result = await signInWithEmailAndPassword(auth, email, pass);
-        // Force immediate fetch and cache after manual sign-in
         if (result.user) {
             const userDoc = await getDoc(doc(db, "users", result.user.uid));
             if (userDoc.exists()) {
