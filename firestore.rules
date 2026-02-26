@@ -6,32 +6,35 @@ service cloud.firestore {
       return request.auth != null;
     }
     
-    function getUserRole() {
-      // Prioritize Custom Claims (if set), fallback to checking the users collection
-      return request.auth.token.role != null 
+    function getRole() {
+      let role = request.auth.token.role != null 
         ? request.auth.token.role 
-        : get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role;
+        : (exists(/databases/$(database)/documents/users/$(request.auth.uid))
+           ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data.role
+           : null);
+      return role;
     }
     
     function isAdmin() {
-      let role = getUserRole();
-      return isSignedIn() && (role == 'ADMIN' || role == 'SUPER_ADMIN');
+      let r = getRole();
+      return isSignedIn() && (r == 'ADMIN' || r == 'SUPER_ADMIN' || r == 'admin' || r == 'super_admin');
     }
 
     function isManager() {
-      let role = getUserRole();
-      return isSignedIn() && (role == 'MANAGER' || isAdmin());
+      let r = getRole();
+      return isSignedIn() && (r == 'MANAGER' || r == 'manager' || isAdmin());
     }
 
     function isTeacher() {
-      return isSignedIn() && getUserRole() == 'TEACHER';
+      let r = getRole();
+      return isSignedIn() && (r == 'TEACHER' || r == 'teacher');
     }
 
     // --- COLLECTION RULES ---
 
     // Admin-only collections (Audit, Analytics)
-    match /audit_logs/{log} { allow read, write: if isAdmin(); }
-    match /analytics/{doc} { allow read, write: if isAdmin(); }
+    match /audit_logs/{log} { allow read, write: if isManager(); }
+    match /analytics/{doc} { allow read, write: if isManager(); }
     
     // Core Config (Academic years needed for Landing Page/Context)
     match /config/academic_years { allow read: if true; allow write: if isAdmin(); }
@@ -62,28 +65,28 @@ service cloud.firestore {
         isManager() || 
         isTeacher()
       );
-      allow write: if isAdmin();
+      allow write: if isManager();
     }
     
     match /teachers/{teacherId} {
       allow read: if isSignedIn() && (request.auth.uid == teacherId || resource.data.uid == request.auth.uid || isManager());
-      allow write: if isAdmin();
+      allow write: if isManager();
     }
 
     // Academic & Operations
     match /exam_results/{id} {
       allow read: if isSignedIn() && (request.auth.uid == resource.data.studentId || isManager() || isTeacher());
-      allow write: if isAdmin(); // Forced via backend
+      allow write: if isManager(); // Forced via backend
     }
 
     match /homework/{id} {
       allow read: if isSignedIn();
-      allow write: if isAdmin() || isTeacher();
+      allow write: if isManager() || isTeacher();
     }
     
     match /attendance/{id} {
-      allow read: if isSignedIn() && (isManager() || isTeacher() || getUserRole() == 'STUDENT');
-      allow write: if isAdmin(); // Forced via backend to validate time windows and read-only
+      allow read: if isSignedIn() && (isManager() || isTeacher() || getRole() == 'STUDENT' || getRole() == 'student');
+      allow write: if isManager(); // Forced via backend to validate time windows and read-only
     }
     
     match /student_fee_ledgers/{id} { 
@@ -93,7 +96,7 @@ service cloud.firestore {
         request.auth.uid == resource.data.studentId ||
         request.auth.email.split('@')[0].upper() == resource.data.studentId
       ); 
-      allow write: if isAdmin(); 
+      allow write: if isManager(); 
     }
 
     match /payments/{id} { 
@@ -103,7 +106,7 @@ service cloud.firestore {
         request.auth.uid == resource.data.studentId ||
         request.auth.email.split('@')[0].upper() == resource.data.studentId
       ); 
-      allow write: if isAdmin(); 
+      allow write: if isManager(); 
     }
     match /invoices/{id} { 
       allow read: if isSignedIn() && (
@@ -112,7 +115,7 @@ service cloud.firestore {
         request.auth.uid == resource.data.studentId ||
         request.auth.email.split('@')[0].upper() == resource.data.studentId
       ); 
-      allow write: if isAdmin(); 
+      allow write: if isManager(); 
     }
 
     // Communication & Notices
@@ -143,7 +146,7 @@ service cloud.firestore {
         isManager() || 
         isTeacher()
       );
-      allow create: if isSignedIn() && getUserRole() == 'STUDENT';
+      allow create: if isSignedIn() && (getRole() == 'STUDENT' || getRole() == 'student');
       allow update, delete: if isManager();
     }
 
