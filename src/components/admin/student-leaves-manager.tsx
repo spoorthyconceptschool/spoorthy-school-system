@@ -19,17 +19,54 @@ export function StudentLeavesManager() {
     const [loading, setLoading] = useState(true);
     const [actioning, setActioning] = useState<string | null>(null);
 
-    useEffect(() => {
-        const q = query(collection(db, "student_leaves"), orderBy("createdAt", "desc"));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            setLeaves(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-            setLoading(false);
-        }, (error) => {
-            console.error("Student Leaves Listener Error:", error);
-            setLoading(false);
-        });
+    // Pagination State
+    const [pageTokens, setPageTokens] = useState<any[]>([]);
+    const [currentPage, setCurrentPage] = useState(0);
+    const PAGE_SIZE = 20;
 
-        return () => unsubscribe();
+    const fetchPage = async (pageIndex: number, newTokens: any[] = pageTokens) => {
+        setLoading(true);
+        try {
+            const { getDocs, query, collection, orderBy, limit, startAfter } = await import("firebase/firestore");
+            let baseConstraints: any[] = [
+                orderBy("createdAt", "desc"),
+                limit(PAGE_SIZE + 1)
+            ];
+
+            if (pageIndex > 0 && newTokens[pageIndex - 1]) {
+                baseConstraints.push(startAfter(newTokens[pageIndex - 1]));
+            }
+
+            const pq = query(collection(db, "student_leaves"), ...baseConstraints);
+            const snapshot = await getDocs(pq);
+
+            const docs = snapshot.docs;
+            const hasMore = docs.length > PAGE_SIZE;
+            const displayDocs = hasMore ? docs.slice(0, PAGE_SIZE) : docs;
+
+            const loaded = displayDocs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+
+            setLeaves(loaded);
+
+            if (hasMore) {
+                const nextTokens = [...newTokens];
+                nextTokens[pageIndex] = displayDocs[displayDocs.length - 1];
+                setPageTokens(nextTokens);
+            }
+
+            setCurrentPage(pageIndex);
+        } catch (error) {
+            console.error("Student Leaves Pagination Error:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchPage(0, []);
     }, []);
 
     const handleAction = async (leaveId: string, action: "APPROVE" | "REJECT" | "REVERT") => {
@@ -57,6 +94,8 @@ export function StudentLeavesManager() {
             const data = await res.json();
             if (data.success) {
                 toast({ title: "Success", description: `Leave ${action.toLowerCase()}d`, type: "success" });
+                // Re-fetch current page to reflect status update immediately without full reload
+                fetchPage(currentPage, pageTokens);
             } else {
                 toast({ title: "Error", description: data.error, type: "error" });
             }
@@ -165,6 +204,11 @@ export function StudentLeavesManager() {
                             )}
                         </div>
                     )}
+                    serverPagination={true}
+                    hasNextPage={pageTokens.length > currentPage}
+                    hasPrevPage={currentPage > 0}
+                    onNextPage={() => fetchPage(currentPage + 1)}
+                    onPrevPage={() => fetchPage(currentPage - 1)}
                 />
 
                 {!loading && leaves.length === 0 && (

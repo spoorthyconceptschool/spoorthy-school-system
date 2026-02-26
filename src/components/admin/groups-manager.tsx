@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { collection, doc, getDocs, updateDoc, deleteDoc, addDoc, query, where } from "firebase/firestore";
+import { collection, doc, getDocs, updateDoc, deleteDoc, addDoc, query, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -213,32 +213,47 @@ export function GroupsManager() {
         }
     };
 
-    const fetchMembers = async (groupId: string) => {
+    // 1. Group Data Sync (Real-time and Cached)
+    useEffect(() => {
+        if (!user) return;
+        setLoading(true);
+        const unsub = onSnapshot(collection(db, "groups"), (snap: any) => {
+            const list: Group[] = [];
+            snap.forEach((d: any) => list.push({ id: d.id, ...d.data() } as Group));
+            setGroups(list);
+            setLoading(false);
+        }, (err: any) => {
+            console.error("Groups Sync Error:", err);
+            setLoading(false);
+        });
+        return () => unsub();
+    }, [user]);
+
+    // 2. Local Fetch for Members (when viewing a group)
+    useEffect(() => {
+        if (!viewingGroup?.id) {
+            setMembers([]);
+            return;
+        }
+
         setMembersLoading(true);
-        try {
-            const q = query(collection(db, "students"), where("groupId", "==", groupId));
-            const snap = await getDocs(q);
+        const q = query(collection(db, "students"), where("groupId", "==", viewingGroup.id));
+        const unsub = onSnapshot(q, (snap) => {
             const list: any[] = [];
             snap.forEach(d => list.push({ id: d.id, ...d.data() }));
             setMembers(list);
-        } catch (e) {
-            console.error(e);
-        } finally {
             setMembersLoading(false);
-        }
-    };
+        }, (err) => {
+            console.error("Members Sync Error:", err);
+            setMembersLoading(false);
+        });
+        return () => unsub();
+    }, [viewingGroup?.id]);
 
     const openViewMembers = (g: Group) => {
         setViewingGroup(g);
-        setSelectedClasses([]); // Reset filter
-        fetchMembers(g.id);
+        setSelectedClasses([]);
     };
-
-    useEffect(() => {
-        if (user) {
-            fetchGroups();
-        }
-    }, [user]);
 
     // Sync Students & Teachers from Global Cache
     useEffect(() => {
@@ -266,20 +281,6 @@ export function GroupsManager() {
         }
     }, [globalTeachers]);
 
-    const fetchGroups = async () => {
-        setLoading(true);
-        try {
-            const snap = await getDocs(collection(db, "groups"));
-            const list: Group[] = [];
-            snap.forEach(d => list.push({ id: d.id, ...d.data() } as Group));
-            setGroups(list);
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const handleCreate = async () => {
         if (!formName || !formColor) return;
         setSaving(true);
@@ -291,7 +292,6 @@ export function GroupsManager() {
                 createdAt: new Date()
             });
             setIsCreateOpen(false);
-            fetchGroups();
             resetForm();
         } catch (e) {
             alert("Error creating group");
@@ -344,7 +344,6 @@ export function GroupsManager() {
 
             await updateDoc(doc(db, "groups", editingGroup.id), updates);
             setIsEditOpen(false);
-            fetchGroups();
             resetForm();
         } catch (e) {
             console.error(e);
@@ -358,7 +357,6 @@ export function GroupsManager() {
         if (!confirm("Are you sure? This will remove the group but students will remain assigned to the deleted group ID until updated.")) return;
         try {
             await deleteDoc(doc(db, "groups", id));
-            fetchGroups();
         } catch (e) {
             alert("Error deleting group");
         }

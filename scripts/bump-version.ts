@@ -1,5 +1,5 @@
 
-import { adminDb } from "./src/lib/firebase-admin.ts";
+import { adminDb } from "../src/lib/firebase-admin";
 
 async function incrementVersion() {
     const ref = adminDb.collection("config").doc("system");

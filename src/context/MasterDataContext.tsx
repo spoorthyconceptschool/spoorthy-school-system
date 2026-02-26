@@ -2,11 +2,10 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode, useMemo } from "react";
 import { ref, onValue, off } from "firebase/database";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, onSnapshot, collection, query, limit, orderBy, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
 import { rtdb, db, auth } from "@/lib/firebase";
 import { useAuth } from "./AuthContext";
-import { collection, query, limit, orderBy } from "firebase/firestore";
 
 interface MasterDataState {
     villages: Record<string, any>;
@@ -48,9 +47,9 @@ const initialState: MasterDataState = {
     homeworkSubjects: {},
     roles: {},
     branding: {
-        schoolName: "Spoorthy Concept School",
+        schoolName: "",
         address: "",
-        schoolLogo: "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png",
+        schoolLogo: "",
         principalSignature: ""
     },
     academicYears: {},
@@ -103,7 +102,14 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
             const cached = localStorage.getItem(MASTER_CACHE_KEY);
             if (cached) {
                 try {
-                    setData(prev => ({ ...JSON.parse(cached), loading: false }));
+                    const parsed = JSON.parse(cached);
+                    setData(prev => ({
+                        ...prev,
+                        ...parsed,
+                        branding: { ...prev.branding, ...(parsed.branding || {}) },
+                        systemConfig: { ...prev.systemConfig, ...(parsed.systemConfig || {}) },
+                        loading: false
+                    }));
                 } catch (e) {
                     console.warn("Master cache parse failed");
                 }
@@ -299,19 +305,36 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
         return () => unsub();
     }, []);
 
-    // 4. Authenticated State Management
+    // 4. Authenticated Real-time Sync for Core Directories
     const { role, user } = useAuth();
     useEffect(() => {
-        if (!user || (role !== "ADMIN" && role !== "MANAGER")) {
-            if (data.students.length > 0) setData(prev => ({ ...prev, students: [], teachers: [], staff: [] }));
-            return;
-        }
+        if (!user || (role !== "ADMIN" && role !== "MANAGER" && role !== "TEACHER")) return;
 
-        // NOTE: Large datasets (Students/Teachers) are no longer synced globally to prevent 
-        // browser memory overload and long initial load times. 
-        // Use local page hooks with limit() and pagination instead.
-        setData(prev => ({ ...prev, loading: false }));
+        // Sync Teachers (Active only for speed)
+        const teachersQ = query(collection(db, "teachers"), where("status", "==", "ACTIVE"));
+        const teachersUnsub = onSnapshot(teachersQ, (snap) => {
+            const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setData(prev => ({ ...prev, teachers: list }));
+        });
 
+        // Sync Staff (Active only)
+        const staffQ = query(collection(db, "staff"), where("status", "==", "ACTIVE"));
+        const staffUnsub = onSnapshot(staffQ, (snap) => {
+            const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setData(prev => ({ ...prev, staff: list }));
+        });
+
+        // Sync Groups (House system)
+        const groupsUnsub = onSnapshot(collection(db, "groups"), (snap) => {
+            const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setData(prev => ({ ...prev, groups: list }));
+        });
+
+        return () => {
+            teachersUnsub();
+            staffUnsub();
+            groupsUnsub();
+        };
     }, [user, role]);
 
     const handleSetSelectedYear = (year: string) => {

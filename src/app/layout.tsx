@@ -61,6 +61,24 @@ export default function RootLayout({
   return (
     <html lang="en" className={cn(inter.variable, outfit.variable, "dark")} suppressHydrationWarning>
       <body className={`font-body antialiased bg-background text-foreground overflow-x-hidden`} suppressHydrationWarning>
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              window.addEventListener('error', (e) => {
+                if (e.message && (e.message.includes('ChunkLoadError') || e.message.includes('Loading chunk'))) {
+                  console.warn('Caught ChunkLoadError, reloading page...', e);
+                  window.location.reload();
+                }
+              }, true);
+              window.addEventListener('unhandledrejection', (e) => {
+                if (e.reason && (e.reason.name === 'ChunkLoadError' || (e.reason.message && e.reason.message.includes('Loading chunk')))) {
+                  console.warn('Caught unhandled ChunkLoadError rejection, reloading page...', e);
+                  window.location.reload();
+                }
+              });
+            `,
+          }}
+        />
         <AuthProvider>
           <MasterDataProvider>
             {children}

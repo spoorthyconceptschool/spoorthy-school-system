@@ -29,17 +29,54 @@ export function LeavesManager() {
     const [schedule, setSchedule] = useState<any>(null);
     const [loadingImpact, setLoadingImpact] = useState(false);
 
-    useEffect(() => {
-        const q = query(collection(db, "leave_requests"), orderBy("createdAt", "desc"));
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            setLeaves(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
-            setLoading(false);
-        }, (error) => {
-            console.error("Leaves Listener Error:", error);
-            setLoading(false);
-        });
+    // Pagination State
+    const [pageTokens, setPageTokens] = useState<any[]>([]);
+    const [currentPage, setCurrentPage] = useState(0);
+    const PAGE_SIZE = 20;
 
-        return () => unsubscribe();
+    const fetchPage = async (pageIndex: number, newTokens: any[] = pageTokens) => {
+        setLoading(true);
+        try {
+            const { getDocs, query, collection, orderBy, limit, startAfter } = await import("firebase/firestore");
+            let baseConstraints: any[] = [
+                orderBy("createdAt", "desc"),
+                limit(PAGE_SIZE + 1)
+            ];
+
+            if (pageIndex > 0 && newTokens[pageIndex - 1]) {
+                baseConstraints.push(startAfter(newTokens[pageIndex - 1]));
+            }
+
+            const pq = query(collection(db, "leave_requests"), ...baseConstraints);
+            const snapshot = await getDocs(pq);
+
+            const docs = snapshot.docs;
+            const hasMore = docs.length > PAGE_SIZE;
+            const displayDocs = hasMore ? docs.slice(0, PAGE_SIZE) : docs;
+
+            const loaded = displayDocs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+
+            setLeaves(loaded);
+
+            if (hasMore) {
+                const nextTokens = [...newTokens];
+                nextTokens[pageIndex] = displayDocs[displayDocs.length - 1];
+                setPageTokens(nextTokens);
+            }
+
+            setCurrentPage(pageIndex);
+        } catch (error) {
+            console.error("Leaves Pagination Error:", error);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    useEffect(() => {
+        fetchPage(0, []);
     }, []);
 
     const fetchImpact = async (leave: any) => {
@@ -92,7 +129,8 @@ export function LeavesManager() {
             });
             const data = await res.json();
             if (data.success) {
-                // onSnapshot will update the list automatically
+                // Refresh current page
+                fetchPage(currentPage, pageTokens);
             } else {
                 alert("Error: " + data.error);
             }
@@ -244,6 +282,11 @@ export function LeavesManager() {
                             )}
                         </div>
                     )}
+                    serverPagination={true}
+                    hasNextPage={pageTokens.length > currentPage}
+                    hasPrevPage={currentPage > 0}
+                    onNextPage={() => fetchPage(currentPage + 1)}
+                    onPrevPage={() => fetchPage(currentPage - 1)}
                 />
 
                 {leaves.length === 0 && !loading && (

@@ -8,6 +8,7 @@ import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
+import { useMasterData } from "@/context/MasterDataContext";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -38,6 +39,12 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
     const [checking, setChecking] = useState(true);
     const [mustChangePassword, setMustChangePassword] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const { branding } = useMasterData();
+    const [imageError, setImageError] = useState(false);
+
+    useEffect(() => {
+        setImageError(false);
+    }, [branding?.schoolLogo]);
 
     // 1. Fetch User Status ONCE when user logs in
     useEffect(() => {
@@ -105,8 +112,25 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
                         <X size={20} />
                     </button>
                     <div className="flex items-center gap-3">
-                        <div className="w-8 h-8 rounded bg-[#3B82F6]/10 border border-[#3B82F6]/30 flex items-center justify-center text-[#3B82F6] font-bold font-mono text-lg">S</div>
-                        <h1 className="font-display font-bold text-xl text-white tracking-tight">Student<span className="text-[#3B82F6]">.Panel</span></h1>
+                        <div className="w-8 h-8 rounded bg-transparent flex items-center justify-center border border-white/20 shadow-md shrink-0 overflow-hidden">
+                            {!imageError ? (
+                                <img
+                                    src={branding?.schoolLogo || "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png"}
+                                    alt="Logo"
+                                    className="w-full h-full object-contain filter drop-shadow-sm"
+                                    onError={() => setImageError(true)}
+                                />
+                            ) : (
+                                <div className="w-full h-full bg-[#3B82F6]/10 flex items-center justify-center text-[#3B82F6] font-bold font-mono text-sm">S</div>
+                            )}
+                        </div>
+                        <h1 className="font-display font-bold text-xl text-white tracking-tight truncate max-w-[150px]">
+                            {branding?.schoolName ? (
+                                <span className="text-white text-base md:text-lg">{branding.schoolName}</span>
+                            ) : (
+                                <>Student<span className="text-[#3B82F6]">.Panel</span></>
+                            )}
+                        </h1>
                     </div>
                 </div>
 
@@ -151,7 +175,23 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
                     >
                         <Menu size={24} />
                     </button>
-                    <div className="font-bold text-lg text-white">Student Portal</div>
+                    <div className="flex items-center gap-2 overflow-hidden mx-2">
+                        <div className="w-7 h-7 rounded bg-transparent flex items-center justify-center border border-white/20 shadow-md shrink-0 overflow-hidden">
+                            {!imageError ? (
+                                <img
+                                    src={branding?.schoolLogo || "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png"}
+                                    alt="Logo"
+                                    className="w-full h-full object-contain filter drop-shadow-sm"
+                                    onError={() => setImageError(true)}
+                                />
+                            ) : (
+                                <div className="w-full h-full bg-[#3B82F6]/10 flex items-center justify-center text-[#3B82F6] font-bold font-mono text-xs">S</div>
+                            )}
+                        </div>
+                        <div className="font-bold text-sm md:text-base text-white truncate max-w-[120px] xs:max-w-[160px]">
+                            {branding?.schoolName || "Student Portal"}
+                        </div>
+                    </div>
                     <div className="flex items-center gap-4 ml-auto">
                         <NotificationCenter role="STUDENT" />
                         {/* Profile Dropdown */}

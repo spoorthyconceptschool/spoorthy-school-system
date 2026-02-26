@@ -130,7 +130,7 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
             <div className="h-24 flex items-center justify-between px-4 pt-4 border-b border-[#64FFDA]/5">
                 {(!collapsed || mobile) && (
                     <div className="flex items-center gap-3 select-none overflow-hidden">
-                        <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl bg-white flex items-center justify-center p-1.5 border border-white/20 shadow-lg relative overflow-hidden">
+                        <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl bg-transparent flex items-center justify-center border border-white/20 shadow-lg relative overflow-hidden">
                             {!imageError ? (
                                 <img
                                     src={branding.schoolLogo || "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png"}

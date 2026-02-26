@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { collection, query, where, getDocs, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, getDocs, doc, onSnapshot } from "firebase/firestore";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -13,7 +13,6 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DataTable } from "@/components/ui/data-table";
 import { cn } from "@/lib/utils";
-import { BarChart3, User, CalendarDays, FileText } from "lucide-react";
 import { documentId } from "firebase/firestore";
 import { useMasterData } from "@/context/MasterDataContext";
 
@@ -38,14 +37,7 @@ export default function StaffAttendanceManager({
 
     const date = defaultDate || new Date().toISOString().split('T')[0];
 
-    useEffect(() => {
-        if (viewStats) {
-            fetchStats();
-        } else {
-            fetchData();
-        }
-    }, [date, viewStats, statsMonth, staff]); // Added staff as dependency to trigger re-fetch when staff data arrives
-
+    // Sync Staff from Global Cache
     useEffect(() => {
         if (globalStaff?.length > 0) {
             const list = globalStaff.map(d => ({
@@ -58,16 +50,40 @@ export default function StaffAttendanceManager({
         }
     }, [globalStaff]);
 
+    // Sync Attendance (Real-time & Offline-first)
+    useEffect(() => {
+        if (!user || staff.length === 0) return;
+
+        if (viewStats) {
+            fetchStats();
+        } else {
+            setLoading(true);
+            const attId = `STAFF_${date}`;
+            const unsub = onSnapshot(doc(db, "attendance_daily", attId), (snap) => {
+                if (snap.exists()) {
+                    setAlreadyMarked(true);
+                    setAttendance(snap.data().records || {});
+                } else {
+                    setAlreadyMarked(false);
+                    const initial: Record<string, 'P' | 'A'> = {};
+                    staff.forEach((s: any) => { initial[s.schoolId] = 'P'; });
+                    setAttendance(initial);
+                }
+                setLoading(false);
+            }, (err) => {
+                console.error("Attendance Sync Error:", err);
+                setLoading(false);
+            });
+            return () => unsub();
+        }
+    }, [date, viewStats, statsMonth, staff, user]);
+
     const fetchStats = async () => {
         setLoading(true);
         try {
-            // Use local staff list synced from global
             const sList = staff;
-
-            // Fetch Attendance in range
             const currentYear = new Date().getFullYear();
             let startKey, endKey;
-
             if (statsMonth === "ALL") {
                 startKey = `STAFF_${currentYear}-01-01`;
                 endKey = `STAFF_${currentYear}-12-31`;
@@ -75,15 +91,9 @@ export default function StaffAttendanceManager({
                 startKey = `STAFF_${currentYear}-${statsMonth}-01`;
                 endKey = `STAFF_${currentYear}-${statsMonth}-31`;
             }
-
-            const q = query(
-                collection(db, "attendance"),
-                where(documentId(), ">=", startKey),
-                where(documentId(), "<=", endKey)
-            );
+            const q = query(collection(db, "attendance_daily"), where(documentId(), ">=", startKey), where(documentId(), "<=", endKey));
             const snap = await getDocs(q);
             const staffStats: Record<string, { total: number, present: number }> = {};
-
             snap.docs.forEach((doc) => {
                 const data = doc.data();
                 if (data.records) {
@@ -96,15 +106,9 @@ export default function StaffAttendanceManager({
                     });
                 }
             });
-
             const data = sList.map(s => {
                 const st = staffStats[s.schoolId] || { total: 0, present: 0 };
-                return {
-                    ...s,
-                    totalDays: st.total,
-                    presentDays: st.present,
-                    percentage: st.total > 0 ? ((st.present / st.total) * 100).toFixed(1) : "0.0"
-                };
+                return { ...s, totalDays: st.total, presentDays: st.present, percentage: st.total > 0 ? ((st.present / st.total) * 100).toFixed(1) : "0.0" };
             });
             setStatsData(data);
         } catch (error: any) {
@@ -193,36 +197,6 @@ export default function StaffAttendanceManager({
         win?.document.close();
     };
 
-    const fetchData = async () => {
-        setLoading(true);
-        try {
-            // 1. Use existing staff list (already synced from global)
-            const sList = staff;
-            if (sList.length === 0) return; // Wait for staff to load
-
-            // 2. Fetch Existing Attendance
-            const attId = `STAFF_${date}`;
-            const attSnap = await getDoc(doc(db, "attendance", attId));
-
-            if (attSnap.exists()) {
-                setAlreadyMarked(true);
-                setAttendance(attSnap.data().records || {});
-            } else {
-                setAlreadyMarked(false);
-                const initial: Record<string, 'P' | 'A'> = {};
-                sList.forEach((s: any) => {
-                    initial[s.schoolId] = 'P'; // Default Present
-                });
-                setAttendance(initial);
-            }
-        } catch (e: any) {
-            console.error(e);
-            toast({ title: "Error", description: "Failed to fetch data.", type: "error" });
-        } finally {
-            setLoading(false);
-        }
-    };
-
     const toggleStatus = (schoolId: string) => {
         setAttendance(prev => ({
             ...prev,
@@ -278,7 +252,7 @@ export default function StaffAttendanceManager({
         (s.role || "").toLowerCase().includes(searchQuery.toLowerCase())
     );
 
-    if (loading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin" /></div>;
+    if (loading && staff.length === 0) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin" /></div>;
 
     const stats = {
         total: staff.length,
@@ -288,7 +262,6 @@ export default function StaffAttendanceManager({
 
     return (
         <div className="space-y-6">
-            {/* Stats Cards */}
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                 <Card className="bg-black/20 border-white/10 overflow-hidden">
                     <div className="p-4 flex items-center justify-between">
@@ -325,7 +298,6 @@ export default function StaffAttendanceManager({
                 </Card>
             </div>
 
-            {/* List */}
             <Card className="bg-black/20 border-white/10">
                 <div className="p-4 border-b border-white/10 flex flex-col md:flex-row justify-between gap-4 items-center">
                     <div className="flex flex-wrap bg-black/40 p-1 rounded-lg border border-white/10 items-center gap-2">
@@ -511,8 +483,8 @@ export default function StaffAttendanceManager({
                             }
                         ]}
                     />
-                </CardContent>
-            </Card>
+                </CardContent >
+            </Card >
 
             {!viewStats && (
                 <div className="flex justify-between items-center bg-white/5 p-4 rounded-lg border border-white/10">
@@ -533,6 +505,6 @@ export default function StaffAttendanceManager({
                     </Button>
                 </div>
             )}
-        </div>
+        </div >
     );
 }

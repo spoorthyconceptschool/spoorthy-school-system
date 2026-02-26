@@ -20,7 +20,7 @@ export function Hero() {
     const [loading, setLoading] = useState(true);
     const [isMobile, setIsMobile] = useState(false);
 
-    const [videoLoaded, setVideoLoaded] = useState(false);
+
 
     useEffect(() => {
         const unsub = onValue(ref(rtdb, 'siteContent/home/hero'), (snap) => {
@@ -102,19 +102,22 @@ export function Hero() {
                   Video Layer - High priority rendering.
                 */}
                 {activeVideoUrl && (
-                    <video
+                    <div
                         key={activeVideoUrl}
-                        src={activeVideoUrl}
-                        autoPlay
-                        muted
-                        loop
-                        playsInline
-                        preload="auto"
-                        onLoadedData={() => setVideoLoaded(true)}
-                        className={cn(
-                            "w-full h-full object-cover transition-opacity duration-1000",
-                            videoLoaded ? "opacity-100" : "opacity-0"
-                        )}
+                        className="absolute inset-0 w-full h-full"
+                        dangerouslySetInnerHTML={{
+                            __html: `
+                            <video
+                                src="${activeVideoUrl}"
+                                class="w-full h-full object-cover select-none"
+                                autoplay
+                                muted
+                                loop
+                                playsinline
+                                preload="auto"
+                            ></video>
+                            `
+                        }}
                     />
                 )}
 

@@ -73,7 +73,7 @@ service cloud.firestore {
     // Academic & Operations
     match /exam_results/{id} {
       allow read: if isSignedIn() && (request.auth.uid == resource.data.studentId || isManager() || isTeacher());
-      allow write: if isAdmin() || isTeacher();
+      allow write: if isAdmin(); // Forced via backend
     }
 
     match /homework/{id} {
@@ -83,7 +83,7 @@ service cloud.firestore {
     
     match /attendance/{id} {
       allow read: if isSignedIn() && (isManager() || isTeacher() || getUserRole() == 'STUDENT');
-      allow write: if isAdmin() || isTeacher();
+      allow write: if isAdmin(); // Forced via backend to validate time windows and read-only
     }
     
     match /student_fee_ledgers/{id} { 

@@ -24,6 +24,11 @@ function Navbar() {
         setScrolled(latest > 50);
     });
 
+    // Reset image error when branding changes so it updates immediately
+    useEffect(() => {
+        setImageError(false);
+    }, [branding?.schoolLogo]);
+
     const pathname = usePathname();
     const isHome = pathname === "/";
 
@@ -52,7 +57,7 @@ function Navbar() {
 
                         {/* Brand Identity */}
                         <Link href="/" className="flex items-center gap-3 md:gap-4 group z-50 relative shrink-0 min-w-0">
-                            <div className="relative w-10 h-10 min-w-[40px] md:w-12 md:min-w-[48px] md:h-12 lg:w-14 lg:h-14 lg:min-w-[56px] overflow-hidden rounded-xl bg-white p-1 group-hover:scale-105 transition-transform duration-500 shadow-xl shrink-0 flex items-center justify-center">
+                            <div className="relative w-10 h-10 min-w-[40px] md:w-12 md:min-w-[48px] md:h-12 lg:w-14 lg:h-14 lg:min-w-[56px] overflow-hidden rounded-xl bg-transparent group-hover:scale-105 transition-transform duration-500 shadow-xl shrink-0 flex items-center justify-center">
                                 {!imageError ? (
                                     <img
                                         src={branding.schoolLogo || "https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Flogo.png?alt=media"}

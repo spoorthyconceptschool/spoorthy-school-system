@@ -64,7 +64,7 @@ export function TopBar() {
             <div className="flex items-center gap-2">
                 <MobileSidebar />
                 <div className="lg:hidden flex items-center gap-2 shrink-0">
-                    <div className="w-8 h-8 rounded-lg bg-white flex items-center justify-center p-1 overflow-hidden shrink-0 shadow-md">
+                    <div className="w-8 h-8 rounded-lg bg-transparent flex items-center justify-center border border-white/20 overflow-hidden shrink-0 shadow-md">
                         {!imageError ? (
                             <img
                                 src={branding?.schoolLogo || "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png"}

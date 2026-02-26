@@ -54,22 +54,18 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
     const { user, role } = useAuth(); // Use role from global context
 
     const [activeTab, setActiveTab] = useState("teachers");
+    const [search, setSearch] = useState("");
+    const [roleFilter, setRoleFilter] = useState("ALL");
 
     useEffect(() => {
         onTabChange?.(activeTab);
     }, [activeTab, onTabChange]);
 
-    // Data State
-    const [teachers, setTeachers] = useState<Teacher[]>([]);
-    const [staff, setStaff] = useState<Staff[]>([]);
-    const [loading, setLoading] = useState(true);
-
-    // Filter State
-    const [search, setSearch] = useState("");
-    const [roleFilter, setRoleFilter] = useState("ALL");
-
-    // Master Data for filters
-    const [roles, setRoles] = useState<any[]>([]);
+    const {
+        teachers,
+        staff,
+        loading
+    } = useMasterData();
 
     // Modals
     const [showTeacherModal, setShowTeacherModal] = useState(false);
@@ -85,26 +81,8 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
     const [salaryUser, setSalaryUser] = useState<{ id: string, name: string, schoolId: string, role: "TEACHER" | "STAFF", currentSalary: number, roleCode?: string } | null>(null);
     const [isSalaryModalOpen, setIsSalaryModalOpen] = useState(false);
 
-    useEffect(() => {
-        const qTeachers = query(collection(db, "teachers"), orderBy("createdAt", "desc"));
-        const unsubTeachers = onSnapshot(qTeachers, (snap) => {
-            const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Teacher));
-            setTeachers(list);
-            setLoading(false);
-        });
-
-        const qStaff = query(collection(db, "staff"), orderBy("createdAt", "desc"));
-        const unsubStaff = onSnapshot(qStaff, (snap) => {
-            const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() } as Staff));
-            setStaff(list);
-            setLoading(false);
-        });
-
-        return () => {
-            unsubTeachers();
-            unsubStaff();
-        };
-    }, []);
+    // Master Data for filters
+    const [roles, setRoles] = useState<any[]>([]);
 
     useEffect(() => {
         // Real-time Roles (RTDB/Firestore)
@@ -121,19 +99,20 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
     }, []);
 
     // Filter Logic
-    const filteredTeachers = teachers.filter(t =>
+    const filteredTeachers = (teachers || []).filter((t: any) =>
         t.name?.toLowerCase().includes(search.toLowerCase()) ||
         t.schoolId?.toLowerCase().includes(search.toLowerCase()) ||
         t.mobile?.includes(search)
     );
 
-    const filteredStaff = staff.filter(s => {
+    const filteredStaff = (staff || []).filter((s: any) => {
         const matchesSearch = s.name?.toLowerCase().includes(search.toLowerCase()) ||
             s.schoolId?.toLowerCase().includes(search.toLowerCase()) ||
             s.mobile?.includes(search);
         const matchesRole = roleFilter === "ALL" || s.roleCode === roleFilter;
         return matchesSearch && matchesRole;
     });
+
 
     return (
         <div className={cn("space-y-6 animate-in fade-in duration-500 max-w-7xl mx-auto pb-20", !hideHeader ? "p-4 md:p-0" : "p-0")}>
@@ -190,7 +169,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                                         </SelectTrigger>
                                         <SelectContent className="bg-zinc-900 border-white/10 text-white">
                                             <SelectItem value="ALL">All Roles</SelectItem>
-                                            {roles.filter(r => !r.hasLogin).map(r => (
+                                            {roles.filter((r: any) => !r.hasLogin).map((r: any) => (
                                                 <SelectItem key={r.code} value={r.code}>{r.name}</SelectItem>
                                             ))}
                                         </SelectContent>
@@ -338,7 +317,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                                 key: "role",
                                 header: "Role & Placement",
                                 render: (s: Staff) => {
-                                    const roleObj = roles.find(r => r.code === s.roleCode);
+                                    const roleObj = roles.find((r: any) => r.code === s.roleCode);
                                     return (
                                         <div className="flex flex-col gap-1">
                                             <span className="text-[10px] uppercase font-black text-muted-foreground tracking-tighter bg-white/5 px-2 py-0.5 rounded border border-white/5 w-fit lowercase">{roleObj?.name || s.roleCode || "Staff"}</span>

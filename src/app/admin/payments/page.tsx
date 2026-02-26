@@ -47,6 +47,12 @@ export default function PaymentsPage() {
     const [allStudents, setAllStudents] = useState<any[]>([]);
     const [suggestions, setSuggestions] = useState<any[]>([]);
 
+    // Pagination & Stats State
+    const [pageTokens, setPageTokens] = useState<any[]>([]);
+    const [currentPage, setCurrentPage] = useState(0);
+    const PAGE_SIZE = 20;
+    const [stats, setStats] = useState({ total: 0, online: 0, cash: 0 });
+
     // Payment Form State
     const [selectedStudent, setSelectedStudent] = useState<any>(null);
     const [studentLedger, setStudentLedger] = useState<any>(null);
@@ -58,24 +64,74 @@ export default function PaymentsPage() {
     });
     const [collectingFee, setCollectingFee] = useState(false);
 
-    useEffect(() => {
-        let isMounted = true;
+    // Provide fetchAggregates and fetchPage as stable references/callbacks
+    const fetchAggregates = async () => {
+        try {
+            const { getAggregateFromServer, sum, where } = await import("firebase/firestore");
+            const colRef = collection(db, "payments");
 
-        // 1. Fetch live payments
-        const pq = query(collection(db, "payments"), orderBy("date", "desc"), limit(50));
-        const unsubPayments = onSnapshot(pq, (snapshot) => {
-            if (!isMounted) return;
-            const loaded = snapshot.docs.map(doc => ({
+            const [totalSnap, onlineSnap, cashSnap] = await Promise.all([
+                getAggregateFromServer(colRef, { total: sum("amount") }),
+                getAggregateFromServer(query(colRef, where("method", "==", "razorpay")), { total: sum("amount") }),
+                getAggregateFromServer(query(colRef, where("method", "==", "cash")), { total: sum("amount") })
+            ]);
+
+            setStats({
+                total: totalSnap.data().total || 0,
+                online: onlineSnap.data().total || 0,
+                cash: cashSnap.data().total || 0
+            });
+        } catch (e) {
+            console.error("Aggregation Failed:", e);
+        }
+    };
+
+    const fetchPage = async (pageIndex: number, newTokens: any[] = pageTokens) => {
+        setLoading(true);
+        try {
+            const { startAfter, getDocs, limit, orderBy, query: firestoreQuery } = await import("firebase/firestore");
+            let baseConstraints: any[] = [
+                orderBy("date", "desc"),
+                limit(PAGE_SIZE + 1)
+            ];
+
+            if (pageIndex > 0 && newTokens[pageIndex - 1]) {
+                baseConstraints.push(startAfter(newTokens[pageIndex - 1]));
+            }
+
+            const pq = firestoreQuery(collection(db, "payments"), ...baseConstraints);
+            const snapshot = await getDocs(pq);
+
+            const docs = snapshot.docs;
+            const hasMore = docs.length > PAGE_SIZE;
+            const displayDocs = hasMore ? docs.slice(0, PAGE_SIZE) : docs;
+
+            const loaded = displayDocs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
             })) as Payment[];
+
             setPayments(loaded);
+
+            if (hasMore) {
+                const nextTokens = [...newTokens];
+                nextTokens[pageIndex] = displayDocs[displayDocs.length - 1];
+                setPageTokens(nextTokens);
+            }
+
+            setCurrentPage(pageIndex);
+        } catch (err) {
+            console.error("Payments Pagination error:", err);
+        } finally {
             setLoading(false);
-        }, (err) => {
-            if (!isMounted) return;
-            console.error("Payments listener error:", err);
-            setLoading(false);
-        });
+        }
+    };
+
+    useEffect(() => {
+        let isMounted = true;
+
+        fetchPage(0, []);
+        fetchAggregates();
 
         // 2. Fetch all active students for the autocomplete
         const sq = query(collection(db, "students"), orderBy("studentName", "asc"));
@@ -93,7 +149,6 @@ export default function PaymentsPage() {
 
         return () => {
             isMounted = false;
-            unsubPayments();
             unsubStudents();
         };
     }, []);
@@ -135,80 +190,42 @@ export default function PaymentsPage() {
 
     const handleCollectFee = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!selectedStudent) return;
+        if (!selectedStudent || !user) return;
         setCollectingFee(true);
 
         try {
             const amount = Number(feeForm.amount);
             if (amount <= 0) throw new Error("Invalid Amount");
 
-            const newPayment = {
-                studentId: selectedStudent.schoolId,
-                studentName: selectedStudent.studentName,
-                amount,
-                method: feeForm.method,
-                date: Timestamp.fromDate(new Date(feeForm.date)),
-                status: "success",
-                remarks: feeForm.remarks,
-                createdAt: Timestamp.now(),
-                verifiedBy: "admin"
-            };
-
-            const ref = await addDoc(collection(db, "payments"), newPayment);
-
-            // Update Ledger
-            const currentYearId = "2025-2026";
-            const ledgerRef = doc(db, "student_fee_ledgers", `${selectedStudent.schoolId}_${currentYearId}`);
-
-            // We re-fetch or use state? Safer to fetch-modify-write or use state if we trust it. 
-            // In StudentDetails we used state + amount.
-            // Let's use the fetched ledger logic safely.
-            const totalPaid = (studentLedger?.totalPaid || 0) + amount;
-            const totalFee = studentLedger?.totalFee || 0;
-
-            await updateDoc(ledgerRef, {
-                totalPaid: totalPaid,
-                status: totalPaid >= totalFee ? "PAID" : "PENDING",
-                updatedAt: new Date().toISOString()
+            const token = await user.getIdToken();
+            const res = await fetch("/api/admin/payments/create", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    studentId: selectedStudent.schoolId,
+                    studentName: selectedStudent.studentName,
+                    amount,
+                    method: feeForm.method,
+                    date: feeForm.date,
+                    remarks: feeForm.remarks,
+                    adminId: user.uid
+                })
             });
 
-            // === Notifications ===
-            // 1. Notify Student
-            if (selectedStudent.uid) {
-                try {
-                    await addDoc(collection(db, "notifications"), {
-                        userId: selectedStudent.uid,
-                        title: "Fee Payment Received",
-                        message: `Payment of ₹${amount.toLocaleString()} received via ${feeForm.method}. ${feeForm.remarks ? `(${feeForm.remarks})` : ''}`,
-                        type: "PAYMENT_RECEIVED",
-                        status: "UNREAD",
-                        createdAt: Timestamp.now(),
-                        read: false
-                    });
-                } catch (e) {
-                    console.error("Failed to notify student", e);
-                }
-            }
-
-            // 2. Notify Admins
-            try {
-                await addDoc(collection(db, "notifications"), {
-                    target: "ALL_ADMINS",
-                    title: "Fee Collected",
-                    message: `Collected ₹${amount.toLocaleString()} from ${selectedStudent.studentName} (${selectedStudent.schoolId}) via ${feeForm.method}.`,
-                    type: "PAYMENT_COLLECTED",
-                    status: "UNREAD",
-                    createdAt: Timestamp.now(),
-                    read: false
-                });
-            } catch (e) {
-                console.error("Failed to notify admins", e);
-            }
+            const data = await res.json();
+            if (!data.success) throw new Error(data.error || "Failed to record payment");
 
             setOpen(false);
             setFeeForm({ amount: "", method: "cash", date: new Date().toISOString().split('T')[0], remarks: "" });
             setSelectedStudent(null);
             setStudentLedger(null);
+
+            // Refresh first page & Aggregates after correct payment processing
+            fetchPage(0, []);
+            fetchAggregates();
             alert("Payment Recorded & Ledger Updated");
 
         } catch (e: any) {
@@ -246,8 +263,8 @@ export default function PaymentsPage() {
             key: "amount",
             header: "Amount",
             render: (p: Payment) => (
-                <span className={`font-mono font-medium ${p.type === 'credit' ? 'text-green-500' : 'text-red-500'}`}>
-                    {p.type === 'credit' ? '+' : '-'} ₹{p.amount.toLocaleString()}
+                <span className={`font-mono font-medium ${p.type === 'credit' ? 'text-green-500' : 'text-emerald-500'}`}>
+                    + ₹{p.amount.toLocaleString()}
                 </span>
             )
         },
@@ -280,10 +297,6 @@ export default function PaymentsPage() {
             )
         }
     ];
-
-    const totalCollection = payments.reduce((sum, p) => sum + p.amount, 0);
-    const onlineCollection = payments.filter(p => p.method === "razorpay").reduce((sum, p) => sum + p.amount, 0);
-    const cashCollection = payments.filter(p => p.method === "cash").reduce((sum, p) => sum + p.amount, 0);
 
     return (
         <div className="space-y-4 md:space-y-6 animate-in fade-in duration-200 max-w-none p-0 pb-20">
@@ -433,7 +446,7 @@ export default function PaymentsPage() {
                     <div>
                         <p className="text-[8px] md:text-sm text-muted-foreground uppercase font-black tracking-widest">Total</p>
                         <h3 className="text-sm md:text-2xl font-bold mt-0.5 md:mt-1 text-white italic truncate">
-                            {loading ? <div className="h-8 w-20 bg-white/5 animate-pulse rounded" /> : `₹ ${totalCollection.toLocaleString()}`}
+                            {loading ? <div className="h-8 w-20 bg-white/5 animate-pulse rounded" /> : `₹ ${stats.total.toLocaleString()}`}
                         </h3>
                     </div>
                 </div>
@@ -441,7 +454,7 @@ export default function PaymentsPage() {
                     <div>
                         <p className="text-[8px] md:text-sm text-muted-foreground uppercase font-black tracking-widest">Online</p>
                         <h3 className="text-sm md:text-2xl font-bold mt-0.5 md:mt-1 text-blue-400 italic truncate">
-                            {loading ? <div className="h-8 w-20 bg-white/5 animate-pulse rounded" /> : `₹ ${onlineCollection.toLocaleString()}`}
+                            {loading ? <div className="h-8 w-20 bg-white/5 animate-pulse rounded" /> : `₹ ${stats.online.toLocaleString()}`}
                         </h3>
                     </div>
                 </div>
@@ -449,7 +462,7 @@ export default function PaymentsPage() {
                     <div>
                         <p className="text-[8px] md:text-sm text-muted-foreground uppercase font-black tracking-widest">Cash</p>
                         <h3 className="text-sm md:text-2xl font-bold mt-0.5 md:mt-1 text-emerald-400 italic truncate">
-                            {loading ? <div className="h-8 w-20 bg-white/5 animate-pulse rounded" /> : `₹ ${cashCollection.toLocaleString()}`}
+                            {loading ? <div className="h-8 w-20 bg-white/5 animate-pulse rounded" /> : `₹ ${stats.cash.toLocaleString()}`}
                         </h3>
                     </div>
                 </div>
@@ -459,6 +472,11 @@ export default function PaymentsPage() {
                 data={payments}
                 columns={columns}
                 isLoading={loading}
+                serverPagination={true}
+                hasNextPage={pageTokens.length > currentPage}
+                hasPrevPage={currentPage > 0}
+                onNextPage={() => fetchPage(currentPage + 1)}
+                onPrevPage={() => fetchPage(currentPage - 1)}
             />
         </div>
     );

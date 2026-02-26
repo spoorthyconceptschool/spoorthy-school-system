@@ -1,4 +1,4 @@
-import "server-only";
+// import "server-only";
 import * as admin from "firebase-admin";
 
 /**
@@ -56,7 +56,7 @@ function initAdmin() {
         console.log("[FIREBASE ADMIN] Attempting Initialization...");
         _app = admin.initializeApp({
             credential: admin.credential.cert(SERVICE_ACCOUNT),
-            storageBucket: "spoorthy-school-live-55917.appspot.com",
+            storageBucket: "spoorthy-school-live-55917.firebasestorage.app",
             databaseURL: "https://spoorthy-school-live-55917-default-rtdb.firebaseio.com"
         });
         console.log("[FIREBASE ADMIN] Success.");

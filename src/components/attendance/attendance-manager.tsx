@@ -55,7 +55,7 @@ export default function AttendanceManager({
             );
             const sSnap = await getDocs(sQ);
             const sList = sSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-                .sort((a, b) => (a.rollNumber || 0) - (b.rollNumber || 0));
+                .sort((a: any, b: any) => (a.rollNumber || 0) - (b.rollNumber || 0));
             setStudents(sList);
 
             // 2. Fetch Attendance in range
@@ -71,7 +71,7 @@ export default function AttendanceManager({
             }
 
             const q = query(
-                collection(db, "attendance"),
+                collection(db, "attendance_daily"),
                 where(documentId(), ">=", startKey),
                 where(documentId(), "<=", endKey)
             );
@@ -212,7 +212,7 @@ export default function AttendanceManager({
                 );
                 const sSnap = await getDocs(sQ);
                 const sList = sSnap.docs.map(d => ({ id: d.id, ...d.data() }))
-                    .sort((a, b) => (a.rollNumber || 0) - (b.rollNumber || 0));
+                    .sort((a: any, b: any) => (a.rollNumber || 0) - (b.rollNumber || 0));
 
                 if (isMounted) setStudents(sList);
 
@@ -241,7 +241,7 @@ export default function AttendanceManager({
                     }
                 });
 
-                unsubAttendance = onSnapshot(doc(db, "attendance", attId), (attSnap) => {
+                unsubAttendance = onSnapshot(doc(db, "attendance_daily", attId), (attSnap) => {
                     if (!isMounted) return;
                     if (attSnap.exists()) {
                         setAlreadyMarked(true);

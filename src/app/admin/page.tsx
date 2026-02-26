@@ -70,72 +70,43 @@ export default function AdminDashboard() {
     useEffect(() => {
         if (!user) return;
 
-        const fetchStats = async () => {
+        const fetchEnterpriseStats = async () => {
             try {
-                const { getCountFromServer, where } = await import("firebase/firestore");
-
-                // 1. Total Students for selected year
-                const studentsQ = query(collection(db, "students"), where("academicYear", "==", selectedYear || "2025-2026"));
-                const studentSnap = await getCountFromServer(studentsQ);
-                setStats(p => ({ ...p, totalStudents: studentSnap.data().count }));
-
-                // 2. Staff Stats (One-time or could be live)
-                const staffSnap = await getCountFromServer(collection(db, "teachers"));
-                setStats(p => ({ ...p, totalStaff: staffSnap.data().count }));
-
-                // 3. Overall Pending Fees (Approximation using limited aggregation)
-                // Note: For real-time, maybe stick to snapshots but with smaller limit or pre-aggregated stats doc.
-                // For now, let's keep it simple but avoid full map/filter.
-                // We'll use the existing snapshot but ensure it doesn't block loading.
+                // Ensure UI does not calculate anything - Rule 3
+                const req = await fetch(`/api/admin/dashboard/stats?year=${encodeURIComponent(selectedYear || "2024-2025")}`);
+                const res = await req.json();
+                if (res.success) {
+                    setStats(prev => ({
+                        ...prev,
+                        ...res.data
+                    }));
+                }
                 setLoading(false);
             } catch (e) {
-                console.error("Fetch Stats Error", e);
+                console.error("Fetch Enterprise Stats Error", e);
                 setLoading(false);
             }
         };
 
-        fetchStats();
+        fetchEnterpriseStats();
+    }, [user, selectedYear]);
 
-        // Financials - Today's Collection (Live is good here)
-        const startOfDay = new Date();
-        startOfDay.setHours(0, 0, 0, 0);
-        const startTimestamp = Timestamp.fromDate(startOfDay);
-
-        const qTodayPayments = query(
-            collection(db, "payments"),
-            where("date", ">=", startTimestamp),
-            limit(100)
-        );
-        const unsubTodayPayments = onSnapshot(qTodayPayments, (snap) => {
-            const total = snap.docs.reduce((acc, d) => acc + (d.data().amount || 0), 0);
-            setStats((prev: DashboardStats) => ({ ...prev, todayCollection: total }));
-        });
-
-        // Financials - Aggregate Ledger Balance (Live)
-        // Optimization: Increase limit but avoid deep data mapping if not needed.
-        const qLedgers = query(collection(db, "student_fee_ledgers"), where("academicYearId", "==", selectedYear || "2025-2026"), limit(500));
-        const unsubLedgers = onSnapshot(qLedgers, (snap) => {
-            const total = snap.docs.reduce((acc, d) => {
-                const l = d.data();
-                return acc + ((l.totalFee || 0) - (l.totalPaid || 0));
-            }, 0);
-            setStats((prev: DashboardStats) => ({ ...prev, pendingFees: total }));
-        });
+    // We maintain simple non-aggregated paginated sub-lists if needed,
+    // like recent leaves.
+    useEffect(() => {
+        if (!user) return;
 
         const qLeaves = query(collection(db, "leave_requests"), where("status", "==", "PENDING"), limit(5));
         const unsubLeaves = onSnapshot(qLeaves, (snap) => {
-            setStats((prev: DashboardStats) => ({ ...prev, leaveRequests: snap.size }));
             const leaves = snap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveRequest));
             leaves.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
             setPendingLeavesList(leaves);
         });
 
         return () => {
-            unsubTodayPayments();
-            unsubLedgers();
             unsubLeaves();
         };
-    }, [user, selectedYear]);
+    }, [user]);
 
     // Applications Listener
     useEffect(() => {

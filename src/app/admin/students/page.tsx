@@ -55,24 +55,10 @@ export default function StudentsPage() {
     const [localLoading, setLocalLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<"directory" | "leaves">("directory");
 
-    // Replace master data sync with local fetch
-    useEffect(() => {
-        if (!selectedYear) return;
-        setLocalLoading(true);
-        const q = query(
-            collection(db, "students"),
-            where("academicYear", "==", selectedYear),
-            limit(1000)
-        );
-        const unsub = onSnapshot(q, (snap) => {
-            setStudents(snap.docs.map(d => ({ id: d.id, studentDocId: d.id, ...d.data() } as Student)));
-            setLocalLoading(false);
-        }, (error) => {
-            console.error("Firebase Students onSnapshot Error:", error);
-            setLocalLoading(false);
-        });
-        return () => unsub();
-    }, [selectedYear]);
+    // Pagination State
+    const [pageTokens, setPageTokens] = useState<any[]>([]);
+    const [currentPage, setCurrentPage] = useState(0);
+    const PAGE_SIZE = 20;
 
     // Filter State
     const [searchQuery, setSearchQuery] = useState("");
@@ -80,7 +66,7 @@ export default function StudentsPage() {
     const [villageFilter, setVillageFilter] = useState("all");
     const [classFilter, setClassFilter] = useState("all");
 
-    // Unified loading state for the table ONLY
+    // Unified loading state
     const isTableLoading = masterLoading || localLoading;
 
     const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name || "Unknown Village" })).sort((a, b) => String(a.name).localeCompare(String(b.name)));
@@ -92,37 +78,71 @@ export default function StudentsPage() {
     const [resetUser, setResetUser] = useState<{ uid: string, schoolId: string, name: string, role: string } | null>(null);
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
-    // Filtered Students - Computed synchronously during render
-    const filteredStudents = useMemo(() => {
-        let result = students;
+    // Fetch Page
+    const fetchPage = async (pageIndex: number, newTokens: any[] = pageTokens) => {
+        if (!selectedYear) return;
+        setLocalLoading(true);
 
-        // Note: Primary academic year filtering now happens in the useEffect query.
-        // This useMemo handles search, class, and village filters.
+        try {
+            let baseConstraints: any[] = [
+                where("academicYear", "==", selectedYear),
+                limit(PAGE_SIZE + 1)
+            ];
 
-        if (statusFilter !== "all") {
-            result = result.filter(s => s.status === statusFilter);
+            if (statusFilter !== "all") baseConstraints.push(where("status", "==", statusFilter));
+            if (classFilter !== "all") baseConstraints.push(where("classId", "==", classFilter));
+            if (villageFilter !== "all") baseConstraints.push(where("villageId", "==", villageFilter));
+
+            // If there's a search query, since we don't have Full Text Search, we do an exact match or prefix if needed.
+            // But we will stick to exact match or basic startsWith on ID for enterprise reliability
+            if (searchQuery.trim()) {
+                const q = searchQuery.trim().toUpperCase();
+                baseConstraints.push(where("schoolId", "==", q));
+            } else {
+                // Order by name if no search
+                baseConstraints.push(orderBy("studentName", "asc"));
+            }
+
+            if (pageIndex > 0 && newTokens[pageIndex - 1]) {
+                const { startAfter } = await import("firebase/firestore");
+                baseConstraints.push(startAfter(newTokens[pageIndex - 1]));
+            }
+
+            const q = query(collection(db, "students"), ...baseConstraints);
+            const snap = await import("firebase/firestore").then(m => m.getDocs(q));
+
+            const docs = snap.docs;
+            const hasMore = docs.length > PAGE_SIZE;
+            const displayDocs = hasMore ? docs.slice(0, PAGE_SIZE) : docs;
+
+            setStudents(displayDocs.map(d => ({ id: d.id, studentDocId: d.id, ...d.data() } as Student)));
+
+            if (hasMore) {
+                const nextTokens = [...newTokens];
+                nextTokens[pageIndex] = displayDocs[displayDocs.length - 1];
+                setPageTokens(nextTokens);
+            }
+
+            setCurrentPage(pageIndex);
+        } catch (error) {
+            console.error("Firebase Students Pagination Error:", error);
+        } finally {
+            setLocalLoading(false);
         }
+    };
 
-        if (classFilter !== "all") {
-            result = result.filter(s => s.classId === classFilter || s.className === classFilter);
-        }
+    // Reset pagination when filters change
+    useEffect(() => {
+        if (!selectedYear) return;
+        setPageTokens([]);
+        setCurrentPage(0);
 
-        if (villageFilter !== "all") {
-            result = result.filter(s => s.villageId === villageFilter || s.villageName === villageFilter);
-        }
-
-        if (searchQuery.trim()) {
-            const q = searchQuery.toLowerCase().trim();
-            result = result.filter(s =>
-                s.studentName?.toLowerCase().includes(q) ||
-                s.schoolId?.toLowerCase().includes(q) ||
-                s.parentName?.toLowerCase().includes(q) ||
-                s.parentMobile?.includes(q)
-            );
-        }
-
-        return result;
-    }, [students, selectedYear, statusFilter, classFilter, villageFilter, searchQuery]);
+        // Debounce fetching to avoid spamming if user types in search
+        const timeout = setTimeout(() => {
+            fetchPage(0, []);
+        }, 500);
+        return () => clearTimeout(timeout);
+    }, [selectedYear, statusFilter, classFilter, villageFilter, searchQuery]);
 
     return (
         <div className="space-y-4 md:space-y-6 animate-in fade-in duration-200 max-w-7xl mx-auto p-1 md:p-6 pb-20">
@@ -160,7 +180,7 @@ export default function StudentsPage() {
 
                 {activeTab === "directory" && (
                     <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
-                        <StudentExportModal students={filteredStudents} />
+                        <StudentExportModal students={students} />
                         {role !== "MANAGER" && (
                             <>
                                 <StudentImportModal onSuccess={() => { window.location.reload(); }} />
@@ -237,9 +257,14 @@ export default function StudentsPage() {
 
                     {/* Content View - Non-blocking Table */}
                     <div className="relative min-h-[400px]">
-                        <DataTable
-                            data={filteredStudents}
+                        <DataTable<Student>
+                            data={students}
                             isLoading={isTableLoading}
+                            serverPagination={true}
+                            onNextPage={() => fetchPage(currentPage + 1)}
+                            onPrevPage={() => fetchPage(currentPage - 1)}
+                            hasNextPage={pageTokens.length > currentPage}
+                            hasPrevPage={currentPage > 0}
                             onRowClick={(s) => router.push(`/admin/students/${s.schoolId}`)}
                             columns={[
                                 {

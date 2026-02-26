@@ -32,18 +32,28 @@ interface DataTableProps<T> {
     columns: Column<T>[];
     isLoading?: boolean;
     onRowClick?: (item: T) => void;
-    actions?: (item: T) => React.ReactNode; // Extra kebab menu actions
+    actions?: (item: T) => React.ReactNode;
     pageSize?: number;
+    // Server-side Pagination Support
+    serverPagination?: boolean;
+    onNextPage?: () => void;
+    onPrevPage?: () => void;
+    hasNextPage?: boolean;
+    hasPrevPage?: boolean;
+    totalServerItems?: number;
 }
 
-export function DataTable<T>({ data, columns, isLoading, onRowClick, actions, pageSize = 20 }: DataTableProps<T>) {
+export function DataTable<T>({
+    data, columns, isLoading, onRowClick, actions, pageSize = 20,
+    serverPagination = false, onNextPage, onPrevPage, hasNextPage, hasPrevPage, totalServerItems
+}: DataTableProps<T>) {
     const [currentPage, setCurrentPage] = useState(1);
 
-    // Pagination Logic
-    const totalItems = Array.isArray(data) ? data.length : 0;
-    const totalPages = Math.ceil(totalItems / pageSize);
+    // Local Pagination Logic
+    const totalItems = serverPagination ? (totalServerItems || data.length) : (Array.isArray(data) ? data.length : 0);
+    const totalPages = serverPagination ? 0 : Math.ceil(totalItems / pageSize);
     const startIndex = (currentPage - 1) * pageSize;
-    const paginatedData = Array.isArray(data) ? data.slice(startIndex, startIndex + pageSize) : [];
+    const paginatedData = serverPagination ? data : (Array.isArray(data) ? data.slice(startIndex, startIndex + pageSize) : []);
 
     if (isLoading) {
         return (
@@ -135,14 +145,18 @@ export function DataTable<T>({ data, columns, isLoading, onRowClick, actions, pa
 
             <div className="flex items-center justify-between py-2 md:py-4 px-3 md:px-6 bg-white/5 border border-white/10 rounded-xl md:rounded-2xl">
                 <div className="text-[8px] md:text-xs font-black uppercase tracking-widest text-muted-foreground italic">
-                    Showing <span className="text-white">{Math.min(startIndex + 1, totalItems)} - {Math.min(startIndex + pageSize, totalItems)}</span> of <span className="text-white">{totalItems} items</span>
+                    {serverPagination ? (
+                        <>Showing <span className="text-white">{data.length} items</span> on this page.</>
+                    ) : (
+                        <>Showing <span className="text-white">{Math.min(startIndex + 1, totalItems)} - {Math.min(startIndex + pageSize, totalItems)}</span> of <span className="text-white">{totalItems} items</span></>
+                    )}
                 </div>
                 <div className="flex gap-1 md:gap-2">
                     <Button
                         variant="ghost"
                         size="sm"
-                        disabled={currentPage === 1}
-                        onClick={() => setCurrentPage(curr => Math.max(1, curr - 1))}
+                        disabled={serverPagination ? !hasPrevPage : currentPage === 1}
+                        onClick={() => serverPagination && onPrevPage ? onPrevPage() : setCurrentPage(curr => Math.max(1, curr - 1))}
                         className="h-6 md:h-8 px-2 md:px-4 text-[8px] md:text-[10px] font-black uppercase tracking-widest border border-white/10 opacity-90 disabled:opacity-30"
                     >
                         Prev
@@ -150,8 +164,8 @@ export function DataTable<T>({ data, columns, isLoading, onRowClick, actions, pa
                     <Button
                         variant="ghost"
                         size="sm"
-                        disabled={currentPage === totalPages || totalPages === 0}
-                        onClick={() => setCurrentPage(curr => Math.min(totalPages, curr + 1))}
+                        disabled={serverPagination ? !hasNextPage : (currentPage === totalPages || totalPages === 0)}
+                        onClick={() => serverPagination && onNextPage ? onNextPage() : setCurrentPage(curr => Math.min(totalPages, curr + 1))}
                         className="h-6 md:h-8 px-2 md:px-4 text-[8px] md:text-[10px] font-black uppercase tracking-widest border border-white/10 opacity-90 disabled:opacity-30"
                     >
                         Next

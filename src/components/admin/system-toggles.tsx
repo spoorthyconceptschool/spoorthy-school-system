@@ -9,6 +9,7 @@ import { db } from "@/lib/firebase";
 import { useMasterData } from "@/context/MasterDataContext";
 import { toast } from "@/lib/toast-store";
 import { Terminal, FlaskConical, ShieldAlert, Loader2 } from "lucide-react";
+import { Button } from "@/components/ui/button";
 
 export function SystemToggles() {
     const { systemConfig } = useMasterData();
@@ -73,6 +74,61 @@ export function SystemToggles() {
                     <p className="text-[10px] text-amber-500/80 font-medium">
                         Testing mode should be disabled in production unless you are performing maintenance or seeding demo data.
                     </p>
+                </div>
+
+                <div className="pt-4 border-t border-[#64FFDA]/10">
+                    <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-red-500/5 border border-red-500/20 transition-all hover:bg-red-500/10">
+                        <div className="space-y-1">
+                            <div className="flex items-center gap-2">
+                                <ShieldAlert size={16} className="text-red-500" />
+                                <Label className="text-sm font-bold text-red-500 uppercase tracking-wider">Factory Reset</Label>
+                            </div>
+                            <p className="text-[10px] text-red-400/80 leading-relaxed max-w-[280px]">
+                                Completely wipes all operational and transactional data. Cannot be undone. Super Admin only.
+                            </p>
+                        </div>
+                        <Button
+                            variant="destructive"
+                            size="sm"
+                            className="bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/30"
+                            onClick={async () => {
+                                const confirm1 = window.confirm("CRITICAL WARNING: This will permanently delete ALL operational data in the database. Are you absolutely sure?");
+                                if (!confirm1) return;
+
+                                const confirm2 = window.prompt("To proceed, type exactly: I AM SURE");
+                                if (confirm2 !== "I AM SURE") return;
+
+                                setUpdating(true);
+                                try {
+                                    const { auth } = await import("@/lib/firebase");
+                                    const token = await auth.currentUser?.getIdToken();
+
+                                    const res = await fetch("/api/admin/purge-data", {
+                                        method: "POST",
+                                        headers: {
+                                            "Content-Type": "application/json",
+                                            "Authorization": `Bearer ${token}`
+                                        },
+                                        body: JSON.stringify({ type: "FULL_SYSTEM" })
+                                    });
+                                    const data = await res.json();
+                                    if (data.success) {
+                                        toast({ title: "System Nuked", description: "All system data has been wiped.", type: "success" });
+                                        setTimeout(() => window.location.reload(), 2000);
+                                    } else {
+                                        throw new Error(data.error || "Failed to nuke system");
+                                    }
+                                } catch (e: any) {
+                                    toast({ title: "Nuke Failed", description: e.message, type: "error" });
+                                } finally {
+                                    setUpdating(false);
+                                }
+                            }}
+                            disabled={updating}
+                        >
+                            {updating ? <Loader2 className="w-4 h-4 animate-spin" /> : "NUKE SYSTEM"}
+                        </Button>
+                    </div>
                 </div>
             </CardContent>
         </Card>
