@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, where, orderBy, getDocs, doc, getDoc, limit, onSnapshot } from "firebase/firestore";
+import { collection, query, where, orderBy, getDocs, doc, getDoc, limit, startAfter } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -37,7 +37,6 @@ export function LeavesManager() {
     const fetchPage = async (pageIndex: number, newTokens: any[] = pageTokens) => {
         setLoading(true);
         try {
-            const { getDocs, query, collection, orderBy, limit, startAfter } = await import("firebase/firestore");
             let baseConstraints: any[] = [
                 orderBy("createdAt", "desc"),
                 limit(PAGE_SIZE + 1)

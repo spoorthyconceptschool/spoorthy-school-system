@@ -13,7 +13,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Loader2, DollarSign, TrendingUp, TrendingDown } from "lucide-react";
-import { getDoc } from "firebase/firestore";
+import { getDoc, getDocs, query, collection, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 import { useAuth } from "@/context/AuthContext";
@@ -55,7 +55,6 @@ export function AdjustSalaryModal({ isOpen, onClose, person, onSuccess }: Adjust
 
     const fetchRoleBasicSalary = async (roleCode: string) => {
         try {
-            const { getDocs, query, collection, where } = await import("firebase/firestore");
             const q = query(collection(db, "master_staff_roles"), where("code", "==", roleCode));
             const snap = await getDocs(q);
             if (!snap.empty) {

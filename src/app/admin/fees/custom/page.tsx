@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, getDocs, query, orderBy, where, onSnapshot } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, where, onSnapshot, addDoc, setDoc, doc, serverTimestamp, deleteDoc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -90,7 +90,6 @@ export default function CustomFeesPage() {
         setSubmitting(true);
 
         try {
-            const { addDoc, setDoc, doc, collection, serverTimestamp } = await import("firebase/firestore");
 
             if (editingFeeId) {
                 // Update
@@ -143,7 +142,6 @@ export default function CustomFeesPage() {
         if (!confirm("Are you sure you want to delete this custom fee payment? It will be removed from all student ledgers where it is currently unpaid.")) return;
         setLoading(true);
         try {
-            const { deleteDoc, doc } = await import("firebase/firestore");
             await deleteDoc(doc(db, "custom_fees", id));
 
             // Auto-Sync to remove from ledgers

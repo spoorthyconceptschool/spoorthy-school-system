@@ -93,19 +93,28 @@ export async function POST(req: NextRequest) {
         ];
 
         try {
+            const operationalCols = [
+                "student_fee_ledgers", "payments", "invoices", "transactions", "fee_structures", "fee_types", "ledger", "expenses", "payroll",
+                "attendance", "leaves", "class_timetables", "teacher_schedules", "substitutions", "coverage_tasks",
+                "homework", "homework_submissions", "exam_results", "grades",
+                "announcements", "events", "notifications", "audit_logs", "notices", "analytics", "reports",
+                "feedback", "enquiries", "applications", "custom_fees", "exams", "salaries", "teaching_assignments",
+                "timetable_settings", "search_index", "student_leaves"
+            ];
+
+            const coreCols = ["students", "teachers", "staff"];
+
             if (purgeType === 'FULL_SYSTEM') {
                 console.log("[Purge] Fetching all collections for deep wipe...");
                 const allCols = await adminDb.listCollections();
                 collectionsToDelete = allCols.map((c: any) => c.id).filter((id: string) => !PROTECTED.includes(id));
+
+                // Force append core cols just in case listCollections missed them
+                coreCols.concat(operationalCols).forEach(col => {
+                    if (!collectionsToDelete.includes(col) && !PROTECTED.includes(col)) collectionsToDelete.push(col);
+                });
             } else {
-                collectionsToDelete = [
-                    "student_fee_ledgers", "payments", "invoices", "transactions", "fee_structures", "fee_types", "ledger", "expenses", "payroll",
-                    "attendance", "leaves", "class_timetables", "teacher_schedules", "substitutions", "coverage_tasks",
-                    "homework", "homework_submissions", "exam_results", "grades",
-                    "announcements", "events", "notifications", "audit_logs", "notices", "analytics", "reports",
-                    "feedback", "enquiries", "applications", "custom_fees", "exams", "salaries", "teaching_assignments",
-                    "timetable_settings", "search_index", "students", "teachers", "staff"
-                ];
+                collectionsToDelete = [...operationalCols];
             }
         } catch (colErr: any) {
             console.error("[Purge] Collection fetch failed:", colErr.message);

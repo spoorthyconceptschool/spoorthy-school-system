@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, query, orderBy, limit, doc, getDoc, updateDoc, addDoc, Timestamp } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, limit, doc, getDoc, updateDoc, addDoc, Timestamp, getAggregateFromServer, sum, where, startAfter, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { DataTable } from "@/components/ui/data-table";
 import { Loader2, Plus, Search, ArrowLeft, Printer } from "lucide-react";
@@ -67,7 +67,6 @@ export default function PaymentsPage() {
     // Provide fetchAggregates and fetchPage as stable references/callbacks
     const fetchAggregates = async () => {
         try {
-            const { getAggregateFromServer, sum, where } = await import("firebase/firestore");
             const colRef = collection(db, "payments");
 
             const [totalSnap, onlineSnap, cashSnap] = await Promise.all([
@@ -89,7 +88,6 @@ export default function PaymentsPage() {
     const fetchPage = async (pageIndex: number, newTokens: any[] = pageTokens) => {
         setLoading(true);
         try {
-            const { startAfter, getDocs, limit, orderBy, query: firestoreQuery } = await import("firebase/firestore");
             let baseConstraints: any[] = [
                 orderBy("date", "desc"),
                 limit(PAGE_SIZE + 1)
@@ -99,7 +97,7 @@ export default function PaymentsPage() {
                 baseConstraints.push(startAfter(newTokens[pageIndex - 1]));
             }
 
-            const pq = firestoreQuery(collection(db, "payments"), ...baseConstraints);
+            const pq = query(collection(db, "payments"), ...baseConstraints);
             const snapshot = await getDocs(pq);
 
             const docs = snapshot.docs;

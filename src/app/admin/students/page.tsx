@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { collection, onSnapshot, query, limit, orderBy, getDocs, where, doc, updateDoc } from "firebase/firestore";
+import { collection, onSnapshot, query, limit, orderBy, getDocs, where, doc, updateDoc, startAfter } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { AddStudentModal } from "@/components/admin/add-student-modal";
 import { DeleteUserModal } from "@/components/admin/delete-user-modal";
@@ -104,12 +104,11 @@ export default function StudentsPage() {
             }
 
             if (pageIndex > 0 && newTokens[pageIndex - 1]) {
-                const { startAfter } = await import("firebase/firestore");
                 baseConstraints.push(startAfter(newTokens[pageIndex - 1]));
             }
 
             const q = query(collection(db, "students"), ...baseConstraints);
-            const snap = await import("firebase/firestore").then(m => m.getDocs(q));
+            const snap = await getDocs(q);
 
             const docs = snap.docs;
             const hasMore = docs.length > PAGE_SIZE;
