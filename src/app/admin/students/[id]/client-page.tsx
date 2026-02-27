@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useParams, useRouter } from "next/navigation";
-import { doc, getDoc, collection, query, where, getDocs, deleteDoc, updateDoc, addDoc, Timestamp, orderBy, setDoc, onSnapshot, limit } from "firebase/firestore";
+import { doc, getDoc, collection, query, where, getDocs, deleteDoc, updateDoc, addDoc, Timestamp, orderBy, setDoc, onSnapshot, limit, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { motion } from "framer-motion";
 import { Button } from "@/components/ui/button";
@@ -23,6 +23,11 @@ import { useMasterData } from "@/context/MasterDataContext";
 import { useAuth } from "@/context/AuthContext";
 import { notifyManagerAction } from "@/lib/notifications";
 
+/**
+ * Safely parses a Date object or Firestore Timestamp into a number (milliseconds).
+ * @param {any} d - The date to parse.
+ * @returns {number} The parsed time in milliseconds, or 0 if invalid.
+ */
 const safeDateParse = (d: any): number => {
     if (!d) return 0;
     if (d?.toDate) return d.toDate().getTime();
@@ -31,6 +36,11 @@ const safeDateParse = (d: any): number => {
     return isNaN(t) ? 0 : t;
 };
 
+/**
+ * Safely converts a Date object or Firestore Timestamp to a localized date string.
+ * @param {any} d - The date to parse.
+ * @returns {string} The localized date string, or "N/A" if invalid.
+ */
 const safeDateString = (d: any): string => {
     try {
         const time = safeDateParse(d);
@@ -87,6 +97,12 @@ interface FeeLedger {
     items: FeeLedgerItem[];
 }
 
+/**
+ * Main component for the Student Details page.
+ * Displays student profile, payment history, and fee ledger.
+ * Allows admins and managers to update details and collect fees.
+ * @returns {JSX.Element} The rendered component.
+ */
 export default function StudentDetailsPage() {
     const params = useParams();
     const router = useRouter();
@@ -214,7 +230,10 @@ export default function StudentDetailsPage() {
         fetchAll();
     }, [studentId, router, selectedYear]);
 
-    // Update Profile
+    /**
+     * Updates the student's profile information in Firestore and logs the action.
+     * Removes undefined fields before saving.
+     */
     const handleUpdate = async () => {
         if (!student) return;
         try {
@@ -231,7 +250,11 @@ export default function StudentDetailsPage() {
             };
 
             // Remove undefined fields to prevent Firestore crash
-            Object.keys(updates).forEach(key => updates[key] === undefined && delete updates[key]);
+            Object.keys(updates).forEach(key => {
+                if (updates[key] === undefined) {
+                    delete updates[key];
+                }
+            });
 
             await updateDoc(doc(db, "students", student.id), updates);
             setStudent({ ...student, ...updates } as Student);
@@ -264,7 +287,11 @@ export default function StudentDetailsPage() {
         }
     };
 
-    // Collect Fee
+    /**
+     * Handles the collection of a fee payment.
+     * Records the payment in the 'payments' collection and updates the student's ledger sequentially via transaction/batch.
+     * @param {React.FormEvent} e - The form submission event.
+     */
     const handleCollectFee = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!student) return;
@@ -290,18 +317,23 @@ export default function StudentDetailsPage() {
                 verifiedBy: role === "MANAGER" ? `manager:${user?.displayName || 'Manager'}` : "admin"
             };
 
-            const ref = await addDoc(collection(db, "payments"), newPayment);
+            const batch = writeBatch(db);
+            const paymentRef = doc(collection(db, "payments"));
+            batch.set(paymentRef, newPayment);
 
             // === Critical Update: Update Student Ledger ===
             const newTotalPaid = totalPaid + amount;
             const currentYearId = selectedYear || "2025-2026";
             const ledgerRef = doc(db, "student_fee_ledgers", `${student.schoolId}_${currentYearId}`);
 
-            await updateDoc(ledgerRef, {
+            batch.update(ledgerRef, {
                 totalPaid: newTotalPaid,
                 status: newTotalPaid >= totalFee ? "PAID" : "PENDING",
                 updatedAt: new Date().toISOString()
             });
+
+            await batch.commit();
+            const ref = paymentRef;
 
             setPayments([{ id: ref.id, ...newPayment } as unknown as Payment, ...payments]);
             setLedger(prev => prev ? { ...prev, totalPaid: newTotalPaid, status: newTotalPaid >= totalFee ? "PAID" : "PENDING" } : null);
@@ -361,7 +393,11 @@ export default function StudentDetailsPage() {
     const dueAmount = totalFee - totalPaid;
     const paymentProgress = totalFee > 0 ? Math.min((totalPaid / totalFee) * 100, 100) : 0;
 
-    // Financial Breakdown logic for Fee Table and Overview
+    /**
+     * Calculates the breakdown of due and paid amounts across term and custom fees.
+     * Distributes total payments across fee items using a FIFO strategy based on due dates.
+     * @returns {Object} An object containing the processed items and summarized totals.
+     */
     const getBreakdown = () => {
         if (!ledger) return { items: [], termsPaid: 0, termsTotal: 0, customPaid: 0, customTotal: 0, pending: [], termsPending: 0, customPending: 0 };
 
@@ -409,6 +445,9 @@ export default function StudentDetailsPage() {
 
     const breakdown = getBreakdown();
 
+    /**
+     * Refreshes the page data by simply reloading the window.
+     */
     const refreshData = () => {
         // Cheap refresh: strict reload or just re-fetch function? 
         // For now, full reload is safer for sync issues. 
@@ -418,7 +457,10 @@ export default function StudentDetailsPage() {
     // Reset Password State
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
-    // Recalculate Fees (Sync with Global)
+    /**
+     * Recalculates the student's fee ledger based on global term fees and applicable custom fees.
+     * Merges current ledger state with new expectations.
+     */
     const [recalculating, setRecalculating] = useState(false);
     const handleRecalculateFees = async () => {
         if (!student) return;
@@ -533,10 +575,8 @@ export default function StudentDetailsPage() {
                 classId: student.classId,
                 className: student.className,
                 totalFee,
-                totalPaid: ledger?.totalPaid || 0, // Persist or re-sum?
-                // Better re-sum from payments? No, payments collection is truth.
-                // Assuming ledger.totalPaid is synced.
-                status: (ledger?.totalPaid || 0) >= totalFee ? "PAID" : "PENDING",
+                totalPaid: totalPaid, // Changed from ledger?.totalPaid || 0 to use payment-derived true status
+                status: totalPaid >= totalFee ? "PAID" : "PENDING",
                 items: mergedItems,
                 updatedAt: new Date().toISOString() // serverTimestamp ideally
             };
