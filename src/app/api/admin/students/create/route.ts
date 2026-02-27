@@ -34,26 +34,13 @@ export async function GET() {
 }
 
 export async function POST(req: NextRequest) {
-    // 1. Authorization: Only Admins can invoke this endpoint
-    return withEnterpriseGuard(req, ['ADMIN'], async (req, user) => {
+    // 1. Authorization: Only Admins and Managers can invoke this endpoint
+    return withEnterpriseGuard(req, ['ADMIN', 'MANAGER'], async (req, user) => {
         try {
             const body = await req.json();
 
-            // Transform legacy payload to enterprise payload for migration compatibility
-            const normalizedBody = {
-                firstName: body.studentName?.split(' ')[0] || "Unknown",
-                lastName: body.studentName?.split(' ').slice(1).join(' ') || undefined,
-                admissionNumber: body.admissionNumber || "PENDING",
-                classId: body.classId || "UNKNOWN_CLASS",
-                sectionId: body.sectionId || "A", // Defaulting for simple fallback
-                dateOfBirth: body.dateOfBirth || "2000-01-01", // Placeholder if null
-                gender: body.gender || "OTHER",
-                parentContact: body.parentMobile ? `+91${body.parentMobile.replace(/\D/g, '').slice(-10)}` : "+910000000000",
-                address: body.address || undefined
-            };
-
-            // 2. Strict Zod Validation
-            const { success, data, errors } = validateEnterpriseSchema(CreateStudentSchema, normalizedBody);
+            // 2. Strict Zod Validation mapping frontend directly
+            const { success, data, errors } = validateEnterpriseSchema(CreateStudentSchema, body);
 
             if (!success || !data) {
                 return NextResponse.json({ error: "Validation Failed", details: errors }, { status: 400 });

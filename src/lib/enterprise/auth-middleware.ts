@@ -7,7 +7,7 @@ import { adminAuth } from '@/lib/firebase-admin';
  * Ensures strict role-based access control at the API level.
  */
 
-export type Role = 'ADMIN' | 'TEACHER' | 'ACCOUNTANT' | 'STUDENT';
+export type Role = 'ADMIN' | 'TEACHER' | 'ACCOUNTANT' | 'STUDENT' | 'MANAGER' | 'SUPERADMIN' | 'SUPER_ADMIN' | 'OWNER' | 'DEVELOPER';
 
 export interface AuthenticatedUser {
     uid: string;
@@ -41,19 +41,41 @@ export async function authenticateRoute(
         const decodedToken = await adminAuth.verifyIdToken(token);
 
         // Destructure custom claims (Role should be strictly set on the user claims)
-        const { role } = decodedToken;
+        let roleStr = String(decodedToken.role || "").toUpperCase();
 
-        if (!role || !allowedRoles.includes(role as Role)) {
-            console.warn(`[Enterprise SecOps] User ${decodedToken.uid} attempted forbidden access. Role: ${role}. Required: ${allowedRoles.join(' | ')}`);
+        if (!roleStr) {
+            // Fallback: Check Firestore if custom claims are not yet set (legacy admin accounts)
+            try {
+                const { adminDb } = require('@/lib/firebase-admin');
+                const userDoc = await adminDb.collection('users').doc(decodedToken.uid).get();
+                if (userDoc.exists) {
+                    const data = userDoc.data();
+                    roleStr = String(data?.role || "").toUpperCase();
+                }
+            } catch (err) {
+                console.warn("[Enterprise SecOps] Fallback role fetch failed:", err);
+            }
+        }
+
+        // Role Normalization: Treat SUPER_ADMIN, SUPERADMIN, OWNER, DEVELOPER as ADMIN for simplicity in checks
+        const normalizedRole = (roleStr === 'SUPER_ADMIN' || roleStr === 'SUPERADMIN' || roleStr === 'OWNER' || roleStr === 'DEVELOPER')
+            ? 'ADMIN'
+            : roleStr;
+
+        if (!roleStr || (!allowedRoles.includes(roleStr as Role) && !allowedRoles.includes(normalizedRole as Role))) {
+            console.warn(`[Enterprise SecOps] User ${decodedToken.uid} attempted forbidden access. Role: ${decodedToken.role}. Required: ${allowedRoles.join(' | ')}`);
             return {
-                errorResponse: NextResponse.json({ error: 'Forbidden: Insufficient privileges' }, { status: 403 })
+                errorResponse: NextResponse.json({
+                    error: 'Forbidden: Insufficient privileges',
+                    debug: { userRole: decodedToken.role, required: allowedRoles }
+                }, { status: 403 })
             };
         }
 
         const authUser: AuthenticatedUser = {
             uid: decodedToken.uid,
             email: decodedToken.email,
-            role: role as Role,
+            role: normalizedRole as Role,
             schoolId: decodedToken.schoolId || 'DEFAULT', // System default if not multi-tenant
         };
 

@@ -171,7 +171,20 @@ export async function POST(req: NextRequest) {
             if (purgeType === 'FULL_SYSTEM') {
                 tasks.push(adminRtdb.ref("academic_years").remove());
                 tasks.push(adminRtdb.ref("master").remove());
+                tasks.push(adminRtdb.ref("siteContent").remove()); // Wipe RTDB branding
                 tasks.push(adminRtdb.ref("timetables").remove());
+                // Also reset Firestore config for academic years
+                tasks.push(adminDb.collection("config").doc("academic_years").delete());
+
+                // Deep clean Storage footprint (settings folder)
+                tasks.push((async () => {
+                    try {
+                        const [files] = await adminStorage.bucket().getFiles({ prefix: 'settings/' });
+                        await Promise.all(files.map((file: any) => file.delete()));
+                    } catch (e) {
+                        console.warn("[Purge] Storage wipe skipped (empty or no permission)");
+                    }
+                })());
             }
         }
 

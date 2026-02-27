@@ -50,7 +50,7 @@ import { StudentLeavesManager } from "@/components/admin/student-leaves-manager"
 export default function StudentsPage() {
     const router = useRouter();
     const { user, role } = useAuth();
-    const { villages: villagesData, classes: classesData, loading: masterLoading, selectedYear } = useMasterData();
+    const { villages: villagesData, classes: classesData, loading: masterLoading, selectedYear, setSelectedYear } = useMasterData();
     const [students, setStudents] = useState<Student[]>([]);
     const [localLoading, setLocalLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<"directory" | "leaves">("directory");
@@ -100,7 +100,8 @@ export default function StudentsPage() {
                 baseConstraints.push(where("schoolId", "==", q));
             } else {
                 // Order by name if no search
-                baseConstraints.push(orderBy("studentName", "asc"));
+                // Temporarily disabled to bypass index requirements
+                // baseConstraints.push(orderBy("studentName", "asc"));
             }
 
             if (pageIndex > 0 && newTokens[pageIndex - 1]) {
@@ -139,7 +140,7 @@ export default function StudentsPage() {
         // Debounce fetching to avoid spamming if user types in search
         const timeout = setTimeout(() => {
             fetchPage(0, []);
-        }, 500);
+        }, 300);
         return () => clearTimeout(timeout);
     }, [selectedYear, statusFilter, classFilter, villageFilter, searchQuery]);
 

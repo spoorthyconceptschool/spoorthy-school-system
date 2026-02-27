@@ -12,16 +12,23 @@ const MoneySchema = z.number().int().min(0).describe("Store money as integers (c
 
 // 2. Student Schemas
 export const CreateStudentSchema = z.object({
-    firstName: z.string().min(2, "First name must be at least 2 characters").max(50),
-    lastName: z.string().max(50).optional(),
-    admissionNumber: z.string().min(4).max(20).describe("Primary Key equivalent"),
-    classId: z.string().uuid("Class ID must be strict UUID or known format"),
+    studentName: z.string().min(2, "Name must be at least 2 characters").max(100),
+    parentName: z.string().max(100).optional(),
+    parentMobile: z.string().regex(/^\d{10}$/, "Must be strictly 10 digits"),
+    dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD").or(z.literal("")).optional(),
+    gender: z.enum(["male", "female", "other", "select"]).optional(),
+    villageId: z.string().min(1),
+    villageName: z.string().optional(),
+    classId: z.string().min(1),
+    className: z.string().optional(),
     sectionId: z.string().min(1),
-    dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD"),
-    gender: z.enum(["MALE", "FEMALE", "OTHER"]),
-    parentContact: z.string().regex(/^\+?[1-9]\d{1,14}$/, "Must be strict E.164 phone format"),
-    emergencyContact: z.string().optional(),
+    sectionName: z.string().optional(),
+    transportRequired: z.boolean().optional(),
+    academicYear: z.string().min(4),
+    admissionNumber: z.string().optional(),
     address: z.string().max(500).optional(),
+    firstName: z.string().optional(),
+    lastName: z.string().optional()
 });
 
 export type CreateStudentPayload = z.infer<typeof CreateStudentSchema>;
@@ -64,7 +71,7 @@ export function validateEnterpriseSchema<T>(schema: z.ZodSchema<T>, data: any): 
     if (!result.success) {
         return {
             success: false,
-            errors: result.error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
+            errors: result.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`)
         };
     }
     return { success: true, data: result.data };

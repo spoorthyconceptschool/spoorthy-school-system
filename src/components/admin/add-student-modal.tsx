@@ -72,7 +72,7 @@ export function AddStudentModal({ onSuccess }: { onSuccess?: () => void }) {
                 dateOfBirth: formData.dateOfBirth,
                 gender: formData.gender,
                 transportRequired: formData.transportRequired,
-                academicYear: selectedYear || "2025-2026"
+                academicYear: selectedYear || "2026-2027"
             };
 
             console.log("Creating student with payload:", payload);

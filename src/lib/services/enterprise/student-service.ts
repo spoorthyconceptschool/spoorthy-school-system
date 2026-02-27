@@ -54,15 +54,15 @@ export class EnterpriseStudentService {
         // Outside transaction - hit Auth service (Idempotent enough for this flow, though edge cases exist if DB write fails next)
         const userRecord = await adminAuth.createUser({
             email: studentRecord.syntheticEmail,
-            password: payload.parentContact, // Default password
-            displayName: `${payload.firstName} ${payload.lastName || ''}`.trim()
+            password: payload.parentMobile, // Default password
+            displayName: payload.studentName
         });
 
         await adminAuth.setCustomUserClaims(userRecord.uid, { role: "STUDENT" });
 
         const finalStudentData = {
             ...payload,
-            studentName: `${payload.firstName} ${payload.lastName || ''}`.trim(),
+            studentName: payload.studentName,
             schoolId: studentRecord.newSchoolId, // Overriding the payload admissionNumber with system generated one
             uid: userRecord.uid,
             role: "STUDENT",
@@ -98,11 +98,11 @@ export class EnterpriseStudentService {
 
         // 4. Initial Fee Ledger (Empty/Append-Only setup)
         // Assuming current academic year is dynamically determined or passed. Hardcoded for MVP example.
-        const ledgerYear = "2024-2025";
+        const ledgerYear = payload.academicYear || "2026-2027";
         const ledgerRef = adminDb.collection("fee_ledger_accounts").doc(`${studentRecord.newSchoolId}_${ledgerYear}`);
         batch.set(ledgerRef, {
             studentId: studentRecord.newSchoolId,
-            academicYear: ledgerYear,
+            academicYear: payload.academicYear || "2026-2027",
             balance: 0,
             status: 'ACTIVE',
             createdAt: Timestamp.now(),
