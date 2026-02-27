@@ -161,6 +161,10 @@ export default function StudentDetailsPage() {
 
     // Initial Fetch
     useEffect(() => {
+        /**
+         * Fetches all necessary student profile information, payment history, 
+         * and the active fee ledger snapshot from Firestore.
+         */
         const fetchAll = async () => {
             if (!studentId) return;
             setLoading(true);
@@ -261,10 +265,13 @@ export default function StudentDetailsPage() {
             setIsEditing(false);
 
             // Log Update
+            const safeUpdates = { ...updates };
+            delete safeUpdates.parentMobile;
+
             await addDoc(collection(db, "audit_logs"), {
                 action: "UPDATE_STUDENT_PROFILE",
                 targetId: student.id,
-                details: updates,
+                details: safeUpdates,
                 timestamp: Timestamp.now()
             });
 
@@ -326,11 +333,11 @@ export default function StudentDetailsPage() {
             const currentYearId = selectedYear || "2025-2026";
             const ledgerRef = doc(db, "student_fee_ledgers", `${student.schoolId}_${currentYearId}`);
 
-            batch.update(ledgerRef, {
+            batch.set(ledgerRef, {
                 totalPaid: newTotalPaid,
                 status: newTotalPaid >= totalFee ? "PAID" : "PENDING",
                 updatedAt: new Date().toISOString()
-            });
+            }, { merge: true });
 
             await batch.commit();
             const ref = paymentRef;
@@ -457,11 +464,12 @@ export default function StudentDetailsPage() {
     // Reset Password State
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
+    const [recalculating, setRecalculating] = useState(false);
+
     /**
      * Recalculates the student's fee ledger based on global term fees and applicable custom fees.
      * Merges current ledger state with new expectations.
      */
-    const [recalculating, setRecalculating] = useState(false);
     const handleRecalculateFees = async () => {
         if (!student) return;
         setRecalculating(true);
