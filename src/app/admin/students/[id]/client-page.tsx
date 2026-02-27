@@ -116,6 +116,11 @@ export default function StudentDetailsPage() {
     const [role, setRole] = useState<string>("");
     const { user, role: authRole } = useAuth();
 
+    const normalizedRole = role?.toUpperCase();
+    const isManager = normalizedRole === "MANAGER";
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'SUPERADMIN', 'OWNER', 'DEVELOPER'].includes(normalizedRole);
+    const canEdit = isAdmin || isManager;
+
     useEffect(() => {
         if (authRole) {
             setRole(authRole);
@@ -276,7 +281,7 @@ export default function StudentDetailsPage() {
             });
 
             // Notification for Manager Action
-            if (role === "MANAGER") {
+            if (isManager) {
                 await notifyManagerAction({
                     userId: student.uid || student.id,
                     title: "Profile Updated",
@@ -310,7 +315,7 @@ export default function StudentDetailsPage() {
 
             const now = new Date();
             const timestampStr = `${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
-            const managerRemark = role === "MANAGER" ? ` | Collected by manager: ${user?.displayName || "Manager"} at ${timestampStr}` : "";
+            const managerRemark = isManager ? ` | Collected by manager: ${user?.displayName || "Manager"} at ${timestampStr}` : "";
 
             const newPayment = {
                 studentId: student.schoolId,
@@ -321,7 +326,7 @@ export default function StudentDetailsPage() {
                 status: "success",
                 remarks: (feeForm.remarks || "") + managerRemark,
                 createdAt: Timestamp.now(),
-                verifiedBy: role === "MANAGER" ? `manager:${user?.displayName || 'Manager'}` : "admin"
+                verifiedBy: isManager ? `manager:${user?.displayName || 'Manager'}` : "admin"
             };
 
             const batch = writeBatch(db);
@@ -347,7 +352,7 @@ export default function StudentDetailsPage() {
 
             // === Notifications ===
             // 2. Notify Admins & Effective User (if Manager)
-            if (role === "MANAGER") {
+            if (isManager) {
                 await notifyManagerAction({
                     userId: student.uid || student.id,
                     title: "Fee Payment Received",
@@ -595,7 +600,7 @@ export default function StudentDetailsPage() {
             setLedger({ ...newLedgerData, items: mergedItems } as FeeLedger);
 
             // 9. Notification for Manager Action
-            if (role === "MANAGER") {
+            if (isManager) {
                 await notifyManagerAction({
                     userId: student.uid || student.schoolId,
                     title: "Fee Structure Synced",
@@ -666,7 +671,7 @@ export default function StudentDetailsPage() {
 
                 {!loading && student && (
                     <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
-                        {(role === "ADMIN" || role === "MANAGER") && (
+                        {canEdit && (
                             <Dialog open={isFeeModalOpen} onOpenChange={setIsFeeModalOpen}>
                                 <DialogTrigger asChild>
                                     <Button size="sm" className="h-8 md:h-11 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg text-[10px] md:text-sm font-bold flex-1 md:flex-none">
@@ -730,7 +735,7 @@ export default function StudentDetailsPage() {
                                 <Button size="sm" onClick={handleUpdate} className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-[10px] md:text-xs px-3">Save</Button>
                             </div>
                         ) : (
-                            (role === "ADMIN" || role === "MANAGER") && (
+                            canEdit && (
                                 <div className="flex items-center gap-1.5 md:gap-2">
                                     <Button variant="outline" size="sm" onClick={() => setIsResetModalOpen(true)} className="h-8 md:h-9 border-white/10 bg-white/5 text-[9px] md:text-sm px-1.5 md:px-4">
                                         <Lock className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> <span className="hidden sm:inline">Reset</span>
@@ -738,7 +743,7 @@ export default function StudentDetailsPage() {
                                     <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="h-8 md:h-9 border-white/10 bg-white/5 text-[9px] md:text-sm px-1.5 md:px-4">
                                         <Edit className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> Edit
                                     </Button>
-                                    {role === "ADMIN" && (
+                                    {isAdmin && (
                                         <Button variant="destructive" size="sm" onClick={() => setIsDeleteModalOpen(true)} className="h-8 md:h-9 bg-red-500/10 border-red-500/20 text-red-500 hover:bg-red-500/20 px-1.5 md:px-3">
                                             <ShieldAlert className="w-3 h-3 md:w-3.5 md:h-3.5" />
                                         </Button>
@@ -853,7 +858,7 @@ export default function StudentDetailsPage() {
                             <CardTitle className="text-xs md:text-xl font-bold text-accent italic">Fee Structure</CardTitle>
                             {!loading && (
                                 <div className="flex gap-1">
-                                    {(role === "ADMIN" || role === "MANAGER") && (
+                                    {canEdit && (
                                         <Button variant="outline" size="sm" onClick={handleRecalculateFees} disabled={recalculating} className="h-6 px-1.5 md:h-7 md:px-2 border-white/10 bg-white/5 text-[8px] md:text-[9px] font-bold">
                                             <RefreshCw className={`w-2.5 h-2.5 md:w-3 md:h-3 mr-1 ${recalculating ? "animate-spin" : ""}`} /> Sync
                                         </Button>
@@ -861,7 +866,7 @@ export default function StudentDetailsPage() {
                                     <Button variant="outline" size="sm" className="h-6 px-1.5 md:h-7 md:px-2 border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-[8px] md:text-[9px] font-bold" onClick={() => ledger && student && printStudentFeeStructure({ studentName: student.studentName, schoolId: student.schoolId, className: student.className, items: ledger.items || [], totalPaid: ledger.totalPaid || 0, schoolLogo: branding?.schoolLogo, schoolName: branding?.schoolName })}>
                                         <Printer className="w-2.5 h-2.5 md:w-3 md:h-3 mr-1" />
                                     </Button>
-                                    {(role === "ADMIN" || role === "MANAGER") && (
+                                    {canEdit && (
                                         <Button variant="outline" size="sm" className="h-6 px-1.5 md:h-7 md:px-2 border-white/10 bg-white/5 text-[8px] md:text-[9px] font-bold" onClick={() => setIsAdjustModalOpen(true)}>
                                             <Settings2 className="w-2.5 h-2.5 md:w-3 md:h-3 mr-1" /> Adjust
                                         </Button>
