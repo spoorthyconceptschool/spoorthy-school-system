@@ -197,7 +197,7 @@ function searchStaticFeatures(queryText: string): SearchIndexItem[] {
  * Global Typeahead Search
  * Queries the 'search_index' collection using 'array-contains'.
  */
-export async function searchGlobal(searchTerm: string, limitCount = 5): Promise<SearchIndexItem[]> {
+export async function searchGlobal(searchTerm: string, limitCount = 8): Promise<SearchIndexItem[]> {
     if (!searchTerm || searchTerm.length < 2) return [];
 
     const normalizedQuery = searchTerm.toLowerCase().trim();
@@ -209,16 +209,50 @@ export async function searchGlobal(searchTerm: string, limitCount = 5): Promise<
 
     // 2. Get Firestore Data (Async)
     try {
-        const q = query(
-            collection(db, "search_index"),
-            where("keywords", "array-contains", normalizedQuery),
-            limit(limitCount)
-        );
+        const tokens = normalizedQuery.split(/\s+/).filter(t => t.length >= 2);
 
-        const snapshot = await getDocs(q);
-        const dbHits = snapshot.docs.map(doc => doc.data() as SearchIndexItem);
+        // If we have tokens, we search for each unique token to get broad hits
+        // and then filter for intersections/relevance on the client.
+        // For simplicity and to stay within Firebase limits, we search the first 2 tokens.
+        const searchTasks = tokens.slice(0, 2).map(token => {
+            const q = query(
+                collection(db, "search_index"),
+                where("keywords", "array-contains", token),
+                limit(15)
+            );
+            return getDocs(q);
+        });
 
-        finalResults.push(...dbHits);
+        const snapshots = await Promise.all(searchTasks);
+        const hitMap = new Map<string, SearchIndexItem>();
+
+        snapshots.forEach(snap => {
+            snap.docs.forEach(doc => {
+                const item = doc.data() as SearchIndexItem;
+                hitMap.set(item.id, item);
+            });
+        });
+
+        const dbHits = Array.from(hitMap.values());
+
+        // Sort by relevance (if multiple tokens match)
+        const scoredHits = dbHits.map(hit => {
+            let score = 0;
+            // Higher score if query is a prefix of titles
+            if (hit.title.toLowerCase().startsWith(normalizedQuery)) score += 50;
+            // Higher score if all tokens are present in keywords
+            const matchedTokens = tokens.filter(t => hit.keywords.includes(t)).length;
+            score += matchedTokens * 20;
+
+            return { ...hit, score };
+        });
+
+        scoredHits.sort((a, b) => b.score - a.score);
+
+        const topDbHits = scoredHits.slice(0, limitCount).map(({ score, ...hit }) => hit as SearchIndexItem);
+
+        console.log(`[Search] Found ${topDbHits.length} hits for "${normalizedQuery}"`);
+        finalResults.push(...topDbHits);
 
     } catch (error) {
         console.error("Global search failed:", error);

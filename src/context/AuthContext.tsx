@@ -45,18 +45,27 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const router = useRouter();
 
     useEffect(() => {
-        // Background refresh only, initial state is already set from cache above
-
         const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
             if (authUser) {
-                setUser(authUser);
-                // Background refresh
                 try {
                     const userDoc = await getDoc(doc(db, "users", authUser.uid));
                     if (userDoc.exists()) {
-                        const data = { ...userDoc.data(), uid: authUser.uid };
-                        setUserData(data);
-                        localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                        const data = userDoc.data();
+                        if (data.status !== "ACTIVE") {
+                            await firebaseSignOut(auth);
+                            setUser(null);
+                            setUserData(null);
+                            localStorage.removeItem(STORAGE_KEY);
+                            router.push("/login?error=account_deactivated");
+                        } else {
+                            const uData = { ...data, uid: authUser.uid };
+                            setUser(authUser);
+                            setUserData(uData);
+                            localStorage.setItem(STORAGE_KEY, JSON.stringify(uData));
+                        }
+                    } else {
+                        // User exists in Auth but not in Firestore users collection
+                        setUser(authUser);
                     }
                 } catch (err) {
                     console.error("Auth context user data fetch failed", err);
@@ -77,9 +86,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         if (result.user) {
             const userDoc = await getDoc(doc(db, "users", result.user.uid));
             if (userDoc.exists()) {
-                const data = { ...userDoc.data(), uid: result.user.uid };
-                setUserData(data);
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(data));
+                const data = userDoc.data();
+                if (data.status !== "ACTIVE") {
+                    await firebaseSignOut(auth);
+                    throw new Error("Account is deactivated. Please contact administrator.");
+                }
+                const uData = { ...data, uid: result.user.uid };
+                setUserData(uData);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(uData));
             }
         }
     };

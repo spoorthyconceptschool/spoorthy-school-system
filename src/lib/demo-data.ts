@@ -1,9 +1,8 @@
-import { collection, doc, setDoc, writeBatch, Timestamp, query, getDocs, getDoc } from "firebase/firestore";
-import { ref, set } from "firebase/database";
-import { db, rtdb } from "@/lib/firebase";
+import { adminDb, adminRtdb, FieldValue, Timestamp } from "@/lib/firebase-admin";
 
 /**
- * Enterprise Demo Data Seeding Script
+ * Enterprise Demo Data Seeding Script (SERVER SIDE ONLY)
+ * Optimized for Firebase Admin SDK.
  * Generates a full ecosystem for testing:
  * - 200 Students (10 per section, 2 sections, 10 classes)
  * - Master Data (Villages, Classes, Sections) - Both Firestore & RTDB
@@ -13,23 +12,45 @@ import { db, rtdb } from "@/lib/firebase";
  * - Config (Academic Years, System Constants)
  */
 export const seedDemoData = async () => {
-    // Helper for large batch operations
-    const commitInChunks = async (operations: { ref: any, data: any, type: 'set' | 'update' | 'delete' }[]) => {
-        const CHUNK_SIZE = 400;
-        for (let i = 0; i < operations.length; i += CHUNK_SIZE) {
-            const chunk = operations.slice(i, i + CHUNK_SIZE);
-            const batch = writeBatch(db);
-            chunk.forEach(op => {
-                if (op.type === 'set') batch.set(op.ref, op.data, { merge: true });
-                else if (op.type === 'update') batch.update(op.ref, op.data);
-                else if (op.type === 'delete') batch.delete(op.ref);
-            });
-            await batch.commit();
-            console.log(`Committed chunk ${i / CHUNK_SIZE + 1} of ${Math.ceil(operations.length / CHUNK_SIZE)}`);
+    console.log("[Seeding] Initiating server-side ecosystem rebuild...");
+
+    // Helper to delete all docs in a collection using Admin SDK
+    const nukeCollection = async (collectionName: string) => {
+        const ref = adminDb.collection(collectionName);
+        try {
+            // @ts-ignore
+            if (adminDb.recursiveDelete) {
+                // @ts-ignore
+                await adminDb.recursiveDelete(ref);
+            } else {
+                const snap = await ref.get();
+                const batch = adminDb.batch();
+                snap.docs.forEach((d: any) => batch.delete(d.ref));
+                await batch.commit();
+            }
+        } catch (e) {
+            console.warn(`[Seeding] Could not purge ${collectionName}:`, e);
         }
     };
 
-    const ops: any[] = [];
+    console.log("[Seeding] Purging old data...");
+    const coreCols = [
+        "students", "master_villages", "master_classes", "master_sections", "master_class_sections",
+        "payments", "applications", "leaves", "teachers", "student_fee_ledgers", "search_index", "notices"
+    ];
+    for (const col of coreCols) {
+        await nukeCollection(col);
+    }
+
+    const firstNames = ["Aarav", "Advait", "Akash", "Anay", "Arjun", "Aryan", "Ayaan", "Dhruv", "Ishaan", "Kabir", "Madhav", "Reyansh", "Rudra", "Sai", "Shaurya", "Siddharth", "Tejas", "Vasudev", "Vihaan", "Viraj", "Aadhya", "Ananya", "Anvi", "Avni", "Diya", "Ira", "Ishani", "Kavya", "Myra", "Navya", "Priya", "Riya", "Saanvi", "Sara", "Shanaya", "Siya", "Tanvi", "Vanya", "Zoya"];
+    const lastNames = ["Sharma", "Verma", "Gupta", "Malhotra", "Kapoor", "Khanna", "Mehra", "Joshi", "Patel", "Shah", "Desai", "Goel", "Agarwal", "Reddy", "Yadav", "Singh", "Choudhary", "Rao", "Nair", "Iyer"];
+    const fatherNames = ["Vikram", "Suresh", "Rajeev", "Amit", "Manish", "Sanjay", "Vishnu", "Ramesh", "Kiran", "Prasad", "Basavaraj", "Mallikarjun", "Somesh", "Venkatesh"];
+    const villageNames = ["Miyapur", "Bachupally", "Nizampet", "Kukatpally", "Hyder Nagar", "Pragathi Nagar", "Beeramguda", "Ameenpur", "Patancheru", "Kondapur"];
+    const genders = ["male", "female"];
+
+    const getRandom = (arr: any[]) => arr[Math.floor(Math.random() * arr.length)];
+    const academicYearId = "2026-2027";
+
     const rtdbMaster: any = {
         villages: {},
         classes: {},
@@ -42,71 +63,49 @@ export const seedDemoData = async () => {
         }
     };
 
-    // Helper to delete all docs in a collection
-    const queueDeleteCollection = async (collectionName: string) => {
-        try {
-            const q = query(collection(db, collectionName));
-            const snapshot = await getDocs(q);
-            snapshot.docs.forEach((d) => {
-                ops.push({ ref: d.ref, type: 'delete' });
-            });
-        } catch (e) {
-            console.warn(`Could not purge ${collectionName}:`, e);
+    let batch = adminDb.batch();
+    let opCount = 0;
+
+    const commitBatch = async () => {
+        if (opCount > 0) {
+            await batch.commit();
+            batch = adminDb.batch();
+            opCount = 0;
         }
     };
 
-    console.log("Starting full system purge...");
-    await queueDeleteCollection("students");
-    await queueDeleteCollection("master_villages");
-    await queueDeleteCollection("master_classes");
-    await queueDeleteCollection("master_sections");
-    await queueDeleteCollection("master_class_sections");
-    await queueDeleteCollection("payments");
-    await queueDeleteCollection("applications");
-    await queueDeleteCollection("leaves");
-    await queueDeleteCollection("teachers");
-    await queueDeleteCollection("student_fee_ledgers");
-    await queueDeleteCollection("search_index");
-
-    const firstNames = ["Arjun", "Aaditya", "Vihaan", "Krishna", "Sai", "Ishaan", "Aarav", "Reyansh", "Aryan", "Abhimanyu", "Priya", "Ananya", "Diya", "Saanvi", "Aadhya", "Myra", "Ishani", "Anvi", "Kyra", "Aarohi"];
-    const lastNames = ["Sharma", "Verma", "Gupta", "Reddy", "Patel", "Singh", "Yadav", "Kumar", "Rao", "Choudhary"];
-    const fatherNames = ["Vikram", "Suresh", "Rajeev", "Amit", "Manish", "Sanjay", "Vishnu", "Ramesh", "Kiran", "Prasad"];
-    const villageNames = ["Miyapur", "Bachupally", "Nizampet", "Kukatpally", "Hyder Nagar", "Pragathi Nagar", "Beeramguda", "Ameenpur", "Patancheru", "Kondapur"];
-    const genders = ["male", "female"];
-
-    const getRandom = (arr: any[]) => arr[Math.floor(Math.random() * arr.length)];
-    const academicYearId = "2026-2027";
+    const addOp = async (ref: any, data: any) => {
+        batch.set(ref, data, { merge: true });
+        opCount++;
+        if (opCount === 450) await commitBatch();
+    };
 
     // 0. Academic Config
-    ops.push({
-        ref: doc(db, "config", "academic_years"),
-        type: 'set',
-        data: {
-            currentYear: academicYearId,
-            currentYearStartDate: "2026-06-01",
-            upcoming: ["2027-2028"],
-            history: [{ year: "2025-2026", startDate: "2025-06-01", archivedAt: Timestamp.now() }]
-        }
+    await addOp(adminDb.collection("config").doc("academic_years"), {
+        currentYear: academicYearId,
+        currentYearStartDate: "2026-06-01",
+        upcoming: ["2027-2028"],
+        history: [{ year: "2025-2026", startDate: "2025-06-01", archivedAt: Timestamp.now() }]
     });
 
-    // 1. Seed Master Data: Villages
+    // 1. Villages
     const villageIds: string[] = [];
     villageNames.forEach((name, i) => {
         const id = `VIL_${String(i + 1).padStart(3, '0')}`;
         villageIds.push(id);
         const data = { id, name, isActive: true, createdAt: Timestamp.now() };
-        ops.push({ ref: doc(db, "master_villages", id), type: 'set', data });
+        addOp(adminDb.collection("master_villages").doc(id), data);
         rtdbMaster.villages[id] = data;
     });
 
-    // 2. Seed Master Data: Classes & Sections
+    // 2. Classes & Sections
     const classData: { id: string, name: string }[] = [];
     for (let i = 1; i <= 10; i++) {
         const id = `CLS_${String(i).padStart(2, '0')}`;
         const name = i === 1 ? "Nursery" : i === 2 ? "LKG" : i === 3 ? "UKG" : `Class ${i - 3}`;
         classData.push({ id, name });
         const data = { id, name, isActive: true, order: i, createdAt: Timestamp.now() };
-        ops.push({ ref: doc(db, "master_classes", id), type: 'set', data });
+        addOp(adminDb.collection("master_classes").doc(id), data);
         rtdbMaster.classes[id] = data;
     }
 
@@ -116,25 +115,19 @@ export const seedDemoData = async () => {
     ];
     sections.forEach(s => {
         const data = { id: s.id, name: s.name, isActive: true, createdAt: Timestamp.now() };
-        ops.push({ ref: doc(db, "master_sections", s.id), type: 'set', data });
+        addOp(adminDb.collection("master_sections").doc(s.id), data);
         rtdbMaster.sections[s.id] = data;
     });
 
-    // 3. Class-Section Mapping
+    // 3. Mapping
     classData.forEach(c => {
         sections.forEach(s => {
             const id = `${c.id}_${s.id}`;
             const data = {
-                id,
-                classId: c.id,
-                className: c.name,
-                sectionId: s.id,
-                sectionName: s.name,
-                displayName: `${c.name} - ${s.name}`,
-                isActive: true,
-                createdAt: Timestamp.now()
+                id, classId: c.id, className: c.name, sectionId: s.id, sectionName: s.name,
+                displayName: `${c.name} - ${s.name}`, isActive: true, createdAt: Timestamp.now()
             };
-            ops.push({ ref: doc(db, "master_class_sections", id), type: 'set', data });
+            addOp(adminDb.collection("master_class_sections").doc(id), data);
             rtdbMaster.classSections[id] = data;
         });
     });
@@ -150,149 +143,173 @@ export const seedDemoData = async () => {
         ],
         updatedAt: Timestamp.now()
     };
-    ops.push({ ref: doc(db, "config", "fees"), type: 'set', data: feeConfig });
+    await addOp(adminDb.collection("config").doc("fees"), feeConfig);
 
-    // 5. Seed Students (Exactly 10 per section, 2 sections per class = 200 total)
+    // 5. Students (Exactly 200)
     let studentIdCounter = 1000;
-
-    console.log("Generating 200 enterprise students...");
+    console.log("[Seeding] Generating 200 students with financial records...");
     for (const cls of classData) {
         for (const sec of sections) {
             for (let i = 1; i <= 10; i++) {
                 studentIdCounter++;
                 const schoolId = `SHS${studentIdCounter}`;
-
                 const fName = getRandom(firstNames);
                 const lName = getRandom(lastNames);
                 const sName = `${fName} ${lName}`;
-                const pName = `${getRandom(fatherNames)} ${lName}`;
                 const mobile = `9${Math.floor(100000000 + Math.random() * 900000000)}`;
                 const vId = getRandom(villageIds);
                 const vName = villageNames[villageIds.indexOf(vId)];
-                const gender = getRandom(genders);
 
-                const studentData = {
-                    schoolId,
-                    studentName: sName,
-                    firstName: fName,
-                    lastName: lName,
-                    parentName: pName,
-                    parentMobile: mobile,
-                    villageId: vId,
-                    villageName: vName,
-                    classId: cls.id,
-                    className: cls.name,
-                    sectionId: sec.id,
-                    sectionName: sec.name,
-                    status: "ACTIVE",
-                    academicYear: academicYearId,
-                    gender,
-                    dateOfBirth: `201${Math.floor(Math.random() * 9)}-${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`,
-                    transportRequired: Math.random() > 0.7,
-                    admissionNumber: `ADM/${academicYearId}/${studentIdCounter}`,
-                    address: `${i}, Main Street, ${vName}`,
-                    createdAt: Timestamp.now(),
-                    recoveryPassword: mobile,
-                    type: "student",
-                    version: 1
-                };
-
-                ops.push({ ref: doc(db, "students", schoolId), type: 'set', data: studentData });
-
-                // 5.1 Fee Ledger
-                const totalTermFee = feeConfig.terms.reduce((acc, t) => acc + (t.amounts[cls.name] || 0), 0);
-                const ledgerItems = feeConfig.terms.map(t => ({
-                    id: `TERM_${t.id}`,
-                    type: "TERM",
-                    name: t.name,
-                    dueDate: t.dueDate,
-                    amount: t.amounts[cls.name],
-                    paidAmount: 0,
-                    status: "PENDING"
-                }));
-
-                const ledgerData = {
-                    studentId: schoolId,
-                    academicYearId: academicYearId,
-                    classId: cls.id,
-                    className: cls.name,
-                    totalFee: totalTermFee,
-                    totalPaid: 0,
-                    status: "PENDING",
-                    items: ledgerItems,
-                    updatedAt: new Date().toISOString()
-                };
-                ops.push({ ref: doc(db, "student_fee_ledgers", `${schoolId}_${academicYearId}`), type: 'set', data: ledgerData });
-
-                // 5.2 Search Index
-                const keywords = [sName, schoolId, mobile, cls.name, vName, fName, lName].map(v => String(v).toLowerCase());
-                ops.push({
-                    ref: doc(db, "search_index", schoolId),
-                    type: 'set',
-                    data: {
-                        id: schoolId, entityId: schoolId, type: "student",
-                        title: sName, subtitle: `${cls.name} | ${vName}`,
-                        url: `/admin/students/${schoolId}`,
-                        keywords, updatedAt: Timestamp.now()
+                // Generate Keywords
+                const searchTags = new Set<string>();
+                [sName, schoolId, mobile, vName, fName, lName].forEach(term => {
+                    const normalized = String(term).toLowerCase().trim();
+                    searchTags.add(normalized);
+                    if (normalized.length >= 2) {
+                        for (let k = 2; k <= normalized.length; k++) {
+                            searchTags.add(normalized.substring(0, k));
+                        }
+                    }
+                });
+                sName.toLowerCase().split(/\s+/).forEach(token => {
+                    if (token.length >= 2) {
+                        for (let k = 2; k <= token.length; k++) {
+                            searchTags.add(token.substring(0, k));
+                        }
                     }
                 });
 
-                // 5.3 Random Payments
-                if (Math.random() > 0.4) {
-                    const payAmount = Math.random() > 0.8 ? totalTermFee : (feeConfig.terms[0].amounts[cls.name] || 5000);
-                    ops.push({
-                        ref: doc(db, "payments", `PAY_${schoolId}_${i}`),
-                        type: 'set',
-                        data: {
-                            studentId: schoolId, studentName: sName, amount: payAmount,
-                            method: getRandom(["cash", "upi", "bank_transfer"]),
-                            date: Timestamp.now(), status: "success", createdAt: Timestamp.now()
-                        }
+                const studentData = {
+                    schoolId, studentName: sName, firstName: fName, lastName: lName,
+                    parentName: `${getRandom(fatherNames)} ${lName}`, parentMobile: mobile,
+                    villageId: vId, villageName: vName, classId: cls.id, className: cls.name,
+                    sectionId: sec.id, sectionName: sec.name, status: "ACTIVE", academicYear: academicYearId,
+                    gender: getRandom(genders), dateOfBirth: `201${Math.floor(Math.random() * 9)}-06-01`,
+                    transportRequired: Math.random() > 0.7, admissionNumber: `ADM/26/${studentIdCounter}`,
+                    address: `${i}, Main Street, ${vName}`, createdAt: Timestamp.now(), recoveryPassword: mobile, type: "student",
+                    keywords: Array.from(searchTags)
+                };
+                await addOp(adminDb.collection("students").doc(schoolId), studentData);
+
+                // Ledger
+                const totalTermFee = feeConfig.terms.reduce((acc, t) => acc + (t.amounts[cls.name] || 0), 0);
+                const ledgerItems = feeConfig.terms.map(t => ({
+                    id: `TERM_${t.id}`, type: "TERM", name: t.name, dueDate: t.dueDate,
+                    amount: t.amounts[cls.name], paidAmount: 0, status: "PENDING"
+                }));
+                await addOp(adminDb.collection("student_fee_ledgers").doc(`${schoolId}_${academicYearId}`), {
+                    studentId: schoolId, academicYearId, classId: cls.id, className: cls.name,
+                    totalFee: totalTermFee, totalPaid: 0, status: "PENDING", items: ledgerItems, updatedAt: new Date().toISOString()
+                });
+
+                // Search Index (Legacy/Global)
+                await addOp(adminDb.collection("search_index").doc(schoolId), {
+                    id: schoolId, entityId: schoolId, type: "student",
+                    title: sName, subtitle: `${cls.name} | ${vName}`,
+                    url: `/admin/students/${schoolId}`,
+                    keywords: Array.from(searchTags),
+                    updatedAt: Timestamp.now()
+                });
+
+                // Random Payment
+                if (Math.random() > 0.5) {
+                    await addOp(adminDb.collection("payments").doc(`PAY_${schoolId}`), {
+                        studentId: schoolId, studentName: sName, amount: 5000,
+                        method: "cash", date: Timestamp.now(), status: "success", createdAt: Timestamp.now()
                     });
-                    if (payAmount >= totalTermFee) { ledgerData.totalPaid = totalTermFee; ledgerData.status = "PAID"; }
-                    else { ledgerData.totalPaid = payAmount; ledgerData.status = "PARTIAL"; }
                 }
             }
         }
     }
 
-    // 6. HR & STAFF
-    const staffSubjects = ["math", "science", "english"];
-    for (let i = 1; i <= 5; i++) {
-        const tId = `TCH_${String(i).padStart(3, '0')}`;
-        const tName = `${getRandom(firstNames)} ${getRandom(lastNames)}`;
-        const data = { id: tId, teacherId: tId, name: tName, subject: getRandom(staffSubjects), status: "ACTIVE", createdAt: Timestamp.now() };
-        ops.push({ ref: doc(db, "teachers", tId), type: 'set', data });
-
-        if (i % 2 === 0) {
-            ops.push({
-                ref: doc(collection(db, "leaves")),
-                type: 'set',
-                data: { staffId: tId, staffName: tName, type: "Casual Leave", startDate: "2026-03-01", endDate: "2026-03-01", status: "PENDING", appliedAt: Timestamp.now() }
-            });
-        }
-    }
-
-    // 7. CMS: Notices
-    const notices = [
-        { title: "Academic Year 2026-27 Enrollment", content: "Admissions are now open for all grades from Nursery to Class 10.", audience: "ALL", urgency: "IMPORTANT" },
-        { title: "Annual Sports Meet postponed", content: "Due to rain, the sports meet is rescheduled to March 15th.", audience: "STUDENTS", urgency: "NORMAL" }
+    // 6. HR Data (Staff Roles)
+    console.log("[Seeding] Generating HR data...");
+    const staffRoles = [
+        { code: "DRIVER", name: "Driver", hasLogin: false },
+        { code: "CLEANER", name: "Cleaner", hasLogin: false },
+        { code: "WATCHMAN", name: "Watchman", hasLogin: false },
+        { code: "ACCOUNTANT", name: "Accountant", hasLogin: true },
+        { code: "CLERK", name: "Clerk", hasLogin: true },
+        { code: "PRINCIPAL", name: "Principal", hasLogin: true }
     ];
-    notices.forEach(n => {
-        ops.push({
-            ref: doc(collection(db, "notices")),
-            type: 'set',
-            data: { ...n, date: Timestamp.now(), status: "PUBLISHED", createdAt: Timestamp.now() }
-        });
+    staffRoles.forEach(r => {
+        addOp(adminDb.collection("master_staff_roles").doc(r.code), r);
     });
 
-    // FINAL SYNC & COMMIT
-    console.log("Syncing Master Data to RTDB...");
-    await set(ref(rtdb, 'master'), rtdbMaster);
+    // 7. Teachers
+    const teacherNames = [
+        "Dr. Venkat Rao", "Mrs. Lakshmi Devi", "Mr. Satyanarayana M", "Dr. Geeta Pillai",
+        "Prof. K. Subramaniam", "Ms. Rajeshwari Reddy", "Mr. Anand Murthy", "Mrs. Shanthi Bhushan",
+        "Dr. Pradeep Kumar", "Ms. Nirmala Sitharaman", "Mr. Jagadeesh Chandra", "Mrs. Padmaja Naidu",
+        "Mr. Bhaskar Rao", "Ms. Srilatha V", "Dr. Murali Manohar"
+    ];
+    for (let i = 0; i < teacherNames.length; i++) {
+        const id = `TCH${100 + i}`;
+        const name = teacherNames[i];
+        const mobile = `98480${20000 + i}`;
+        const tags = new Set<string>();
+        [name, id, mobile].forEach(t => {
+            const n = String(t).toLowerCase();
+            tags.add(n);
+            if (n.length >= 2) {
+                for (let k = 2; k <= n.length; k++) tags.add(n.substring(0, k));
+            }
+        });
+        name.toLowerCase().split(/\s+/).forEach(t => { if (t.length >= 2) for (let k = 2; k <= t.length; k++) tags.add(t.substring(0, k)); });
 
-    console.log(`Committing ${ops.length} Firestore operations in chunks...`);
-    await commitInChunks(ops);
+        await addOp(adminDb.collection("teachers").doc(id), {
+            id, schoolId: id, name, mobile, status: "ACTIVE",
+            salary: 25000 + (i * 500), recoveryPassword: mobile,
+            createdAt: Timestamp.now(), keywords: Array.from(tags)
+        });
+        await addOp(adminDb.collection("search_index").doc(id), {
+            id, entityId: id, type: "teacher", title: name, subtitle: `Faculty | ${id}`,
+            url: `/admin/faculty?tab=directory`, keywords: Array.from(tags), updatedAt: Timestamp.now()
+        });
+    }
 
-    console.log("✅ Demo Seeding Complete. System is now enterprise-populated.");
+    // 8. Staff
+    const staffNames = ["Somulu", "Yadiah", "Narsimha", "Laxmi", "Bharat", "Mallaiah", "Pentamma", "Ramulu", "Sattiah", "Chandraiah"];
+    const sRoles = ["DRIVER", "CLEANER", "WATCHMAN", "DRIVER", "WATCHMAN", "DRIVER", "CLEANER", "WATCHMAN", "WATCHMAN", "CLEANER"];
+    for (let i = 0; i < staffNames.length; i++) {
+        const id = `STF${500 + i}`;
+        const name = staffNames[i];
+        const mobile = `91000${60000 + i}`;
+        const tags = new Set<string>();
+        [name, id, mobile].forEach(t => {
+            const n = String(t).toLowerCase();
+            tags.add(n);
+            if (n.length >= 2) {
+                for (let k = 2; k <= n.length; k++) tags.add(n.substring(0, k));
+            }
+        });
+
+        await addOp(adminDb.collection("staff").doc(id), {
+            id, schoolId: id, name, mobile, status: "ACTIVE",
+            roleCode: sRoles[i], baseSalary: 12000 + (i * 200),
+            createdAt: Timestamp.now(), keywords: Array.from(tags)
+        });
+        await addOp(adminDb.collection("search_index").doc(id), {
+            id, entityId: id, type: "staff", title: name, subtitle: `${sRoles[i]} | ${id}`,
+            url: `/admin/faculty?tab=directory`, keywords: Array.from(tags), updatedAt: Timestamp.now()
+        });
+    }
+
+    // 9. Notices
+    const notices = [
+        { title: "Academic Year 2026-27 Enrollment", content: "Admissions open.", audience: "ALL", urgency: "IMPORTANT" },
+        { title: "Annual Day 2026", content: "Coming soon.", audience: "STUDENTS", urgency: "NORMAL" }
+    ];
+    notices.forEach(n => {
+        addOp(adminDb.collection("notices").doc(), { ...n, date: Timestamp.now(), status: "PUBLISHED", createdAt: Timestamp.now() });
+    });
+
+    await commitBatch();
+
+    // 7. RTDB Sync
+    console.log("[Seeding] Syncing Master Data to Realtime Database...");
+    await adminRtdb.ref("master").set(rtdbMaster);
+
+    console.log("[Seeding] Success. 200 student ecosystem built.");
     return true;
 };

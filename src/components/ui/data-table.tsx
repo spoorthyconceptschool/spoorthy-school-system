@@ -9,7 +9,7 @@ import {
 } from "@/components/ui/table";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
-import { ChevronLeft, ChevronRight, MoreHorizontal, ArrowUpDown } from "lucide-react";
+import { ChevronLeft, ChevronRight, MoreVertical, ArrowUpDown } from "lucide-react";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -123,7 +123,7 @@ export function DataTable<T>({
                                                 <DropdownMenuTrigger asChild>
                                                     <Button variant="ghost" className="h-7 w-7 md:h-8 md:w-8 p-0 hover:bg-white/10 text-muted-foreground hover:text-white">
                                                         <span className="sr-only">Open menu</span>
-                                                        <MoreHorizontal className="h-3 w-3 md:h-4 md:w-4" />
+                                                        <MoreVertical className="h-3 w-3 md:h-4 md:w-4" />
                                                     </Button>
                                                 </DropdownMenuTrigger>
                                                 <DropdownMenuContent align="end" className="bg-[#0A192F] border-white/10 backdrop-blur-xl rounded-xl">

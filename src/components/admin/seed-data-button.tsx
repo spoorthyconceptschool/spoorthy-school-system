@@ -43,22 +43,22 @@ export function SeedDataButton() {
     };
 
     const seedData = async () => {
-        console.log("Ultimate Seed initiated. Requesting ecosystem rebuild...");
+        console.log("Structured Seed initiated. Requesting ecosystem build...");
         setLoading(true);
 
         try {
-            const res = await fetch("/api/admin/demo/super-seed");
+            const res = await fetch("/api/setup-data");
             const data = await res.json();
 
             if (data.success) {
-                console.log("Ultimate Seed Response:", data);
+                console.log("Ecosystem Build Response:", data);
                 toast({
-                    title: "System Rebuilt",
-                    description: `Successfully seeded master data, students, teachers, and finances.`,
+                    title: "System Ready",
+                    description: `Successfully seeded 200 students and master data.`,
                     type: "success"
                 });
 
-                // Optional: Trigger a refresh after a small delay to let RTDB listeners settle
+                // Optional: Trigger a refresh
                 setTimeout(() => window.location.reload(), 1500);
             } else {
                 throw new Error(data.error || "Seeding API failed");
@@ -71,47 +71,11 @@ export function SeedDataButton() {
         }
     };
 
-    const megaSeedData = async () => {
-        const firstConfirm = window.confirm("WARNING: This will generate 2000+ students, 5 exams, and 10k+ result documents. This operation is heavy. Continue?");
-        if (!firstConfirm) return;
-        const secondConfirm = window.confirm("Are you absolutely sure? This will overwrite existing student and exam data.");
-        if (!secondConfirm) return;
-
-        console.log("Mega Seed initiated. Building high-load dataset...");
-        setLoading(true);
-
-        try {
-            const res = await fetch("/api/admin/demo/mega-seed");
-            const data = await res.json();
-
-            if (data.success) {
-                console.log("Mega Seed Response:", data);
-                toast({
-                    title: "Scale Test Ready",
-                    description: `Successfully generated 2000 students and a full academic year of results.`,
-                    type: "success"
-                });
-                setTimeout(() => window.location.reload(), 2000);
-            } else {
-                throw new Error(data.error || "Mega Seed API failed");
-            }
-        } catch (e: any) {
-            console.error("Mega Seed Error:", e);
-            toast({ title: "Mega Seed Failed", description: e.message, type: "error" });
-        } finally {
-            setLoading(false);
-        }
-    };
-
     return (
         <div className="flex gap-2">
             <Button onClick={seedData} variant="outline" className="border-dashed" disabled={loading || settingLogins}>
                 {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Database className="w-4 h-4 mr-2" />}
                 Seed Data
-            </Button>
-            <Button onClick={megaSeedData} variant="outline" className="border-dashed border-purple-500/50 text-purple-400" disabled={loading || settingLogins}>
-                {loading ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Database className="w-4 h-4 mr-2" />}
-                Mega Seed (2k)
             </Button>
             <Button
                 onClick={setupLogins}
