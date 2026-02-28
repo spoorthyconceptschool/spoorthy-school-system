@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Search as SearchIcon, Loader2, X, ChevronRight, User, CreditCard, FileText, Zap } from "lucide-react";
+import { Search as SearchIcon, Loader2, X, ChevronRight, User, CreditCard, FileText, Zap, Briefcase } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { searchGlobal, SearchIndexItem } from "@/lib/search";
@@ -35,7 +35,7 @@ export function UniversalSearch() {
     // Execute Search
     useEffect(() => {
         const fetchResults = async () => {
-            if (debouncedQuery.length < 2) {
+            if (debouncedQuery.length < 1) {
                 setResults([]);
                 setOpen(false); // Close if query too short or cleared
                 return;
@@ -119,6 +119,7 @@ export function UniversalSearch() {
             case 'student': return <User className="w-4 h-4 text-blue-400" />;
             case 'payment': return <CreditCard className="w-4 h-4 text-green-400" />;
             case 'teacher': return <User className="w-4 h-4 text-purple-400" />;
+            case 'staff': return <Briefcase className="w-4 h-4 text-zinc-400" />;
             case 'action': return <Zap className="w-4 h-4 text-amber-400" />;
             default: return <FileText className="w-4 h-4 text-gray-400" />;
         }
@@ -136,7 +137,7 @@ export function UniversalSearch() {
                     type="text"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    onFocus={() => { if (results.length > 0 && query.length >= 2) setOpen(true); }}
+                    onFocus={() => { if (results.length > 0 && query.length >= 1) setOpen(true); }}
                     onKeyDown={(e) => {
                         if (e.key === "ArrowDown" || e.key === "ArrowUp") {
                             e.preventDefault();
@@ -167,8 +168,8 @@ export function UniversalSearch() {
             </div>
 
             {/* Results Dropdown */}
-            {open && query.length >= 2 && (
-                <div className="absolute top-12 left-0 right-0 z-50 bg-black/90 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2">
+            {open && query.length >= 1 && (
+                <div className="absolute top-12 left-0 w-[calc(100vw-32px)] xs:w-[350px] md:w-full max-w-[500px] z-50 bg-black/90 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2">
                     {results.length === 0 && !loading ? (
                         <div className="p-4 text-center text-sm text-muted-foreground">
                             No results found for "{query}"
@@ -195,6 +196,8 @@ export function UniversalSearch() {
                                             <span className="font-medium text-sm text-foreground truncate">{item.title}</span>
                                             {item.type === 'student' && <span className="text-[10px] uppercase tracking-wider bg-blue-500/10 text-blue-400 px-1.5 rounded">Student</span>}
                                             {item.type === 'payment' && <span className="text-[10px] uppercase tracking-wider bg-green-500/10 text-green-400 px-1.5 rounded">Fee</span>}
+                                            {item.type === 'teacher' && <span className="text-[10px] uppercase tracking-wider bg-purple-500/10 text-purple-400 px-1.5 rounded">Teacher</span>}
+                                            {item.type === 'staff' && <span className="text-[10px] uppercase tracking-wider bg-zinc-500/10 text-zinc-400 px-1.5 rounded">Staff</span>}
                                         </div>
                                         <p className="text-xs text-muted-foreground truncate">{item.subtitle}</p>
                                     </div>
