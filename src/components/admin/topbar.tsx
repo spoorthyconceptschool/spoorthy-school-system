@@ -76,8 +76,8 @@ export function TopBar() {
                             <div className="w-full h-full bg-[#64FFDA]/10 flex items-center justify-center text-[#0A192F] font-bold font-display text-xs">S</div>
                         )}
                     </div>
-                    {/* Hide name on tiny screens to make room for Search */}
-                    <span className="font-display font-black text-white text-[10px] xs:text-sm tracking-tight truncate max-w-[80px] sm:max-w-[150px] hidden sm:block">
+                    {/* Hide name on tiny/medium screens to make room for Search and dev tools */}
+                    <span className="font-display font-black text-white text-[10px] xs:text-sm tracking-tight truncate max-w-[80px] sm:max-w-[150px] hidden lg:block">
                         {branding?.schoolName || "Spoorthy School"}
                     </span>
                 </div>
