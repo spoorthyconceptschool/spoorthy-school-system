@@ -229,7 +229,9 @@ export async function searchGlobal(searchTerm: string, limitCount = 8): Promise<
         snapshots.forEach(snap => {
             snap.docs.forEach(doc => {
                 const item = doc.data() as SearchIndexItem;
-                hitMap.set(item.id, item);
+                const id = item.id || doc.id;
+                if (!item.id) item.id = doc.id;
+                hitMap.set(id, item);
             });
         });
 

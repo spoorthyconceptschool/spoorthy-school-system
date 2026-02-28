@@ -23,10 +23,15 @@ export const seedDemoData = async () => {
                 // @ts-ignore
                 await adminDb.recursiveDelete(ref);
             } else {
-                const snap = await ref.get();
-                const batch = adminDb.batch();
-                snap.docs.forEach((d: any) => batch.delete(d.ref));
-                await batch.commit();
+                // Manual chunked delete for environments/versions without recursiveDelete
+                while (true) {
+                    const snap = await ref.limit(500).get();
+                    if (snap.empty) break;
+                    const batch = adminDb.batch();
+                    snap.docs.forEach((d: any) => batch.delete(d.ref));
+                    await batch.commit();
+                    if (snap.size < 500) break;
+                }
             }
         } catch (e) {
             console.warn(`[Seeding] Could not purge ${collectionName}:`, e);
@@ -36,7 +41,7 @@ export const seedDemoData = async () => {
     console.log("[Seeding] Purging old data...");
     const coreCols = [
         "students", "master_villages", "master_classes", "master_sections", "master_class_sections",
-        "payments", "applications", "leaves", "teachers", "student_fee_ledgers", "search_index", "notices"
+        "payments", "applications", "leaves", "teachers", "staff", "student_fee_ledgers", "search_index", "notices"
     ];
     for (const col of coreCols) {
         await nukeCollection(col);
@@ -90,13 +95,13 @@ export const seedDemoData = async () => {
 
     // 1. Villages
     const villageIds: string[] = [];
-    villageNames.forEach((name, i) => {
+    for (const [i, name] of villageNames.entries()) {
         const id = `VIL_${String(i + 1).padStart(3, '0')}`;
         villageIds.push(id);
         const data = { id, name, isActive: true, createdAt: Timestamp.now() };
-        addOp(adminDb.collection("master_villages").doc(id), data);
+        await addOp(adminDb.collection("master_villages").doc(id), data);
         rtdbMaster.villages[id] = data;
-    });
+    }
 
     // 2. Classes & Sections
     const classData: { id: string, name: string }[] = [];
@@ -105,7 +110,7 @@ export const seedDemoData = async () => {
         const name = i === 1 ? "Nursery" : i === 2 ? "LKG" : i === 3 ? "UKG" : `Class ${i - 3}`;
         classData.push({ id, name });
         const data = { id, name, isActive: true, order: i, createdAt: Timestamp.now() };
-        addOp(adminDb.collection("master_classes").doc(id), data);
+        await addOp(adminDb.collection("master_classes").doc(id), data);
         rtdbMaster.classes[id] = data;
     }
 
@@ -113,24 +118,24 @@ export const seedDemoData = async () => {
         { id: "SEC_A", name: "A" },
         { id: "SEC_B", name: "B" }
     ];
-    sections.forEach(s => {
+    for (const s of sections) {
         const data = { id: s.id, name: s.name, isActive: true, createdAt: Timestamp.now() };
-        addOp(adminDb.collection("master_sections").doc(s.id), data);
+        await addOp(adminDb.collection("master_sections").doc(s.id), data);
         rtdbMaster.sections[s.id] = data;
-    });
+    }
 
     // 3. Mapping
-    classData.forEach(c => {
-        sections.forEach(s => {
+    for (const c of classData) {
+        for (const s of sections) {
             const id = `${c.id}_${s.id}`;
             const data = {
                 id, classId: c.id, className: c.name, sectionId: s.id, sectionName: s.name,
                 displayName: `${c.name} - ${s.name}`, isActive: true, createdAt: Timestamp.now()
             };
-            addOp(adminDb.collection("master_class_sections").doc(id), data);
+            await addOp(adminDb.collection("master_class_sections").doc(id), data);
             rtdbMaster.classSections[id] = data;
-        });
-    });
+        }
+    }
 
     // 4. Global Fee Config
     const feeAmounts: Record<string, number> = {};
@@ -232,9 +237,9 @@ export const seedDemoData = async () => {
         { code: "CLERK", name: "Clerk", hasLogin: true },
         { code: "PRINCIPAL", name: "Principal", hasLogin: true }
     ];
-    staffRoles.forEach(r => {
-        addOp(adminDb.collection("master_staff_roles").doc(r.code), r);
-    });
+    for (const r of staffRoles) {
+        await addOp(adminDb.collection("master_staff_roles").doc(r.code), r);
+    }
 
     // 7. Teachers
     const teacherNames = [
@@ -300,15 +305,19 @@ export const seedDemoData = async () => {
         { title: "Academic Year 2026-27 Enrollment", content: "Admissions open.", audience: "ALL", urgency: "IMPORTANT" },
         { title: "Annual Day 2026", content: "Coming soon.", audience: "STUDENTS", urgency: "NORMAL" }
     ];
-    notices.forEach(n => {
-        addOp(adminDb.collection("notices").doc(), { ...n, date: Timestamp.now(), status: "PUBLISHED", createdAt: Timestamp.now() });
-    });
+    for (const n of notices) {
+        await addOp(adminDb.collection("notices").doc(), { ...n, date: Timestamp.now(), status: "PUBLISHED", createdAt: Timestamp.now() });
+    }
 
     await commitBatch();
 
-    // 7. RTDB Sync
+    // 10. RTDB Sync
     console.log("[Seeding] Syncing Master Data to Realtime Database...");
-    await adminRtdb.ref("master").set(rtdbMaster);
+    try {
+        await adminRtdb.ref("master").set(rtdbMaster);
+    } catch (e) {
+        console.warn("[Seeding] RTDB Sync skipped or failed:", e);
+    }
 
     console.log("[Seeding] Success. 200 student ecosystem built.");
     return true;
