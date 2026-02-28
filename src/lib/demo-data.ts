@@ -170,15 +170,15 @@ export const seedDemoData = async () => {
                 [sName, schoolId, mobile, vName, fName, lName].forEach(term => {
                     const normalized = String(term).toLowerCase().trim();
                     searchTags.add(normalized);
-                    if (normalized.length >= 2) {
-                        for (let k = 2; k <= normalized.length; k++) {
+                    if (normalized.length >= 1) {
+                        for (let k = 1; k <= normalized.length; k++) {
                             searchTags.add(normalized.substring(0, k));
                         }
                     }
                 });
                 sName.toLowerCase().split(/\s+/).forEach(token => {
-                    if (token.length >= 2) {
-                        for (let k = 2; k <= token.length; k++) {
+                    if (token.length >= 1) {
+                        for (let k = 1; k <= token.length; k++) {
                             searchTags.add(token.substring(0, k));
                         }
                     }
@@ -256,11 +256,11 @@ export const seedDemoData = async () => {
         [name, id, mobile].forEach(t => {
             const n = String(t).toLowerCase();
             tags.add(n);
-            if (n.length >= 2) {
-                for (let k = 2; k <= n.length; k++) tags.add(n.substring(0, k));
+            if (n.length >= 1) {
+                for (let k = 1; k <= n.length; k++) tags.add(n.substring(0, k));
             }
         });
-        name.toLowerCase().split(/\s+/).forEach(t => { if (t.length >= 2) for (let k = 2; k <= t.length; k++) tags.add(t.substring(0, k)); });
+        name.toLowerCase().split(/\s+/).forEach(t => { if (t.length >= 1) for (let k = 1; k <= t.length; k++) tags.add(t.substring(0, k)); });
 
         await addOp(adminDb.collection("teachers").doc(id), {
             id, schoolId: id, name, mobile, status: "ACTIVE",
@@ -284,8 +284,8 @@ export const seedDemoData = async () => {
         [name, id, mobile].forEach(t => {
             const n = String(t).toLowerCase();
             tags.add(n);
-            if (n.length >= 2) {
-                for (let k = 2; k <= n.length; k++) tags.add(n.substring(0, k));
+            if (n.length >= 1) {
+                for (let k = 1; k <= n.length; k++) tags.add(n.substring(0, k));
             }
         });
 

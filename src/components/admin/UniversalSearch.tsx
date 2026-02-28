@@ -35,7 +35,7 @@ export function UniversalSearch() {
     // Execute Search
     useEffect(() => {
         const fetchResults = async () => {
-            if (debouncedQuery.length < 2) {
+            if (debouncedQuery.length < 1) {
                 setResults([]);
                 setOpen(false); // Close if query too short or cleared
                 return;
@@ -136,7 +136,7 @@ export function UniversalSearch() {
                     type="text"
                     value={query}
                     onChange={(e) => setQuery(e.target.value)}
-                    onFocus={() => { if (results.length > 0 && query.length >= 2) setOpen(true); }}
+                    onFocus={() => { if (results.length > 0 && query.length >= 1) setOpen(true); }}
                     onKeyDown={(e) => {
                         if (e.key === "ArrowDown" || e.key === "ArrowUp") {
                             e.preventDefault();
@@ -167,8 +167,8 @@ export function UniversalSearch() {
             </div>
 
             {/* Results Dropdown */}
-            {open && query.length >= 2 && (
-                <div className="absolute top-12 left-0 right-0 z-50 bg-black/90 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2">
+            {open && query.length >= 1 && (
+                <div className="absolute top-12 left-0 w-[calc(100vw-32px)] xs:w-[350px] md:w-full max-w-[500px] z-50 bg-black/90 backdrop-blur-xl border border-white/10 rounded-xl shadow-2xl overflow-hidden animate-in fade-in slide-in-from-top-2">
                     {results.length === 0 && !loading ? (
                         <div className="p-4 text-center text-sm text-muted-foreground">
                             No results found for "{query}"

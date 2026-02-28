@@ -83,7 +83,7 @@ export function TopBar() {
             </div>
 
             {/* Search - Pill shaped, integrated */}
-            <div className="flex-1 min-w-0 max-w-[140px] xs:max-w-[180px] sm:max-w-xl mx-2 md:mx-4 hidden sm:block">
+            <div className="flex-1 min-w-0 max-w-[200px] xs:max-w-[300px] md:max-w-xl mx-2 md:mx-4 hidden sm:block">
                 <UniversalSearch />
             </div>
 
