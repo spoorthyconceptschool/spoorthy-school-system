@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Search as SearchIcon, Loader2, X, ChevronRight, User, CreditCard, FileText, Zap } from "lucide-react";
+import { Search as SearchIcon, Loader2, X, ChevronRight, User, CreditCard, FileText, Zap, Briefcase } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { cn } from "@/lib/utils";
 import { searchGlobal, SearchIndexItem } from "@/lib/search";
@@ -119,6 +119,7 @@ export function UniversalSearch() {
             case 'student': return <User className="w-4 h-4 text-blue-400" />;
             case 'payment': return <CreditCard className="w-4 h-4 text-green-400" />;
             case 'teacher': return <User className="w-4 h-4 text-purple-400" />;
+            case 'staff': return <Briefcase className="w-4 h-4 text-zinc-400" />;
             case 'action': return <Zap className="w-4 h-4 text-amber-400" />;
             default: return <FileText className="w-4 h-4 text-gray-400" />;
         }
@@ -195,6 +196,8 @@ export function UniversalSearch() {
                                             <span className="font-medium text-sm text-foreground truncate">{item.title}</span>
                                             {item.type === 'student' && <span className="text-[10px] uppercase tracking-wider bg-blue-500/10 text-blue-400 px-1.5 rounded">Student</span>}
                                             {item.type === 'payment' && <span className="text-[10px] uppercase tracking-wider bg-green-500/10 text-green-400 px-1.5 rounded">Fee</span>}
+                                            {item.type === 'teacher' && <span className="text-[10px] uppercase tracking-wider bg-purple-500/10 text-purple-400 px-1.5 rounded">Teacher</span>}
+                                            {item.type === 'staff' && <span className="text-[10px] uppercase tracking-wider bg-zinc-500/10 text-zinc-400 px-1.5 rounded">Staff</span>}
                                         </div>
                                         <p className="text-xs text-muted-foreground truncate">{item.subtitle}</p>
                                     </div>

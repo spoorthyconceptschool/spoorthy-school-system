@@ -71,7 +71,7 @@ export function DataTable<T>({
                         <TableRow className="border-white/10 hover:bg-transparent">
                             {columns.map((col) => (
                                 <TableHead
-                                    key={col.key}
+                                    key={`head-${col.key}`}
                                     className={cn(
                                         "text-muted-foreground font-black uppercase text-[7px] md:text-[10px] tracking-widest h-8 md:h-12 whitespace-nowrap px-2 md:px-6 italic",
                                         col.headerClassName
@@ -80,64 +80,67 @@ export function DataTable<T>({
                                     {col.header}
                                 </TableHead>
                             ))}
-                            {actions && <TableHead className="w-[30px] md:w-[50px] whitespace-nowrap px-2 md:px-6"></TableHead>}
+                            {actions && <TableHead key="head-actions" className="w-[30px] md:w-[50px] whitespace-nowrap px-2 md:px-6"></TableHead>}
                         </TableRow>
                     </TableHeader>
                     <TableBody>
                         {paginatedData.length === 0 ? (
-                            <TableRow>
+                            <TableRow key="no-results">
                                 <TableCell colSpan={columns.length + (actions ? 1 : 0)} className="h-24 md:h-32 text-center text-muted-foreground border-white/10 whitespace-nowrap text-[10px] md:text-sm italic">
                                     No results found.
                                 </TableCell>
                             </TableRow>
                         ) : (
-                            paginatedData.map((item, index) => (
-                                <TableRow
-                                    key={(item as any).id || index}
-                                    className={cn(
-                                        "border-white/5 transition-all duration-300 hover:bg-[#64FFDA]/5 group cursor-default",
-                                        onRowClick && "cursor-pointer"
-                                    )}
-                                    onClick={() => onRowClick?.(item)}
-                                >
-                                    {columns.map((col) => (
-                                        <TableCell
-                                            key={`${(item as any).id || index}-${col.key}`}
-                                            className={cn(
-                                                "py-2 md:py-4 px-2 md:px-6 font-medium whitespace-nowrap text-[10px] md:text-sm",
-                                                col.cellClassName
-                                            )}
-                                        >
-                                            <div className="flex flex-col">
-                                                {col.render ? col.render(item, index) : (
-                                                    <span className="text-white group-hover:text-accent transition-colors">
-                                                        {(item as any)[col.key]}
-                                                    </span>
+                            paginatedData.map((item, index) => {
+                                const rowId = (item as any).id || (item as any).schoolId || index;
+                                return (
+                                    <TableRow
+                                        key={`row-${rowId}`}
+                                        className={cn(
+                                            "border-white/5 transition-all duration-300 hover:bg-[#64FFDA]/5 group cursor-default",
+                                            onRowClick && "cursor-pointer"
+                                        )}
+                                        onClick={() => onRowClick?.(item)}
+                                    >
+                                        {columns.map((col) => (
+                                            <TableCell
+                                                key={`cell-${rowId}-${col.key}`}
+                                                className={cn(
+                                                    "py-2 md:py-4 px-2 md:px-6 font-medium whitespace-nowrap text-[10px] md:text-sm",
+                                                    col.cellClassName
                                                 )}
-                                            </div>
-                                        </TableCell>
-                                    ))}
-                                    {actions && (
-                                        <TableCell className="px-2 md:px-6">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" className="h-7 w-7 md:h-8 md:w-8 p-0 hover:bg-white/10 text-muted-foreground hover:text-white">
-                                                        <span className="sr-only">Open menu</span>
-                                                        <MoreVertical className="h-3 w-3 md:h-4 md:w-4" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="bg-[#0A192F] border-white/10 backdrop-blur-xl rounded-xl">
-                                                    <DropdownMenuLabel className="text-[10px] uppercase font-black tracking-widest text-muted-foreground/60 p-3 italic">Operations</DropdownMenuLabel>
-                                                    <DropdownMenuSeparator className="bg-white/5" />
-                                                    <div className="p-1">
-                                                        {actions(item)}
-                                                    </div>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </TableCell>
-                                    )}
-                                </TableRow>
-                            ))
+                                            >
+                                                <div className="flex flex-col">
+                                                    {col.render ? col.render(item, index) : (
+                                                        <span className="text-white group-hover:text-accent transition-colors">
+                                                            {(item as any)[col.key]}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </TableCell>
+                                        ))}
+                                        {actions && (
+                                            <TableCell key={`cell-${rowId}-actions`} className="px-2 md:px-6">
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" className="h-7 w-7 md:h-8 md:w-8 p-0 hover:bg-white/10 text-muted-foreground hover:text-white">
+                                                            <span className="sr-only">Open menu</span>
+                                                            <MoreVertical className="h-3 w-3 md:h-4 md:w-4" />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" className="bg-[#0A192F] border-white/10 backdrop-blur-xl rounded-xl">
+                                                        <DropdownMenuLabel className="text-[10px] uppercase font-black tracking-widest text-muted-foreground/60 p-3 italic">Operations</DropdownMenuLabel>
+                                                        <DropdownMenuSeparator className="bg-white/5" />
+                                                        <div className="p-1">
+                                                            {actions(item)}
+                                                        </div>
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            </TableCell>
+                                        )}
+                                    </TableRow>
+                                );
+                            })
                         )}
                     </TableBody>
                 </Table>
