@@ -269,7 +269,7 @@ export const seedDemoData = async () => {
         });
         await addOp(adminDb.collection("search_index").doc(id), {
             id, entityId: id, type: "teacher", title: name, subtitle: `Faculty | ${id}`,
-            url: `/admin/faculty?tab=directory`, keywords: Array.from(tags), updatedAt: Timestamp.now()
+            url: `/admin/teachers/${id}`, keywords: Array.from(tags), updatedAt: Timestamp.now()
         });
     }
 
@@ -296,7 +296,7 @@ export const seedDemoData = async () => {
         });
         await addOp(adminDb.collection("search_index").doc(id), {
             id, entityId: id, type: "staff", title: name, subtitle: `${sRoles[i]} | ${id}`,
-            url: `/admin/faculty?tab=directory`, keywords: Array.from(tags), updatedAt: Timestamp.now()
+            url: `/admin/staff/${id}`, keywords: Array.from(tags), updatedAt: Timestamp.now()
         });
     }
 

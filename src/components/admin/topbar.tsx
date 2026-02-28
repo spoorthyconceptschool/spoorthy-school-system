@@ -61,7 +61,7 @@ export function TopBar() {
                 : "bg-[#0A192F] md:bg-transparent"
                 }`}
         >
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 shrink-0">
                 <MobileSidebar />
                 <div className="lg:hidden flex items-center gap-2 shrink-0">
                     <div className="w-8 h-8 rounded-lg bg-transparent flex items-center justify-center border border-white/20 overflow-hidden shrink-0 shadow-md">
@@ -76,31 +76,31 @@ export function TopBar() {
                             <div className="w-full h-full bg-[#64FFDA]/10 flex items-center justify-center text-[#0A192F] font-bold font-display text-xs">S</div>
                         )}
                     </div>
-                    <span className="font-display font-black text-white text-sm tracking-tight truncate max-w-[120px] xs:max-w-[150px]">
+                    {/* Hide name on tiny screens to make room for Search */}
+                    <span className="font-display font-black text-white text-[10px] xs:text-sm tracking-tight truncate max-w-[80px] sm:max-w-[150px] hidden sm:block">
                         {branding?.schoolName || "Spoorthy School"}
                     </span>
                 </div>
             </div>
 
-            {/* Search - Pill shaped, integrated */}
-            <div className="flex-1 min-w-0 max-w-[200px] xs:max-w-[300px] md:max-w-xl mx-2 md:mx-4 hidden sm:block">
+            {/* Search - Pill shaped, integrated - Now visible on all screens */}
+            <div className="flex-1 min-w-[40px] xs:min-w-[120px] md:min-w-[200px] max-w-xl mx-1 md:mx-4">
                 <UniversalSearch />
             </div>
 
             {/* Actions */}
-            <div className="flex items-center gap-1 md:gap-4 shrink-0 px-1">
-
-                {/* Global Add - Hidden on small mobile */}
-                <div className="hidden sm:flex items-center gap-2 mr-2">
-                    {/* Academic Year Switcher */}
+            <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
+                {/* Global Actions - Hidden on tiny mobile, shown as icon on sm */}
+                <div className="flex items-center gap-1 md:gap-3">
+                    {/* Academic Year Switcher - Compact on mobile */}
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" size="sm" className={cn(
-                                "h-9 gap-2 rounded-full border-[#64FFDA]/20 px-4 bg-[#0A192F]/40 transition-all",
+                                "h-8 md:h-9 gap-1 rounded-full border-[#64FFDA]/20 px-2 md:px-4 bg-[#0A192F]/40 transition-all",
                                 academicYears[selectedYear]?.active ? "text-[#64FFDA]/80 hover:bg-[#64FFDA]/10" : "text-amber-400 border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20"
                             )}>
-                                <CalendarClock size={16} />
-                                <span className="text-xs font-bold font-mono">{selectedYear}</span>
+                                <CalendarClock size={14} className="shrink-0 md:size-4" />
+                                <span className="text-[9px] md:text-xs font-bold font-mono whitespace-nowrap hidden xs:inline">{selectedYear}</span>
                             </Button>
                         </DropdownMenuTrigger>
                         <DropdownMenuContent align="end" className="bg-[#0A192F]/95 backdrop-blur-xl border border-[#64FFDA]/20 text-white min-w-[150px]">
@@ -133,10 +133,10 @@ export function TopBar() {
                     </DropdownMenu>
 
                     {systemConfig.testingMode && <SeedDataButton />}
-                    {/* Pill Action Button */}
-                    <Button variant="outline" size="sm" className="h-9 gap-2 rounded-full border-[#64FFDA]/20 hover:bg-[#64FFDA]/10 hover:text-[#64FFDA] px-4 bg-[#0A192F]/40 text-[#64FFDA]/80">
-                        <Plus size={16} />
-                        <span className="text-xs font-bold">Action</span>
+
+                    {/* Pill Action Button - Optional Quick Action */}
+                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-[#64FFDA]/50 hover:text-[#64FFDA] hover:bg-[#64FFDA]/10 sm:hidden lg:flex">
+                        <Plus size={18} />
                     </Button>
                 </div>
 

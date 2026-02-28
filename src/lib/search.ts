@@ -30,7 +30,7 @@ export function generateKeywords(text: string): string[] {
 
 // === INDEXING ACTIONS ===
 
-export type SearchEntityType = "student" | "payment" | "teacher" | "notice" | "other" | "action";
+export type SearchEntityType = "student" | "payment" | "teacher" | "staff" | "notice" | "other" | "action";
 
 export interface SearchIndexItem {
     id: string; // The ID of the search index doc (usually same as entity ID)
