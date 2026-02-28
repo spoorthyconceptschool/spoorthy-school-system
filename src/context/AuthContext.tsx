@@ -11,12 +11,21 @@ import { auth, db } from "@/lib/firebase";
 import { doc, getDoc } from "firebase/firestore";
 import { useRouter } from "next/navigation";
 
+/**
+ * Defines the shape of the global authentication state and available actions.
+ */
 interface AuthContextType {
+    /** The raw Firebase Auth User object. */
     user: User | null;
+    /** Extended user profile attributes from the 'users' Firestore collection. */
     userData: any | null;
+    /** Computed permission role (e.g., 'ADMIN', 'STUDENT'). */
     role: string;
+    /** Global authentication loading state. */
     loading: boolean;
+    /** Function to execute email/password sign-in. */
     signIn: (email: string, pass: string) => Promise<void>;
+    /** Function to sign out and clear local caches. */
     signOut: () => Promise<void>;
 }
 
@@ -24,6 +33,11 @@ const AuthContext = createContext<AuthContextType>({} as AuthContextType);
 
 const STORAGE_KEY = "spoorthy_user_cache";
 
+/**
+ * Global authentication provider that handles session persistence and role hydration.
+ * This component monitors the Firebase Auth state and synchronizes it with 
+ * the school's internal user directory automatically.
+ */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [userData, setUserData] = useState<any>(null);
@@ -116,4 +130,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     );
 }
 
+/**
+ * Convenience hook to access the current authenticated user and their permissions.
+ * @returns The global Authentication context state.
+ */
 export const useAuth = () => useContext(AuthContext);

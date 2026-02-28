@@ -3,7 +3,14 @@ import { db } from "@/lib/firebase";
 
 // === INDEXING UTILS ===
 
-// Generate simple prefix/token buckets for robust search
+/**
+ * Generates an array of search keywords for a given text string.
+ * This including full name, space-tokenized segments, and n-gram prefixes
+ * (min 1 character) to support robust autocomplete and fuzzy-like matching.
+ * 
+ * @param text - The raw string to tokenize (e.g., student name or ID).
+ * @returns An array of unique lowercase keyword strings.
+ */
 export function generateKeywords(text: string): string[] {
     if (!text) return [];
 
@@ -30,17 +37,31 @@ export function generateKeywords(text: string): string[] {
 
 // === INDEXING ACTIONS ===
 
+/**
+ * Supported entity categories indexable by the global search system.
+ */
 export type SearchEntityType = "student" | "payment" | "teacher" | "staff" | "notice" | "other" | "action";
 
+/**
+ * Normalized interface for a searchable record within the global index.
+ */
 export interface SearchIndexItem {
-    id: string; // The ID of the search index doc (usually same as entity ID)
-    entityId: string; // Ref to actual doc
+    /** Unique document ID within the search_index collection. */
+    id: string;
+    /** Reference to the source document (e.g., Student SchoolID). */
+    entityId: string;
+    /** Category tag for icon mapping and filtering. */
     type: SearchEntityType;
+    /** Primary display label (e.g., "Arjun Kumar"). */
     title: string;
+    /** Descriptive context (e.g., "Class 4 | Palam"). */
     subtitle: string;
+    /** Internal route for one-click navigation from search. */
     url: string;
+    /** Pre-indexed keyword buckets for Firestore querying. */
     keywords: string[];
-    metadata?: any; // Extra fields like status, amount, etc.
+    /** Optional extended metadata required by specific result types. */
+    metadata?: any;
 }
 
 // === STATIC FEATURES / INTENTS ===

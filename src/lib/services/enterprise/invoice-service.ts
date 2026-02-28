@@ -1,21 +1,40 @@
 import { adminDb } from "@/lib/firebase-admin";
 
+/**
+ * Represents an individual debit or credit within a student's invoice.
+ */
 export interface InvoiceLineItem {
     id: string;
+    /** Date of the transaction in ISO format. */
     date: string;
     description: string;
+    /** Absolute monetary value (always positive integers/decimals). */
     amount: number;
-    type: 'CREDIT' | 'DEBIT'; // CREDIT = Paid, DEBIT = Charge
+    /** 
+     * CREDIT indicates a payment/reduction.
+     * DEBIT indicates a charge/addition.
+     */
+    type: 'CREDIT' | 'DEBIT';
 }
 
+/**
+ * Represents a summarized financial snapshot for a student's academic year.
+ * Invoices are read-only and pre-computed here.
+ */
 export interface EnterpriseInvoice {
     studentId: string;
     academicYear: string;
+    /** The official generation timestamp. */
     generationDate: string;
+    /** Total charges (debits) recorded. */
     totalCharges: number;
+    /** Total payments (credits) recorded. */
     totalPaid: number;
+    /** Mathematically enforced balance (Charges - Paid). */
     outstandingBalance: number;
+    /** Collection of individual verified ledger entries. */
     lineItems: InvoiceLineItem[];
+    /** The calculated settlement status. */
     status: 'PAID' | 'PARTIAL' | 'DUE';
 }
 
@@ -31,11 +50,15 @@ export interface EnterpriseInvoice {
 export class EnterpriseInvoiceService {
 
     /**
-     * Synthesizes a real-time invoice for a student by aggregating their Append-Only Ledger.
-     * Guarantees 100% mathematical consistency.
+     * Synthesizes a real-time invoice for a student by aggregating their immutable ledger entries.
      * 
-     * @param studentId The ID of the student
-     * @param academicYear Target ledger year
+     * This method rebuilds the financial history of a student strictly from primary,
+     * append-only entries, ensuring that calculations are reproducible, consistent,
+     * and free from UI-layer artifacts.
+     * 
+     * @param studentId - The unique ID of the student.
+     * @param academicYear - Target year for the summary.
+     * @returns A pre-calculated student invoice for display or export.
      */
     static async generateInvoice(studentId: string, academicYear: string): Promise<EnterpriseInvoice> {
         const accountId = `${studentId}_${academicYear}`;
@@ -48,7 +71,7 @@ export class EnterpriseInvoiceService {
         let totalPaid = 0;    // Credits
         const lineItems: InvoiceLineItem[] = [];
 
-        entriesSnap.forEach(doc => {
+        entriesSnap.forEach((doc: any) => {
             const data = doc.data() as any;
 
             // Skip transactions that have been explicitly flagged as reversed

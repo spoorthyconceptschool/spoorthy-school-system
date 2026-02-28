@@ -7,32 +7,54 @@ import { onAuthStateChanged } from "firebase/auth";
 import { rtdb, db, auth } from "@/lib/firebase";
 import { useAuth } from "./AuthContext";
 
+/**
+ * Represents the comprehensive master data schema for the school.
+ * Contains configuration, registries, and system-wide state synchronized from Realtime DB.
+ */
 interface MasterDataState {
+    /** Mapping of unique village IDs to their metadata. */
     villages: Record<string, any>;
+    /** School class definitions and ordering. */
     classes: Record<string, any>;
+    /** Section definitions for classes. */
     sections: Record<string, any>;
+    /** Available subjects registry. */
     subjects: Record<string, any>;
+    /** Junction records linking classes to their sections. */
     classSections: Record<string, any>;
+    /** Junction records linking classes to their subjects. */
     classSubjects: Record<string, any>;
+    /** Assignment records for subject teachers. */
     subjectTeachers: Record<string, any>;
+    /** Filtered set of subjects for homework assignment. */
     homeworkSubjects: Record<string, any>;
+    /** Registry of system-wide administrative roles. */
     roles: Record<string, any>;
+    /** Global school identity and visual appearance config. */
     branding: {
         schoolName: string;
         address: string;
         schoolLogo: string;
         principalSignature: string;
     };
+    /** Configured academic cycles and their timeline status. */
     academicYears: Record<string, { id: string, name: string, active: boolean, startDate: string, endDate: string }>;
+    /** Operational flags for developers and system modes. */
     systemConfig: {
         testingMode: boolean;
         developerMaintenance: boolean;
     };
+    /** The currently active academic year context for the session. */
     selectedYear: string;
+    /** Callback to switch the active academic year global context. */
     setSelectedYear: (year: string) => void;
+    /** Cached set of active students. */
     students: any[];
+    /** Cached set of active teachers. */
     teachers: any[];
+    /** Cached set of active staff. */
     staff: any[];
+    /** Tracks the initial synchronization status with the RTDB. */
     loading: boolean;
 }
 
@@ -67,6 +89,12 @@ const initialState: MasterDataState = {
 
 const MasterDataContext = createContext<MasterDataState>(initialState);
 
+/**
+ * Primary hook to access global school configuration and synchronized master registries.
+ * Use this to fetch school branding, class lists, and active student data.
+ * 
+ * @returns The complete Master Data state.
+ */
 export function useMasterData() {
     return useContext(MasterDataContext);
 }
@@ -89,6 +117,11 @@ export function useSubjectName(id: string) {
 
 const MASTER_CACHE_KEY = "spoorthy_master_cache";
 
+/**
+ * Central data synchronization provider for the entire school application.
+ * Listens to Realtime Database changes and hydration events to keep all
+ * UI components in sync with the school's master configuration.
+ */
 export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
     const [data, setData] = useState<Omit<MasterDataState, 'selectedYear' | 'setSelectedYear'>>(initialState);
     const [selectedYear, setSelectedYear] = useState("2026-2027");

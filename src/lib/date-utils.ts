@@ -1,5 +1,9 @@
 /**
- * Format a date string (YYYY-MM-DD) to DD/MM/YYYY
+ * Formats a raw date string (YYYY-MM-DD) or a JavaScript Date object into a DD/MM/YYYY string.
+ * This is primarily used for display consistency in student reports and UI lists.
+ * 
+ * @param dateStr - A valid ISO date string (YYYY-MM-DD) or a Date object.
+ * @returns A formatted string or the original input if invalid.
  */
 export function formatDateToDDMMYYYY(dateStr: string): string {
     if (!dateStr) return '';
@@ -18,7 +22,11 @@ export function formatDateToDDMMYYYY(dateStr: string): string {
 }
 
 /**
- * Format a Firestore Timestamp to DD/MM/YYYY
+ * Specifically converts a Firestore-style Timestamp object into DD/MM/YYYY format.
+ * Provides fallback for standard string dates if the toDate method is missing.
+ * 
+ * @param timestamp - The Firestore timestamp or raw date reference.
+ * @returns A localized date string.
  */
 export function formatTimestampToDDMMYYYY(timestamp: any): string {
     if (!timestamp) return '';
