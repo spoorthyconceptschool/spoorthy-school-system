@@ -150,6 +150,12 @@ service cloud.firestore {
       allow update, delete: if isManager();
     }
 
+    // Search Index
+    match /search_index/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
     // Global Catch-all (Default to Admin only for safety)
     match /{document=**} {
       allow read, write: if isAdmin();

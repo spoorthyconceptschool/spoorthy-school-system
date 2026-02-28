@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
         const academicYear = url.searchParams.get("year") || "2026-2027";
 
         const [studentsSnap, staffSnap, todayPaymentsSnap] = await Promise.all([
-            adminDb.collection("students").where("academicYear", "==", academicYear).count().get(),
+            adminDb.collection("students").where("academicYear", "==", academicYear).where("status", "==", "ACTIVE").count().get(),
             adminDb.collection("users").where("role", "==", "TEACHER").where("status", "==", "ACTIVE").count().get(),
 
             // Get today's payments (Live check instead of cached because it changes hourly)

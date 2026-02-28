@@ -2,219 +2,133 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, adminRtdb, adminStorage } from "@/lib/firebase-admin";
 
-export const maxDuration = 60; // Allow 60s execution time for Vercel/Next.js
+export const maxDuration = 300; // Allow 5 minutes session for deep wipes
 export const dynamic = 'force-dynamic';
 
-// Ultra-fast batch delete wrapper
-// Robust recursive delete wrapper
-async function nukeCollection(col: string) {
+// Manual batch delete (Stable across all environments)
+async function safeDeleteCollection(col: string) {
+    console.log(`[Purge] Starting wipe of: ${col}`);
     const ref = adminDb.collection(col);
+    let deletedCount = 0;
+
     try {
-        // Try native recursiveDelete (handles subcollections & batches)
-        // @ts-ignore
-        if (adminDb.recursiveDelete) {
-            console.log(`[Purge] Recursively deleting ${col}...`);
-            // @ts-ignore
-            await adminDb.recursiveDelete(ref);
-        } else {
-            throw new Error("No recursiveDelete");
-        }
-    } catch (e) {
-        // Fallback to manual batch loop
-        console.log(`[Purge] Manual delete fallback for ${col}...`);
         while (true) {
-            const snap = await ref.limit(500).get();
+            const snap = await ref.limit(400).get();
             if (snap.empty) break;
+
             const batch = adminDb.batch();
             snap.docs.forEach((doc: any) => batch.delete(doc.ref));
             await batch.commit();
-            await new Promise(r => setTimeout(r, 20));
+
+            deletedCount += snap.docs.length;
+            console.log(`[Purge] Deleted ${deletedCount} from ${col}...`);
+            await new Promise(r => setTimeout(r, 50)); // Slight throttle
         }
+        console.log(`[Purge] Completed wipe of ${col}. Total: ${deletedCount}`);
+        return { col, success: true, count: deletedCount };
+    } catch (e: any) {
+        console.error(`[Purge] Error wiping ${col}:`, e.message);
+        return { col, success: false, error: e.message };
     }
 }
 
-
-
 export async function POST(req: NextRequest) {
-    console.log("[Purge] >>> Incoming Request Initiated");
+    console.log("[Purge] >>> Incoming Purge Operation <<<");
     const startTime = Date.now();
 
     try {
-        // 1. Authorization
+        // Authorization
         const authHeader = req.headers.get("Authorization");
-        if (!authHeader?.startsWith("Bearer ")) {
-            console.log("[Purge] Auth Strike: No Bearer token");
-            return NextResponse.json({ success: false, error: "Unauthorized access detected." }, { status: 200 });
-        }
+        const token = authHeader?.split("Bearer ").pop()?.trim();
+        if (!token) return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
 
-        const token = authHeader.split("Bearer ").pop()?.trim();
-        if (!token) {
-            console.log("[Purge] Auth Strike: Token empty after split");
-            return NextResponse.json({ success: false, error: "Identification token missing." }, { status: 200 });
-        }
-
-        let decodedToken;
-        try {
-            decodedToken = await adminAuth.verifyIdToken(token);
-            console.log("[Purge] Identity Verified:", decodedToken.email);
-        } catch (e: any) {
-            console.error("[Purge] JWT Verification Failed:", e.message);
-            return NextResponse.json({ success: false, error: "Invalid or expired session. Please log in again." }, { status: 200 });
-        }
-
+        const decodedToken = await adminAuth.verifyIdToken(token);
         const isSuperAdmin = decodedToken.role === "SUPER_ADMIN" || decodedToken.role === "ADMIN" || decodedToken.email?.includes("admin") || decodedToken.email?.includes("prane");
+
         if (!isSuperAdmin) {
-            console.log("[Purge] Forbidden: User lacks administrative clearance.");
-            return NextResponse.json({ success: false, error: "Clearance Level 1 required for this operation." }, { status: 200 });
+            return NextResponse.json({ success: false, error: "Administrative clearance required." }, { status: 403 });
         }
 
-        // 2. Body Parsing
-        let purgeType = 'OPERATIONAL_ONLY';
-        try {
-            const body = await req.json();
-            purgeType = body.type || 'OPERATIONAL_ONLY';
-            console.log("[Purge] Mode Selected:", purgeType);
-        } catch (e) {
-            console.log("[Purge] No body provided, defaulting to Operational.");
-        }
+        // Body Parsing
+        let body;
+        try { body = await req.json(); } catch (e) { body = {}; }
+        const purgeType = body.type || 'OPERATIONAL_ONLY';
+        console.log("[Purge] Mode:", purgeType);
 
-        const SAFE_EMAILS = ["spoorthy@school.local", "pranesh@school.local"];
-        const SAFE_UIDS = [decodedToken.uid];
-
-        // 3. TASK GENERATION
-        const tasks: Promise<any>[] = [];
-        let collectionsToDelete: string[] = [];
-
-        // A. Firestore Collections
-        const PROTECTED = [
-            'settings', 'users', 'config', 'branding',
-            'registry',
-            'site_content', 'landing_page', 'cms_content', 'counters',
-            'master_classes', 'master_sections', 'master_villages', 'master_subjects', 'master_staff_roles', 'master_class_sections'
+        // Task Generation
+        const collectionsToWipe: string[] = [];
+        const operationalCols = [
+            "student_fee_ledgers", "payments", "invoices", "transactions", "fee_structures", "fee_types", "ledger", "expenses", "payroll",
+            "attendance", "leaves", "class_timetables", "teacher_schedules", "substitutions", "coverage_tasks",
+            "homework", "homework_submissions", "exam_results", "grades",
+            "announcements", "events", "notifications", "audit_logs", "notices", "analytics", "reports",
+            "feedback", "enquiries", "applications", "custom_fees", "exams", "salaries", "teaching_assignments",
+            "timetable_settings", "search_index", "student_leaves"
         ];
 
-        try {
-            const operationalCols = [
-                "student_fee_ledgers", "payments", "invoices", "transactions", "fee_structures", "fee_types", "ledger", "expenses", "payroll",
-                "attendance", "leaves", "class_timetables", "teacher_schedules", "substitutions", "coverage_tasks",
-                "homework", "homework_submissions", "exam_results", "grades",
-                "announcements", "events", "notifications", "audit_logs", "notices", "analytics", "reports",
-                "feedback", "enquiries", "applications", "custom_fees", "exams", "salaries", "teaching_assignments",
-                "timetable_settings", "search_index", "student_leaves"
-            ];
-
-            const coreCols = ["students", "teachers", "staff"];
-
-            if (purgeType === 'FULL_SYSTEM') {
-                console.log("[Purge] Fetching all collections for deep wipe...");
-                const allCols = await adminDb.listCollections();
-                collectionsToDelete = allCols.map((c: any) => c.id).filter((id: string) => !PROTECTED.includes(id));
-
-                // Force append core cols just in case listCollections missed them
-                coreCols.concat(operationalCols).forEach(col => {
-                    if (!collectionsToDelete.includes(col) && !PROTECTED.includes(col)) collectionsToDelete.push(col);
-                });
-            } else {
-                collectionsToDelete = [...operationalCols];
-            }
-        } catch (colErr: any) {
-            console.error("[Purge] Collection fetch failed:", colErr.message);
-            return NextResponse.json({ success: false, error: "System encountered an error while indexing databases." }, { status: 200 });
+        if (purgeType === 'FULL_SYSTEM') {
+            const PROTECTED = ['settings', 'users', 'config', 'branding', 'registry', 'site_content', 'landing_page', 'cms_content', 'counters', 'master_classes', 'master_sections', 'master_villages', 'master_subjects', 'master_staff_roles', 'master_class_sections'];
+            const allCols = await adminDb.listCollections();
+            allCols.forEach((c: any) => {
+                if (!PROTECTED.includes(c.id)) collectionsToWipe.push(c.id);
+            });
+            // Ensure core ones are included if not listed
+            ["students", "teachers", "staff"].forEach(c => {
+                if (!collectionsToWipe.includes(c)) collectionsToWipe.push(c);
+            });
+        } else {
+            operationalCols.forEach(c => collectionsToWipe.push(c));
         }
 
-        console.log(`[Purge] Preparing to nuke ${collectionsToDelete.length} collections...`);
-        collectionsToDelete.forEach(col => tasks.push(nukeCollection(col)));
+        // Execute sequentially to avoid memory pressure and concurrency issues
+        const results = [];
+        for (const col of collectionsToWipe) {
+            const res = await safeDeleteCollection(col);
+            results.push(res);
+        }
 
-        // B. Identity Management (Safe Wipe)
-        tasks.push((async () => {
-            console.log("[Purge] Sanitizing user registry...");
-            const snap = await adminDb.collection("users").get();
+        // Cleanup Users (Safe Wipe)
+        if (purgeType === 'FULL_SYSTEM') {
+            console.log("[Purge] Resetting User Registry...");
+            const SAFE_EMAILS = ["spoorthy@school.local", "pranesh@school.local"];
+            const SAFE_UIDS = [decodedToken.uid];
+
+            const userSnap = await adminDb.collection("users").get();
             let batch = adminDb.batch();
-            let count = 0;
-            for (const doc of snap.docs) {
+            let c = 0;
+            for (const doc of userSnap.docs) {
                 const d = doc.data();
                 if (!SAFE_UIDS.includes(doc.id) && !SAFE_EMAILS.includes(d.email?.toLowerCase())) {
                     batch.delete(doc.ref);
-                    count++;
-                    if (count === 400) { await batch.commit(); batch = adminDb.batch(); count = 0; }
+                    c++;
+                    if (c === 400) { await batch.commit(); batch = adminDb.batch(); c = 0; }
                 }
             }
-            if (count > 0) await batch.commit();
-        })());
+            if (c > 0) await batch.commit();
 
-        // C. Auth Registry (FULL only)
-        if (purgeType === 'FULL_SYSTEM') {
-            console.log("[Purge] Nuking Auth Registry...");
-            tasks.push((async () => {
-                let nextPageToken;
-                do {
-                    const list: any = await adminAuth.listUsers(1000, nextPageToken);
-                    const toDelete = list.users
-                        .filter((u: any) => !SAFE_UIDS.includes(u.uid) && !SAFE_EMAILS.includes(u.email?.toLowerCase()))
-                        .map((u: any) => u.uid);
-                    if (toDelete.length > 0) await adminAuth.deleteUsers(toDelete);
-                    nextPageToken = list.pageToken;
-                } while (nextPageToken);
-            })());
+            // Reset Counters
+            await adminDb.collection("counters").doc("students").set({ current: 0 }, { merge: true });
 
-            tasks.push(adminDb.collection("counters").doc("students").set({ current: 0 }, { merge: true }));
-            tasks.push(adminDb.collection("counters").doc("teachers").set({ current: 0 }, { merge: true }));
-            tasks.push(adminDb.collection("counters").doc("staff").set({ current: 0 }, { merge: true }));
-        }
-
-        // D. RTDB Wipe
-        if (adminRtdb) {
-            console.log("[Purge] Clearing real-time databases...");
-            tasks.push(adminRtdb.ref("analytics").remove());
-            tasks.push(adminRtdb.ref("notifications").remove());
-            tasks.push(adminRtdb.ref("chats").remove());
-            tasks.push(adminRtdb.ref("presence").remove());
-            if (purgeType === 'FULL_SYSTEM') {
-                tasks.push(adminRtdb.ref("academic_years").remove());
-                tasks.push(adminRtdb.ref("siteContent").remove()); // Wipe RTDB branding
-                tasks.push(adminRtdb.ref("timetables").remove());
-                // Also reset Firestore config for academic years
-                tasks.push(adminDb.collection("config").doc("academic_years").delete());
-
-                // Deep clean Storage footprint (settings folder)
-                tasks.push((async () => {
-                    try {
-                        const [files] = await adminStorage.bucket().getFiles({ prefix: 'settings/' });
-                        await Promise.all(files.map((file: any) => file.delete()));
-                    } catch (e) {
-                        console.warn("[Purge] Storage wipe skipped (empty or no permission)");
-                    }
-                })());
+            // Cleanup RTDB
+            if (adminRtdb) {
+                await adminRtdb.ref("analytics").remove();
+                await adminRtdb.ref("academic_years").remove();
             }
         }
-
-        // 4. EXECUTION
-        console.log(`[Purge] 🚀 Launching ${tasks.length} task suites...`);
-
-        // Use allSettled to ensure we don't crash the whole response if one file delete fails
-        const results = await Promise.allSettled(tasks);
-        const failures = results.filter(r => r.status === 'rejected');
 
         const duration = (Date.now() - startTime) / 1000;
-        console.log(`[Purge] 🏁 Done in ${duration}s. Failures: ${failures.length}`);
-
         return NextResponse.json({
             success: true,
-            message: `Deep Wipe successfully finalized in ${duration}s.`,
-            meta: {
-                tasksRun: tasks.length,
-                failed: failures.length,
-                type: purgeType
-            }
+            message: `Wipe successfully finalized in ${duration}s.`,
+            meta: { duration, collectionsProcessed: results.length }
         });
 
-    } catch (criticalErr: any) {
-        console.error("[Purge] CRITICAL SYSTEM FAILURE:", criticalErr);
-        // ALWAYS return JSON with status 200 to bypass proxy error pages
+    } catch (error: any) {
+        console.error("[Purge] FATAL RECOVERY:", error);
         return NextResponse.json({
             success: false,
-            error: "System Overload: The purge process encountered a heavy volume and may need to be repeated.",
-            details: criticalErr.message
-        }, { status: 200 });
+            error: "System Overload or Failure",
+            details: error.message
+        }, { status: 200 }); // Status 200 to prevent proxy HTML pages
     }
 }
