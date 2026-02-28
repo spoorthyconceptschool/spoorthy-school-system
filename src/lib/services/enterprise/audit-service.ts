@@ -1,5 +1,9 @@
 import { adminDb, FieldValue } from "@/lib/firebase-admin";
 
+/**
+ * Valid sensitive actions that are tracked within the school system.
+ * These actions are logged with full state snapshots for audit and compliance.
+ */
 export type AuditActionType =
     | 'CREATE_STUDENT'
     | 'UPDATE_STUDENT'
@@ -14,15 +18,27 @@ export type AuditActionType =
     | 'DELETE_USER'
     | 'SYSTEM_CONFIG_CHANGE';
 
+/**
+ * Represents a single normalized entry within the system audit logs.
+ */
 export interface AuditLogEntry {
+    /** Uid of the actor who performed the action. */
     userId: string;
+    /** Role/Rank of the actor at the time of action. */
     userRole: string;
+    /** The specific action constant. */
     action: AuditActionType;
+    /** Primary unique key of the modified database record. */
     entityId: string;
+    /** The logical collection group. */
     entityType: 'student' | 'attendance' | 'fee_ledger' | 'user' | 'system';
+    /** JSON payload of the record BEFORE modification. */
     oldValue: Record<string, any> | null;
+    /** JSON payload of the record AFTER modification. */
     newValue: Record<string, any> | null;
+    /** Optional identifier for the origin network address. */
     ipAddress?: string;
+    /** Extensible metadata for action-specific details. */
     metadata?: Record<string, any>;
 }
 
