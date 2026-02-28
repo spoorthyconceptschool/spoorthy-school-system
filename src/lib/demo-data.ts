@@ -1,324 +1,298 @@
-import { collection, doc, setDoc, writeBatch, Timestamp, query, getDocs } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { collection, doc, setDoc, writeBatch, Timestamp, query, getDocs, getDoc } from "firebase/firestore";
+import { ref, set } from "firebase/database";
+import { db, rtdb } from "@/lib/firebase";
 
+/**
+ * Enterprise Demo Data Seeding Script
+ * Generates a full ecosystem for testing:
+ * - 200 Students (10 per section, 2 sections, 10 classes)
+ * - Master Data (Villages, Classes, Sections) - Both Firestore & RTDB
+ * - Financial Data (Fee Ledgers, Payments)
+ * - HR Data (Teachers, Leaves)
+ * - Operational Data (Admissions, Search Index)
+ * - Config (Academic Years, System Constants)
+ */
 export const seedDemoData = async () => {
-    const batch = writeBatch(db);
+    // Helper for large batch operations
+    const commitInChunks = async (operations: { ref: any, data: any, type: 'set' | 'update' | 'delete' }[]) => {
+        const CHUNK_SIZE = 400;
+        for (let i = 0; i < operations.length; i += CHUNK_SIZE) {
+            const chunk = operations.slice(i, i + CHUNK_SIZE);
+            const batch = writeBatch(db);
+            chunk.forEach(op => {
+                if (op.type === 'set') batch.set(op.ref, op.data, { merge: true });
+                else if (op.type === 'update') batch.update(op.ref, op.data);
+                else if (op.type === 'delete') batch.delete(op.ref);
+            });
+            await batch.commit();
+            console.log(`Committed chunk ${i / CHUNK_SIZE + 1} of ${Math.ceil(operations.length / CHUNK_SIZE)}`);
+        }
+    };
+
+    const ops: any[] = [];
+    const rtdbMaster: any = {
+        villages: {},
+        classes: {},
+        sections: {},
+        classSections: {},
+        subjects: {
+            "math": { id: "math", name: "Mathematics", isActive: true },
+            "science": { id: "science", name: "Science", isActive: true },
+            "english": { id: "english", name: "English", isActive: true }
+        }
+    };
 
     // Helper to delete all docs in a collection
-    const deleteCollection = async (collectionName: string) => {
-        const q = query(collection(db, collectionName));
-        const snapshot = await getDocs(q);
-        const deleteBatch = writeBatch(db);
-        snapshot.docs.forEach((doc) => {
-            deleteBatch.delete(doc.ref);
-        });
-        await deleteBatch.commit();
+    const queueDeleteCollection = async (collectionName: string) => {
+        try {
+            const q = query(collection(db, collectionName));
+            const snapshot = await getDocs(q);
+            snapshot.docs.forEach((d) => {
+                ops.push({ ref: d.ref, type: 'delete' });
+            });
+        } catch (e) {
+            console.warn(`Could not purge ${collectionName}:`, e);
+        }
     };
 
-    // 0. Cleanup Old Data (Students Only per request)
-    // 0. Cleanup Old Data
-    await deleteCollection("students");
-    await deleteCollection("master_villages");
-    await deleteCollection("master_classes");
-    await deleteCollection("master_sections");
-    await deleteCollection("master_class_sections");
+    console.log("Starting full system purge...");
+    await queueDeleteCollection("students");
+    await queueDeleteCollection("master_villages");
+    await queueDeleteCollection("master_classes");
+    await queueDeleteCollection("master_sections");
+    await queueDeleteCollection("master_class_sections");
+    await queueDeleteCollection("payments");
+    await queueDeleteCollection("applications");
+    await queueDeleteCollection("leaves");
+    await queueDeleteCollection("teachers");
+    await queueDeleteCollection("student_fee_ledgers");
+    await queueDeleteCollection("search_index");
 
-    // 1. Seed Students (New Schema per QA Prompt)
-    const students = [
-        {
-            schoolId: "SCSS93821",
-            studentName: "Aarav Patel",
-            grade: "Class 10",
-            section: "A",
-            fatherName: "Vikram Patel",
-            fatherMobile: "9876543210",
-            village: "Miyapur",
-            status: "active",
-            type: "student",
-            password: "changeMe123", // Should be hashed in prod
-            mustChangePassword: true,
-            createdAt: Timestamp.now()
-        },
-        {
-            schoolId: "SCSS93822",
-            studentName: "Diya Sharma",
-            grade: "Class 9",
-            section: "B",
-            fatherName: "Suresh Sharma",
-            fatherMobile: "9876543211",
-            village: "Bachupally",
-            status: "active",
-            type: "student",
-            password: "changeMe123",
-            mustChangePassword: true,
-            createdAt: Timestamp.now()
-        },
-        {
-            schoolId: "SCSS93823",
-            studentName: "Ishaan Kumar",
-            grade: "Class 10",
-            section: "A",
-            fatherName: "Rajeev Kumar",
-            fatherMobile: "9876543212",
-            village: "Nizampet",
-            status: "active",
-            type: "student",
-            password: "changeMe123",
-            mustChangePassword: true,
-            createdAt: Timestamp.now()
-        },
-        {
-            schoolId: "SCSS93824",
-            studentName: "Vihaan Singh",
-            grade: "Class 8",
-            section: "C",
-            fatherName: "Amit Singh",
-            fatherMobile: "9876543213",
-            village: "Kukatpally",
-            status: "inactive",
-            type: "student",
-            password: "changeMe123",
-            mustChangePassword: true,
-            createdAt: Timestamp.now()
-        },
-        {
-            schoolId: "SCSS93825",
-            studentName: "Ananya Gupta",
-            grade: "Class 10",
-            section: "B",
-            fatherName: "Manish Gupta",
-            fatherMobile: "9876543214",
-            village: "Miyapur",
-            status: "active",
-            type: "student",
-            password: "changeMe123",
-            mustChangePassword: true,
-            createdAt: Timestamp.now()
+    const firstNames = ["Arjun", "Aaditya", "Vihaan", "Krishna", "Sai", "Ishaan", "Aarav", "Reyansh", "Aryan", "Abhimanyu", "Priya", "Ananya", "Diya", "Saanvi", "Aadhya", "Myra", "Ishani", "Anvi", "Kyra", "Aarohi"];
+    const lastNames = ["Sharma", "Verma", "Gupta", "Reddy", "Patel", "Singh", "Yadav", "Kumar", "Rao", "Choudhary"];
+    const fatherNames = ["Vikram", "Suresh", "Rajeev", "Amit", "Manish", "Sanjay", "Vishnu", "Ramesh", "Kiran", "Prasad"];
+    const villageNames = ["Miyapur", "Bachupally", "Nizampet", "Kukatpally", "Hyder Nagar", "Pragathi Nagar", "Beeramguda", "Ameenpur", "Patancheru", "Kondapur"];
+    const genders = ["male", "female"];
+
+    const getRandom = (arr: any[]) => arr[Math.floor(Math.random() * arr.length)];
+    const academicYearId = "2026-2027";
+
+    // 0. Academic Config
+    ops.push({
+        ref: doc(db, "config", "academic_years"),
+        type: 'set',
+        data: {
+            currentYear: academicYearId,
+            currentYearStartDate: "2026-06-01",
+            upcoming: ["2027-2028"],
+            history: [{ year: "2025-2026", startDate: "2025-06-01", archivedAt: Timestamp.now() }]
         }
+    });
+
+    // 1. Seed Master Data: Villages
+    const villageIds: string[] = [];
+    villageNames.forEach((name, i) => {
+        const id = `VIL_${String(i + 1).padStart(3, '0')}`;
+        villageIds.push(id);
+        const data = { id, name, isActive: true, createdAt: Timestamp.now() };
+        ops.push({ ref: doc(db, "master_villages", id), type: 'set', data });
+        rtdbMaster.villages[id] = data;
+    });
+
+    // 2. Seed Master Data: Classes & Sections
+    const classData: { id: string, name: string }[] = [];
+    for (let i = 1; i <= 10; i++) {
+        const id = `CLS_${String(i).padStart(2, '0')}`;
+        const name = i === 1 ? "Nursery" : i === 2 ? "LKG" : i === 3 ? "UKG" : `Class ${i - 3}`;
+        classData.push({ id, name });
+        const data = { id, name, isActive: true, order: i, createdAt: Timestamp.now() };
+        ops.push({ ref: doc(db, "master_classes", id), type: 'set', data });
+        rtdbMaster.classes[id] = data;
+    }
+
+    const sections = [
+        { id: "SEC_A", name: "A" },
+        { id: "SEC_B", name: "B" }
     ];
-
-    students.forEach(student => {
-        const docRef = doc(db, "students", student.schoolId);
-        batch.set(docRef, student);
-    });
-
-    // 2. Seed Teachers
-    const teachers = [
-        {
-            teacherId: "T202601",
-            name: "Priya Reddy",
-            subject: "Mathematics",
-            designation: "Senior Teacher",
-            phone: "9988776655",
-            status: "active",
-            type: "teacher",
-            createdAt: Timestamp.now()
-        },
-        {
-            teacherId: "T202602",
-            name: "Rahul Verma",
-            subject: "Science",
-            designation: "Lab Instructor",
-            phone: "9988776656",
-            status: "active",
-            type: "teacher",
-            createdAt: Timestamp.now()
-        },
-        {
-            teacherId: "T202603",
-            name: "Sneha Kapoor",
-            subject: "English",
-            designation: "Teacher",
-            phone: "9988776657",
-            status: "on_leave",
-            type: "teacher",
-            createdAt: Timestamp.now()
-        }
-    ];
-
-    teachers.forEach(teacher => {
-        const docRef = doc(db, "teachers", teacher.teacherId);
-        batch.set(docRef, teacher);
-    });
-
-    // 3. Seed Applications (for Dashboard Home)
-    const applications = [
-        {
-            studentName: "Rohan Gupta",
-            grade: "Class 5",
-            fatherName: "Sanjay Gupta",
-            phone: "9123456780",
-            status: "submitted",
-            submittedAt: Timestamp.now()
-        },
-        {
-            studentName: "Meara Reddy",
-            grade: "Class 1",
-            fatherName: "Vishnu Reddy",
-            phone: "9123456781",
-            status: "approved",
-            submittedAt: Timestamp.now()
-        }
-    ];
-
-    applications.forEach(app => {
-        const docRef = doc(collection(db, "applications"));
-        batch.set(docRef, app);
-    });
-
-    // 4. Seed Payments
-    const payments = [
-        {
-            studentId: "2026001",
-            studentName: "Aarav Patel",
-            amount: 15000,
-            type: "credit",
-            method: "razorpay",
-            status: "success",
-            date: Timestamp.now()
-        },
-        {
-            studentId: "2026002",
-            studentName: "Diya Sharma",
-            amount: 5000,
-            type: "credit",
-            method: "cash",
-            status: "success",
-            date: Timestamp.now()
-        },
-        {
-            studentId: "2026003",
-            studentName: "Ishaan Kumar",
-            amount: 7500,
-            type: "credit",
-            method: "cash",
-            status: "success",
-            date: Timestamp.now()
-        }
-    ];
-
-    payments.forEach(payment => {
-        const docRef = doc(collection(db, "payments"));
-        batch.set(docRef, payment);
-    });
-
-    // 5. Seed Fees Config
-    const feeConfig = {
-        terms: [
-            { id: "term1", name: "Term 1", dueDate: "2026-06-30", isActive: true, amounts: { "Class 10": 15000, "Class 9": 14000 } },
-            { id: "term2", name: "Term 2", dueDate: "2026-10-31", isActive: true, amounts: { "Class 10": 15000, "Class 9": 14000 } },
-            { id: "term3", name: "Term 3", dueDate: "2027-02-28", isActive: false, amounts: { "Class 10": 15000, "Class 9": 14000 } },
-        ]
-    };
-    const feesRef = doc(db, "config", "fees");
-    batch.set(feesRef, feeConfig);
-
-    // 6. Seed Notices
-    const notices = [
-        {
-            title: "School Annual Day 2026",
-            content: "We are excited to announce the Annual Day celebrations on Feb 20th. All parents are invited.",
-            audience: "all",
-            date: Timestamp.now(),
-            status: "published"
-        },
-        {
-            title: "Exam Schedule - Class 10",
-            content: "Pre-board exams start from March 1st. Please check the timetable section.",
-            audience: "students",
-            grade: "Class 10",
-            date: Timestamp.now(),
-            status: "published"
-        }
-    ];
-    notices.forEach(notice => {
-        const docRef = doc(collection(db, "notices"));
-        batch.set(docRef, notice);
-    });
-
-    // 7. Seed Leaves
-    const leaves = [
-        {
-            staffId: "T202603",
-            staffName: "Sneha Kapoor",
-            type: "Sick Leave",
-            startDate: "2026-01-20",
-            endDate: "2026-01-22",
-            reason: "Viral fever",
-            status: "pending",
-            appliedAt: Timestamp.now()
-        },
-        {
-            staffId: "T202601",
-            staffName: "Priya Reddy",
-            type: "Casual Leave",
-            startDate: "2026-02-05",
-            endDate: "2026-02-05",
-            reason: "Personal work",
-            status: "approved",
-            appliedAt: Timestamp.now()
-        }
-    ];
-    leaves.forEach(leave => {
-        const docRef = doc(collection(db, "leaves"));
-        batch.set(docRef, leave);
-    });
-
-    // 8. Seed Master Data: Villages
-    const villages = ["Miyapur", "Bachupally", "Nizampet", "Kukatpally", "Hyder Nagar", "Pragathi Nagar"];
-    villages.forEach(v => {
-        // Use name as ID for simplicity or random ID? Let's use auto-ID or name-slug to avoid dups if run multiple times?
-        // Actually, deleteCollection("master_villages") should be called first if we want a clean slate.
-        // But the previous code doesn't call deleteCollection for everything, only students.
-        // Let's add deleteCollection for master data to be safe.
-        const docRef = doc(collection(db, "master_villages"));
-        batch.set(docRef, {
-            name: v,
-            isActive: true,
-            createdAt: Timestamp.now(),
-            updatedAt: Timestamp.now()
-        });
-    });
-
-    // 9. Seed Master Data: Classes & Sections
-    const classes = Array.from({ length: 10 }, (_, i) => `Class ${i + 1}`);
-    const sections = ["A", "B", "C"];
-
-    // Seed individual classes
-    // Note: The UI separates them into "master_classes" and "master_sections" ? 
-    // Wait, let me check the page implementation again.
-    // In `ClassesSectionsPage`, it seems I decided to store them?
-    // Let's check `src/app/admin/master-data/classes-sections/page.tsx` usage.
-    // Ah, I set up `master_class_sections` usage in `AddStudentModal`.
-    // But does the management page use `master_classes` and `master_sections` individually?
-    // I recall creating tabs for them.
-    // Let's blindly seed the COMBINATIONS into `master_class_sections` as that's what AddStudent uses.
-    // And also seed `master_classes` and `master_sections` if the management page uses them.
-
-    // Based on my previous view of AddStudentModal, it uses `master_class_sections`.
-    // Let's assume the management page also works with `master_classes` and `master_sections` for the dropdowns there.
-    // I'll seed ALL three collections to be safe and thorough.
-
-    classes.forEach((c, i) => {
-        batch.set(doc(collection(db, "master_classes")), { name: c, isActive: true, order: i + 1, createdAt: Timestamp.now() });
-    });
-
     sections.forEach(s => {
-        batch.set(doc(collection(db, "master_sections")), { name: s, isActive: true, createdAt: Timestamp.now() });
+        const data = { id: s.id, name: s.name, isActive: true, createdAt: Timestamp.now() };
+        ops.push({ ref: doc(db, "master_sections", s.id), type: 'set', data });
+        rtdbMaster.sections[s.id] = data;
     });
 
-    classes.forEach(c => {
+    // 3. Class-Section Mapping
+    classData.forEach(c => {
         sections.forEach(s => {
-            batch.set(doc(collection(db, "master_class_sections")), {
-                className: c,
-                sectionName: s,
-                displayName: `${c} - ${s}`,
+            const id = `${c.id}_${s.id}`;
+            const data = {
+                id,
+                classId: c.id,
+                className: c.name,
+                sectionId: s.id,
+                sectionName: s.name,
+                displayName: `${c.name} - ${s.name}`,
                 isActive: true,
                 createdAt: Timestamp.now()
-            });
+            };
+            ops.push({ ref: doc(db, "master_class_sections", id), type: 'set', data });
+            rtdbMaster.classSections[id] = data;
         });
     });
 
-    await batch.commit();
+    // 4. Global Fee Config
+    const feeAmounts: Record<string, number> = {};
+    classData.forEach(c => feeAmounts[c.name] = 15000 + (classData.indexOf(c) * 2000));
+    const feeConfig = {
+        terms: [
+            { id: "term_1", name: "I Term (Admission)", dueDate: "2026-06-15", isActive: true, amounts: feeAmounts },
+            { id: "term_2", name: "II Term (Mid-Year)", dueDate: "2026-10-15", isActive: true, amounts: feeAmounts },
+            { id: "term_3", name: "III Term (Final)", dueDate: "2027-02-15", isActive: true, amounts: feeAmounts },
+        ],
+        updatedAt: Timestamp.now()
+    };
+    ops.push({ ref: doc(db, "config", "fees"), type: 'set', data: feeConfig });
+
+    // 5. Seed Students (Exactly 10 per section, 2 sections per class = 200 total)
+    let studentIdCounter = 1000;
+
+    console.log("Generating 200 enterprise students...");
+    for (const cls of classData) {
+        for (const sec of sections) {
+            for (let i = 1; i <= 10; i++) {
+                studentIdCounter++;
+                const schoolId = `SHS${studentIdCounter}`;
+
+                const fName = getRandom(firstNames);
+                const lName = getRandom(lastNames);
+                const sName = `${fName} ${lName}`;
+                const pName = `${getRandom(fatherNames)} ${lName}`;
+                const mobile = `9${Math.floor(100000000 + Math.random() * 900000000)}`;
+                const vId = getRandom(villageIds);
+                const vName = villageNames[villageIds.indexOf(vId)];
+                const gender = getRandom(genders);
+
+                const studentData = {
+                    schoolId,
+                    studentName: sName,
+                    firstName: fName,
+                    lastName: lName,
+                    parentName: pName,
+                    parentMobile: mobile,
+                    villageId: vId,
+                    villageName: vName,
+                    classId: cls.id,
+                    className: cls.name,
+                    sectionId: sec.id,
+                    sectionName: sec.name,
+                    status: "ACTIVE",
+                    academicYear: academicYearId,
+                    gender,
+                    dateOfBirth: `201${Math.floor(Math.random() * 9)}-${String(Math.floor(Math.random() * 12) + 1).padStart(2, '0')}-${String(Math.floor(Math.random() * 28) + 1).padStart(2, '0')}`,
+                    transportRequired: Math.random() > 0.7,
+                    admissionNumber: `ADM/${academicYearId}/${studentIdCounter}`,
+                    address: `${i}, Main Street, ${vName}`,
+                    createdAt: Timestamp.now(),
+                    recoveryPassword: mobile,
+                    type: "student",
+                    version: 1
+                };
+
+                ops.push({ ref: doc(db, "students", schoolId), type: 'set', data: studentData });
+
+                // 5.1 Fee Ledger
+                const totalTermFee = feeConfig.terms.reduce((acc, t) => acc + (t.amounts[cls.name] || 0), 0);
+                const ledgerItems = feeConfig.terms.map(t => ({
+                    id: `TERM_${t.id}`,
+                    type: "TERM",
+                    name: t.name,
+                    dueDate: t.dueDate,
+                    amount: t.amounts[cls.name],
+                    paidAmount: 0,
+                    status: "PENDING"
+                }));
+
+                const ledgerData = {
+                    studentId: schoolId,
+                    academicYearId: academicYearId,
+                    classId: cls.id,
+                    className: cls.name,
+                    totalFee: totalTermFee,
+                    totalPaid: 0,
+                    status: "PENDING",
+                    items: ledgerItems,
+                    updatedAt: new Date().toISOString()
+                };
+                ops.push({ ref: doc(db, "student_fee_ledgers", `${schoolId}_${academicYearId}`), type: 'set', data: ledgerData });
+
+                // 5.2 Search Index
+                const keywords = [sName, schoolId, mobile, cls.name, vName, fName, lName].map(v => String(v).toLowerCase());
+                ops.push({
+                    ref: doc(db, "search_index", schoolId),
+                    type: 'set',
+                    data: {
+                        id: schoolId, entityId: schoolId, type: "student",
+                        title: sName, subtitle: `${cls.name} | ${vName}`,
+                        url: `/admin/students/${schoolId}`,
+                        keywords, updatedAt: Timestamp.now()
+                    }
+                });
+
+                // 5.3 Random Payments
+                if (Math.random() > 0.4) {
+                    const payAmount = Math.random() > 0.8 ? totalTermFee : (feeConfig.terms[0].amounts[cls.name] || 5000);
+                    ops.push({
+                        ref: doc(db, "payments", `PAY_${schoolId}_${i}`),
+                        type: 'set',
+                        data: {
+                            studentId: schoolId, studentName: sName, amount: payAmount,
+                            method: getRandom(["cash", "upi", "bank_transfer"]),
+                            date: Timestamp.now(), status: "success", createdAt: Timestamp.now()
+                        }
+                    });
+                    if (payAmount >= totalTermFee) { ledgerData.totalPaid = totalTermFee; ledgerData.status = "PAID"; }
+                    else { ledgerData.totalPaid = payAmount; ledgerData.status = "PARTIAL"; }
+                }
+            }
+        }
+    }
+
+    // 6. HR & STAFF
+    const staffSubjects = ["math", "science", "english"];
+    for (let i = 1; i <= 5; i++) {
+        const tId = `TCH_${String(i).padStart(3, '0')}`;
+        const tName = `${getRandom(firstNames)} ${getRandom(lastNames)}`;
+        const data = { id: tId, teacherId: tId, name: tName, subject: getRandom(staffSubjects), status: "ACTIVE", createdAt: Timestamp.now() };
+        ops.push({ ref: doc(db, "teachers", tId), type: 'set', data });
+
+        if (i % 2 === 0) {
+            ops.push({
+                ref: doc(collection(db, "leaves")),
+                type: 'set',
+                data: { staffId: tId, staffName: tName, type: "Casual Leave", startDate: "2026-03-01", endDate: "2026-03-01", status: "PENDING", appliedAt: Timestamp.now() }
+            });
+        }
+    }
+
+    // 7. CMS: Notices
+    const notices = [
+        { title: "Academic Year 2026-27 Enrollment", content: "Admissions are now open for all grades from Nursery to Class 10.", audience: "ALL", urgency: "IMPORTANT" },
+        { title: "Annual Sports Meet postponed", content: "Due to rain, the sports meet is rescheduled to March 15th.", audience: "STUDENTS", urgency: "NORMAL" }
+    ];
+    notices.forEach(n => {
+        ops.push({
+            ref: doc(collection(db, "notices")),
+            type: 'set',
+            data: { ...n, date: Timestamp.now(), status: "PUBLISHED", createdAt: Timestamp.now() }
+        });
+    });
+
+    // FINAL SYNC & COMMIT
+    console.log("Syncing Master Data to RTDB...");
+    await set(ref(rtdb, 'master'), rtdbMaster);
+
+    console.log(`Committing ${ops.length} Firestore operations in chunks...`);
+    await commitInChunks(ops);
+
+    console.log("✅ Demo Seeding Complete. System is now enterprise-populated.");
     return true;
 };

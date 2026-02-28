@@ -14,6 +14,7 @@ import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Textarea } from "@/components/ui/textarea";
 import { DeleteUserModal } from "@/components/admin/delete-user-modal";
 import { AdjustFeesModal } from "@/components/admin/adjust-fees-modal";
 import { Badge } from "@/components/ui/badge";
@@ -69,6 +70,11 @@ interface Student {
     dateOfBirth?: string;
     gender?: string;
     transportRequired?: boolean;
+    admissionNumber?: string;
+    academicYear?: string;
+    address?: string;
+    firstName?: string;
+    lastName?: string;
 }
 
 interface Payment {
@@ -651,6 +657,9 @@ export default function StudentDetailsPage() {
                         ) : (
                             canEdit && (
                                 <div className="flex items-center gap-1.5 md:gap-2">
+                                    <Button variant="outline" size="sm" onClick={() => window.print()} className="h-8 md:h-9 border-white/10 bg-white/5 text-[9px] md:text-sm px-1.5 md:px-4">
+                                        <FileText className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> <span className="hidden sm:inline">Print Profile</span>
+                                    </Button>
                                     <Button variant="outline" size="sm" onClick={() => setIsResetModalOpen(true)} className="h-8 md:h-9 border-white/10 bg-white/5 text-[9px] md:text-sm px-1.5 md:px-4">
                                         <Lock className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> <span className="hidden sm:inline">Reset</span>
                                     </Button>
@@ -692,12 +701,32 @@ export default function StudentDetailsPage() {
                                         <Input disabled={!isEditing} className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm font-bold disabled:opacity-100" value={editForm.studentName} onChange={e => setEditForm({ ...editForm, studentName: e.target.value })} />
                                     </div>
                                     <div className="space-y-0.5 md:space-y-1 col-span-2 md:col-span-1">
+                                        <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">First Name</Label>
+                                        <Input disabled={!isEditing} className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm disabled:opacity-100" value={editForm.firstName || ""} onChange={e => setEditForm({ ...editForm, firstName: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-0.5 md:space-y-1 col-span-2 md:col-span-1">
+                                        <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Last Name</Label>
+                                        <Input disabled={!isEditing} className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm disabled:opacity-100" value={editForm.lastName || ""} onChange={e => setEditForm({ ...editForm, lastName: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-0.5 md:space-y-1 col-span-2 md:col-span-1">
                                         <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Parent Name</Label>
                                         <Input disabled={!isEditing} className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm disabled:opacity-100" value={editForm.parentName} onChange={e => setEditForm({ ...editForm, parentName: e.target.value })} />
                                     </div>
                                     <div className="space-y-0.5 md:space-y-1 col-span-2 md:col-span-1">
                                         <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Mobile / Password</Label>
                                         <Input disabled={!isEditing} className="bg-white/5 border-white/10 font-mono h-8 md:h-10 text-[12px] md:text-sm disabled:opacity-100" value={editForm.parentMobile} onChange={e => setEditForm({ ...editForm, parentMobile: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-0.5 md:space-y-1 col-span-2 md:col-span-1">
+                                        <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Admission Number</Label>
+                                        <Input disabled={!isEditing} className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm font-bold disabled:opacity-100" value={editForm.admissionNumber || ""} onChange={e => setEditForm({ ...editForm, admissionNumber: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-0.5 md:space-y-1 col-span-2 md:col-span-1">
+                                        <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Academic Year</Label>
+                                        <Input disabled={!isEditing} className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm disabled:opacity-100" value={editForm.academicYear || ""} onChange={e => setEditForm({ ...editForm, academicYear: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-0.5 md:space-y-1 col-span-2">
+                                        <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Address</Label>
+                                        <Textarea rows={2} disabled={!isEditing} className="bg-white/5 border-white/10 text-[12px] md:text-sm disabled:opacity-100 min-h-[60px]" value={editForm.address || ""} onChange={e => setEditForm({ ...editForm, address: e.target.value })} />
                                     </div>
                                     <div className="space-y-0.5 md:space-y-1">
                                         <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Village</Label>
