@@ -3,7 +3,14 @@ import { db } from "@/lib/firebase";
 
 // === INDEXING UTILS ===
 
-// Generate simple prefix/token buckets for robust search
+/**
+ * Generates an array of search keywords for a given text string.
+ * This including full name, space-tokenized segments, and n-gram prefixes
+ * (min 1 character) to support robust autocomplete and fuzzy-like matching.
+ * 
+ * @param text - The raw string to tokenize (e.g., student name or ID).
+ * @returns An array of unique lowercase keyword strings.
+ */
 export function generateKeywords(text: string): string[] {
     if (!text) return [];
 
@@ -17,10 +24,10 @@ export function generateKeywords(text: string): string[] {
     const tokens = normalized.split(/\s+/);
     tokens.forEach(t => set.add(t));
 
-    // 3. Generate Prefixes (min 2 chars) for each token
-    // e.g. "Arjun" -> "ar", "arj", "arju", "arjun"
+    // 3. Generate Prefixes (min 1 char) for each token
+    // e.g. "Arjun" -> "a", "ar", "arj", "arju", "arjun"
     tokens.forEach(token => {
-        for (let i = 2; i <= token.length; i++) {
+        for (let i = 1; i <= token.length; i++) {
             set.add(token.substring(0, i));
         }
     });
@@ -30,17 +37,31 @@ export function generateKeywords(text: string): string[] {
 
 // === INDEXING ACTIONS ===
 
-export type SearchEntityType = "student" | "payment" | "teacher" | "notice" | "other" | "action";
+/**
+ * Supported entity categories indexable by the global search system.
+ */
+export type SearchEntityType = "student" | "payment" | "teacher" | "staff" | "notice" | "other" | "action";
 
+/**
+ * Normalized interface for a searchable record within the global index.
+ */
 export interface SearchIndexItem {
-    id: string; // The ID of the search index doc (usually same as entity ID)
-    entityId: string; // Ref to actual doc
+    /** Unique document ID within the search_index collection. */
+    id: string;
+    /** Reference to the source document (e.g., Student SchoolID). */
+    entityId: string;
+    /** Category tag for icon mapping and filtering. */
     type: SearchEntityType;
+    /** Primary display label (e.g., "Arjun Kumar"). */
     title: string;
+    /** Descriptive context (e.g., "Class 4 | Palam"). */
     subtitle: string;
+    /** Internal route for one-click navigation from search. */
     url: string;
+    /** Pre-indexed keyword buckets for Firestore querying. */
     keywords: string[];
-    metadata?: any; // Extra fields like status, amount, etc.
+    /** Optional extended metadata required by specific result types. */
+    metadata?: any;
 }
 
 // === STATIC FEATURES / INTENTS ===
@@ -87,10 +108,10 @@ const STATIC_FEATURES: SearchIndexItem[] = [
 
 function searchStaticFeatures(queryText: string): SearchIndexItem[] {
     const q = queryText.toLowerCase().trim();
-    if (q.length < 2) return [];
+    if (q.length < 1) return [];
 
     const results: SearchIndexItem[] = [];
-    const queryTokens = q.split(/\s+/).filter(t => t.length > 1); // Split into words: "add", "student"
+    const queryTokens = q.split(/\s+/).filter(t => t.length > 0); // Split into words: "add", "student"
 
     // 1. Keyword Matching with Scoring
     STATIC_FEATURES.forEach(feature => {
@@ -209,7 +230,7 @@ export async function searchGlobal(searchTerm: string, limitCount = 8): Promise<
 
     // 2. Get Firestore Data (Async)
     try {
-        const tokens = normalizedQuery.split(/\s+/).filter(t => t.length >= 2);
+        const tokens = normalizedQuery.split(/\s+/).filter(t => t.length >= 1);
 
         // If we have tokens, we search for each unique token to get broad hits
         // and then filter for intersections/relevance on the client.

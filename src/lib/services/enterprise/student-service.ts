@@ -4,21 +4,29 @@ import { AuditService } from "./audit-service";
 
 /**
  * Enterprise Student Service
- * Strict 3-Layer Architecture | Backend Enforcement Only
  * 
- * Rules:
- * - Student edits must be versioned.
- * - Old data must remain accessible for audit.
- * - No destructive deletes for critical data.
+ * Provides centralized administrative logic for managing the core student registry.
+ * Encapsulates the complete student lifecycle (Admissions and Profile Updates).
+ * 
+ * Compliance Rules:
+ * 1. Immutability & Audit: All historical states are versioned and preserved.
+ * 2. Concurrency Shield: Updates are protected by optimistic version checks.
+ * 3. Identity Generation: Student IDs are strictly sequenced via atomic counters.
+ * 4. Audit Trail: Mandatory logging of all creation and modification events.
  */
 export class EnterpriseStudentService {
 
     /**
-     * Creates a new student strictly conforming to the CreateStudentPayload schema.
-     * Uses atomic batches and centralized audit logging.
+     * Executes the formal admission and enrollment process for a new student.
      * 
-     * @param payload Validated student payload
-     * @param createdBy Admin user ID creating the student
+     * Performs an atomic sequence of operations including generating a unique
+     * school ID, creating an authentication profile, and establishing a financial
+     * ledger for the student. Ensures that the entire process succeeds or fails
+     * as one unit, preventing orphaned data records.
+     * 
+     * @param payload - A verified student data map (conforming to CreateStudentSchema).
+     * @param createdBy - UID of the administrator executing the enrollment.
+     * @returns A promise resolving to the final assigned school ID and UID.
      */
     static async createStudent(payload: CreateStudentPayload, createdBy: string) {
         // Enforce admission number uniqueness via counter or precise querying if required.
@@ -136,8 +144,17 @@ export class EnterpriseStudentService {
     }
 
     /**
-     * Updates an existing student strictly conforming to the UpdateStudentPayload schema.
-     * Enforces Optimistic Concurrency Control (Version checks) preventing silent overwrites.
+     * Updates an existing student record with integrated concurrency protection.
+     * 
+     * Validates the current version (Optimistic Concurrency Control) to prevent
+     * collisions with simultaneous edits. Each modify action increments the 
+     * record version and creates a point-in-time snapshot in the history store.
+     * 
+     * @param studentId - Unique key of the student to modify.
+     * @param payload - Verified map of fields to update.
+     * @param updatedBy - UID of the user performing the update.
+     * @returns A promise resolving to the new record version number.
+     * @throws Error if version mismatch (collision) or student does not exist.
      */
     static async updateStudent(studentId: string, payload: UpdateStudentPayload, updatedBy: string) {
         const studentRef = adminDb.collection("students").doc(studentId);

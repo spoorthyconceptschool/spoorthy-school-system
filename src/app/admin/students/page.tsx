@@ -218,6 +218,7 @@ export default function StudentsPage() {
                                     <SelectItem value="all">All Status</SelectItem>
                                     <SelectItem value="ACTIVE">Active</SelectItem>
                                     <SelectItem value="INACTIVE">Inactive</SelectItem>
+                                    <SelectItem value="ALUMNI">Alumni</SelectItem>
                                 </SelectContent>
                             </Select>
 
@@ -343,7 +344,9 @@ export default function StudentsPage() {
                                         }} className="cursor-pointer">
                                             <Badge className={cn(
                                                 "text-[9px] font-black uppercase tracking-tighter py-0 h-5 border-none transition-all",
-                                                s.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20" : "bg-red-500/10 text-red-400"
+                                                s.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20" :
+                                                    s.status === 'ALUMNI' ? "bg-indigo-500/10 text-indigo-400" :
+                                                        "bg-red-500/10 text-red-400"
                                             )}>
                                                 {s.status}
                                             </Badge>
