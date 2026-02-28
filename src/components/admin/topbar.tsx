@@ -106,20 +106,29 @@ export function TopBar() {
                         <DropdownMenuContent align="end" className="bg-[#0A192F]/95 backdrop-blur-xl border border-[#64FFDA]/20 text-white min-w-[150px]">
                             <DropdownMenuLabel className="text-[10px] uppercase tracking-widest opacity-90">Academic Session</DropdownMenuLabel>
                             <DropdownMenuSeparator className="bg-white/10" />
-                            {Object.values(academicYears || {}).sort((a: any, b: any) => String(b.id || "").localeCompare(String(a.id || ""))).map((y: any) => (
-                                <DropdownMenuItem
-                                    key={y.id}
-                                    onClick={() => setSelectedYear(y.id)}
-                                    className={cn(
-                                        "cursor-pointer text-xs font-bold font-mono flex items-center justify-between",
-                                        selectedYear === y.id ? "bg-[#64FFDA]/20 text-[#64FFDA]" : "hover:bg-white/5",
-                                        !y.active && "text-zinc-400"
-                                    )}
-                                >
-                                    {y.id}
-                                    {y.active && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10b981]" />}
-                                </DropdownMenuItem>
-                            ))}
+                            <div className="max-h-[300px] overflow-y-auto">
+                                {Object.values(academicYears || {})
+                                    .sort((a: any, b: any) => String(b.id || "").localeCompare(String(a.id || "")))
+                                    .map((y: any) => (
+                                        <DropdownMenuItem
+                                            key={y.id}
+                                            onClick={() => setSelectedYear(y.id)}
+                                            className={cn(
+                                                "cursor-pointer text-xs font-bold font-mono flex items-center justify-between py-2 px-3",
+                                                selectedYear === y.id ? "bg-[#64FFDA]/20 text-[#64FFDA]" : "hover:bg-white/5",
+                                                !y.active && "text-zinc-400 opacity-60"
+                                            )}
+                                        >
+                                            <div className="flex flex-col">
+                                                <span>{y.id}</span>
+                                                <span className="text-[8px] uppercase tracking-tighter opacity-50 font-sans">
+                                                    {y.active ? "Current Session" : "Planned/Archived"}
+                                                </span>
+                                            </div>
+                                            {y.active && <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 shadow-[0_0_5px_#10b981]" />}
+                                        </DropdownMenuItem>
+                                    ))}
+                            </div>
                         </DropdownMenuContent>
                     </DropdownMenu>
 

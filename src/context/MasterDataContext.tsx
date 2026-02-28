@@ -57,7 +57,7 @@ const initialState: MasterDataState = {
         testingMode: false,
         developerMaintenance: false,
     },
-    selectedYear: "2025-2026",
+    selectedYear: "2026-2027",
     setSelectedYear: () => { },
     students: [],
     teachers: [],
@@ -90,41 +90,47 @@ export function useSubjectName(id: string) {
 const MASTER_CACHE_KEY = "spoorthy_master_cache";
 
 export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
-    const [data, setData] = useState<Omit<MasterDataState, 'selectedYear' | 'setSelectedYear'>>({
-        ...initialState,
-    });
-
-    const [selectedYear, setSelectedYear] = useState("2025-2026");
+    const [data, setData] = useState<Omit<MasterDataState, 'selectedYear' | 'setSelectedYear'>>(initialState);
+    const [selectedYear, setSelectedYear] = useState("2026-2027");
+    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
-        // Hydration-safe cache loading
-        if (typeof window !== "undefined") {
-            const cached = localStorage.getItem(MASTER_CACHE_KEY);
-            if (cached) {
-                try {
-                    const parsed = JSON.parse(cached);
-                    setData(prev => ({
-                        ...prev,
-                        ...parsed,
-                        branding: { ...prev.branding, ...(parsed.branding || {}) },
-                        systemConfig: { ...prev.systemConfig, ...(parsed.systemConfig || {}) },
-                        loading: false
-                    }));
-                } catch (e) {
-                    console.warn("Master cache parse failed");
-                }
+        setMounted(true);
+        // Hydrate from cache on mount (Client-side only)
+        const cached = localStorage.getItem(MASTER_CACHE_KEY);
+        if (cached) {
+            try {
+                const parsed = JSON.parse(cached);
+                setData(prev => ({
+                    ...prev,
+                    ...parsed,
+                    branding: { ...initialState.branding, ...(parsed.branding || {}) },
+                    systemConfig: { ...initialState.systemConfig, ...(parsed.systemConfig || {}) },
+                    loading: false
+                }));
+            } catch (e) {
+                console.warn("Master cache corrupted, resetting...");
             }
-            const savedYear = localStorage.getItem("spoorthy_academic_year");
-            if (savedYear) setSelectedYear(savedYear);
         }
+
+        const cachedYear = localStorage.getItem("spoorthy_academic_year");
+        if (cachedYear) setSelectedYear(cachedYear);
+    }, []);
+
+    useEffect(() => {
+        // Cache is already loaded synchronously above.
+        // We only use this for initial Auth check or other setup if needed.
     }, []);
 
     // Helper to persist data
     useEffect(() => {
         if (typeof window !== "undefined" && !data.loading) {
-            localStorage.setItem(MASTER_CACHE_KEY, JSON.stringify(data));
+            // WE REMOVE BRANDING FROM CACHE TO PREVENT STALE LOGO FLICKER ("No Footprints")
+            const cacheData = { ...data };
+            delete (cacheData as any).branding;
+            localStorage.setItem(MASTER_CACHE_KEY, JSON.stringify(cacheData));
         }
-    }, [data.branding, data.classes, data.sections, data.villages, data.subjects]);
+    }, [data.classes, data.sections, data.villages, data.subjects]);
 
     // 1. RTDB Sync for Master Data & Branding
     useEffect(() => {
@@ -191,7 +197,7 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
 
         const timer = setTimeout(() => {
             setData(prev => ({ ...prev, loading: false }));
-        }, 3000);
+        }, 8000);
 
         return () => {
             if (brandingUnsub) brandingUnsub();
@@ -308,7 +314,13 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
     // 4. Authenticated Real-time Sync for Core Directories
     const { role, user } = useAuth();
     useEffect(() => {
-        if (!user || (role !== "ADMIN" && role !== "MANAGER" && role !== "TEACHER")) return;
+        if (!user) return;
+
+        const normalizedRole = String(role || "").toUpperCase();
+        const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'SUPERADMIN', 'OWNER', 'DEVELOPER', 'MANAGER'].includes(normalizedRole);
+        const isTeacher = normalizedRole === 'TEACHER';
+
+        if (!isAdmin && !isTeacher) return;
 
         // Sync Teachers (Active only for speed)
         const teachersQ = query(collection(db, "teachers"), where("status", "==", "ACTIVE"));
@@ -347,6 +359,11 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
         selectedYear,
         setSelectedYear: handleSetSelectedYear
     }), [data, selectedYear]);
+
+    if (!mounted) {
+        // Return a minimal consistent shell to avoid hydration errors
+        return <div className="min-h-screen bg-[#0A192F]" />;
+    }
 
     return (
         <MasterDataContext.Provider value={contextValue}>

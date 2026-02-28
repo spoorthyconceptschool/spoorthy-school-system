@@ -89,7 +89,8 @@ export async function POST(req: NextRequest) {
         const PROTECTED = [
             'settings', 'users', 'config', 'branding',
             'registry',
-            'site_content', 'landing_page', 'cms_content', 'counters'
+            'site_content', 'landing_page', 'cms_content', 'counters',
+            'master_classes', 'master_sections', 'master_villages', 'master_subjects', 'master_staff_roles', 'master_class_sections'
         ];
 
         try {
@@ -170,8 +171,20 @@ export async function POST(req: NextRequest) {
             tasks.push(adminRtdb.ref("presence").remove());
             if (purgeType === 'FULL_SYSTEM') {
                 tasks.push(adminRtdb.ref("academic_years").remove());
-                tasks.push(adminRtdb.ref("master").remove());
+                tasks.push(adminRtdb.ref("siteContent").remove()); // Wipe RTDB branding
                 tasks.push(adminRtdb.ref("timetables").remove());
+                // Also reset Firestore config for academic years
+                tasks.push(adminDb.collection("config").doc("academic_years").delete());
+
+                // Deep clean Storage footprint (settings folder)
+                tasks.push((async () => {
+                    try {
+                        const [files] = await adminStorage.bucket().getFiles({ prefix: 'settings/' });
+                        await Promise.all(files.map((file: any) => file.delete()));
+                    } catch (e) {
+                        console.warn("[Purge] Storage wipe skipped (empty or no permission)");
+                    }
+                })());
             }
         }
 

@@ -28,21 +28,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [userData, setUserData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+        // Hydrate from cache on mount
+        const cached = localStorage.getItem(STORAGE_KEY);
+        if (cached) {
+            try {
+                setUserData(JSON.parse(cached));
+            } catch (e) {
+                console.warn("Auth cache corrupted");
+            }
+        }
+    }, []);
     const router = useRouter();
 
     useEffect(() => {
-        // Hydration-safe cache loading
-        if (typeof window !== "undefined") {
-            const cached = localStorage.getItem(STORAGE_KEY);
-            if (cached) {
-                try {
-                    const parsed = JSON.parse(cached);
-                    setUserData(parsed);
-                } catch (e) {
-                    localStorage.removeItem(STORAGE_KEY);
-                }
-            }
-        }
+        // Background refresh only, initial state is already set from cache above
 
         const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
             if (authUser) {
@@ -87,6 +90,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         localStorage.removeItem(STORAGE_KEY);
         router.push("/login");
     };
+
+    if (!mounted) {
+        return <div className="min-h-screen bg-[#0A192F]" />;
+    }
 
     return (
         <AuthContext.Provider value={{ user, userData, role: userData?.role || "", loading, signIn, signOut }}>

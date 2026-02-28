@@ -63,6 +63,39 @@ export async function POST(req: NextRequest) {
             }
         });
 
+        // MANDATORY: Notify Class Teacher
+        try {
+            const { adminRtdb } = await import("@/lib/firebase-admin");
+            const csKey = `${classId}_${sectionId}`;
+            const csSnap = await adminRtdb.ref(`master/classSections/${csKey}`).once('value');
+            const classTeacherId = csSnap.val()?.classTeacherId;
+
+            if (classTeacherId) {
+                const teacherUserSnap = await adminDb.collection("usersBySchoolId").doc(classTeacherId).get();
+                const teacherUid = teacherUserSnap.data()?.uid;
+
+                if (teacherUid) {
+                    await adminDb.collection("notifications").add({
+                        title: "Leave Request: My Student",
+                        message: `${studentName} from your class requested leave: ${reason}`,
+                        type: "LEAVE_REQUEST",
+                        status: "UNREAD",
+                        target: "user",
+                        uid: teacherUid,
+                        createdAt: FieldValue.serverTimestamp(),
+                        metadata: {
+                            studentId: schoolId,
+                            leaveId: leaveRef.id,
+                            type: "STUDENT"
+                        }
+                    });
+                }
+            }
+        } catch (noteError) {
+            console.error("Failed to notify class teacher:", noteError);
+            // Non-blocking for the student
+        }
+
         return NextResponse.json({ success: true, message: "Leave request submitted successfully" });
     } catch (error: any) {
         console.error("Apply Leave Error:", error);

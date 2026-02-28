@@ -235,8 +235,8 @@ export default function LeaveManagementPage() {
                                 <Users className="w-4 h-4 text-blue-400" /> Class Student Absences
                             </CardTitle>
                             <CardDescription>
-                                {teacherProfile?.classInCharge
-                                    ? `Showing leaves for Class ${teacherProfile.classInCharge}${teacherProfile.sectionInCharge || ""}`
+                                {teacherProfile?.classTeacherOf?.classId
+                                    ? `Showing leaves for your assigned class section`
                                     : "You are not assigned as a Class In-charge."}
                             </CardDescription>
                         </CardHeader>

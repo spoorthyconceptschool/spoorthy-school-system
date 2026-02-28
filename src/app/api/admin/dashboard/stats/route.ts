@@ -11,7 +11,7 @@ import { getInitError, adminDb } from "@/lib/firebase-admin";
 export async function GET(req: NextRequest) {
     try {
         const url = new URL(req.url);
-        const academicYear = url.searchParams.get("year") || "2024-2025";
+        const academicYear = url.searchParams.get("year") || "2026-2027";
 
         const [studentsSnap, staffSnap, todayPaymentsSnap] = await Promise.all([
             adminDb.collection("students").where("academicYear", "==", academicYear).count().get(),

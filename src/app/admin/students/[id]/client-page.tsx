@@ -212,19 +212,83 @@ export default function StudentDetailsPage() {
                     return safeDateParse(b.date) - safeDateParse(a.date);
                 }));
 
-                // 3. Fetch Fee Ledger (New)
-                // Assuming current academic year is hardcoded "2025-2026" for MVP or fetched from config.
-                // We use the ID convention: {schoolId}_2025-2026
+                // 3. Auto-Sync Fee Ledger (Real-time synchronization)
                 const currentYearId = selectedYear || "2025-2026";
                 const ledgerRef = doc(db, "student_fee_ledgers", `${sData.schoolId}_${currentYearId}`);
                 const ledgerSnap = await getDoc(ledgerRef);
 
-                if (ledgerSnap.exists()) {
-                    setLedger(ledgerSnap.data() as FeeLedger);
-                } else {
-                    // Fallback: If no ledger exists (old student), we might need to rely on the old calculation or show empty.
-                    // For now, let's treat as empty to encourage "Recalculate" or "Generate" if we were to add that button.
-                    setLedger(null);
+                try {
+                    // Fetch Global Fee Config
+                    const feeConfigSnap = await getDoc(doc(db, "config", "fees"));
+                    const feeTerms = ((feeConfigSnap.data()?.terms as any[]) || []).filter((t: any) => t.isActive);
+
+                    // Fetch Custom Fees (Targeted)
+                    const customFeesQ = query(collection(db, "custom_fees"), where("status", "==", "ACTIVE"));
+                    const customFeesSnap = await getDocs(customFeesQ);
+
+                    const targetClassName = sData.className || "Class 1";
+                    const newItems: FeeLedgerItem[] = [];
+
+                    feeTerms.forEach((term: any) => {
+                        const amount = term.amounts?.[targetClassName] || 0;
+                        if (amount > 0) newItems.push({ id: `TERM_${term.id}`, type: "TERM", name: term.name, dueDate: term.dueDate, amount: Number(amount), paidAmount: 0, status: "PENDING" });
+                    });
+
+                    customFeesSnap.docs.forEach(cDoc => {
+                        const cf = cDoc.data();
+                        if (cf.targetType === "CLASS" && cf.targetIds?.includes(sData.classId)) {
+                            newItems.push({ id: `CUSTOM_${cDoc.id}`, type: "CUSTOM", name: cf.name, dueDate: cf.dueDate, amount: Number(cf.amount), paidAmount: 0, status: "PENDING" });
+                        }
+                    });
+
+                    let existingItems: FeeLedgerItem[] = [];
+                    if (ledgerSnap.exists()) existingItems = (ledgerSnap.data().items as FeeLedgerItem[]) || [];
+
+                    const mergedItems = [...existingItems];
+                    let hasChanges = !ledgerSnap.exists();
+
+                    newItems.forEach(newItem => {
+                        const existingIndex = mergedItems.findIndex(i => i.id === newItem.id);
+                        if (existingIndex === -1) {
+                            mergedItems.push(newItem);
+                            hasChanges = true;
+                        } else {
+                            const ex = mergedItems[existingIndex];
+                            if (ex.paidAmount === 0 && ex.amount !== newItem.amount) {
+                                mergedItems[existingIndex] = { ...ex, amount: newItem.amount, dueDate: newItem.dueDate, name: newItem.name };
+                                hasChanges = true;
+                            } else if (ex.dueDate !== newItem.dueDate || ex.name !== newItem.name) {
+                                mergedItems[existingIndex] = { ...ex, dueDate: newItem.dueDate, name: newItem.name };
+                                hasChanges = true;
+                            }
+                        }
+                    });
+
+                    const calculatedTotalPaid = loadedPayments.reduce((sum, p) => sum + (Number(p.amount) || 0), 0);
+                    const calculatedTotalFee = mergedItems.reduce((sum, i) => sum + i.amount, 0);
+                    const ledData = ledgerSnap.data();
+
+                    if (hasChanges || ledData?.totalFee !== calculatedTotalFee || ledData?.totalPaid !== calculatedTotalPaid) {
+                        const newLedgerData = {
+                            studentId: sData.schoolId,
+                            academicYearId: currentYearId,
+                            classId: sData.classId,
+                            className: sData.className,
+                            totalFee: calculatedTotalFee,
+                            totalPaid: calculatedTotalPaid,
+                            status: calculatedTotalPaid >= calculatedTotalFee && calculatedTotalFee > 0 ? "PAID" : "PENDING",
+                            items: mergedItems,
+                            updatedAt: new Date().toISOString()
+                        };
+                        await setDoc(ledgerRef, newLedgerData, { merge: true });
+                        setLedger(newLedgerData as FeeLedger);
+                    } else {
+                        setLedger(ledData as FeeLedger);
+                    }
+                } catch (autoSyncErr) {
+                    console.error("Auto Sync Failed:", autoSyncErr);
+                    // Fallback to strict DB snapshot if auto-sync fails
+                    setLedger(ledgerSnap.exists() ? (ledgerSnap.data() as FeeLedger) : null);
                 }
 
                 // Master data now handled by context
@@ -469,157 +533,7 @@ export default function StudentDetailsPage() {
     // Reset Password State
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
-    const [recalculating, setRecalculating] = useState(false);
 
-    /**
-     * Recalculates the student's fee ledger based on global term fees and applicable custom fees.
-     * Merges current ledger state with new expectations.
-     */
-    const handleRecalculateFees = async () => {
-        if (!student) return;
-        setRecalculating(true);
-        try {
-            // 1. Fetch Global Fee Config
-            const feeConfigSnap = await getDoc(doc(db, "config", "fees"));
-            const feeConfig = feeConfigSnap.data();
-            const feeTerms = (feeConfig?.terms || []).filter((t: any) => t.isActive);
-
-            // 1.5 Fetch Custom Fees (Targeted)
-            const customFeesQ = query(collection(db, "custom_fees"), where("status", "==", "ACTIVE"));
-            const customFeesSnap = await getDocs(customFeesQ);
-
-            // 2. Identify Target Class
-            const targetClassId = student.classId; // Ideally we use ID
-            const targetClassName = student.className || "Class 1";
-            // Note: Custom Fees page uses IDs for targetIds? Let's check. 
-            // Yes, Custom Fees page uses `formData.targetIds.includes(c.id)` where c.id is firestore doc id of master_class.
-            // Student has `classId` (hopefully matching master_class ID).
-
-            // 3. Build Expected Items
-            const newItems: FeeLedgerItem[] = [];
-
-            // A. Add Standard Term Flags
-            feeTerms.forEach((term: any) => {
-                const amount = term.amounts?.[targetClassName] || 0; // Config uses Name
-                if (amount > 0) {
-                    newItems.push({
-                        id: `TERM_${term.id}`,
-                        type: "TERM",
-                        name: term.name,
-                        dueDate: term.dueDate,
-                        amount: Number(amount),
-                        paidAmount: 0,
-                        status: "PENDING"
-                    });
-                }
-            });
-
-            // B. Add Custom Fees
-            customFeesSnap.docs.forEach(doc => {
-                const cf = doc.data();
-                let isApplicable = false;
-
-                if (cf.targetType === "CLASS" && cf.targetIds?.includes(targetClassId)) {
-                    isApplicable = true;
-                }
-                // Optional: Village check if we had student.villageId
-                // if (cf.targetType === "VILLAGE" && cf.targetIds?.includes(student.villageId)) isApplicable = true;
-
-                if (isApplicable) {
-                    newItems.push({
-                        id: `CUSTOM_${doc.id}`,
-                        type: "CUSTOM",
-                        name: cf.name,
-                        dueDate: cf.dueDate,
-                        amount: Number(cf.amount),
-                        paidAmount: 0,
-                        status: "PENDING"
-                    });
-                }
-            });
-
-            // 4. Fetch Existing Ledger
-            const currentYearId = selectedYear || "2025-2026";
-            const ledgerRef = doc(db, "student_fee_ledgers", `${student.schoolId}_${currentYearId}`);
-            const ledgerSnap = await getDoc(ledgerRef);
-
-            let existingItems: FeeLedgerItem[] = [];
-            if (ledgerSnap.exists()) {
-                existingItems = (ledgerSnap.data().items as FeeLedgerItem[]) || [];
-            }
-
-            // 5. Merge Strategy:
-            // - Keep existing items (preserve payments)
-            // - Add new items if ID missing
-            // - OPTIONAL: Update amount of existing items? 
-            //   For "New Fee Type", strictly adding is safer. 
-            //   If user updated Amount of existing term, we MIGHT want to update it if paid=0.
-            //   Let's do a smart merge: Update amount ONLY if paidAmount is 0.
-
-            const mergedItems = [...existingItems];
-
-            newItems.forEach(newItem => {
-                const existingIndex = mergedItems.findIndex(i => i.id === newItem.id);
-                if (existingIndex === -1) {
-                    // Start fresh
-                    mergedItems.push(newItem);
-                } else {
-                    // Update metadata (due date, name) always
-                    // Update amount ONLY if no payment made yet (to avoid messing up partials)
-                    const ex = mergedItems[existingIndex];
-                    if (ex.paidAmount === 0) {
-                        mergedItems[existingIndex] = { ...ex, amount: newItem.amount, dueDate: newItem.dueDate, name: newItem.name };
-                    } else {
-                        // Just update metadata, keep old amount? Or force new amount?
-                        // If paid partial, total fee might increase.
-                        // Let's safe update:
-                        mergedItems[existingIndex] = { ...ex, dueDate: newItem.dueDate, name: newItem.name };
-                    }
-                }
-            });
-
-            // 6. Recalculate Totals
-            const totalFee = mergedItems.reduce((sum, i) => sum + i.amount, 0);
-
-            // 7. Save
-            const newLedgerData = {
-                studentId: student.schoolId,
-                academicYearId: currentYearId,
-                classId: student.classId,
-                className: student.className,
-                totalFee,
-                totalPaid: totalPaid, // Changed from ledger?.totalPaid || 0 to use payment-derived true status
-                status: totalPaid >= totalFee ? "PAID" : "PENDING",
-                items: mergedItems,
-                updatedAt: new Date().toISOString() // serverTimestamp ideally
-            };
-
-            await setDoc(ledgerRef, newLedgerData, { merge: true });
-
-            // 8. Update Local State
-            setLedger({ ...newLedgerData, items: mergedItems } as FeeLedger);
-
-            // 9. Notification for Manager Action
-            if (isManager) {
-                await notifyManagerAction({
-                    userId: student.uid || student.schoolId,
-                    title: "Fee Structure Synced",
-                    message: `Fee structure for ${student.studentName} has been recalculated & synced with global config by Manager ${user?.displayName || 'Manager'}.`,
-                    type: "INFO",
-                    actionBy: user?.uid,
-                    actionByName: user?.displayName || "Manager"
-                });
-            }
-
-            alert("Fees Recalculated Successfully");
-
-        } catch (e: any) {
-            console.error(e);
-            alert("Recalculate Failed: " + e.message);
-        } finally {
-            setRecalculating(false);
-        }
-    };
 
     return (
         <div className="space-y-3 md:space-y-6 max-w-7xl mx-auto pb-20 animate-in fade-in duration-200 p-1 md:p-0">
@@ -858,11 +772,7 @@ export default function StudentDetailsPage() {
                             <CardTitle className="text-xs md:text-xl font-bold text-accent italic">Fee Structure</CardTitle>
                             {!loading && (
                                 <div className="flex gap-1">
-                                    {canEdit && (
-                                        <Button variant="outline" size="sm" onClick={handleRecalculateFees} disabled={recalculating} className="h-6 px-1.5 md:h-7 md:px-2 border-white/10 bg-white/5 text-[8px] md:text-[9px] font-bold">
-                                            <RefreshCw className={`w-2.5 h-2.5 md:w-3 md:h-3 mr-1 ${recalculating ? "animate-spin" : ""}`} /> Sync
-                                        </Button>
-                                    )}
+
                                     <Button variant="outline" size="sm" className="h-6 px-1.5 md:h-7 md:px-2 border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-[8px] md:text-[9px] font-bold" onClick={() => ledger && student && printStudentFeeStructure({ studentName: student.studentName, schoolId: student.schoolId, className: student.className, items: ledger.items || [], totalPaid: ledger.totalPaid || 0, schoolLogo: branding?.schoolLogo, schoolName: branding?.schoolName })}>
                                         <Printer className="w-2.5 h-2.5 md:w-3 md:h-3 mr-1" />
                                     </Button>

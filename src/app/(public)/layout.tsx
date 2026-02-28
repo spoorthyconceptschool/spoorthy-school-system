@@ -58,15 +58,17 @@ function Navbar() {
                         {/* Brand Identity */}
                         <Link href="/" className="flex items-center gap-3 md:gap-4 group z-50 relative shrink-0 min-w-0">
                             <div className="relative w-10 h-10 min-w-[40px] md:w-12 md:min-w-[48px] md:h-12 lg:w-14 lg:h-14 lg:min-w-[56px] overflow-hidden rounded-xl bg-transparent group-hover:scale-105 transition-transform duration-500 shadow-xl shrink-0 flex items-center justify-center">
-                                {!imageError ? (
+                                {branding.schoolLogo && !imageError ? (
                                     <img
-                                        src={branding.schoolLogo || "https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Flogo.png?alt=media"}
+                                        src={branding.schoolLogo}
                                         alt={branding.schoolName || "Logo"}
                                         className="w-full h-full object-contain filter drop-shadow-sm"
                                         onError={() => setImageError(true)}
                                     />
                                 ) : (
-                                    <div className="w-full h-full bg-[#64FFDA]/10 flex items-center justify-center text-[#0A192F] font-bold font-display text-xl">S</div>
+                                    <div className="w-full h-full bg-[#64FFDA]/10 flex items-center justify-center text-[#64FFDA] font-bold font-display text-xl border border-[#64FFDA]/20 rounded-xl">
+                                        {(branding.schoolName || "S").charAt(0)}
+                                    </div>
                                 )}
                             </div>
                             <div className="flex flex-col justify-center overflow-hidden min-w-0">
@@ -95,10 +97,11 @@ function Navbar() {
                         <Link href="/login" className="px-4 py-2 text-white/70 font-medium hover:text-white transition-colors text-xs uppercase tracking-wider hover:underline underline-offset-4 decoration-accent/50">
                             Portal
                         </Link>
-                        <Link href="/admissions/apply">
-                            <button className="px-6 py-2.5 rounded-full bg-white text-[#0A192F] font-bold text-xs md:text-sm hover:bg-accent transition-all shadow-lg hover:shadow-accent/20 active:scale-95 tracking-wide uppercase">
-                                Admissions
-                            </button>
+                        <Link
+                            href="/admissions/apply"
+                            className="px-6 py-2.5 rounded-full bg-white text-[#0A192F] font-bold text-xs md:text-sm hover:bg-accent transition-all shadow-lg hover:shadow-accent/20 active:scale-95 tracking-wide uppercase flex items-center justify-center"
+                        >
+                            Admissions
                         </Link>
                     </div>
 
@@ -142,10 +145,12 @@ function Navbar() {
                             initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ delay: 0.5 }}
                             className="mt-12 md:mt-20 flex flex-col gap-4 md:gap-6 w-full max-w-sm px-6"
                         >
-                            <Link href="/admissions/apply" onClick={() => setMobileOpen(false)}>
-                                <button className="w-full py-4 md:py-5 rounded-full bg-white text-[#0A192F] font-bold text-lg md:text-xl hover:scale-105 transition-transform shadow-xl">
-                                    Apply Now
-                                </button>
+                            <Link
+                                href="/admissions/apply"
+                                onClick={() => setMobileOpen(false)}
+                                className="w-full py-4 md:py-5 rounded-full bg-white text-[#0A192F] font-bold text-lg md:text-xl hover:scale-105 transition-transform shadow-xl flex items-center justify-center"
+                            >
+                                Apply Now
                             </Link>
                             <Link href="/login" onClick={() => setMobileOpen(false)} className="text-white/50 font-medium text-center uppercase tracking-widest text-xs md:text-sm hover:text-white transition-colors">
                                 Student Portal

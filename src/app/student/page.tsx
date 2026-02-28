@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { CreditCard, Wallet, Calendar, Info, BookOpen, User, Bookmark, Loader2 } from "lucide-react";
 import { collection, query, where, onSnapshot, orderBy, limit } from "firebase/firestore";
 import { Skeleton } from "@/components/ui/skeleton";
+import { useRouter } from "next/navigation";
 
 export default function StudentDashboard() {
     const { user } = useAuth();
@@ -25,7 +26,7 @@ export default function StudentDashboard() {
     const [paymentAmounts, setPaymentAmounts] = useState<{ [key: string]: string }>({});
     const [useHomeworkFallback, setUseHomeworkFallback] = useState(false);
     const [recentHomework, setRecentHomework] = useState<any[]>([]);
-
+    const router = useRouter();
 
     useEffect(() => {
         if (!user?.uid) return;
@@ -305,7 +306,7 @@ export default function StudentDashboard() {
                                     </div>
                                 ))}
                             </div>
-                            <Button variant="outline" className="rounded-xl border-accent/20 text-accent hover:bg-accent hover:text-accent-foreground font-bold italic h-12 px-8" onClick={() => window.location.href = '/student/homework'}>
+                            <Button variant="outline" className="rounded-xl border-accent/20 text-accent hover:bg-accent hover:text-accent-foreground font-bold italic h-12 px-8" onClick={() => router.push('/student/homework')}>
                                 View Homework Feed
                             </Button>
                         </div>
