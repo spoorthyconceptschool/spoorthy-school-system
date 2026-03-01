@@ -63,14 +63,16 @@ export function SyllabusManager({ examId, role }: SyllabusManagerProps) {
                 const q = query(collection(db, "teachers"), where("uid", "==", user.uid));
                 const snap = await getDocs(q);
                 if (snap.empty) return;
-                const teacherId = snap.docs[0].id;
+                const teacherDoc = snap.docs[0];
+                const teacherId = teacherDoc.id;
+                const schoolId = teacherDoc.data().schoolId;
 
                 // 1. Subject Teacher Assignments
                 const assignments: any[] = [];
                 Object.entries(subjectTeachers).forEach(([classSectionKey, subs]: [string, any]) => {
                     const [cId, sId] = classSectionKey.split("_");
                     Object.entries(subs).forEach(([subId, tId]) => {
-                        if (tId === teacherId) {
+                        if (tId === teacherId || tId === schoolId) {
                             // Check if this combination already exists in our simplified list
                             const existing = assignments.find(a => a.classId === cId && a.subjectId === subId);
                             if (existing) {
@@ -86,7 +88,7 @@ export function SyllabusManager({ examId, role }: SyllabusManagerProps) {
                 // 2. Class Teacher Assignments
                 const ctClasses: string[] = [];
                 Object.values(classSections).forEach((cs: any) => {
-                    if (cs.classTeacherId === teacherId && cs.active) {
+                    if ((cs.classTeacherId === teacherId || cs.classTeacherId === schoolId) && cs.active) {
                         if (!ctClasses.includes(cs.classId)) ctClasses.push(cs.classId);
                     }
                 });
