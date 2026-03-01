@@ -178,6 +178,11 @@ service cloud.firestore {
     }
 
     // Global Catch-all (Default to Admin only for safety)
+    match /exams/{id} {
+      allow read: if isSignedIn();
+      allow write: if isManager();
+    }
+
     match /{document=**} {
       allow read, write: if isAdmin();
     }
