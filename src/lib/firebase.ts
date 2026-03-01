@@ -17,27 +17,35 @@ const firebaseConfig = {
     databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL
 };
 
-// Initialize Firebase app
+// Initialize Firebase singleton
 const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 let db: Firestore;
 
-// Initialize Firestore with modern persistent cache settings (v10+)
-// We only enable persistence in the browser environment
+// Robust Firestore Initialization with Persistence
 if (typeof window !== "undefined") {
     try {
+        // Attempt to initialize with multi-tab persistence
         db = initializeFirestore(app, {
             localCache: persistentLocalCache({
                 tabManager: persistentMultipleTabManager()
             })
         });
-        console.log("Firestore Persistence Enabled (Multi-Tab)");
-    } catch (error: any) {
-        // If already initialized with different settings or settings were already applied
-        db = getFirestore(app);
+        console.log("Firestore Persistence Ready (Multi-Tab)");
+    } catch (e: any) {
+        // 1. Check if Firestore is already initialized (Common in HMR)
+        const initializedDb = getFirestore(app);
+        if (initializedDb) {
+            db = initializedDb;
+            console.log("Firestore using existing instance");
+        } else {
+            // 2. Fallback to basic Firestore if persistence setup fails (e.g. Incognito or blocked)
+            db = getFirestore(app);
+            console.warn("Firestore Persistence Failed, using memory-only fallback", e.message);
+        }
     }
 } else {
-    // Server-side: Use standard Firestore without persistence
+    // Server-side: Always use stateless Firestore
     db = getFirestore(app);
 }
 

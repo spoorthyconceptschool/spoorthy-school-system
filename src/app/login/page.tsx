@@ -77,7 +77,8 @@ export default function LoginPage() {
             router.push(targetPath);
 
         } catch (err: any) {
-            console.error("[Login] Error:", err);
+            // Use console.warn to avoid triggering the Next.js Dev Overlay for expected auth failures
+            console.warn("[Login] Auth Failed:", err.message);
             setError(err.message || "Invalid credentials. Please try again.");
             toast({
                 title: "Login Failed",

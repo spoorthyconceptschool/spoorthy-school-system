@@ -52,12 +52,12 @@ export function FCMTokenManager() {
                                 lastFcmTokenAt: new Date()
                             });
                         } else {
-                            console.error("Error saving FCM token to Firestore:", err);
+                            console.warn("[FCM] Error saving token to Firestore:", err.message);
                         }
                     }
                 }
-            } catch (err) {
-                console.error("FCM Token Registration Failed:", err);
+            } catch (err: any) {
+                console.warn("[FCM] Token Registration Failed:", err.message);
             }
         };
 

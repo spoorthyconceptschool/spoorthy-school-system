@@ -360,20 +360,20 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
         const teachersUnsub = onSnapshot(teachersQ, (snap) => {
             const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setData(prev => ({ ...prev, teachers: list }));
-        });
+        }, (err) => console.warn("[MasterData] Teachers Sync Error:", err.message));
 
         // Sync Staff (Active only)
         const staffQ = query(collection(db, "staff"), where("status", "==", "ACTIVE"));
         const staffUnsub = onSnapshot(staffQ, (snap) => {
             const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setData(prev => ({ ...prev, staff: list }));
-        });
+        }, (err) => console.warn("[MasterData] Staff Sync Error:", err.message));
 
         // Sync Groups (House system)
         const groupsUnsub = onSnapshot(collection(db, "groups"), (snap) => {
             const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setData(prev => ({ ...prev, groups: list }));
-        });
+        }, (err) => console.warn("[MasterData] Groups Sync Error:", err.message));
 
         return () => {
             teachersUnsub();

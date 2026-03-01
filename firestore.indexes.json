@@ -103,6 +103,20 @@
             "queryScope": "COLLECTION",
             "fields": [
                 {
+                    "fieldPath": "teacherId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "leave_requests",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
                     "fieldPath": "status",
                     "order": "ASCENDING"
                 },

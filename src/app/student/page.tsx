@@ -37,8 +37,7 @@ export default function StudentDashboard() {
         script.async = true;
         document.body.appendChild(script);
 
-        // A. Listen to Student Profile
-        // Strategy: Try direct Doc ID first (based on email), then fallback to UID query
+        // A. Derived Identifiers
         const schoolIdFromEmail = user?.email?.split('@')[0]?.toUpperCase();
         if (!schoolIdFromEmail) {
             console.warn("[Dashboard] Could not derive schoolId from email:", user?.email);
@@ -47,6 +46,7 @@ export default function StudentDashboard() {
         }
 
         let unsubLedger: (() => void) | null = null;
+        const yearId = "2025-2026";
 
         const processProfileSnap = (pData: any, docId: string) => {
             setProfile(pData);
@@ -54,7 +54,6 @@ export default function StudentDashboard() {
 
             if (sId) {
                 if (unsubLedger) unsubLedger();
-                const yearId = "2025-2026";
                 unsubLedger = onSnapshot(doc(db, "student_fee_ledgers", `${sId}_${yearId}`), (lSnap) => {
                     if (lSnap.exists()) {
                         const lData = lSnap.data();
@@ -83,7 +82,7 @@ export default function StudentDashboard() {
                     }
                     setIsLoading(false);
                 }, (err) => {
-                    console.error("[Dashboard] Ledger sync error:", err);
+                    console.warn("[Dashboard] Ledger sync error:", err.message);
                     setIsLoading(false);
                 });
             } else {
@@ -91,12 +90,12 @@ export default function StudentDashboard() {
             }
         };
 
-        // Primary Listener: Direct Document Access
+        // Primary Listener: Profile
         const unsubProfile = onSnapshot(doc(db, "students", schoolIdFromEmail), (pSnap) => {
             if (pSnap.exists()) {
                 processProfileSnap(pSnap.data(), pSnap.id);
             } else {
-                // Secondary Fallback: UID Query (in case doc ID is not schoolId)
+                // Secondary Fallback: UID Query
                 const qProfile = query(collection(db, "students"), where("uid", "==", user.uid));
                 onSnapshot(qProfile, (qSnap) => {
                     if (!qSnap.empty) {
@@ -105,16 +104,18 @@ export default function StudentDashboard() {
                         console.warn("[Dashboard] Student profile not found in any form.");
                         setIsLoading(false);
                     }
-                });
+                }, (err) => console.warn("[Dashboard] Fallback profile sync error:", err.message));
             }
         }, (err) => {
-            console.error("[Dashboard] Profile sync error:", err);
+            console.warn("[Dashboard] Profile sync error:", err.message);
             setIsLoading(false);
         });
 
         // Razorpay Config
         const unsubConfig = onSnapshot(doc(db, "config", "razorpay"), (snap) => {
             if (snap.exists()) setConfig(snap.data() as { keyId: string });
+        }, (err) => {
+            console.warn("[Dashboard] Razorpay config sync error:", err.message);
         });
 
         return () => {
@@ -162,7 +163,7 @@ export default function StudentDashboard() {
                 console.warn("[Dashboard] Index missing, switching to fallback query.");
                 setUseHomeworkFallback(true);
             } else if (!err.message.includes('index')) {
-                console.error("[Dashboard] Homework Sync Error:", err);
+                console.warn("[Dashboard] Homework Sync Error:", err.message);
             }
         });
 
