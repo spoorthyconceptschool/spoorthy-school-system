@@ -183,6 +183,16 @@ service cloud.firestore {
       allow write: if isManager();
     }
 
+    match /exam_syllabus/{id} {
+      allow read: if isSignedIn();
+      allow write: if isTeacher() || isManager();
+    }
+
+    match /exam_results/{id} {
+      allow read: if isSignedIn();
+      allow write: if isTeacher() || isManager();
+    }
+
     match /{document=**} {
       allow read, write: if isAdmin();
     }
