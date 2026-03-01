@@ -22,6 +22,9 @@ import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import { useMasterData } from "@/context/MasterDataContext";
 
+/**
+ * Base representation of a Teacher object fetched from master data collections.
+ */
 interface Teacher {
     id: string;
     uid?: string;
@@ -33,6 +36,9 @@ interface Teacher {
     recoveryPassword?: string;
 }
 
+/**
+ * Base representation of a generalized non-teaching Staff member.
+ */
 interface Staff {
     id: string;
     uid?: string;
@@ -49,6 +55,15 @@ interface TeachersDirectoryProps {
     onTabChange?: (tab: string) => void;
 }
 
+/**
+ * Renders the centralized directory overview for an admin to view and edit both
+ * Teachers and generic Staff members. Can be embedded natively anywhere with
+ * or without its large stylized heading components.
+ * 
+ * @param hideHeader Boolean flags determining if the title and description should vanish.
+ * @param onTabChange Callback utility to sync external component state when sub-tabs switch.
+ * @returns Complete page or embedded element housing the interactive data tables.
+ */
 export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersDirectoryProps) {
     const router = useRouter();
     const { user, role } = useAuth(); // Use role from global context
@@ -57,6 +72,9 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
     const [search, setSearch] = useState("");
     const [roleFilter, setRoleFilter] = useState("ALL");
 
+    /**
+     * Broadcasts active internal tab state to parent wrappers.
+     */
     useEffect(() => {
         onTabChange?.(activeTab);
     }, [activeTab, onTabChange]);
@@ -84,6 +102,9 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
     // Master Data for filters
     const [roles, setRoles] = useState<any[]>([]);
 
+    /**
+     * Bootstraps real-time active filters metadata (like roles).
+     */
     useEffect(() => {
         // Real-time Roles (RTDB/Firestore)
         const qR = query(collection(db, "master_staff_roles"), orderBy("name"));
@@ -99,12 +120,20 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
     }, []);
 
     // Filter Logic
+    /**
+     * Array of teachers dynamically filtered by the search query spanning
+     * fields like name, ID, or mobile digits.
+     */
     const filteredTeachers = (teachers || []).filter((t: any) =>
         t.name?.toLowerCase().includes(search.toLowerCase()) ||
         t.schoolId?.toLowerCase().includes(search.toLowerCase()) ||
         t.mobile?.includes(search)
     );
 
+    /**
+     * Array of generic staff members filtered interactively by both
+     * text query fields and their exact role assignment code.
+     */
     const filteredStaff = (staff || []).filter((s: any) => {
         const matchesSearch = s.name?.toLowerCase().includes(search.toLowerCase()) ||
             s.schoolId?.toLowerCase().includes(search.toLowerCase()) ||
@@ -235,6 +264,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                                 )
                             },
                             {
+                                key: "salary",
                                 header: "BASE SALARY",
                                 headerClassName: "text-right",
                                 cellClassName: "text-right",
@@ -344,6 +374,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                                 }
                             },
                             {
+                                key: "salary",
                                 header: "BASE SALARY",
                                 headerClassName: "text-right",
                                 cellClassName: "text-right",
