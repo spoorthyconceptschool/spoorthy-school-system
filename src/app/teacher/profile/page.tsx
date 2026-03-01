@@ -51,8 +51,8 @@ export default function TeacherProfilePage() {
                     setProfile({ ...data, schoolId: data.schoolId || snap.docs[0].id });
                 }
             }
-        } catch (error) {
-            console.error("Error fetching teacher profile:", error);
+        } catch (error: any) {
+            console.warn("[Profile] Error fetching teacher profile:", error.message);
         } finally {
             setLoading(false);
         }

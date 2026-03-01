@@ -63,6 +63,10 @@ export function CoverageManager() {
 
     const [error, setError] = useState<string | null>(null);
 
+    /**
+     * Initializes real-time listener hooks for the Firestore coverage tasks backend.
+     * Continuously sinks modified and newly pushed tasks directly into component state.
+     */
     useEffect(() => {
         // Real-time Tasks
         const q = query(collection(db, "coverage_tasks"), orderBy("createdAt", "desc"), limit(100));
@@ -142,6 +146,7 @@ export function CoverageManager() {
      */
     const groupedTasks = useMemo(() => {
         const groups: Record<string, CoverageTask[]> = {};
+        /** Transforms the flat tasks map into dictionary grouping */
         tasks.forEach(task => {
             const key = task.leaveRequestId || task.originalTeacherId;
             if (!groups[key]) groups[key] = [];
@@ -166,6 +171,7 @@ export function CoverageManager() {
         let hasError = false;
         try {
             const pendingTasks = group.filter(t => t.status === "PENDING" && t.suggestedType);
+            /** Evaluates inner task properties, fetching validation API endpoints */
             for (const task of pendingTasks) {
                 const res = await fetch("/api/admin/timetable/coverage/resolve", {
                     method: "POST",
@@ -287,6 +293,7 @@ export function CoverageManager() {
                                                     <div key={task.id} className="flex items-center gap-1.5 bg-black/40 border border-white/5 rounded-md px-2 py-1 shrink-0">
                                                         <span className="text-[9px] text-muted-foreground font-mono">{shortDate}</span>
                                                         <span className="text-[9px] font-black uppercase text-accent/80">P{task.slotId}</span>
+                                                        <span className="text-[9px] font-mono uppercase text-white/40">{task.classId}</span>
                                                         <span className="text-white/20 text-[9px] mx-0.5">→</span>
                                                         <span className="text-[10px] font-bold text-white/80 max-w-[80px] truncate" title={candidate}>{candidate}</span>
                                                     </div>

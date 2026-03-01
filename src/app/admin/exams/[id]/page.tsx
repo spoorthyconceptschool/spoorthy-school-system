@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, use, useMemo } from "react";
 import { doc, getDoc, setDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
@@ -15,6 +15,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Save, Printer, ArrowLeft, Calendar, Clock, FileText, ClipboardCheck } from "lucide-react";
 import { ReportCardGenerator } from "@/components/admin/report-card-generator";
+import { SyllabusManager } from "@/components/exam/SyllabusManager";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -22,7 +23,7 @@ import { useRouter } from "next/navigation";
 export default function ExamDetailsPage({ params }: { params: Promise<{ id: string }> }) {
     const { id: examId } = use(params);
     const router = useRouter();
-    const { classes: classesData, subjects: subjectsData } = useMasterData();
+    const { classes: classesData, subjects: subjectsData, classSubjects } = useMasterData();
     const [exam, setExam] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
@@ -32,9 +33,6 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
 
     // Convert master data
     const classes = Object.values(classesData).map((c: any) => ({ id: c.id, name: c.name, order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
-    const allSubjects = Object.values(subjectsData)
-        .filter((s: any) => s.isActive !== false)
-        .sort((a: any, b: any) => String(a.name || "").localeCompare(String(b.name || "")));
 
     const fetchExam = async () => {
         try {
@@ -55,16 +53,32 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
         fetchExam();
     }, [examId]);
 
+    // All active subjects in the system, with a flag for those assigned to the class
+    const relevantSubjects = useMemo(() => {
+        if (!selectedClassId) return [];
+        const classSubMapping = classSubjects[selectedClassId] || {};
+
+        return Object.values(subjectsData)
+            .filter((s: any) => s.isActive !== false)
+            .map((s: any) => ({
+                ...s,
+                isMapped: !!(classSubMapping[s.id] && s.id !== 'id')
+            }))
+            .sort((a, b) => {
+                // Mapped subjects first, then alphabetically
+                if (a.isMapped && !b.isMapped) return -1;
+                if (!a.isMapped && b.isMapped) return 1;
+                return a.name.localeCompare(b.name);
+            });
+    }, [selectedClassId, classSubjects, subjectsData]);
+
     useEffect(() => {
         if (selectedClassId && exam) {
             // Load existing timetable for this class or init empty
             const existing = exam.timetables?.[selectedClassId] || {};
 
-            // Initialize with all subjects if empty? No, let user add.
-            // Or auto-populate all subjects?
-            // Let's prepopulate structure
             const initial: any = {};
-            allSubjects.forEach(s => {
+            relevantSubjects.forEach(s => {
                 if (existing[s.id]) {
                     initial[s.id] = { ...existing[s.id], enabled: true };
                 } else {
@@ -73,7 +87,7 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
             });
             setTimetable(initial);
         }
-    }, [selectedClassId, exam]); // Re-run if exam updates (after save)
+    }, [selectedClassId, exam, relevantSubjects]);
 
     const handleSaveTimetable = async () => {
         if (!selectedClassId || !exam) {
@@ -268,6 +282,7 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
             <Tabs defaultValue="timetable" className="space-y-6">
                 <TabsList className="bg-black/20 border-white/10">
                     <TabsTrigger value="timetable"><Clock className="w-4 h-4 mr-2" /> Exam Timetable</TabsTrigger>
+                    <TabsTrigger value="syllabus"><FileText className="w-4 h-4 mr-2" /> Exam Syllabus</TabsTrigger>
                     <TabsTrigger value="documents"><FileText className="w-4 h-4 mr-2" /> Documents (Tickets/Reports)</TabsTrigger>
                 </TabsList>
 
@@ -299,7 +314,7 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                                 <div className="space-y-4">
                                     {/* Mobile Card View */}
                                     <div className="md:hidden space-y-3">
-                                        {allSubjects.map(subject => {
+                                        {relevantSubjects.map(subject => {
                                             const data = timetable[subject.id] || { enabled: false };
                                             return (
                                                 <div
@@ -388,24 +403,35 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-white/5">
-                                                {allSubjects.map(subject => {
-                                                    const data = timetable[subject.id] || { enabled: false };
+                                                {Object.keys(timetable).map(subId => {
+                                                    const subject = subjectsData[subId];
+                                                    if (!subject) return null;
+                                                    const data = timetable[subId];
                                                     return (
-                                                        <tr key={subject.id} className={data.enabled ? "bg-white/[0.02]" : "opacity-50"}>
+                                                        <tr key={subId} className={data.enabled ? "bg-white/[0.02]" : "opacity-50"}>
                                                             <td className="p-3">
                                                                 <input
                                                                     type="checkbox"
                                                                     checked={!!data.enabled}
-                                                                    onChange={e => updateSubject(subject.id, 'enabled', e.target.checked)}
+                                                                    onChange={e => updateSubject(subId, 'enabled', e.target.checked)}
                                                                     className="w-4 h-4 rounded border-white/20 bg-black/40"
                                                                 />
                                                             </td>
-                                                            <td className="p-3 font-medium">{subject.name}</td>
+                                                            <td className="p-3">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="font-medium">{subject.name}</span>
+                                                                    {subject.isMapped && (
+                                                                        <Badge variant="outline" className="h-4 px-1.5 text-[8px] bg-emerald-500/10 text-emerald-400 border-emerald-500/20 uppercase tracking-tighter">
+                                                                            Mapped
+                                                                        </Badge>
+                                                                    )}
+                                                                </div>
+                                                            </td>
                                                             <td className="p-3">
                                                                 <Input
                                                                     type="date"
                                                                     value={data.date || ""}
-                                                                    onChange={e => updateSubject(subject.id, 'date', e.target.value)}
+                                                                    onChange={e => updateSubject(subId, 'date', e.target.value)}
                                                                     className="h-8 bg-black/20 border-white/10 w-40"
                                                                     disabled={!data.enabled}
                                                                     min={exam.startDate}
@@ -416,7 +442,7 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                                                                 <Input
                                                                     type="time"
                                                                     value={data.startTime || ""}
-                                                                    onChange={e => updateSubject(subject.id, 'startTime', e.target.value)}
+                                                                    onChange={e => updateSubject(subId, 'startTime', e.target.value)}
                                                                     className="h-8 bg-black/20 border-white/10 w-32"
                                                                     disabled={!data.enabled}
                                                                 />
@@ -425,7 +451,7 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                                                                 <Input
                                                                     type="time"
                                                                     value={data.endTime || ""}
-                                                                    onChange={e => updateSubject(subject.id, 'endTime', e.target.value)}
+                                                                    onChange={e => updateSubject(subId, 'endTime', e.target.value)}
                                                                     className="h-8 bg-black/20 border-white/10 w-32"
                                                                     disabled={!data.enabled}
                                                                 />
@@ -440,6 +466,11 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                             )}
                         </CardContent>
                     </Card>
+                </TabsContent>
+
+                {/* SYLLABUS TAB */}
+                <TabsContent value="syllabus">
+                    <SyllabusManager examId={examId} role="ADMIN" />
                 </TabsContent>
 
                 {/* DOCUMENTS TAB */}

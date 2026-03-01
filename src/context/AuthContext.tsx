@@ -81,8 +81,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         // User exists in Auth but not in Firestore users collection
                         setUser(authUser);
                     }
-                } catch (err) {
-                    console.error("Auth context user data fetch failed", err);
+                } catch (err: any) {
+                    console.warn("[Auth] Context user data fetch failed:", err.message);
                 }
             } else {
                 setUser(null);

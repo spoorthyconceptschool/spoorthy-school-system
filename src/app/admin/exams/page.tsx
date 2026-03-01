@@ -14,6 +14,7 @@ import { HallTicketGenerator } from "@/components/admin/hall-ticket-generator";
 import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { createNotification } from "@/lib/notifications";
 
 export default function ExamsListPage() {
     const [exams, setExams] = useState<any[]>([]);
@@ -55,6 +56,15 @@ export default function ExamsListPage() {
             });
             setCreateOpen(false);
             setForm({ name: "", startDate: "", endDate: "" });
+
+            // Notify all teachers
+            await createNotification({
+                target: "ALL_FACULTY",
+                title: "New Examination Announced",
+                message: `The ${form.name} session has been scheduled from ${new Date(form.startDate).toLocaleDateString()} to ${new Date(form.endDate).toLocaleDateString()}. Please prepare your subject syllabus.`,
+                type: "NOTICE"
+            });
+
             router.push(`/admin/exams/${docRef.id}`);
         } catch (e: any) {
             alert("Error: " + e.message);

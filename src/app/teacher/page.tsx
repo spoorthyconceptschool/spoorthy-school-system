@@ -45,7 +45,7 @@ export default function TeacherDashboard() {
             const [scheduleRes, teacherSnap, leaveSnap] = await Promise.all([
                 fetch("/api/timetable/my-schedule", { headers: { "Authorization": `Bearer ${token}` } }).then(res => res.json()),
                 getDocs(query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1))),
-                getDocs(query(collection(db, "leave_requests"), where("teacherId", "==", user.uid), orderBy("createdAt", "desc"), limit(2))).catch(e => ({ docs: [] })) // Graceful fail
+                getDocs(query(collection(db, "leave_requests"), where("teacherId", "==", user.uid), orderBy("createdAt", "desc"), limit(2))).catch(e => { console.warn("[Dashboard] Leaves fetch error:", e.message); return { docs: [] }; })
             ]);
 
             // 0. Process Teacher Profile
@@ -105,8 +105,8 @@ export default function TeacherDashboard() {
 
             setNotices([]);
 
-        } catch (e) {
-            console.error(e);
+        } catch (e: any) {
+            console.warn("[Dashboard] Data fetch error:", e.message);
         } finally {
             setLoading(false);
         }
@@ -125,8 +125,8 @@ export default function TeacherDashboard() {
             const { rtdb } = await import("@/lib/firebase");
             const targetRef = ref(rtdb, `master/homeworkSubjects/${classKey}/${subjectId}`);
             await set(targetRef, !currentVal);
-        } catch (e) {
-            console.error("Failed to toggle homework subject", e);
+        } catch (e: any) {
+            console.warn("[Dashboard] Failed to toggle homework subject:", e.message);
         }
     };
 

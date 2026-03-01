@@ -50,7 +50,7 @@ export default function SalaryPage() {
         } catch (e: any) {
             // Suppress Firestore index errors - expected during development
             if (!e?.message?.includes('index')) {
-                console.error(e);
+                console.warn("[Salary] error fetching salary:", e.message);
             }
         }
         finally { setLoading(false); }

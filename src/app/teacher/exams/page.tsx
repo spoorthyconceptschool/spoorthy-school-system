@@ -20,8 +20,8 @@ export default function TeacherExamsPage() {
                 const q = query(collection(db, "exams"), orderBy("createdAt", "desc"));
                 const snap = await getDocs(q);
                 setExams(snap.docs.map(d => ({ id: d.id, ...d.data() })));
-            } catch (e) {
-                console.error("Error fetching exams:", e);
+            } catch (e: any) {
+                console.warn("[Exams] Error fetching exams:", e.message);
             } finally {
                 setLoading(false);
             }

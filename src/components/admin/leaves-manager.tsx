@@ -94,6 +94,12 @@ export function LeavesManager() {
                 const snap = await getDoc(doc(db, "teacher_schedules", `${yearId}_${teacherIdRes}`));
                 if (snap.exists()) {
                     setSchedule(snap.data().schedule || {});
+                } else if (teacherData.schoolId) {
+                    // Fallback to Firestore Doc ID if schoolId lookup failed
+                    const fallbackSnap = await getDoc(doc(db, "teacher_schedules", `${yearId}_${tSnap.docs[0].id}`));
+                    if (fallbackSnap.exists()) {
+                        setSchedule(fallbackSnap.data().schedule || {});
+                    }
                 }
             }
         } catch (e) {
