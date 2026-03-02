@@ -164,7 +164,7 @@ export function StudentExportModal({ students }: StudentExportModalProps) {
             }
 
             // 1. Process Students
-            const headers = ["ID", "Student Name", "Parent Name", "Class", "Section", "Parent Mobile", "Village", "Status", "Login Password"];
+            const headers = ["ID", "Student Name", "Parent Name", "Class", "Section", "Parent Mobile", "Village", "Status", "Date of Birth", "Gender", "Transport", "Login Password"];
             const data = targetStudents.map(s => ({
                 "ID": s.schoolId,
                 "Student Name": s.studentName,
@@ -174,6 +174,9 @@ export function StudentExportModal({ students }: StudentExportModalProps) {
                 "Parent Mobile": s.parentMobile,
                 "Village": s.villageName,
                 "Status": s.status,
+                "Date of Birth": s.dateOfBirth || "N/A",
+                "Gender": s.gender || "N/A",
+                "Transport": s.transportRequired ? "YES" : "NO",
                 "Login Password": s.recoveryPassword || "N/A"
             }));
             const ws = XLSX.utils.json_to_sheet(data, { header: headers });

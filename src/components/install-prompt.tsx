@@ -11,6 +11,11 @@ export function InstallPrompt() {
     const [isIOS, setIsIOS] = useState(false);
 
     useEffect(() => {
+        // Check if already dismissed in this session
+        if (sessionStorage.getItem("pwa_prompt_dismissed")) {
+            return;
+        }
+
         // Check if already installed
         if (window.matchMedia('(display-mode: standalone)').matches) {
             return;
@@ -49,6 +54,11 @@ export function InstallPrompt() {
         setDeferredPrompt(null);
     };
 
+    const handleDismiss = () => {
+        sessionStorage.setItem("pwa_prompt_dismissed", "true");
+        setIsVisible(false);
+    };
+
     if (!isVisible) return null;
 
     return (
@@ -82,7 +92,7 @@ export function InstallPrompt() {
                         )}
                     </div>
                     <button
-                        onClick={() => setIsVisible(false)}
+                        onClick={handleDismiss}
                         className="text-white/40 hover:text-white transition-colors"
                     >
                         <X className="w-4 h-4" />

@@ -174,6 +174,7 @@ export async function GET(req: NextRequest) {
                 parentName: `${ln} Parent`, parentMobile: `9${String(i).padStart(9, '0')}`,
                 villageId: vId, villageName: villages[vId as keyof typeof villages].name,
                 transportRequired: i % 4 !== 0, status: "ACTIVE", rollNo: String((Math.floor(i / 26) % 50) + 1),
+                academicYear: academicYearId,
                 createdAt: Timestamp.now()
             });
 

@@ -69,6 +69,7 @@ export class EnterpriseStudentService {
             status: "ACTIVE",
             version: 1, // Enterprise Versioning Start
             createdAt: Timestamp.now(),
+            academicYear: payload.academicYear,
             admissionDate: new Date().toISOString()
         };
 
@@ -97,14 +98,15 @@ export class EnterpriseStudentService {
         });
 
         // 4. Initial Fee Ledger (Empty/Append-Only setup)
-        // Assuming current academic year is dynamically determined or passed. Hardcoded for MVP example.
-        const ledgerYear = "2024-2025";
-        const ledgerRef = adminDb.collection("fee_ledger_accounts").doc(`${studentRecord.newSchoolId}_${ledgerYear}`);
+        const ledgerYear = payload.academicYear;
+        const ledgerRef = adminDb.collection("student_fee_ledgers").doc(`${studentRecord.newSchoolId}_${ledgerYear}`);
         batch.set(ledgerRef, {
             studentId: studentRecord.newSchoolId,
-            academicYear: ledgerYear,
-            balance: 0,
-            status: 'ACTIVE',
+            academicYearId: ledgerYear, // Consistent with import API
+            totalFee: 0,
+            totalPaid: 0,
+            status: 'PENDING',
+            items: [],
             createdAt: Timestamp.now(),
             updatedAt: Timestamp.now()
         });

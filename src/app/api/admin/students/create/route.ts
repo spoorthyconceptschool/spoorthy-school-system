@@ -47,8 +47,9 @@ export async function POST(req: NextRequest) {
                 classId: body.classId || "UNKNOWN_CLASS",
                 sectionId: body.sectionId || "A", // Defaulting for simple fallback
                 dateOfBirth: body.dateOfBirth || "2000-01-01", // Placeholder if null
-                gender: body.gender || "OTHER",
+                gender: body.gender || "other",
                 parentContact: body.parentMobile ? `+91${body.parentMobile.replace(/\D/g, '').slice(-10)}` : "+910000000000",
+                academicYear: body.academicYear || "2025-2026",
                 address: body.address || undefined
             };
 

@@ -43,6 +43,9 @@ interface Student {
     uid: string;
     recoveryPassword?: string;
     studentDocId?: string;
+    dateOfBirth?: string;
+    gender?: string;
+    transportRequired?: boolean;
 }
 
 import { StudentLeavesManager } from "@/components/admin/student-leaves-manager";
@@ -80,7 +83,7 @@ export default function StudentsPage() {
 
     // Fetch Page
     const fetchPage = async (pageIndex: number, newTokens: any[] = pageTokens) => {
-        if (!selectedYear) return;
+        if (!selectedYear || !user) return;
         setLocalLoading(true);
 
         try {
@@ -123,8 +126,15 @@ export default function StudentsPage() {
             }
 
             setCurrentPage(pageIndex);
-        } catch (error) {
-            console.error("Firebase Students Pagination Error:", error);
+        } catch (error: any) {
+            console.error("Firebase Students Pagination Error Details:", {
+                message: error.message,
+                code: error.code,
+                stack: error.stack
+            });
+            if (error.message?.includes("index")) {
+                console.warn("CRITICAL: Missing Firestore Index. Please check the browser console for the creation link.");
+            }
         } finally {
             setLocalLoading(false);
         }
@@ -338,7 +348,7 @@ export default function StudentsPage() {
                                     cellClassName: "text-right",
                                     render: (s) => (
                                         <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
-                                            {(role === "ADMIN" || role === "MANAGER") && (
+                                            {(role?.toUpperCase() === "ADMIN" || role?.toUpperCase() === "MANAGER") && (
                                                 <DropdownMenu>
                                                     <DropdownMenuTrigger asChild>
                                                         <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-white/10">
@@ -347,13 +357,18 @@ export default function StudentsPage() {
                                                     </DropdownMenuTrigger>
                                                     <DropdownMenuContent align="end" className="bg-zinc-900 border-white/10 text-white min-w-[160px] p-1.5 rounded-xl shadow-2xl">
                                                         <DropdownMenuItem onClick={() => {
+                                                            router.push(`/admin/students/${s.schoolId}`);
+                                                        }} className="rounded-lg gap-2 text-xs font-bold text-white hover:text-accent transition-colors">
+                                                            <User size={14} /> Edit Profile
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => {
                                                             if (!s.uid) { alert("UID Missing"); return; }
                                                             setResetUser({ uid: s.uid, schoolId: s.schoolId, name: s.studentName, role: "STUDENT" });
                                                             setIsResetModalOpen(true);
                                                         }} className="rounded-lg gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors">
                                                             <Key size={14} /> Reset Password
                                                         </DropdownMenuItem>
-                                                        {role === "ADMIN" && (
+                                                        {(role?.toUpperCase() === "ADMIN" || role?.toUpperCase() === "MANAGER") && (
                                                             <DropdownMenuItem onClick={() => {
                                                                 setSelectedStudent(s);
                                                                 setIsDeleteModalOpen(true);

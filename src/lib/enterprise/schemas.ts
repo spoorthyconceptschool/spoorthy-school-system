@@ -15,11 +15,12 @@ export const CreateStudentSchema = z.object({
     firstName: z.string().min(2, "First name must be at least 2 characters").max(50),
     lastName: z.string().max(50).optional(),
     admissionNumber: z.string().min(4).max(20).describe("Primary Key equivalent"),
-    classId: z.string().uuid("Class ID must be strict UUID or known format"),
+    classId: z.string().min(1, "Class ID is required"),
     sectionId: z.string().min(1),
     dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD"),
-    gender: z.enum(["MALE", "FEMALE", "OTHER"]),
+    gender: z.enum(["male", "female", "other", "MALE", "FEMALE", "OTHER"]),
     parentContact: z.string().regex(/^\+?[1-9]\d{1,14}$/, "Must be strict E.164 phone format"),
+    academicYear: z.string().min(1, "Academic year is required"),
     emergencyContact: z.string().optional(),
     address: z.string().max(500).optional(),
 });
@@ -64,7 +65,7 @@ export function validateEnterpriseSchema<T>(schema: z.ZodSchema<T>, data: any): 
     if (!result.success) {
         return {
             success: false,
-            errors: result.error.errors.map(e => `${e.path.join('.')}: ${e.message}`)
+            errors: result.error.issues.map((e: z.ZodIssue) => `${e.path.join('.')}: ${e.message}`)
         };
     }
     return { success: true, data: result.data };

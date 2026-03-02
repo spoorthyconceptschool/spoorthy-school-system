@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { ArrowLeft, Edit, Trash2, Save, X, Loader2, CreditCard, ShieldAlert, History, Settings2, Lock, RefreshCw, Download, Printer, FileText } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Save, X, Loader2, CreditCard, History, Settings2, Lock, RefreshCw, Download, Printer, FileText } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { toast } from "@/lib/toast-store";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DeleteUserModal } from "@/components/admin/delete-user-modal";
@@ -55,6 +56,9 @@ interface Student {
     classId: string;
     sectionId: string;
     status: string;
+    dateOfBirth?: string;
+    gender?: string;
+    transportRequired?: boolean;
     createdAt: any;
 }
 
@@ -94,16 +98,7 @@ export default function StudentDetailsPage() {
     const [payments, setPayments] = useState<Payment[]>([]);
     const [ledger, setLedger] = useState<FeeLedger | null>(null);
     const [loading, setLoading] = useState(true);
-    const [role, setRole] = useState<string>("");
-    const { user } = useAuth();
-
-    useEffect(() => {
-        if (!user) return;
-        const unsub = onSnapshot(doc(db, "users", user.uid), (d) => {
-            if (d.exists()) setRole(d.data().role);
-        });
-        return () => unsub();
-    }, [user]);
+    const { user, role } = useAuth();
 
     // UI State
     const [isEditing, setIsEditing] = useState(false);
@@ -207,6 +202,21 @@ export default function StudentDetailsPage() {
     // Update Profile
     const handleUpdate = async () => {
         if (!student) return;
+
+        // Validate required fields
+        if (!editForm.studentName?.trim()) {
+            toast({ title: "Student Name is required", type: "error" });
+            return;
+        }
+        if (!editForm.parentMobile?.trim()) {
+            toast({ title: "Mobile Number is required", type: "error" });
+            return;
+        }
+        if (!editForm.classId) {
+            toast({ title: "Class is required", type: "error" });
+            return;
+        }
+
         try {
             // resolve names based on IDs
             const vName = villages.find(v => v.id === editForm.villageId)?.name || editForm.villageName;
@@ -247,11 +257,18 @@ export default function StudentDetailsPage() {
                 });
             }
 
-            alert("Profile Updated Successfully");
+            toast({ title: "Profile Updated Successfully", type: "success" });
         } catch (e: any) {
             console.error(e);
-            alert("Update Failed: " + e.message);
+            toast({ title: "Update Failed", description: e.message, type: "error" });
         }
+    };
+
+    const handleCancel = () => {
+        if (student) {
+            setEditForm(student);
+        }
+        setIsEditing(false);
     };
 
     // Collect Fee
@@ -608,7 +625,7 @@ export default function StudentDetailsPage() {
 
                 {!loading && student && (
                     <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
-                        {(role === "ADMIN" || role === "MANAGER") && (
+                        {(role?.toUpperCase() === "ADMIN" || role?.toUpperCase() === "MANAGER") && (
                             <Dialog open={isFeeModalOpen} onOpenChange={setIsFeeModalOpen}>
                                 <DialogTrigger asChild>
                                     <Button size="sm" className="h-8 md:h-11 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg text-[10px] md:text-sm font-bold flex-1 md:flex-none">
@@ -666,27 +683,23 @@ export default function StudentDetailsPage() {
                             </Dialog>
                         )}
 
-                        {isEditing ? (
+                        {(role?.toUpperCase() === "ADMIN" || role?.toUpperCase() === "MANAGER") && !isEditing && (
                             <div className="flex items-center gap-1.5 md:gap-2">
-                                <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)} className="h-8 text-[10px] md:text-xs">Cancel</Button>
-                                <Button size="sm" onClick={handleUpdate} className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-[10px] md:text-xs px-3">Save</Button>
+                                <Button variant="outline" size="sm" onClick={() => setIsResetModalOpen(true)} className="h-8 md:h-9 border-white/10 bg-white/5 text-[9px] md:text-sm px-1.5 md:px-4">
+                                    <Lock className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> <span className="hidden sm:inline">Reset</span>
+                                </Button>
+                                {(role?.toUpperCase() === "ADMIN" || role?.toUpperCase() === "MANAGER") && (
+                                    <Button
+                                        variant="destructive"
+                                        size="sm"
+                                        onClick={() => setIsDeleteModalOpen(true)}
+                                        className="h-8 md:h-9 bg-red-500/10 border-red-500/20 text-red-500 hover:bg-red-500 hover:text-white px-3 md:px-4 font-bold transition-all"
+                                    >
+                                        <Trash2 className="w-3 h-3 md:w-4 md:h-4 mr-2" />
+                                        Delete Student
+                                    </Button>
+                                )}
                             </div>
-                        ) : (
-                            (role === "ADMIN" || role === "MANAGER") && (
-                                <div className="flex items-center gap-1.5 md:gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => setIsResetModalOpen(true)} className="h-8 md:h-9 border-white/10 bg-white/5 text-[9px] md:text-sm px-1.5 md:px-4">
-                                        <Lock className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> <span className="hidden sm:inline">Reset</span>
-                                    </Button>
-                                    <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="h-8 md:h-9 border-white/10 bg-white/5 text-[9px] md:text-sm px-1.5 md:px-4">
-                                        <Edit className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> Edit
-                                    </Button>
-                                    {role === "ADMIN" && (
-                                        <Button variant="destructive" size="sm" onClick={() => setIsDeleteModalOpen(true)} className="h-8 md:h-9 bg-red-500/10 border-red-500/20 text-red-500 hover:bg-red-500/20 px-1.5 md:px-3">
-                                            <ShieldAlert className="w-3 h-3 md:w-3.5 md:h-3.5" />
-                                        </Button>
-                                    )}
-                                </div>
-                            )
                         )}
                     </div>
                 )}
@@ -695,12 +708,37 @@ export default function StudentDetailsPage() {
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4">
                 {/* Left Column */}
                 <div className="lg:col-span-2 space-y-3 md:space-y-4">
-                    <Card className="bg-black/20 border-white/10 backdrop-blur-sm">
-                        <CardHeader className="py-2 md:py-3 px-1.5 md:px-6">
-                            <CardTitle className="text-xs md:text-xl font-bold text-accent italic">Personal Information</CardTitle>
+                    <Card className={cn("bg-black/20 border-white/10 backdrop-blur-sm transition-all duration-300", isEditing && "border-blue-500/50 shadow-[0_0_20px_rgba(59,130,246,0.15)]")}>
+                        <CardHeader className="flex flex-row items-center justify-between py-2 md:py-3 px-1.5 md:px-6">
+                            <div className="flex items-center gap-2">
+                                <CardTitle className="text-xs md:text-xl font-bold text-accent italic">Personal Information</CardTitle>
+                                {isEditing && (
+                                    <span className="text-[9px] md:text-[11px] font-bold text-blue-400 bg-blue-500/10 border border-blue-500/30 rounded-full px-2 py-0.5 animate-pulse">
+                                        ✏️ Editing
+                                    </span>
+                                )}
+                            </div>
+                            {!loading && (role === "ADMIN" || role === "MANAGER") && (
+                                <div className="flex gap-2">
+                                    {isEditing ? (
+                                        <div className="flex gap-1.5 md:gap-2">
+                                            <Button variant="ghost" size="sm" onClick={handleCancel} className="h-7 text-[10px] md:text-xs">
+                                                <X className="w-3 h-3 mr-1" /> Cancel
+                                            </Button>
+                                            <Button size="sm" onClick={handleUpdate} className="h-7 bg-blue-600 hover:bg-blue-700 text-white text-[10px] md:text-xs px-3">
+                                                <Save className="w-3 h-3 mr-1" /> Save
+                                            </Button>
+                                        </div>
+                                    ) : (
+                                        <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="h-7 border-white/10 bg-white/5 text-[10px] md:text-xs">
+                                            <Edit className="w-3 h-3 mr-1" /> Edit
+                                        </Button>
+                                    )}
+                                </div>
+                            )}
                         </CardHeader>
                         <CardContent className="grid grid-cols-2 gap-x-2 md:gap-x-3 gap-y-2 md:gap-y-3 px-1.5 md:px-6 pb-3 md:pb-6">
-                            {loading ? (
+                {loading ? (
                                 <div className="col-span-2 space-y-4">
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="h-10 bg-white/5 animate-pulse rounded-lg" />
@@ -712,41 +750,41 @@ export default function StudentDetailsPage() {
                                 <>
                                     <div className="space-y-0.5 md:space-y-1 col-span-2 md:col-span-1">
                                         <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Student Name</Label>
-                                        <Input disabled={!isEditing} className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm font-bold disabled:opacity-100" value={editForm.studentName} onChange={e => setEditForm({ ...editForm, studentName: e.target.value })} />
+                                        <Input disabled={!isEditing} className={cn("bg-white/5 h-8 md:h-10 text-[12px] md:text-sm font-bold disabled:opacity-100 transition-colors", isEditing ? "border-blue-500/60 focus:border-blue-400" : "border-white/10")} value={editForm.studentName} onChange={e => setEditForm({ ...editForm, studentName: e.target.value })} />
                                     </div>
                                     <div className="space-y-0.5 md:space-y-1 col-span-2 md:col-span-1">
                                         <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Parent Name</Label>
-                                        <Input disabled={!isEditing} className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm disabled:opacity-100" value={editForm.parentName} onChange={e => setEditForm({ ...editForm, parentName: e.target.value })} />
+                                        <Input disabled={!isEditing} className={cn("bg-white/5 h-8 md:h-10 text-[12px] md:text-sm disabled:opacity-100 transition-colors", isEditing ? "border-blue-500/60 focus:border-blue-400" : "border-white/10")} value={editForm.parentName} onChange={e => setEditForm({ ...editForm, parentName: e.target.value })} />
                                     </div>
                                     <div className="space-y-0.5 md:space-y-1 col-span-2 md:col-span-1">
                                         <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Mobile / Password</Label>
-                                        <Input disabled={!isEditing} className="bg-white/5 border-white/10 font-mono h-8 md:h-10 text-[12px] md:text-sm disabled:opacity-100" value={editForm.parentMobile} onChange={e => setEditForm({ ...editForm, parentMobile: e.target.value })} />
+                                        <Input disabled={!isEditing} className={cn("bg-white/5 font-mono h-8 md:h-10 text-[12px] md:text-sm disabled:opacity-100 transition-colors", isEditing ? "border-blue-500/60 focus:border-blue-400" : "border-white/10")} value={editForm.parentMobile} onChange={e => setEditForm({ ...editForm, parentMobile: e.target.value })} />
                                     </div>
                                     <div className="space-y-0.5 md:space-y-1">
                                         <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Village</Label>
                                         <Select disabled={!isEditing} value={editForm.villageId} onValueChange={v => setEditForm({ ...editForm, villageId: v })}>
-                                            <SelectTrigger className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm px-2 disabled:opacity-100"><SelectValue placeholder="Village" /></SelectTrigger>
+                                            <SelectTrigger className={cn("bg-white/5 h-8 md:h-10 text-[12px] md:text-sm px-2 disabled:opacity-100 transition-colors", isEditing ? "border-blue-500/60" : "border-white/10")}><SelectValue placeholder="Village" /></SelectTrigger>
                                             <SelectContent className="bg-[#0A192F] border-white/10">{villages.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
                                         </Select>
                                     </div>
                                     <div className="space-y-0.5 md:space-y-1">
                                         <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Class</Label>
                                         <Select disabled={!isEditing} value={editForm.classId} onValueChange={v => setEditForm({ ...editForm, classId: v })}>
-                                            <SelectTrigger className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm px-2 disabled:opacity-100"><SelectValue placeholder="Class" /></SelectTrigger>
+                                            <SelectTrigger className={cn("bg-white/5 h-8 md:h-10 text-[12px] md:text-sm px-2 disabled:opacity-100 transition-colors", isEditing ? "border-blue-500/60" : "border-white/10")}><SelectValue placeholder="Class" /></SelectTrigger>
                                             <SelectContent className="bg-[#0A192F] border-white/10">{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                                         </Select>
                                     </div>
                                     <div className="space-y-0.5 md:space-y-1">
                                         <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Section</Label>
                                         <Select disabled={!isEditing} value={editForm.sectionId} onValueChange={v => setEditForm({ ...editForm, sectionId: v })}>
-                                            <SelectTrigger className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm px-2 disabled:opacity-100"><SelectValue placeholder="Section" /></SelectTrigger>
+                                            <SelectTrigger className={cn("bg-white/5 h-8 md:h-10 text-[12px] md:text-sm px-2 disabled:opacity-100 transition-colors", isEditing ? "border-blue-500/60" : "border-white/10")}><SelectValue placeholder="Section" /></SelectTrigger>
                                             <SelectContent className="bg-[#0A192F] border-white/10">{sections.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
                                         </Select>
                                     </div>
                                     <div className="space-y-0.5 md:space-y-1">
                                         <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Status</Label>
                                         <Select disabled={!isEditing} value={editForm.status} onValueChange={v => setEditForm({ ...editForm, status: v })}>
-                                            <SelectTrigger className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm px-2 disabled:opacity-100"><SelectValue /></SelectTrigger>
+                                            <SelectTrigger className={cn("bg-white/5 h-8 md:h-10 text-[12px] md:text-sm px-2 disabled:opacity-100 transition-colors", isEditing ? "border-blue-500/60" : "border-white/10")}><SelectValue /></SelectTrigger>
                                             <SelectContent className="bg-[#0A192F] border-white/10">
                                                 <SelectItem value="ACTIVE">Active</SelectItem>
                                                 <SelectItem value="PROMOTED">Promoted</SelectItem>
@@ -755,6 +793,32 @@ export default function StudentDetailsPage() {
                                                 <SelectItem value="ALUMNI">Alumni</SelectItem>
                                             </SelectContent>
                                         </Select>
+                                    </div>
+                                    <div className="space-y-0.5 md:space-y-1">
+                                        <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Date of Birth</Label>
+                                        <Input type="date" disabled={!isEditing} className={cn("bg-white/5 h-8 md:h-10 text-[12px] md:text-sm disabled:opacity-100 transition-colors", isEditing ? "border-blue-500/60 focus:border-blue-400" : "border-white/10")} value={editForm.dateOfBirth || ""} onChange={e => setEditForm({ ...editForm, dateOfBirth: e.target.value })} />
+                                    </div>
+                                    <div className="space-y-0.5 md:space-y-1">
+                                        <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Gender</Label>
+                                        <Select disabled={!isEditing} value={editForm.gender} onValueChange={val => setEditForm({ ...editForm, gender: val })}>
+                                            <SelectTrigger className={cn("bg-white/5 h-8 md:h-10 text-[12px] md:text-sm px-2 disabled:opacity-100 transition-colors", isEditing ? "border-blue-500/60" : "border-white/10")}><SelectValue placeholder="Gender" /></SelectTrigger>
+                                            <SelectContent className="bg-[#0A192F] border-white/10">
+                                                <SelectItem value="male">Male</SelectItem>
+                                                <SelectItem value="female">Female</SelectItem>
+                                                <SelectItem value="other">Other</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                    <div className="flex items-center space-x-2 py-2 col-span-2">
+                                        <input
+                                            type="checkbox"
+                                            disabled={!isEditing}
+                                            id="transport"
+                                            className="w-4 h-4 rounded border-white/20 bg-black/50 accent-emerald-500 disabled:opacity-50"
+                                            checked={editForm.transportRequired || false}
+                                            onChange={e => setEditForm({ ...editForm, transportRequired: e.target.checked })}
+                                        />
+                                        <Label htmlFor="transport" className="cursor-pointer text-[10px] md:text-xs uppercase font-black tracking-tighter text-muted-foreground">Transport Required?</Label>
                                     </div>
                                 </>
                             )}
