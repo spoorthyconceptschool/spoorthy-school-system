@@ -1,10 +1,14 @@
-// import "server-only";
-import * as admin from "firebase-admin";
+import { initializeApp, cert, getApps, getApp } from "firebase-admin/app";
+import { getFirestore, FieldValue as FirestoreFieldValue, FieldPath as FirestoreFieldPath, Timestamp as FirestoreTimestamp } from "firebase-admin/firestore";
+import { getAuth } from "firebase-admin/auth";
+import { getDatabase, ServerValue as RTDBServerValue } from "firebase-admin/database";
+import { getStorage } from "firebase-admin/storage";
+import { getMessaging } from "firebase-admin/messaging";
 
 /**
- * ENGINE V5: COMPATIBILITY LAYER
+ * ENGINE V5: MODULAR COMPATIBILITY LAYER
  * Optimized for Next.js 15 + Firebase Hosting Frameworks.
- * Uses strict singleton pattern to prevent 'App already exists' and 'App missing' errors.
+ * Uses modular imports to prevent bundling errors in production.
  */
 
 const SERVICE_ACCOUNT = {
@@ -40,46 +44,45 @@ mKQAwq0Q0dPAv5PdJCkooKsh
 -----END PRIVATE KEY-----`
 };
 
-let _app: admin.app.App | null = null;
 let _initError: string | null = null;
 
 function initAdmin() {
-    if (_app) return _app;
-
-    // Check if already initialized by another module
-    if (admin.apps.length > 0) {
-        _app = admin.apps[0];
-        return _app;
-    }
+    const apps = getApps();
+    if (apps.length > 0) return apps[0];
 
     try {
-        console.log("[FIREBASE ADMIN] Attempting Initialization...");
-        _app = admin.initializeApp({
-            credential: admin.credential.cert(SERVICE_ACCOUNT),
+        return initializeApp({
+            credential: cert(SERVICE_ACCOUNT),
             storageBucket: "spoorthy-school-live-55917.firebasestorage.app",
             databaseURL: "https://spoorthy-school-live-55917-default-rtdb.firebaseio.com"
         });
-        console.log("[FIREBASE ADMIN] Success.");
-        return _app;
     } catch (e: any) {
         console.error("[FIREBASE ADMIN] Initialization Failed:", e);
         _initError = e.message || String(e);
-        // Do not throw here to prevent top-level crashes.
-        // Handlers using the services will throw when they access the Proxy.
         return null as any;
     }
 }
 
 // Fixed services with lazy-load Proxy pattern
-const createLazyService = (serviceName: 'firestore' | 'auth' | 'storage' | 'database' | 'messaging') => {
+const createLazyService = (serviceName: string) => {
     return new Proxy({} as any, {
         get(target, prop) {
             const app = initAdmin();
             if (!app) {
                 throw new Error(`Firebase Admin failed to initialize: ${_initError || 'Unknown Error'}`);
             }
-            const service = (app as any)[serviceName]();
-            const value = service[prop];
+
+            let service;
+            switch (serviceName) {
+                case 'firestore': service = getFirestore(app); break;
+                case 'auth': service = getAuth(app); break;
+                case 'database': service = getDatabase(app); break;
+                case 'storage': service = getStorage(app); break;
+                case 'messaging': service = getMessaging(app); break;
+                default: throw new Error(`Unknown service: ${serviceName}`);
+            }
+
+            const value = (service as any)[prop];
             return typeof value === 'function' ? value.bind(service) : value;
         }
     });
@@ -92,16 +95,15 @@ export const adminRtdb = createLazyService('database');
 export const adminMessaging = createLazyService('messaging');
 
 // Also keep the getters for compatibility
-export const getAdminDb = () => initAdmin()?.firestore();
-export const getAdminAuth = () => initAdmin()?.auth();
-export const getAdminStorage = () => initAdmin()?.storage();
-export const getAdminRtdb = () => initAdmin()?.database();
+export const getAdminDb = () => getFirestore(initAdmin());
+export const getAdminAuth = () => getAuth(initAdmin());
+export const getAdminStorage = () => getStorage(initAdmin());
+export const getAdminRtdb = () => getDatabase(initAdmin());
 
 export const getInitError = () => _initError;
 
-// Static helpers to avoid sub-package import issues
-// These are safe to access directly from the admin object
-export const FieldValue = admin.firestore.FieldValue;
-export const FieldPath = admin.firestore.FieldPath;
-export const Timestamp = admin.firestore.Timestamp;
-export const ServerValue = admin.database.ServerValue;
+// Static helpers using modular exports
+export const FieldValue = FirestoreFieldValue;
+export const FieldPath = FirestoreFieldPath;
+export const Timestamp = FirestoreTimestamp;
+export const ServerValue = RTDBServerValue;
