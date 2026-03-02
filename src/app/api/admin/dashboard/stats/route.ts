@@ -14,7 +14,9 @@ export async function GET(req: NextRequest) {
         const academicYear = url.searchParams.get("year") || "2026-2027";
 
         const [studentsSnap, staffSnap, todayPaymentsSnap] = await Promise.all([
-            adminDb.collection("students").where("academicYear", "==", academicYear).where("status", "==", "ACTIVE").count().get(),
+            // Count ALL students — Total Students KPI shows full enrollment.
+            // Do NOT filter by academicYear or status; students may have mixed field values.
+            adminDb.collection("students").count().get(),
             adminDb.collection("users").where("role", "==", "TEACHER").where("status", "==", "ACTIVE").count().get(),
 
             // Get today's payments (Live check instead of cached because it changes hourly)
@@ -39,13 +41,15 @@ export async function GET(req: NextRequest) {
             leaveRequests: 0 // Fetch from a pre-computed counter in production
         };
 
+        console.log(`[Dashboard Stats] year=${academicYear} totalStudents=${studentsSnap.data().count}`);
+
         return NextResponse.json({
             success: true,
             data: preComputedStats
         }, {
             headers: {
-                // Strict caching - Cache for 5 minutes globally, rebuild in background
-                'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=59'
+                // No-cache: counts need to be real-time
+                'Cache-Control': 'no-cache, no-store, must-revalidate'
             }
         });
     } catch (error: any) {

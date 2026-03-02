@@ -20,12 +20,14 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AddStudentModal } from "@/components/admin/add-student-modal";
 
-interface Application {
+interface Student {
     id: string;
-    studentName: string;
-    grade: string;
-    status: string;
-    submittedAt?: { seconds: number };
+    fullName?: string;
+    studentName?: string;
+    classId?: string;
+    admissionNumber?: string;
+    createdAt?: { seconds: number };
+    status?: string;
 }
 
 interface LeaveRequest {
@@ -53,7 +55,7 @@ export default function AdminDashboard() {
     const router = useRouter();
 
     // Admin State
-    const [applications, setApplications] = useState<Application[]>([]);
+    const [recentStudents, setRecentStudents] = useState<Student[]>([]);
     const [pendingLeavesList, setPendingLeavesList] = useState<LeaveRequest[]>([]);
     const [stats, setStats] = useState<DashboardStats>({
         totalStudents: 0,
@@ -72,18 +74,20 @@ export default function AdminDashboard() {
 
         const fetchEnterpriseStats = async () => {
             try {
-                // Ensure UI does not calculate anything - Rule 3
-                const req = await fetch(`/api/admin/dashboard/stats?year=${encodeURIComponent(selectedYear || "2024-2025")}`);
+                const req = await fetch(`/api/admin/dashboard/stats?year=${encodeURIComponent(selectedYear || "2025-2026")}`);
                 const res = await req.json();
+                console.log("[AdminDashboard] Stats API response:", res);
                 if (res.success) {
                     setStats(prev => ({
                         ...prev,
                         ...res.data
                     }));
+                } else {
+                    console.error("[AdminDashboard] Stats API error:", res.error);
                 }
                 setLoading(false);
             } catch (e) {
-                console.error("Fetch Enterprise Stats Error", e);
+                console.error("[AdminDashboard] Fetch Enterprise Stats Error", e);
                 setLoading(false);
             }
         };
@@ -108,41 +112,48 @@ export default function AdminDashboard() {
         };
     }, [user, selectedYear]);
 
-    // Applications Listener
+    // Recent Students Listener (replaces applications — shows real enrolled students)
     useEffect(() => {
         if (!user || authRole === "TIMETABLE_EDITOR") return;
 
-        const appQ = query(collection(db, "applications"), orderBy("submittedAt", "desc"), limit(10));
-        const unsubscribe = onSnapshot(appQ, (snapshot) => {
-            setApplications(snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Application)));
+        const studentsQ = query(
+            collection(db, "students"),
+            orderBy("createdAt", "desc"),
+            limit(10)
+        );
+        const unsubscribe = onSnapshot(studentsQ, (snapshot) => {
+            const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student));
+            console.log("[AdminDashboard] Recent students fetched:", list.length);
+            setRecentStudents(list);
+        }, (err) => {
+            console.error("[AdminDashboard] Students listener error:", err);
         });
 
         return () => unsubscribe();
     }, [user, authRole]);
 
-    // === SHARED UI ELEMENTS ===
     const columns = [
         {
-            key: "studentName",
+            key: "fullName",
             header: "Student Name",
-            render: (app: Application) => <span className="font-bold text-white italic">{app.studentName}</span>
-        },
-        { key: "grade", header: "Grade" },
-        {
-            key: "status",
-            header: "Status",
-            render: (app: Application) => (
-                <Badge variant="outline" className="capitalize border-accent/20 text-accent bg-accent/5">
-                    {app.status}
-                </Badge>
-            )
+            render: (s: Student) => <span className="font-bold text-white italic">{s.fullName || s.studentName || "—"}</span>
         },
         {
-            key: "submittedAt",
-            header: "Date",
-            render: (app: Application) => (
+            key: "classId",
+            header: "Class",
+            render: (s: Student) => <span className="text-white/70">{s.classId || "—"}</span>
+        },
+        {
+            key: "admissionNumber",
+            header: "Adm. No.",
+            render: (s: Student) => <span className="font-mono text-xs text-white/60">{s.admissionNumber || "—"}</span>
+        },
+        {
+            key: "createdAt",
+            header: "Enrolled On",
+            render: (s: Student) => (
                 <span className="text-xs text-white/40 font-mono">
-                    {app.submittedAt?.seconds ? new Date(app.submittedAt.seconds * 1000).toLocaleDateString() : 'Pending'}
+                    {s.createdAt?.seconds ? new Date(s.createdAt.seconds * 1000).toLocaleDateString() : "—"}
                 </span>
             )
         }
@@ -243,10 +254,10 @@ export default function AdminDashboard() {
                             </h3>
                             <div className="rounded-2xl border border-white/10 bg-black/40 backdrop-blur-md overflow-hidden">
                                 <DataTable
-                                    data={applications.slice(0, 3)}
+                                    data={recentStudents.slice(0, 3)}
                                     columns={columns}
                                     isLoading={false}
-                                    onRowClick={(app) => router.push(`/admin/students`)}
+                                    onRowClick={(s) => router.push(`/admin/students`)}
                                 />
                             </div>
                         </div>
@@ -396,10 +407,10 @@ export default function AdminDashboard() {
                             <Link href="/admin/students" className="text-[10px] font-black uppercase tracking-widest text-accent hover:underline">Full Database</Link>
                         </div>
 
-                        {applications.length > 0 ? (
+                        {recentStudents.length > 0 ? (
                             <div className="rounded-2xl border border-white/10 bg-black/40 shadow-2xl backdrop-blur-md overflow-hidden mobile-dense-table">
                                 <DataTable
-                                    data={applications.slice(0, 5)}
+                                    data={recentStudents.slice(0, 5)}
                                     columns={columns}
                                     isLoading={false}
                                     onRowClick={() => router.push("/admin/students")}
