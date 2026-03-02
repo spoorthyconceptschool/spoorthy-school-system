@@ -7,32 +7,54 @@ import { onAuthStateChanged } from "firebase/auth";
 import { rtdb, db, auth } from "@/lib/firebase";
 import { useAuth } from "./AuthContext";
 
+/**
+ * Represents the comprehensive master data schema for the school.
+ * Contains configuration, registries, and system-wide state synchronized from Realtime DB.
+ */
 interface MasterDataState {
+    /** Mapping of unique village IDs to their metadata. */
     villages: Record<string, any>;
+    /** School class definitions and ordering. */
     classes: Record<string, any>;
+    /** Section definitions for classes. */
     sections: Record<string, any>;
+    /** Available subjects registry. */
     subjects: Record<string, any>;
+    /** Junction records linking classes to their sections. */
     classSections: Record<string, any>;
+    /** Junction records linking classes to their subjects. */
     classSubjects: Record<string, any>;
+    /** Assignment records for subject teachers. */
     subjectTeachers: Record<string, any>;
+    /** Filtered set of subjects for homework assignment. */
     homeworkSubjects: Record<string, any>;
+    /** Registry of system-wide administrative roles. */
     roles: Record<string, any>;
+    /** Global school identity and visual appearance config. */
     branding: {
         schoolName: string;
         address: string;
         schoolLogo: string;
         principalSignature: string;
     };
+    /** Configured academic cycles and their timeline status. */
     academicYears: Record<string, { id: string, name: string, active: boolean, startDate: string, endDate: string }>;
+    /** Operational flags for developers and system modes. */
     systemConfig: {
         testingMode: boolean;
         developerMaintenance: boolean;
     };
+    /** The currently active academic year context for the session. */
     selectedYear: string;
+    /** Callback to switch the active academic year global context. */
     setSelectedYear: (year: string) => void;
+    /** Cached set of active students. */
     students: any[];
+    /** Cached set of active teachers. */
     teachers: any[];
+    /** Cached set of active staff. */
     staff: any[];
+    /** Tracks the initial synchronization status with the RTDB. */
     loading: boolean;
 }
 
@@ -57,7 +79,7 @@ const initialState: MasterDataState = {
         testingMode: false,
         developerMaintenance: false,
     },
-    selectedYear: "2025-2026",
+    selectedYear: "2026-2027",
     setSelectedYear: () => { },
     students: [],
     teachers: [],
@@ -67,6 +89,12 @@ const initialState: MasterDataState = {
 
 const MasterDataContext = createContext<MasterDataState>(initialState);
 
+/**
+ * Primary hook to access global school configuration and synchronized master registries.
+ * Use this to fetch school branding, class lists, and active student data.
+ * 
+ * @returns The complete Master Data state.
+ */
 export function useMasterData() {
     return useContext(MasterDataContext);
 }
@@ -89,42 +117,53 @@ export function useSubjectName(id: string) {
 
 const MASTER_CACHE_KEY = "spoorthy_master_cache";
 
+/**
+ * Central data synchronization provider for the entire school application.
+ * Listens to Realtime Database changes and hydration events to keep all
+ * UI components in sync with the school's master configuration.
+ */
 export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
-    const [data, setData] = useState<Omit<MasterDataState, 'selectedYear' | 'setSelectedYear'>>({
-        ...initialState,
-    });
-
-    const [selectedYear, setSelectedYear] = useState("2025-2026");
+    const [data, setData] = useState<Omit<MasterDataState, 'selectedYear' | 'setSelectedYear'>>(initialState);
+    const [selectedYear, setSelectedYear] = useState("2026-2027");
+    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
-        // Hydration-safe cache loading
-        if (typeof window !== "undefined") {
-            const cached = localStorage.getItem(MASTER_CACHE_KEY);
-            if (cached) {
-                try {
-                    const parsed = JSON.parse(cached);
-                    setData(prev => ({
-                        ...prev,
-                        ...parsed,
-                        branding: { ...prev.branding, ...(parsed.branding || {}) },
-                        systemConfig: { ...prev.systemConfig, ...(parsed.systemConfig || {}) },
-                        loading: false
-                    }));
-                } catch (e) {
-                    console.warn("Master cache parse failed");
-                }
+        setMounted(true);
+        // Hydrate from cache on mount (Client-side only)
+        const cached = localStorage.getItem(MASTER_CACHE_KEY);
+        if (cached) {
+            try {
+                const parsed = JSON.parse(cached);
+                setData(prev => ({
+                    ...prev,
+                    ...parsed,
+                    branding: { ...initialState.branding, ...(parsed.branding || {}) },
+                    systemConfig: { ...initialState.systemConfig, ...(parsed.systemConfig || {}) },
+                    loading: false
+                }));
+            } catch (e) {
+                console.warn("Master cache corrupted, resetting...");
             }
-            const savedYear = localStorage.getItem("spoorthy_academic_year");
-            if (savedYear) setSelectedYear(savedYear);
         }
+
+        const cachedYear = localStorage.getItem("spoorthy_academic_year");
+        if (cachedYear) setSelectedYear(cachedYear);
+    }, []);
+
+    useEffect(() => {
+        // Cache is already loaded synchronously above.
+        // We only use this for initial Auth check or other setup if needed.
     }, []);
 
     // Helper to persist data
     useEffect(() => {
         if (typeof window !== "undefined" && !data.loading) {
-            localStorage.setItem(MASTER_CACHE_KEY, JSON.stringify(data));
+            // WE REMOVE BRANDING FROM CACHE TO PREVENT STALE LOGO FLICKER ("No Footprints")
+            const cacheData = { ...data };
+            delete (cacheData as any).branding;
+            localStorage.setItem(MASTER_CACHE_KEY, JSON.stringify(cacheData));
         }
-    }, [data.branding, data.classes, data.sections, data.villages, data.subjects]);
+    }, [data.classes, data.sections, data.villages, data.subjects]);
 
     // 1. RTDB Sync for Master Data & Branding
     useEffect(() => {
@@ -191,7 +230,7 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
 
         const timer = setTimeout(() => {
             setData(prev => ({ ...prev, loading: false }));
-        }, 3000);
+        }, 8000);
 
         return () => {
             if (brandingUnsub) brandingUnsub();
@@ -308,27 +347,33 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
     // 4. Authenticated Real-time Sync for Core Directories
     const { role, user } = useAuth();
     useEffect(() => {
-        if (!user || (role !== "ADMIN" && role !== "MANAGER" && role !== "TEACHER")) return;
+        if (!user) return;
+
+        const normalizedRole = String(role || "").toUpperCase();
+        const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'SUPERADMIN', 'OWNER', 'DEVELOPER', 'MANAGER'].includes(normalizedRole);
+        const isTeacher = normalizedRole === 'TEACHER';
+
+        if (!isAdmin && !isTeacher) return;
 
         // Sync Teachers (Active only for speed)
         const teachersQ = query(collection(db, "teachers"), where("status", "==", "ACTIVE"));
         const teachersUnsub = onSnapshot(teachersQ, (snap) => {
             const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setData(prev => ({ ...prev, teachers: list }));
-        });
+        }, (err) => console.warn("[MasterData] Teachers Sync Error:", err.message));
 
         // Sync Staff (Active only)
         const staffQ = query(collection(db, "staff"), where("status", "==", "ACTIVE"));
         const staffUnsub = onSnapshot(staffQ, (snap) => {
             const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setData(prev => ({ ...prev, staff: list }));
-        });
+        }, (err) => console.warn("[MasterData] Staff Sync Error:", err.message));
 
         // Sync Groups (House system)
         const groupsUnsub = onSnapshot(collection(db, "groups"), (snap) => {
             const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setData(prev => ({ ...prev, groups: list }));
-        });
+        }, (err) => console.warn("[MasterData] Groups Sync Error:", err.message));
 
         return () => {
             teachersUnsub();
@@ -347,6 +392,11 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
         selectedYear,
         setSelectedYear: handleSetSelectedYear
     }), [data, selectedYear]);
+
+    if (!mounted) {
+        // Return a minimal consistent shell to avoid hydration errors
+        return <div className="min-h-screen bg-[#0A192F]" />;
+    }
 
     return (
         <MasterDataContext.Provider value={contextValue}>

@@ -138,6 +138,23 @@ export async function POST(req: Request) {
                 updatedAt: Timestamp.now()
             });
 
+            // H. Sync with RTDB if Class Teacher assignment is provided
+            if (classTeacherOf && classTeacherOf.classId && classTeacherOf.sectionId) {
+                const { adminRtdb } = require("@/lib/firebase-admin");
+                const csKey = `${classTeacherOf.classId}_${classTeacherOf.sectionId}`;
+                const csRef = adminRtdb.ref(`master/classSections/${csKey}`);
+
+                // We use set/update to ensure this teacher is now the class teacher in the canonical mapping
+                // Note: RTDB operations are not part of Firestore transaction, but we handle it at the end of logic
+                // for structural consistency.
+                await csRef.update({
+                    classId: classTeacherOf.classId,
+                    sectionId: classTeacherOf.sectionId,
+                    classTeacherId: teacherId,
+                    active: true
+                });
+            }
+
             return { teacherId, uid };
         }); // End Transaction
 

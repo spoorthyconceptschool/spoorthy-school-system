@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/context/AuthContext";
-import { format } from "date-fns";
+import { format, isValid } from "date-fns";
 import confetti from "canvas-confetti";
 
 interface AcademicYear {
@@ -273,7 +273,10 @@ export function AcademicYearManager() {
                             <div className="flex flex-wrap items-center gap-4 md:gap-8 pt-2">
                                 <div className="flex items-center gap-2 text-zinc-400 bg-black/20 px-3 py-1.5 rounded-full border border-white/5">
                                     <Calendar className="w-3.5 h-3.5 text-indigo-400" />
-                                    <span className="text-[10px] md:text-xs font-medium">Started {activeYear.startDate ? format(new Date(activeYear.startDate), 'MMM d, yyyy') : 'Recently'}</span>
+                                    <span className="text-[10px] md:text-xs font-medium">Started {(() => {
+                                        const d = new Date(activeYear.startDate || "");
+                                        return (activeYear.startDate && isValid(d)) ? format(d, 'MMM d, yyyy') : 'Recently';
+                                    })()}</span>
                                 </div>
                                 <div className="flex items-center gap-2 text-zinc-400 bg-black/20 px-3 py-1.5 rounded-full border border-white/5">
                                     <Users className="w-3.5 h-3.5 text-indigo-400" />
@@ -350,7 +353,10 @@ export function AcademicYearManager() {
                                     <div>
                                         <span className="font-mono text-sm md:text-base font-bold text-zinc-500 group-hover:text-zinc-300 transition-colors">{year.year}</span>
                                         <div className="text-[9px] text-zinc-700 group-hover:text-zinc-500 uppercase tracking-wider">
-                                            {year.endDate ? format(new Date(year.endDate), 'MMM yyyy') : 'Closed'}
+                                            {(() => {
+                                                const d = new Date(year.endDate || "");
+                                                return (year.endDate && isValid(d)) ? format(d, 'MMM yyyy') : 'Closed';
+                                            })()}
                                         </div>
                                     </div>
                                 </div>

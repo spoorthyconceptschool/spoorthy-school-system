@@ -3,9 +3,9 @@
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Plus, User, Briefcase, Search, MoreHorizontal, Key, Trash2, DollarSign, MapPin, Phone, ArrowRight } from "lucide-react";
+import { Plus, User, Briefcase, Search, MoreVertical, Key, Trash2, DollarSign, MapPin, Phone, ArrowRight } from "lucide-react";
 import { Input } from "@/components/ui/input";
-import { collection, query, orderBy, getDocs, where, doc, updateDoc, onSnapshot } from "firebase/firestore";
+import { collection, query, orderBy, getDocs, where, doc, updateDoc, onSnapshot, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { AddTeacherModal } from "@/components/admin/add-teacher-modal";
 import { AddStaffModal } from "@/components/admin/add-staff-modal";
@@ -22,6 +22,9 @@ import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import { useMasterData } from "@/context/MasterDataContext";
 
+/**
+ * Base representation of a Teacher object fetched from master data collections.
+ */
 interface Teacher {
     id: string;
     uid?: string;
@@ -33,6 +36,9 @@ interface Teacher {
     recoveryPassword?: string;
 }
 
+/**
+ * Base representation of a generalized non-teaching Staff member.
+ */
 interface Staff {
     id: string;
     uid?: string;
@@ -49,6 +55,15 @@ interface TeachersDirectoryProps {
     onTabChange?: (tab: string) => void;
 }
 
+/**
+ * Renders the centralized directory overview for an admin to view and edit both
+ * Teachers and generic Staff members. Can be embedded natively anywhere with
+ * or without its large stylized heading components.
+ * 
+ * @param hideHeader Boolean flags determining if the title and description should vanish.
+ * @param onTabChange Callback utility to sync external component state when sub-tabs switch.
+ * @returns Complete page or embedded element housing the interactive data tables.
+ */
 export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersDirectoryProps) {
     const router = useRouter();
     const { user, role } = useAuth(); // Use role from global context
@@ -57,6 +72,9 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
     const [search, setSearch] = useState("");
     const [roleFilter, setRoleFilter] = useState("ALL");
 
+    /**
+     * Broadcasts active internal tab state to parent wrappers.
+     */
     useEffect(() => {
         onTabChange?.(activeTab);
     }, [activeTab, onTabChange]);
@@ -84,6 +102,9 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
     // Master Data for filters
     const [roles, setRoles] = useState<any[]>([]);
 
+    /**
+     * Bootstraps real-time active filters metadata (like roles).
+     */
     useEffect(() => {
         // Real-time Roles (RTDB/Firestore)
         const qR = query(collection(db, "master_staff_roles"), orderBy("name"));
@@ -99,12 +120,20 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
     }, []);
 
     // Filter Logic
+    /**
+     * Array of teachers dynamically filtered by the search query spanning
+     * fields like name, ID, or mobile digits.
+     */
     const filteredTeachers = (teachers || []).filter((t: any) =>
         t.name?.toLowerCase().includes(search.toLowerCase()) ||
         t.schoolId?.toLowerCase().includes(search.toLowerCase()) ||
         t.mobile?.includes(search)
     );
 
+    /**
+     * Array of generic staff members filtered interactively by both
+     * text query fields and their exact role assignment code.
+     */
     const filteredStaff = (staff || []).filter((s: any) => {
         const matchesSearch = s.name?.toLowerCase().includes(search.toLowerCase()) ||
             s.schoolId?.toLowerCase().includes(search.toLowerCase()) ||
@@ -201,7 +230,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                         columns={[
                             {
                                 key: "name",
-                                header: "Staff Info",
+                                header: "STAFF INFO",
                                 render: (t: Teacher) => (
                                     <div className="flex items-center gap-3">
                                         <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center border border-white/5 group-hover:border-accent/30 transition-colors">
@@ -216,7 +245,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                             },
                             {
                                 key: "mobile",
-                                header: "Contact",
+                                header: "CONTACT",
                                 render: (t: Teacher) => (
                                     <div className="flex items-center gap-1.5 text-xs text-white/60">
                                         <Phone size={12} className="text-white/20" />
@@ -226,7 +255,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                             },
                             {
                                 key: "password",
-                                header: "Secret Key",
+                                header: "LOGIN CREDENTIALS",
                                 render: (t: Teacher) => (
                                     <div className="flex items-center gap-1.5 text-[10px] text-amber-500/80 bg-amber-500/5 px-2 py-1 rounded border border-amber-500/10 w-fit">
                                         <Key size={10} className="text-amber-500" />
@@ -236,23 +265,38 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                             },
                             {
                                 key: "salary",
-                                header: "Base Salary",
+                                header: "BASE SALARY",
                                 headerClassName: "text-right",
                                 cellClassName: "text-right",
                                 render: (t: Teacher) => role === "MANAGER" ? <span className="text-white/20">••••••</span> : <span className="font-mono font-black text-sm text-emerald-400">₹{t.salary?.toLocaleString() || '0'}</span>
                             },
                             {
                                 key: "status",
-                                header: "Status",
+                                header: "STATUS",
                                 headerClassName: "text-center",
                                 cellClassName: "text-center",
                                 render: (t: Teacher) => (
-                                    <Badge className={cn(
-                                        "text-[9px] font-black uppercase tracking-tighter py-0 h-5 border-none transition-all",
-                                        t.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
-                                    )}>
-                                        {t.status}
-                                    </Badge>
+                                    <div onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (t.status === 'ACTIVE') {
+                                            setDeleteUser({
+                                                id: t.id,
+                                                schoolId: t.schoolId,
+                                                name: t.name,
+                                                role: "teacher",
+                                                uid: t.uid,
+                                                collectionName: "teachers"
+                                            });
+                                            setIsDeleteModalOpen(true);
+                                        }
+                                    }} className="cursor-pointer">
+                                        <Badge className={cn(
+                                            "text-[9px] font-black uppercase tracking-tighter py-0 h-5 border-none transition-all",
+                                            t.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20" : "bg-red-500/10 text-red-400"
+                                        )}>
+                                            {t.status}
+                                        </Badge>
+                                    </div>
                                 )
                             }
                         ]}
@@ -300,7 +344,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                         columns={[
                             {
                                 key: "name",
-                                header: "Staff Info",
+                                header: "STAFF INFO",
                                 render: (s: Staff) => (
                                     <div className="flex items-center gap-3">
                                         <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center border border-white/5 group-hover:border-blue-400/30 transition-colors">
@@ -315,7 +359,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                             },
                             {
                                 key: "role",
-                                header: "Role & Placement",
+                                header: "ROLE & PLACEMENT",
                                 render: (s: Staff) => {
                                     const roleObj = roles.find((r: any) => r.code === s.roleCode);
                                     return (
@@ -330,24 +374,39 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                                 }
                             },
                             {
-                                key: "baseSalary",
-                                header: "Base Salary",
+                                key: "salary",
+                                header: "BASE SALARY",
                                 headerClassName: "text-right",
                                 cellClassName: "text-right",
                                 render: (s: Staff) => role === "MANAGER" ? <span className="text-white/20">••••••</span> : <span className="font-mono font-black text-sm text-emerald-400">₹{s.baseSalary?.toLocaleString() || "0"}</span>
                             },
                             {
                                 key: "status",
-                                header: "Status",
+                                header: "STATUS",
                                 headerClassName: "text-center",
                                 cellClassName: "text-center",
                                 render: (s: Staff) => (
-                                    <Badge className={cn(
-                                        "text-[9px] font-black uppercase tracking-tighter py-0 h-5 border-none transition-all",
-                                        s.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
-                                    )}>
-                                        {s.status}
-                                    </Badge>
+                                    <div onClick={(e) => {
+                                        e.stopPropagation();
+                                        if (s.status === 'ACTIVE') {
+                                            setDeleteUser({
+                                                id: s.id,
+                                                schoolId: s.schoolId,
+                                                name: s.name,
+                                                role: "teacher", // DeleteUserModal uses this label for title
+                                                uid: s.uid,
+                                                collectionName: "staff"
+                                            });
+                                            setIsDeleteModalOpen(true);
+                                        }
+                                    }} className="cursor-pointer">
+                                        <Badge className={cn(
+                                            "text-[9px] font-black uppercase tracking-tighter py-0 h-5 border-none transition-all",
+                                            s.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20" : "bg-red-500/10 text-red-400"
+                                        )}>
+                                            {s.status}
+                                        </Badge>
+                                    </div>
                                 )
                             }
                         ]}
@@ -414,11 +473,19 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                     checkEligibility={async () => ({ canDelete: true })}
                     onDeactivate={async (reason) => {
                         try {
-                            await updateDoc(doc(db, deleteUser.collectionName, deleteUser.id), {
+                            const batch = writeBatch(db);
+                            batch.update(doc(db, deleteUser.collectionName, deleteUser.id), {
                                 status: "INACTIVE",
                                 deactivationReason: reason,
                                 updatedAt: new Date().toISOString()
                             });
+                            if (deleteUser.uid) {
+                                batch.update(doc(db, "users", deleteUser.uid), {
+                                    status: "INACTIVE",
+                                    updatedAt: new Date().toISOString()
+                                });
+                            }
+                            await batch.commit();
                         } catch (e: any) {
                             console.error(e);
                             throw e;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, where, orderBy, getDocs, limit, doc, getDoc } from "firebase/firestore";
+import { collection, query, where, orderBy, getDocs, limit, doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
@@ -49,21 +49,30 @@ export default function LeaveManagementPage() {
         if (!snap.empty) setTeacherProfile(snap.docs[0].data());
     };
 
-    const fetchLeaves = async () => {
-        if (!user?.uid) return;
+    const fetchHistory = async () => {
+        if (!user) return;
         setLoading(true);
         try {
-            const q = query(
-                collection(db, "leave_requests"),
-                where("teacherId", "==", user.uid),
-                orderBy("createdAt", "desc"),
-                limit(20)
-            );
-            const snap = await getDocs(q);
-            setLeaves(snap.docs.map((d: any) => ({ id: d.id, ...d.data() })));
+            const token = await user.getIdToken();
+            const res = await fetch("/api/teacher/leaves/history", {
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const data = await res.json();
+            if (data.success) {
+                setLeaves(data.data);
+            } else {
+                console.warn("[Leaves] API Error:", data.error);
+            }
         } catch (e: any) {
-            if (!e?.message?.includes('index')) console.error(e);
-        } finally { setLoading(false); }
+            console.warn("[Leaves] Fetch Error:", e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+
+    const fetchLeaves = () => {
+        fetchHistory();
     };
 
     const fetchStudentLeaves = async () => {
@@ -75,7 +84,7 @@ export default function LeaveManagementPage() {
             });
             const data = await res.json();
             if (data.success) setStudentLeaves(data.data);
-        } catch (e) { console.error(e); }
+        } catch (e: any) { console.warn("[Leaves] Student leaves fetch error:", e.message); }
         finally { setStudentLoading(false); }
     };
 
@@ -235,8 +244,8 @@ export default function LeaveManagementPage() {
                                 <Users className="w-4 h-4 text-blue-400" /> Class Student Absences
                             </CardTitle>
                             <CardDescription>
-                                {teacherProfile?.classInCharge
-                                    ? `Showing leaves for Class ${teacherProfile.classInCharge}${teacherProfile.sectionInCharge || ""}`
+                                {teacherProfile?.classTeacherOf?.classId
+                                    ? `Showing leaves for your assigned class section`
                                     : "You are not assigned as a Class In-charge."}
                             </CardDescription>
                         </CardHeader>

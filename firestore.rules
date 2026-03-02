@@ -53,7 +53,8 @@ service cloud.firestore {
     // Users Collection
     match /users/{userId} {
       allow read: if isSignedIn() && (request.auth.uid == userId || isManager());
-      allow write: if isAdmin();
+      allow update: if isSignedIn() && (request.auth.uid == userId || isManager());
+      allow create, delete: if isAdmin();
     }
 
     // Students & Teachers
@@ -69,7 +70,7 @@ service cloud.firestore {
     }
     
     match /teachers/{teacherId} {
-      allow read: if isSignedIn() && (request.auth.uid == teacherId || resource.data.uid == request.auth.uid || isManager());
+      allow read: if isSignedIn();
       allow write: if isManager();
     }
 
@@ -150,7 +151,48 @@ service cloud.firestore {
       allow update, delete: if isManager();
     }
 
+    match /leave_requests/{id} {
+      allow read: if isSignedIn() && (
+        resource.data.teacherId == request.auth.uid || 
+        isManager()
+      );
+      allow create: if isTeacher() && request.resource.data.teacherId == request.auth.uid;
+      allow update, delete: if isManager();
+    }
+
+    // Search Index
+    match /search_index/{id} {
+      allow read: if isSignedIn();
+      allow write: if isAdmin();
+    }
+
+    // Timetable & Coverage
+    match /coverage_tasks/{id} {
+      allow read: if isManager() || isTeacher();
+      allow write: if isManager();
+    }
+
+    match /substitutions/{id} {
+      allow read: if isManager() || isTeacher();
+      allow write: if isManager();
+    }
+
     // Global Catch-all (Default to Admin only for safety)
+    match /exams/{id} {
+      allow read: if isSignedIn();
+      allow write: if isManager();
+    }
+
+    match /exam_syllabus/{id} {
+      allow read: if isSignedIn();
+      allow write: if isTeacher() || isManager();
+    }
+
+    match /exam_results/{id} {
+      allow read: if isSignedIn();
+      allow write: if isTeacher() || isManager();
+    }
+
     match /{document=**} {
       allow read, write: if isAdmin();
     }

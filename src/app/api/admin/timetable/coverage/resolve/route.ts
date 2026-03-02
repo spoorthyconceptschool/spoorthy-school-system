@@ -43,7 +43,17 @@ export async function POST(req: NextRequest) {
                 const schedule = subScheduleDoc.data()?.schedule || {};
 
                 if (schedule[dayName]?.[slotId]) {
-                    throw new Error("Selected substitute is NOT free at this time.");
+                    throw new Error("Selected substitute is NOT free at this time due to regular classes.");
+                }
+
+                // Check existing substitutions for double-booking
+                const existingSubQuery = adminDb.collection("substitutions")
+                    .where("substituteTeacherId", "==", substituteTeacherId)
+                    .where("date", "==", date)
+                    .where("slotId", "==", slotId);
+                const existingSubSnap = await t.get(existingSubQuery);
+                if (!existingSubSnap.empty) {
+                    throw new Error("Selected substitute is already covering another class at this time.");
                 }
 
                 // Resolve UID for Notification

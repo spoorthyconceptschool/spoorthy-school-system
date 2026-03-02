@@ -11,14 +11,14 @@ export async function GET(req: NextRequest) {
         const decodedToken = await adminAuth.verifyIdToken(token);
 
         // Get Teacher Profile to find their class
-        const teacherId = decodedToken.uid;
-        const teacherSnap = await adminDb.collection("teachers").doc(teacherId).get();
-        if (!teacherSnap.exists) {
+        const teacherUid = decodedToken.uid;
+        const teacherSnap = await adminDb.collection("teachers").where("uid", "==", teacherUid).limit(1).get();
+        if (teacherSnap.empty) {
             return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
         }
-        const teacherData = teacherSnap.data();
-        const classId = teacherData?.classInCharge; // In-charge class
-        const sectionId = teacherData?.sectionInCharge;
+        const teacherData = teacherSnap.docs[0].data();
+        const classId = teacherData?.classTeacherOf?.classId;
+        const sectionId = teacherData?.classTeacherOf?.sectionId;
 
         if (!classId) {
             return NextResponse.json({
@@ -37,11 +37,19 @@ export async function GET(req: NextRequest) {
             query = query.where("sectionId", "==", sectionId);
         }
 
-        const snap = await query.orderBy("createdAt", "desc").limit(50).get();
+        const snap = await query.limit(50).get();
+
+        // Sort in memory to bypass the missing Firebase generic index error
+        const docs = snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
+        docs.sort((a: any, b: any) => {
+            const timeA = a.createdAt?.toMillis() || 0;
+            const timeB = b.createdAt?.toMillis() || 0;
+            return timeB - timeA;
+        });
 
         return NextResponse.json({
             success: true,
-            data: snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }))
+            data: docs
         });
 
     } catch (error: any) {

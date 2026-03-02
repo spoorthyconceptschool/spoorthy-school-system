@@ -4,22 +4,29 @@ import { AuditService } from "./audit-service";
 
 /**
  * Enterprise Fee Ledger Service
- * Strict 3-Layer Architecture | Backend Enforcement Only
  * 
- * Rules:
- * - Append-only ledger system.
- * - Never overwrite or delete financial data.
- * - To correct mistakes, reversing transactions must be posted.
- * - Balances are maintained atomically alongside immutable logs.
+ * Provides an append-only, idempotent financial ledger for managing student fees. 
+ * This service is designed for maximum mathematical integrity and strict auditability.
+ * 
+ * Compliance Rules:
+ * 1. Absolute Immutability: Financial records are NEVER overwritten or deleted.
+ * 2. Rectification: Mistakes are corrected exclusively through reversal transactions.
+ * 3. Atomic State: Account balances are updated in sync with the immutable ledger log.
+ * 4. Audit Trail: Every single transaction is mirrored in the central system audit.
  */
 export class EnterpriseFeeLedgerService {
 
     /**
-     * Posts a new transaction (Credit/Payment or Debit/Charge) to a student's ledger.
-     * Uses strict atomicity to guarantee no double-spending or race conditions.
+     * Records a new financial transaction on a student's ledger.
      * 
-     * @param payload Validated ledger entry payload
-     * @param postedBy Admin/Accountant user ID executing the transaction
+     * Handles both 'CREDIT' (payments/discounts) and 'DEBIT' (charges/fees).
+     * The method calculates the new running balance relative to the student's 
+     * account status and saves both the individual ledger entry and an updated
+     * snapshot of the student's total outstanding balance.
+     * 
+     * @param payload - A verified payload containing amount, type, and categorization.
+     * @param postedBy - UID of the accountant or automated system posting the fee.
+     * @returns A detailed result object including the new calculated ledger balance.
      */
     static async postTransaction(payload: FeeLedgerEntryPayload, postedBy: string) {
         // Assume academic year is determined by business logic or sent in payload. Using fixed for MVP.
@@ -88,13 +95,18 @@ export class EnterpriseFeeLedgerService {
     }
 
     /**
-     * Exclusively for rectifying mistakes. Posts an inverse transaction.
+     * Post an inverse transaction to rectify an erroneous previous entry.
      * 
-     * @param originalTransactionId The ID of the transaction to reverse
-     * @param studentId The student the transaction belongs to
-     * @param academicYear The ledger year
-     * @param reversedBy The user executing the reversal
-     * @param reason Mandatory reason for compliance
+     * This is the only legitimate tool for addressing mistakes in the ledger.
+     * It cross-references the original transaction, flags it as 'Reversed', 
+     * and posts a counter-entry (e.g., if the original was a Payment, this posts a Charge).
+     * 
+     * @param originalTransactionId - Pointer to the errant record.
+     * @param studentId - Owner of the ledger account.
+     * @param academicYear - Target year (e.g. 2026-2027).
+     * @param reversedBy - UID of the authorized user performing the reversal.
+     * @param reason - Detailed explanation for the correction (required for auditing).
+     * @throws Error if the original record is already reversed or does not exist.
      */
     static async reverseTransaction(originalTransactionId: string, studentId: string, academicYear: string, reversedBy: string, reason: string) {
         const accountId = `${studentId}_${academicYear}`;

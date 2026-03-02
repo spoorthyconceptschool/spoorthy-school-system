@@ -25,9 +25,19 @@ export default function TeacherAttendanceManager({
     const { user } = useAuth();
     const { branding, teachers: globalTeachers } = useMasterData();
 
-    const [teachers, setTeachers] = useState<any[]>([]);
+    const [teachers, setTeachers] = useState<any[]>(() => {
+        if (globalTeachers?.length > 0) {
+            return globalTeachers.map(d => ({
+                id: d.id,
+                schoolId: d.schoolId || d.id,
+                name: d.name,
+                uid: d.uid
+            })).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+        }
+        return [];
+    });
     const [attendance, setAttendance] = useState<Record<string, 'P' | 'A'>>({});
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(teachers.length === 0);
     const [submitting, setSubmitting] = useState(false);
     const [alreadyMarked, setAlreadyMarked] = useState(false);
     const [isModified, setIsModified] = useState(false);

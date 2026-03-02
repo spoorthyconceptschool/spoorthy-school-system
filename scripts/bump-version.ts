@@ -1,10 +1,22 @@
-
-import { adminDb } from "../src/lib/firebase-admin";
+import { adminDb, adminRtdb } from "../src/lib/firebase-admin";
 
 async function incrementVersion() {
-    const ref = adminDb.collection("config").doc("system");
-    await ref.set({ liveVersion: Date.now() }, { merge: true });
-    console.log("System version updated to trigger live update prompt.");
+    const version = Date.now();
+
+    // 1. Sync to Firestore (for record keeping)
+    const fsRef = adminDb.collection("config").doc("system");
+    await fsRef.set({ liveVersion: version }, { merge: true });
+
+    // 2. Sync to RTDB (for real-time push to clients)
+    if (adminRtdb) {
+        await adminRtdb.ref('system/liveVersion').set(version);
+    }
+
+    console.log(`System version bumped to ${version}. Clients will be prompted to update.`);
+    process.exit(0);
 }
 
-incrementVersion().catch(console.error);
+incrementVersion().catch((err) => {
+    console.error(err);
+    process.exit(1);
+});

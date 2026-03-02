@@ -44,7 +44,7 @@ export function Hero() {
         };
     }, []);
 
-    const activeVideoUrl = isMobile ? (content.mobileVideoUrl || content.videoUrl) : content.videoUrl;
+    const activeVideoUrl = (isMobile && content.mobileVideoUrl) ? content.mobileVideoUrl : content.videoUrl;
 
     const containerRef = useRef<HTMLDivElement>(null);
     const { scrollY } = useScroll();
@@ -102,22 +102,15 @@ export function Hero() {
                   Video Layer - High priority rendering.
                 */}
                 {activeVideoUrl && (
-                    <div
+                    <video
                         key={activeVideoUrl}
-                        className="absolute inset-0 w-full h-full"
-                        dangerouslySetInnerHTML={{
-                            __html: `
-                            <video
-                                src="${activeVideoUrl}"
-                                class="w-full h-full object-cover select-none"
-                                autoplay
-                                muted
-                                loop
-                                playsinline
-                                preload="auto"
-                            ></video>
-                            `
-                        }}
+                        src={activeVideoUrl}
+                        className="absolute inset-0 w-full h-full object-cover select-none"
+                        autoPlay
+                        muted
+                        loop
+                        playsInline
+                        preload="auto"
                     />
                 )}
 
@@ -158,26 +151,23 @@ export function Hero() {
 
                 {/* CTAs - Responsive Sizing */}
                 <motion.div variants={itemVariants} className="flex flex-col sm:flex-row gap-4 sm:gap-6 items-center w-full sm:w-auto">
-                    <Link href="/login" className="w-full sm:w-auto">
-                        <button className="group relative w-full sm:w-auto px-12 py-4 md:px-14 md:py-5 rounded-full bg-[#64FFDA] text-[#0A192F] font-bold text-base md:text-lg overflow-hidden transition-transform hover:scale-105 active:scale-95 shadow-[0_0_20px_-5px_#64FFDA]">
-                            <span className="relative z-10 flex items-center justify-center gap-2">
-                                Student Portal <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
-                            </span>
-                        </button>
+                    <Link
+                        href="/login"
+                        className="group relative w-full sm:w-auto px-12 py-4 md:px-14 md:py-5 rounded-full bg-[#64FFDA] text-[#0A192F] font-bold text-base md:text-lg overflow-hidden transition-transform hover:scale-105 active:scale-95 shadow-[0_0_20px_-5px_#64FFDA] flex items-center justify-center gap-2"
+                    >
+                        Student Portal <ArrowRight size={18} className="group-hover:translate-x-1 transition-transform" />
                     </Link>
 
                     <a
                         href={content.tourVideoUrl || "https://www.youtube.com"}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="w-full sm:w-auto"
+                        className="group flex w-full sm:w-auto items-center justify-center gap-3 px-6 py-4 md:px-8 md:py-5 rounded-full bg-white/5 backdrop-blur-xl border border-white/20 text-white font-bold text-base md:text-lg hover:bg-white/10 transition-all hover:scale-105 active:scale-95 shadow-lg"
                     >
-                        <button className="group flex w-full items-center justify-center gap-3 px-6 py-4 md:px-8 md:py-5 rounded-full bg-white/5 backdrop-blur-xl border border-white/20 text-white font-bold text-base md:text-lg hover:bg-white/10 transition-all hover:scale-105 active:scale-95 shadow-lg">
-                            <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-[#64FFDA] text-[#0A192F] flex items-center justify-center shrink-0">
-                                <Play size={12} fill="currentColor" className="ml-0.5" />
-                            </div>
-                            Watch Campus Tour
-                        </button>
+                        <div className="w-6 h-6 md:w-8 md:h-8 rounded-full bg-[#64FFDA] text-[#0A192F] flex items-center justify-center shrink-0">
+                            <Play size={12} fill="currentColor" className="ml-0.5" />
+                        </div>
+                        Watch Campus Tour
                     </a>
                 </motion.div>
             </motion.div>

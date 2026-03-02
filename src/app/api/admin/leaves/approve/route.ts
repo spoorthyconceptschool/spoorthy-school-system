@@ -2,7 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb, FieldValue } from "@/lib/firebase-admin";
 import { notifyManagerActionServer } from "@/lib/notifications-server";
 
-// Helper to get dates between range
+/**
+ * Helper utility that generates a consecutive array of Date objects between two dates.
+ * 
+ * @param startDate The beginning Date boundary.
+ * @param endDate The ending Date boundary.
+ * @returns Array of Date objects spanning strictly between startDate and endDate inclusive.
+ */
 function getDatesInRange(startDate: Date, endDate: Date) {
     const dates = [];
     let currentDate = new Date(startDate);
@@ -13,11 +19,36 @@ function getDatesInRange(startDate: Date, endDate: Date) {
     return dates;
 }
 
-// Helper to get Day Name (MONDAY, etc.)
+/**
+ * Utility to reliably extract the uppercase string day name (e.g. "MONDAY") from a Date.
+ * Forces UTC evaluation to align cleanly across client timezone boundaries.
+ * 
+ * @param date A valid JavaScript Date object.
+ * @returns An uppercase string name corresponding to the day of the week.
+ */
 function getDayName(date: Date) {
-    return date.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+    // Force UTC to ensure consistency across environments when handling YYYY-MM-DD
+    return date.toLocaleDateString('en-US', { weekday: 'long', timeZone: 'UTC' }).toUpperCase();
 }
 
+/**
+ * POST /api/admin/leaves/approve
+ * 
+ * Handles administrative actions (Approve, Reject, Revert) on teacher leave requests.
+ * 
+ * When a leave is APPROVED, this endpoint acts as an intelligent load-balancing schedule engine:
+ * 1. It fetches the absent teacher's schedule.
+ * 2. It checks availability of all other teachers, ensuring they aren't on leave and are free at that period.
+ * 3. It assigns substitute teachers using a load-balanced Priority Queue system:
+ *    - Priority 1: Teachers who already teach that specific class.
+ *    - Priority 2: Any available teacher.
+ *    - Priority 3: Fallback straight to "LEISURE" mode if no one is available.
+ * 4. It intelligently balances the assigned workload by maintaining an `assignedCounts` matrix, 
+ *    ensuring the system doesn't unfairly dump all coverage tasks onto a single available teacher.
+ * 
+ * @param req NextRequest containing the `leaveId` and `action` to perform, along with headers.
+ * @returns NextResponse indicating success or failure of the requested operational change.
+ */
 export async function POST(req: NextRequest) {
     try {
         const authHeader = req.headers.get("Authorization");
@@ -128,8 +159,15 @@ export async function POST(req: NextRequest) {
             const applicantName = applicantData.name || "Teacher";
 
             // 2. Fetch teacher's schedule
-            const scheduleDoc = await adminDb.collection("teacher_schedules").doc(`${yearId}_${applicantSchoolId}`).get();
-            const teacherSchedule = scheduleDoc.exists ? scheduleDoc.data()?.schedule || {} : {};
+            const teacherIdRes = applicantData.schoolId || applicantData.teacherId || applicantSnap.docs[0].id;
+            const scheduleDoc = await adminDb.collection("teacher_schedules").doc(`${yearId}_${teacherIdRes}`).get();
+            let teacherSchedule = scheduleDoc.exists ? scheduleDoc.data()?.schedule || {} : {};
+
+            // Fallback: If no schedule found with schoolId, try with Doc ID
+            if (Object.keys(teacherSchedule).length === 0 && applicantData.schoolId) {
+                const fallbackDoc = await adminDb.collection("teacher_schedules").doc(`${yearId}_${applicantSnap.docs[0].id}`).get();
+                if (fallbackDoc.exists) teacherSchedule = fallbackDoc.data()?.schedule || {};
+            }
 
             if (!teacherSchedule || Object.keys(teacherSchedule).length === 0) {
                 await leaveRef.update({
@@ -146,6 +184,7 @@ export async function POST(req: NextRequest) {
             const teachers = teachersSnap.docs.map((d: any) => {
                 const data = d.data();
                 return {
+                    id: d.id, // Firestore Doc ID
                     uid: data.uid,
                     schoolId: data.schoolId || d.id,
                     name: data.name
@@ -175,6 +214,7 @@ export async function POST(req: NextRequest) {
             const dateKeys = getDatesInRange(fromDate, toDate).map((d: Date) => d.toISOString().split('T')[0]);
 
             const coverageTasks: any[] = [];
+            const assignedCounts: Record<string, number> = {};
 
             dateKeys.forEach(dateKey => {
                 const dateObj = new Date(dateKey);
@@ -197,7 +237,8 @@ export async function POST(req: NextRequest) {
                             );
                             if (onLeave) return false;
 
-                            const tSched = scheduleMap[t.schoolId];
+                            // Availability check: check both schoolId and docId in scheduleMap
+                            const tSched = scheduleMap[t.schoolId] || scheduleMap[t.id];
                             if (tSched?.[dayName]?.[slotId]) return false;
 
                             return true;
@@ -209,15 +250,22 @@ export async function POST(req: NextRequest) {
 
                         const classTeachers = freeCandidates.filter((t: any) => {
                             const cAssigns = assignmentMap[classId];
-                            return cAssigns && Object.values(cAssigns).includes(t.schoolId);
+                            // Check both schoolId and docId against the assignments map values
+                            const assignedIds = cAssigns ? Object.values(cAssigns) : [];
+                            return assignedIds.includes(t.schoolId) || assignedIds.includes(t.id);
                         });
+
+                        classTeachers.sort((a: any, b: any) => (assignedCounts[a.schoolId] || 0) - (assignedCounts[b.schoolId] || 0));
+                        freeCandidates.sort((a: any, b: any) => (assignedCounts[a.schoolId] || 0) - (assignedCounts[b.schoolId] || 0));
 
                         if (classTeachers.length > 0) {
                             subId = classTeachers[0].schoolId;
                             resType = "SUBSTITUTE";
+                            assignedCounts[subId] = (assignedCounts[subId] || 0) + 1;
                         } else if (freeCandidates.length > 0) {
                             subId = freeCandidates[0].schoolId;
                             resType = "SUBSTITUTE";
+                            assignedCounts[subId] = (assignedCounts[subId] || 0) + 1;
                         } else {
                             subId = null;
                             resType = "LEISURE";

@@ -52,8 +52,9 @@ export async function POST(req: NextRequest) {
         // Re-write to handle loop properly
         const studentsSnap = await adminDb.collection("students").get();
         const teachersSnap = await adminDb.collection("teachers").get();
+        const staffSnap = await adminDb.collection("staff").get();
 
-        const allDocs = [...studentsSnap.docs, ...teachersSnap.docs];
+        const allDocs = [...studentsSnap.docs, ...teachersSnap.docs, ...staffSnap.docs];
 
         // Batching chunks
         const chunkSize = 400;
@@ -83,16 +84,29 @@ export async function POST(req: NextRequest) {
                         ...generateKeywords(data.className || ""),
                         ...generateKeywords(data.villageName || "")
                     ];
-                } else {
+                } else if (data.mobile !== undefined && (data.salary !== undefined || data.id?.startsWith('TCH'))) {
                     type = "teacher";
-                    title = data.name || "Unknown";
-                    subtitle = `Teacher - ${data.mobile || ""}`;
-                    url = `/admin/teachers`;
+                    title = data.name || "Unknown Staff";
+                    subtitle = `Teacher | ${doc.id}`;
+                    url = `/admin/teachers/${doc.id}`;
                     keywords = [
                         ...generateKeywords(data.name || ""),
                         ...generateKeywords(doc.id),
                         ...generateKeywords(data.mobile || ""),
-                        ...generateKeywords("Teacher")
+                        "teacher", "faculty"
+                    ];
+                } else {
+                    type = "staff";
+                    title = data.name || "Unknown Staff";
+                    const role = data.roleCode || "Staff";
+                    subtitle = `${role} | ${doc.id}`;
+                    url = `/admin/staff/${doc.id}`;
+                    keywords = [
+                        ...generateKeywords(data.name || ""),
+                        ...generateKeywords(doc.id),
+                        ...generateKeywords(data.mobile || ""),
+                        ...generateKeywords(role),
+                        "staff", "helper"
                     ];
                 }
 

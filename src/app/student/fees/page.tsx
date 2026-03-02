@@ -38,7 +38,7 @@ export default function StudentFeesPage() {
                 if (lSnap.exists()) setLedger(lSnap.data());
                 setLoading(false);
             }, (err) => {
-                console.error("Ledger sync error:", err);
+                console.warn("[Fees] Ledger sync error:", err.message);
                 setLoading(false);
             });
 
@@ -72,7 +72,7 @@ export default function StudentFeesPage() {
                 setLoading(false);
             }
         }, (err) => {
-            console.error("Profile sync error:", err);
+            console.warn("[Fees] Profile sync error:", err.message);
             setLoading(false);
         });
 

@@ -30,7 +30,6 @@ const TEACHER_NAV = [
     { label: "Groups", icon: Users, href: "/teacher/groups" },
     { label: "Holidays", icon: Calendar, href: "/teacher/holidays" },
     { label: "Profile", icon: User, href: "/teacher/profile" },
-    { label: "Help & Queries", icon: MessageSquare, href: "/teacher/queries" },
 ];
 
 export default function TeacherLayout({ children }: { children: React.ReactNode }) {

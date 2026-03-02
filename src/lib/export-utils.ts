@@ -80,35 +80,35 @@ export const printStudentFeeStructure = ({ studentName, schoolId, className, ite
         <head>
             <title>Fee Structure - ${studentName}</title>
             <style>
-                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20mm; color: #333; line-height: 1.5; }
-                .header { display: flex; align-items: center; justify-content: center; gap: 30px; border-bottom: 2px solid #333; padding-bottom: 5mm; margin-bottom: 10mm; }
-                .logo { height: 80px; width: auto; object-fit: contain; }
+                body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 10mm; color: #333; line-height: 1.4; }
+                .header { display: flex; align-items: center; justify-content: center; gap: 20px; border-bottom: 2px solid #333; padding-bottom: 3mm; margin-bottom: 6mm; }
+                .logo { height: 60px; width: auto; object-fit: contain; }
                 .header-text { text-align: left; }
-                .school-name { font-size: 28px; font-weight: bold; text-transform: uppercase; color: #1a1a1a; margin-bottom: 2px; }
-                .sub-header { font-size: 14px; color: #666; font-style: italic; }
-                .doc-title { font-size: 20px; font-weight: 800; margin-top: 8mm; text-decoration: underline; letter-spacing: 1px; }
+                .school-name { font-size: 24px; font-weight: bold; text-transform: uppercase; color: #1a1a1a; margin-bottom: 2px; }
+                .sub-header { font-size: 12px; color: #666; font-style: italic; }
+                .doc-title { font-size: 16px; font-weight: 800; margin-top: 4mm; text-decoration: underline; letter-spacing: 1px; }
                 
-                .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 8mm; margin-bottom: 12mm; background: #fcfcfc; padding: 5mm; border: 1px solid #eee; }
-                .info-item { display: flex; gap: 3mm; border-bottom: 1px dashed #eee; padding-bottom: 1mm; }
-                .label { font-weight: bold; color: #555; width: 120px; flex-shrink: 0; }
+                .info-grid { display: grid; grid-template-columns: 1fr 1fr; gap: 4mm; margin-bottom: 6mm; background: #fcfcfc; padding: 4mm; border: 1px solid #eee; }
+                .info-item { display: flex; gap: 2mm; border-bottom: 1px dashed #eee; padding-bottom: 1mm; font-size: 12px; }
+                .label { font-weight: bold; color: #555; width: 100px; flex-shrink: 0; }
                 .value { font-weight: 600; color: #000; }
 
-                table { width: 100%; border-collapse: collapse; margin-bottom: 12mm; box-shadow: 0 2px 5px rgba(0,0,0,0.05); }
-                th, td { border: 1px solid #ccc; padding: 4mm; text-align: left; }
-                th { background-color: #f1f1f1; font-weight: bold; text-transform: uppercase; font-size: 12px; }
+                table { width: 100%; border-collapse: collapse; margin-bottom: 6mm; box-shadow: 0 1px 3px rgba(0,0,0,0.05); }
+                th, td { border: 1px solid #ccc; padding: 2mm 3mm; text-align: left; font-size: 12px; }
+                th { background-color: #f1f1f1; font-weight: bold; text-transform: uppercase; font-size: 11px; }
                 .total-row { font-weight: bold; background-color: #f9f9f9; }
                 
-                .summary-box { margin-left: auto; width: 300px; border: 2px solid #333; padding: 5mm; border-radius: 1mm; background: #fff; }
-                .summary-item { display: flex; justify-content: space-between; margin-bottom: 3mm; font-size: 14px; }
-                .summary-item.grand { border-top: 2px solid #333; padding-top: 3mm; margin-top: 2mm; font-size: 18px; }
+                .summary-box { margin-left: auto; width: 280px; border: 2px solid #333; padding: 4mm; border-radius: 1mm; background: #fff; }
+                .summary-item { display: flex; justify-content: space-between; margin-bottom: 2mm; font-size: 12px; }
+                .summary-item.grand { border-top: 2px solid #333; padding-top: 2mm; margin-top: 2mm; font-size: 16px; }
                 
-                .footer { margin-top: 30mm; display: flex; justify-content: space-between; }
-                .sig-box { border-top: 1px solid #000; width: 220px; text-align: center; padding-top: 3mm; font-size: 13px; font-weight: bold; }
+                .footer { margin-top: 15mm; display: flex; justify-content: space-between; page-break-inside: avoid; }
+                .sig-box { border-top: 1px solid #000; width: 200px; text-align: center; padding-top: 2mm; font-size: 12px; font-weight: bold; }
                 
-                .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 100px; opacity: 0.03; z-index: -1; pointer-events: none; }
+                .watermark { position: fixed; top: 50%; left: 50%; transform: translate(-50%, -50%) rotate(-45deg); font-size: 80px; opacity: 0.03; z-index: -1; pointer-events: none; }
                 
                 @media print {
-                    body { padding: 0; }
+                    body { padding: 0; margin: 5mm; }
                     .no-print { display: none; }
                     .summary-box { border-color: #000; }
                 }
@@ -173,8 +173,8 @@ export const printStudentFeeStructure = ({ studentName, schoolId, className, ite
                 </div>
             </div>
 
-            <div style="margin-top: 10mm; font-size: 11px; color: #666; border-left: 3px solid #ccc; padding-left: 4mm;">
-                <p><strong>Note:</strong> This is a system-generated document and reflects the current fee commitments for the academic year 2025-26. Please retain this for your records.</p>
+            <div style="margin-top: 6mm; font-size: 10px; color: #666; border-left: 3px solid #ccc; padding-left: 4mm;">
+                <p style="margin: 0;"><strong>Note:</strong> This is a system-generated document and reflects the current fee commitments for the academic year 2025-26. Please retain this for your records.</p>
             </div>
 
             <div class="footer">

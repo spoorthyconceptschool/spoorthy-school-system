@@ -93,7 +93,7 @@ export default function NoticesPage() {
                 console.warn("Inbox notices index missing, enabling fallback.");
                 setUseInboxFallback(true);
             } else if (!err.message.includes("index")) {
-                console.error("Inbox stream error:", err);
+                console.warn("[Notices] Inbox stream warning:", err.message);
             }
         });
 

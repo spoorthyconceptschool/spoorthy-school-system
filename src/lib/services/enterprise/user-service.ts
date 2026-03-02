@@ -19,21 +19,29 @@ export type CreateUserPayload = z.infer<typeof CreateUserPayloadSchema>;
 
 /**
  * Enterprise User Access & Permissions Service
- * Strict 3-Layer Architecture | Backend Enforcement Only
+ * 
+ * Manages the generation, role assignment, and access control for system users. 
+ * This service handles security-critical tasks like custom claim injection
+ * and account suspensions to ensure environment integrity.
  * 
  * Rules:
- * - Passwords MUST be hashed (Firebase Auth natively handles adaptive scrypt hashing for us)
- * - One-time secure desktop login for sensitive software (Tied to Auth state constraints handled by UI)
- * - No shared credentials / Strict Role assignments on Auth Claims.
+ * 1. Secure Storage: Passwords MUST be hashed (handled automatically by Firebase Auth).
+ * 2. RBAC Enforcement: User roles are locked into ID Tokens using Auth Custom Claims.
+ * 3. Auditability: All user creation and permission changes must be logged.
+ * 4. Immutable History: Records are NEVER deleted; only 'SUSPENDED' or 'REVOKED'.
  */
 export class EnterpriseUserService {
 
     /**
-     * Creates a new System User (E.g. Accountant, Teacher, Admin).
-     * Atomic operations and custom claims enforced strictly here.
+     * Creates a new administrative user with assigned system privileges.
      * 
-     * @param payload User Details conforming to CreateUserPayloadSchema
-     * @param createdBy Admin user executing the creation
+     * Registers the user with Firebase Authentication and creates a parallel 
+     * public profile record in the central 'users' collection. Roles are 
+     * injected directly into the user's secure token for real-time permission checks.
+     * 
+     * @param payload - Verified information conforming to the user schema.
+     * @param createdBy - UID of the administrator who is provisioning this user.
+     * @returns A promise resolving to user identifiers (UID and primary email).
      */
     static async createUser(payload: CreateUserPayload, createdBy: string) {
 
@@ -80,8 +88,17 @@ export class EnterpriseUserService {
     }
 
     /**
-     * Re-assigns roles or soft-suspends users safely.
-     * Destructive deletions are completely prohibited.
+     * Soft-suspends a system user and revokes their active access tokens.
+     * 
+     * This is a non-destructive method to permanently or temporarily disable 
+     * a user's account. It disables the Firebase Auth record and marks the
+     * profile record as 'SUSPENDED' for system-wide exclusion.
+     * 
+     * @param uid - The unique key of the user to revoke.
+     * @param targetRole - The administrative role authorizing the action.
+     * @param revokedBy - The UID of the admin performing the revocation.
+     * @param reason - Detailed justification (Required for compliance).
+     * @returns A promise resolving to the impacted UID.
      */
     static async revokeAccess(uid: string, targetRole: EnterpriseRole, revokedBy: string, reason: string) {
         const userRef = adminDb.collection("users").doc(uid);

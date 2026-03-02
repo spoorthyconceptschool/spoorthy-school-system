@@ -41,7 +41,7 @@ export default function MarkAttendancePage() {
                 }
             }
         } catch (e: any) {
-            console.error(e);
+            console.warn("[Attendance] Teacher fetch error:", e.message);
         } finally {
             setLoading(false);
         }

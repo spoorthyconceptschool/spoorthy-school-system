@@ -34,7 +34,7 @@ export default function TeacherTimetablePage() {
             const hQuery = query(collection(db, "notices"), where("type", "==", "HOLIDAY"));
             const hSnap = await getDocs(hQuery);
             setHolidays(hSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        } catch (e) { console.error(e); }
+        } catch (e) { console.warn("[Timetable] Holiday Fetch Error", e); }
     };
 
     const fetchTeachers = async () => {
@@ -48,7 +48,7 @@ export default function TeacherTimetablePage() {
                 map[d.id] = data.name;
             });
             setTeacherMap(map);
-        } catch (e) { console.error("Error fetching teachers:", e); }
+        } catch (e) { console.warn("[Timetable] Teachers Fetch Error:", e); }
     };
 
     const fetchMySchedule = async () => {
@@ -61,7 +61,7 @@ export default function TeacherTimetablePage() {
                 setSchedule(data.data.weeklySchedule || {});
                 setSubstitutions(data.data.substitutions || []);
             }
-        } catch (e) { console.error(e); }
+        } catch (e) { console.warn("[Timetable] My Schedule Fetch Error", e); }
         finally { setLoading(false); }
     };
 

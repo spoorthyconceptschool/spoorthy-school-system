@@ -17,8 +17,8 @@ export default function HolidaysPage() {
                 const q = query(collection(db, "notices"), where("type", "==", "HOLIDAY"));
                 const snap = await getDocs(q);
                 setHolidays(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-            } catch (error) {
-                console.error("Error fetching holidays:", error);
+            } catch (error: any) {
+                console.warn("[Holidays] error fetching holidays:", error.message);
             } finally {
                 setLoading(false);
             }

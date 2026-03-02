@@ -2,15 +2,18 @@ import { adminDb, Timestamp } from "@/lib/firebase-admin";
 import { AuditService } from "./audit-service";
 
 /**
- * ENTERPRISE ATTENDANCE SERVICE
- * Strict 3-Layer Architecture | Backend Enforcement Only
+ * Enterprise Attendance Service
  * 
- * Rules:
- * - One attendance record per student per day
- * - Read-only after marking
- * - School time window enforcement
- * - Unknown persons ignored
- * - No face images stored
+ * Provides centralized backend logic for school attendance tracking across all categories
+ * (Students, Teachers, and Staff). Follows a strict 3-layer architecture which ensures 
+ * that all business rules are enforced exclusively on the server side.
+ * 
+ * Business Rules:
+ * 1. Mutual Exclusivity: Only one attendance record per entity (student/staff) per day.
+ * 2. Immutability: Once marked, records are considered final and read-only.
+ * 3. Temporal Constraints: Attendance can only be submitted during configured school hours.
+ * 4. Validation: Only active, recognized entities can have their attendance recorded.
+ * 5. Privacy: No biometrics or sensitive images are persisted in the attendance stream.
  */
 
 // Configuration for time window enforcement (24-hour format)
@@ -19,12 +22,19 @@ const SCHOOL_TIME_WINDOW = { startHour: 7, endHour: 17 };
 export class EnterpriseAttendanceService {
 
     /**
-     * Mark daily attendance for a class section.
-     * @param date "YYYY-MM-DD"
-     * @param classId The class ID
-     * @param sectionId The section ID
-     * @param records Map of studentId -> 'P' | 'A'
-     * @param markedBy The user ID marking attendance
+     * Records the daily attendance for an entire class section.
+     * 
+     * Validates the submission time against school hours, verifies that the attendance
+     * hasn't already been marked for this section/date, and ensures all student IDs
+     * correspond to active students currently enrolled in that class.
+     * 
+     * @param date - The target date in ISO YYYY-MM-DD format.
+     * @param classId - Unique identifier for the class (e.g., 'CLASS_1').
+     * @param sectionId - Unique identifier for the section (e.g., 'SEC_A').
+     * @param records - A dictionary mapping student IDs to their status ('P' for Present, 'A' for Absent).
+     * @param markedBy - The UID of the authenticated user submitting the attendance.
+     * @returns A promise resolving to an object containing success status and statistics.
+     * @throws Error if outside time window, section already marked, or database failure.
      */
     static async markAttendance(date: string, classId: string, sectionId: string, records: Record<string, 'P' | 'A'>, markedBy: string) {
         // Enforce time window
@@ -127,10 +137,17 @@ export class EnterpriseAttendanceService {
     }
 
     /**
-     * Mark daily attendance for Teachers.
-     * @param date "YYYY-MM-DD"
-     * @param records Map of schoolId -> 'P' | 'A'
-     * @param markedBy The user ID marking attendance
+     * Records daily attendance for the teaching faculty.
+     * 
+     * Similar to student attendance, this enforces school hour windows and record immutability.
+     * Automatically cross-references submitted IDs against the active teachers registry
+     * and triggers system notifications for the concerned faculty members.
+     * 
+     * @param date - The target date in ISO YYYY-MM-DD format.
+     * @param records - A dictionary mapping teacher school IDs to their status ('P' or 'A').
+     * @param markedBy - The UID of the administrator submitting the attendance.
+     * @returns A promise resolving to success status and faculty attendance stats.
+     * @throws Error if submitted outside of configured active school hours.
      */
     static async markTeacherAttendance(date: string, records: Record<string, 'P' | 'A'>, markedBy: string) {
         // Enforce time window
@@ -223,10 +240,16 @@ export class EnterpriseAttendanceService {
     }
 
     /**
-     * Mark daily attendance for Staff.
-     * @param date "YYYY-MM-DD"
-     * @param records Map of schoolId -> 'P' | 'A'
-     * @param markedBy The user ID marking attendance
+     * Records daily attendance for non-teaching support staff.
+     * 
+     * Enforces the standard enterprise attendance rules (time windows, immutability,
+     * and validation). Logs the action in the central audit trail and notifies
+     * staff members via the integrated notification system.
+     * 
+     * @param date - The target date in ISO YYYY-MM-DD format.
+     * @param records - A dictionary mapping staff school IDs to their status ('P' or 'A').
+     * @param markedBy - The UID of the administrator submitting the attendance.
+     * @returns A promise resolving to the final attendance statistics for the day.
      */
     static async markStaffAttendance(date: string, records: Record<string, 'P' | 'A'>, markedBy: string) {
         // Enforce time window

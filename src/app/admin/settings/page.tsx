@@ -4,6 +4,7 @@
 import { AcademicYearManager } from "@/components/admin/academic-year-manager";
 import { BrandingSettings } from "@/components/admin/branding-settings";
 import { SystemUsersManager } from "@/components/admin/system-users-manager";
+import { InactiveUsersManager } from "@/components/admin/inactive-users-manager";
 import { SystemToggles } from "@/components/admin/system-toggles";
 import { useAuth } from "@/context/AuthContext";
 import { useRouter } from "next/navigation";
@@ -65,6 +66,7 @@ export default function AdminSettingsPage() {
                 <div className="w-full space-y-4 md:space-y-8">
                     <BrandingSettings />
                     <SystemUsersManager />
+                    <InactiveUsersManager />
                 </div>
 
                 {/* Right Panel: Academic Years & System Control */}

@@ -139,6 +139,12 @@ export default function StudentExamsPage() {
                                     </Link>
                                 )}
 
+                                <Link href={`/student/exams/${exam.id}/syllabus`}>
+                                    <Button variant="outline" className="w-full border-[#64FFDA]/30 text-[#64FFDA] hover:bg-[#64FFDA]/10">
+                                        <FileText className="w-4 h-4 mr-2" /> View Exam Syllabus
+                                    </Button>
+                                </Link>
+
                                 {feeStatus === "CLEARED" ? (
                                     <Link href={`/student/exams/${exam.id}/hall-ticket`} target="_blank">
                                         <Button variant="outline" className="w-full border-blue-500/30 text-blue-400 hover:bg-blue-500/10">
