@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getAdminAuth, getAdminDb, FieldValue } from "@/lib/firebase-admin";
 
+/**
+ * Handles bulk import of student records from Excel/CSV uploads.
+ * 
+ * Verifies admin privileges, assigns sequential school IDs, creates unified authentication
+ * profiles, initializes fee ledgers based on the selected academic year, and updates the global
+ * search index with comprehensive keywords automatically generated for each imported student.
+ * 
+ * @param req - The incoming NextRequest containing the JSON payload with `students` array and `academicYear`.
+ * @returns A NextResponse with a JSON object detailing success/failure counts, errors, and created records.
+ */
 export async function POST(req: NextRequest) {
     try {
         const db = getAdminDb();
@@ -120,6 +130,15 @@ export async function POST(req: NextRequest) {
                     role: "STUDENT"
                 });
 
+                const { SearchService } = await import("@/lib/services/enterprise/search-service");
+                const keywords = Array.from(new Set([
+                    ...SearchService.generateKeywords(student.studentName || ""),
+                    ...SearchService.generateKeywords(schoolId),
+                    ...SearchService.generateKeywords(student.parentMobile || ""),
+                    ...SearchService.generateKeywords(className || ""),
+                    ...SearchService.generateKeywords(villageName || "")
+                ]));
+
                 // 3. /students/{schoolId}
                 batch.set(db.collection("students").doc(schoolId), {
                     ...student,
@@ -134,6 +153,7 @@ export async function POST(req: NextRequest) {
                     sectionId: student.sectionId || "",
                     status: "ACTIVE",
                     academicYear: currentYearId,
+                    keywords,
                     createdAt: FieldValue.serverTimestamp(),
                     email: syntheticEmail,
                     recoveryPassword: String(initialPassword),
@@ -205,34 +225,12 @@ export async function POST(req: NextRequest) {
                 });
 
                 // 5. Search Index
-                const searchKeywords = new Set<string>();
-                const addKeywords = (text: string) => {
-                    if (!text) return;
-                    const normalized = String(text).toLowerCase().trim();
-                    searchKeywords.add(normalized);
-                    const tokens = normalized.split(/\s+/);
-                    tokens.forEach(t => searchKeywords.add(t));
-                    tokens.forEach(token => {
-                        for (let i = 2; i <= token.length; i++) {
-                            searchKeywords.add(token.substring(0, i));
-                        }
-                    });
-                };
-                addKeywords(student.studentName);
-                addKeywords(schoolId);
-                addKeywords(student.parentMobile);
-                addKeywords(className);
-
-                batch.set(db.collection("search_index").doc(schoolId), {
-                    id: schoolId,
-                    entityId: schoolId,
-                    type: "student",
-                    title: student.studentName,
-                    subtitle: `${className} | ${student.parentMobile}`,
-                    url: `/admin/students/${schoolId}`,
-                    keywords: Array.from(searchKeywords),
-                    updatedAt: FieldValue.serverTimestamp()
-                });
+                await SearchService.indexStudent(schoolId, {
+                    studentName: student.studentName,
+                    parentMobile: student.parentMobile,
+                    className,
+                    villageName
+                }, batch);
 
                 await batch.commit();
                 results.success++;
