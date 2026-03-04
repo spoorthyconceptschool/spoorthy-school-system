@@ -1,12 +1,14 @@
-import * as admin from "firebase-admin";
+import { createRequire } from "module";
+const require = createRequire(import.meta.url);
+const admin = require("firebase-admin");
 
 /**
- * ENGINE V7: PRODUCTION MONOLITH LAYER
- * Reverting to monolithic imports to solve ERR_MODULE_NOT_FOUND on Subpath exports
- * which is a known issue with Next.js 15 Turbopack + External Modules.
+ * ENGINE V8: HYBRID COMPATIBILITY LAYER
+ * Uses manual require() to bypass Turbopack's mangled external module resolution.
+ * This is the ultimate fix for ERR_MODULE_NOT_FOUND in Next.js 15.
  */
 
-type App = admin.app.App;
+type App = any; // admin.app.App;
 
 /**
  * ENGINE V6: ENTERPRISE STABILITY LAYER
