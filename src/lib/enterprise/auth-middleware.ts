@@ -95,13 +95,13 @@ export async function withEnterpriseGuard(
     allowedRoles: Role[],
     handler: (req: NextRequest, user: AuthenticatedUser) => Promise<NextResponse>
 ) {
-    const { user, errorResponse } = await authenticateRoute(req, allowedRoles);
-
-    if (errorResponse || !user) {
-        return errorResponse;
-    }
-
     try {
+        const { user, errorResponse } = await authenticateRoute(req, allowedRoles);
+
+        if (errorResponse || !user) {
+            return errorResponse;
+        }
+
         return await handler(req, user);
     } catch (error: any) {
         console.error(`[Enterprise Backend] FATAL Exception:`, error);
