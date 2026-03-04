@@ -18,64 +18,51 @@ const SERVICE_ACCOUNT = {
 };
 
 let _initError: string | null = null;
+let _cachedApp: any = null;
 
-function initAdmin() {
-    const apps = getApps();
-    if (apps.length > 0) return apps[0];
-
+function getAdminApp() {
+    if (_cachedApp) return _cachedApp;
     try {
-        return initializeApp({
+        const apps = getApps();
+        if (apps.length > 0) {
+            _cachedApp = apps[0];
+            return _cachedApp;
+        }
+
+        _cachedApp = initializeApp({
             credential: cert(SERVICE_ACCOUNT),
             storageBucket: "spoorthy-school-live-55917.firebasestorage.app",
             databaseURL: "https://spoorthy-school-live-55917-default-rtdb.firebaseio.com"
         });
+        return _cachedApp;
     } catch (e: any) {
         console.error("[FIREBASE ADMIN] Initialization Failed:", e);
         _initError = e.message || String(e);
-        return null as any;
+        throw e; // Re-throw so the caller knows it failed
     }
 }
 
-// Fixed services with lazy-load Proxy pattern
-const createLazyService = (serviceName: string) => {
+// Lazy Loaders to prevent top-level module crash
+const createLazyProxy = (getService: () => any) => {
     return new Proxy({} as any, {
-        get(target, prop) {
-            const app = initAdmin();
-            if (!app) {
-                throw new Error(`Firebase Admin failed to initialize: ${_initError || 'Unknown Error'}`);
-            }
-
-            let service;
-            switch (serviceName) {
-                case 'firestore': service = getFirestore(app); break;
-                case 'auth': service = getAuth(app); break;
-                case 'database': service = getDatabase(app); break;
-                case 'storage': service = getStorage(app); break;
-                case 'messaging': service = getMessaging(app); break;
-                default: throw new Error(`Unknown service: ${serviceName}`);
-            }
-
-            const value = (service as any)[prop];
+        get(_, prop) {
+            const service = getService();
+            const value = service[prop];
             return typeof value === 'function' ? value.bind(service) : value;
         }
     });
 };
 
-export const adminDb = createLazyService('firestore');
-export const adminAuth = createLazyService('auth');
-export const adminStorage = createLazyService('storage');
-export const adminRtdb = createLazyService('database');
-export const adminMessaging = createLazyService('messaging');
+export const adminDb = createLazyProxy(() => getFirestore(getAdminApp()));
+export const adminAuth = createLazyProxy(() => getAuth(getAdminApp()));
+export const adminStorage = createLazyProxy(() => getStorage(getAdminApp()));
+export const adminRtdb = createLazyProxy(() => getDatabase(getAdminApp()));
+export const adminMessaging = createLazyProxy(() => getMessaging(getAdminApp()));
 
-// Also keep the getters for compatibility
-export const getAdminDb = () => getFirestore(initAdmin());
-export const getAdminAuth = () => getAuth(initAdmin());
-export const getAdminStorage = () => getStorage(initAdmin());
-export const getAdminRtdb = () => getDatabase(initAdmin());
-
+// Connectivity check for API
 export const getInitError = () => _initError;
 
-// Static helpers using modular exports
+// Static helpers
 export const FieldValue = FirestoreFieldValue;
 export const FieldPath = FirestoreFieldPath;
 export const Timestamp = FirestoreTimestamp;
