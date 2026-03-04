@@ -10,9 +10,18 @@ import { Badge } from "@/components/ui/badge";
 import { Loader2, AlertCircle } from "lucide-react";
 import AttendanceManager from "@/components/attendance/attendance-manager";
 
+/**
+ * MarkAttendancePage Component
+ * 
+ * Provides a dedicated interface for teachers to record student attendance.
+ * Dynamically resolves accessible classes by combining explicit "Class Teacher"
+ * roles from RTDB and "Subject Teacher" assignments from the master registry.
+ * 
+ * @returns {JSX.Element} The rendered attendance management view.
+ */
 export default function MarkAttendancePage() {
     const { user } = useAuth();
-    const { classes, sections, subjectTeachers } = useMasterData();
+    const { classes, sections, classSections, subjectTeachers } = useMasterData();
     const [teacher, setTeacher] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [selectedClassKey, setSelectedClassKey] = useState("");
@@ -47,17 +56,25 @@ export default function MarkAttendancePage() {
         }
     };
 
+    /**
+     * Resolves the set of classes for which the current teacher is authorized
+     * to perform attendance operations.
+     * 
+     * @param {any} tProfile - The base Firestore profile of the teacher.
+     * @returns {Array<{classId: string, sectionId: string, key: string, isClassTeacher: boolean}>} 
+     *          List of authorized class objects.
+     */
     const getAuthorizedClasses = (tProfile: any) => {
-        if (!tProfile || !subjectTeachers) return [];
+        if (!tProfile || !classSections || !subjectTeachers) return [];
         const tId = tProfile.schoolId || tProfile.id;
         const set = new Map<string, { classId: string, sectionId: string, key: string, isClassTeacher: boolean }>();
 
-        // 1. Classes where I am Class Teacher
-        if (tProfile.classTeacherOf) {
-            const { classId, sectionId } = tProfile.classTeacherOf;
-            const key = `${classId}_${sectionId}`;
-            set.set(key, { classId, sectionId, key, isClassTeacher: true });
-        }
+        // 1. Classes where I am Class Teacher (Dynamic from RTDB)
+        Object.values(classSections).forEach((cs: any) => {
+            if (cs.classTeacherId === tId && (cs.active || cs.isActive)) {
+                set.set(cs.id, { classId: cs.classId, sectionId: cs.sectionId, key: cs.id, isClassTeacher: true });
+            }
+        });
 
         // 2. Classes where I teach subjects
         Object.keys(subjectTeachers).forEach(key => {

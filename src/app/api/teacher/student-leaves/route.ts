@@ -1,6 +1,16 @@
 import { NextRequest, NextResponse } from "next/server";
 import { adminAuth, adminDb } from "@/lib/firebase-admin";
 
+/**
+ * GET Handler - Student Leaves Fetch
+ * 
+ * Retrieves all pending leave requests for students.
+ * For teachers, it dynamically resolves their assigned classes from the 
+ * Realtime Database (RTDB) and filters leaves belonging strictly to those classes.
+ * 
+ * @param {NextRequest} req - The incoming HTTP request.
+ * @returns {Promise<NextResponse>} JSON response with leave records or error.
+ */
 export async function GET(req: NextRequest) {
     try {
         const authHeader = req.headers.get("Authorization");
@@ -10,34 +20,39 @@ export async function GET(req: NextRequest) {
         const token = authHeader.split("Bearer ")[1];
         const decodedToken = await adminAuth.verifyIdToken(token);
 
-        // Get Teacher Profile to find their class
+        // Get Teacher Profile to find their ID
         const teacherUid = decodedToken.uid;
         const teacherSnap = await adminDb.collection("teachers").where("uid", "==", teacherUid).limit(1).get();
         if (teacherSnap.empty) {
             return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
         }
         const teacherData = teacherSnap.docs[0].data();
-        const classId = teacherData?.classTeacherOf?.classId;
-        const sectionId = teacherData?.classTeacherOf?.sectionId;
+        const teacherId = teacherData.schoolId || teacherSnap.docs[0].id;
 
-        if (!classId) {
+        // Fetch ALL class assignments for this teacher from RTDB
+        const { adminRtdb } = require("@/lib/firebase-admin");
+        const sectionsSnap = await adminRtdb.ref("master/classSections").get();
+        const allSections = sectionsSnap.val() || {};
+
+        const myAssignments = Object.values(allSections).filter((cs: any) => cs.classTeacherId === teacherId);
+
+        if (myAssignments.length === 0) {
             return NextResponse.json({
                 success: true,
                 data: [],
-                message: "You are not assigned as a Class In-charge. Student leaves are only visible to class teachers."
+                message: "You are not assigned as a Class In-charge."
             });
         }
 
-        // Fetch leaves for this class
-        let query = adminDb.collection("student_leaves")
-            .where("classId", "==", classId)
-            .where("status", "==", "PENDING"); // Added filter for PENDING status
+        // Fetch leaves for ALL assigned classes
+        // Note: Firestore 'whereIn' is limited to 10 items. For schools, a teacher usually has < 10 class teacher roles.
+        const classIds = Array.from(new Set(myAssignments.map((a: any) => a.classId)));
 
-        if (sectionId) {
-            query = query.where("sectionId", "==", sectionId);
-        }
+        let leavesQuery = adminDb.collection("student_leaves")
+            .where("classId", "in", classIds)
+            .where("status", "==", "PENDING");
 
-        const snap = await query.limit(50).get();
+        const snap = await leavesQuery.limit(50).get();
 
         // Sort in memory to bypass the missing Firebase generic index error
         const docs = snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
@@ -59,6 +74,16 @@ export async function GET(req: NextRequest) {
 }
 
 // Action for teacher to approve/noted
+/**
+ * POST Handler - Student Leave Action
+ * 
+ * Processes a teacher's decision (APPROVE/REJECT) on a student leave request.
+ * If approved, it automatically marks the student as ABSENT ('A') in the 
+ * attendance registry for the specified date range.
+ * 
+ * @param {NextRequest} req - The incoming HTTP request containing leaveId and action.
+ * @returns {Promise<NextResponse>} JSON success message or error.
+ */
 export async function POST(req: NextRequest) {
     try {
         const authHeader = req.headers.get("Authorization");

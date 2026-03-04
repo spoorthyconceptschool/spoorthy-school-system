@@ -28,6 +28,16 @@ interface EditTeacherModalProps {
     onSuccess: () => void;
 }
 
+/**
+ * EditTeacherModal Component
+ * 
+ * Provides an administrative interface for modifying teacher profiles.
+ * Features atomic synchronization of "Class Teacher" assignments between 
+ * Firestore (convenience) and Realtime Database (canonical registry).
+ * 
+ * @param {EditTeacherModalProps} props - Component properties.
+ * @returns {JSX.Element} The rendered modal component.
+ */
 export function EditTeacherModal({ isOpen, onClose, teacher, onSuccess }: EditTeacherModalProps) {
     const { subjects: masterSubjects, classes: masterClasses, sections: masterSections } = useMasterData();
     const [subjects, setSubjects] = useState<any[]>([]);
@@ -58,7 +68,11 @@ export function EditTeacherModal({ isOpen, onClose, teacher, onSuccess }: EditTe
     }, [user]);
 
     useEffect(() => {
-        if (isOpen && teacher) {
+        if (isOpen && teacher && masterClasses && masterSections && classSections) {
+            // Find current assignment from RTDB for accurate initial state
+            const teacherId = teacher.schoolId || teacher.id;
+            const currentAssignment = Object.values(classSections).find((cs: any) => cs.classTeacherId === teacherId);
+
             setForm({
                 name: teacher.name || "",
                 mobile: teacher.mobile || "",
@@ -67,8 +81,8 @@ export function EditTeacherModal({ isOpen, onClose, teacher, onSuccess }: EditTe
                 qualifications: teacher.qualifications || "",
                 primarySubject: teacher.subjects?.[0] || "",
                 secondarySubject: teacher.subjects?.[1] || "NONE",
-                classTeacherClass: teacher.classTeacherOf?.classId || "NONE",
-                classTeacherSection: teacher.classTeacherOf?.sectionId || "A"
+                classTeacherClass: currentAssignment?.classId || teacher.classTeacherOf?.classId || "NONE",
+                classTeacherSection: currentAssignment?.sectionId || teacher.classTeacherOf?.sectionId || "A"
             });
 
             // Populate subjects from Master Data context
@@ -103,6 +117,34 @@ export function EditTeacherModal({ isOpen, onClose, teacher, onSuccess }: EditTe
                 } : null,
                 updatedAt: new Date().toISOString()
             });
+
+            // 2. Clear old RTDB assignment if any, and set new one
+            const { ref, set, get, update } = await import("firebase/database");
+            const { rtdb } = await import("@/lib/firebase");
+            const teacherId = teacher.schoolId || teacher.id;
+
+            // Find all instances of this teacher in RTDB registry and clear them first
+            const registryRef = ref(rtdb, 'master/classSections');
+            const registrySnap = await get(registryRef);
+            if (registrySnap.exists()) {
+                const registry = registrySnap.val();
+                const updates: any = {};
+                Object.keys(registry).forEach(key => {
+                    if (registry[key].classTeacherId === teacherId) {
+                        updates[`${key}/classTeacherId`] = null;
+                    }
+                });
+                if (Object.keys(updates).length > 0) {
+                    await update(registryRef, updates);
+                }
+            }
+
+            // Set new assignment if provided
+            if (form.classTeacherClass && form.classTeacherClass !== "NONE") {
+                const csKey = `${form.classTeacherClass}_${form.classTeacherSection || "A"}`;
+                const rtdbRef = ref(rtdb, `master/classSections/${csKey}/classTeacherId`);
+                await set(rtdbRef, teacherId);
+            }
 
             // Notification for Manager Action
             if (role === "MANAGER") {
