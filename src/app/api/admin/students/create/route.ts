@@ -38,26 +38,44 @@ export async function POST(req: NextRequest) {
     return withEnterpriseGuard(req, ['ADMIN'], async (req, user) => {
         try {
             const body = await req.json();
+            console.log("[Enterprise Admission] Raw Payload Received:", body);
 
             // Transform legacy payload to enterprise payload for migration compatibility
+            // This ensures we capture all fields from the frontend while adhering to strict schema
             const normalizedBody = {
+                studentName: body.studentName || "Unknown",
                 firstName: body.studentName?.split(' ')[0] || "Unknown",
                 lastName: body.studentName?.split(' ').slice(1).join(' ') || undefined,
                 admissionNumber: body.admissionNumber || "PENDING",
                 classId: body.classId || "UNKNOWN_CLASS",
-                sectionId: body.sectionId || "A", // Defaulting for simple fallback
-                dateOfBirth: body.dateOfBirth || "2000-01-01", // Placeholder if null
-                gender: body.gender || "other",
+                className: body.className || undefined,
+                sectionId: body.sectionId || "A",
+                sectionName: body.sectionName || undefined,
+                villageId: body.villageId || undefined,
+                villageName: body.villageName || undefined,
+                dateOfBirth: body.dateOfBirth || "2000-01-01",
+                gender: String(body.gender || "other").toLowerCase(), // Normalize to lowercase for schema enum
+                parentName: body.parentName || undefined,
+                parentMobile: body.parentMobile || undefined,
                 parentContact: body.parentMobile ? `+91${body.parentMobile.replace(/\D/g, '').slice(-10)}` : "+910000000000",
-                academicYear: body.academicYear || "2025-2026",
-                address: body.address || undefined
+                academicYear: body.academicYear || "2026-2027",
+                address: body.address || undefined,
+                transportRequired: body.transportRequired === true
             };
+
+            console.log("[Enterprise Admission] Normalized Body:", normalizedBody);
 
             // 2. Strict Zod Validation
             const { success, data, errors } = validateEnterpriseSchema(CreateStudentSchema, normalizedBody);
 
             if (!success || !data) {
-                return NextResponse.json({ error: "Validation Failed", details: errors }, { status: 400 });
+                console.error("[Enterprise Admission] Validation Failed:", errors);
+                return NextResponse.json({
+                    success: false,
+                    error: "Validation Failed",
+                    details: errors,
+                    received: normalizedBody
+                }, { status: 400 });
             }
 
             // 3. Execution via strict Enterprise Service (Atomics, DB versioning, Auditing)

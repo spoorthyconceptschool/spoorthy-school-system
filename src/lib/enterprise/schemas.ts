@@ -12,17 +12,25 @@ const MoneySchema = z.number().int().min(0).describe("Store money as integers (c
 
 // 2. Student Schemas
 export const CreateStudentSchema = z.object({
+    studentName: z.string().min(2).max(100),
     firstName: z.string().min(2, "First name must be at least 2 characters").max(50),
     lastName: z.string().max(50).optional(),
     admissionNumber: z.string().min(4).max(20).describe("Primary Key equivalent"),
     classId: z.string().min(1, "Class ID is required"),
+    className: z.string().optional(),
     sectionId: z.string().min(1),
+    sectionName: z.string().optional(),
+    villageId: z.string().optional(),
+    villageName: z.string().optional(),
     dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD"),
     gender: z.enum(["male", "female", "other", "MALE", "FEMALE", "OTHER"]),
+    parentName: z.string().optional(),
+    parentMobile: z.string().optional(),
     parentContact: z.string().regex(/^\+?[1-9]\d{1,14}$/, "Must be strict E.164 phone format"),
     academicYear: z.string().min(1, "Academic year is required"),
     emergencyContact: z.string().optional(),
     address: z.string().max(500).optional(),
+    transportRequired: z.boolean().optional(),
 });
 
 export type CreateStudentPayload = z.infer<typeof CreateStudentSchema>;
