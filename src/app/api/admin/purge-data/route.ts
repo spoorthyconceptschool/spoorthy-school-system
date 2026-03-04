@@ -137,6 +137,9 @@ export async function POST(req: NextRequest) {
                         await adminRtdb.ref("analytics").remove();
                         await adminRtdb.ref("attendance").remove();
                         await adminRtdb.ref("realtime_notifications").remove();
+                        await adminRtdb.ref("master").remove();
+                        await adminRtdb.ref("teachers").remove();
+                        await adminRtdb.ref("staff").remove();
                     }
                 } catch (rtdbErr) {
                     console.warn("[Purge] RTDB Cleanup missed:", rtdbErr);

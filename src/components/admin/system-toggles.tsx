@@ -158,6 +158,7 @@ export function SystemToggles() {
                                     const data = await res.json();
                                     if (data.success) {
                                         toast({ title: "System Nuked", description: "All system data has been wiped.", type: "success" });
+                                        localStorage.clear();
                                         setTimeout(() => window.location.reload(), 2000);
                                     } else {
                                         throw new Error(data.error || "Failed to nuke system");

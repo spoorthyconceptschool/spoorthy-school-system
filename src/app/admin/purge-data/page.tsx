@@ -44,6 +44,7 @@ export default function PurgeDataPage() {
                     description: "The system is being wiped in the background.",
                     type: "success"
                 });
+                if (mode === 'FULL_SYSTEM') localStorage.clear();
 
                 // Final log after simulated delay or just leave it running
                 setTimeout(() => addLog("Process backgrounded. Check server logs for full completion.", 'info'), 2000);
