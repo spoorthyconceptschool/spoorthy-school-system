@@ -22,6 +22,7 @@ export class EnterpriseStudentService {
      * @param createdBy Admin user ID creating the student
      */
     static async createStudent(payload: CreateStudentPayload, createdBy: string) {
+        let userRecord: any = null;
         try {
             const counterRef = adminDb.collection("counters").doc("students");
             let newSchoolId = payload.admissionNumber;
@@ -43,15 +44,31 @@ export class EnterpriseStudentService {
                 };
             });
 
-            const userRecord = await adminAuth.createUser({
+            const studentName = `${payload.firstName} ${payload.lastName || ''}`.trim();
+            // Secure Temporary Password
+            const tempPassword = Math.random().toString(36).slice(-8) + "@" + studentRecord.newSchoolId;
+
+            // PRE-EMPTIVE CLEANUP: Check if a user with this email already exists (e.g., from an orphaned record)
+            try {
+                const existingUser = await adminAuth.getUserByEmail(studentRecord.syntheticEmail);
+                if (existingUser) {
+                    console.warn(`[Enterprise Admissions] Collision detected for ${studentRecord.syntheticEmail}. Cleaning up orphaned Auth user...`);
+                    await adminAuth.deleteUser(existingUser.uid);
+                }
+            } catch (authErr: any) {
+                // If user not found, that's what we expect. Ignore other errors unless catastrophic.
+                if (authErr.code !== 'auth/user-not-found') {
+                    console.error("[Enterprise Admissions] Auth Pre-check failed:", authErr);
+                }
+            }
+
+            userRecord = await adminAuth.createUser({
                 email: studentRecord.syntheticEmail,
-                password: payload.parentContact,
-                displayName: `${payload.firstName} ${payload.lastName || ''}`.trim()
+                password: tempPassword,
+                displayName: studentName
             });
 
             await adminAuth.setCustomUserClaims(userRecord.uid, { role: "STUDENT" });
-
-            const studentName = `${payload.firstName} ${payload.lastName || ''}`.trim();
 
             const keywords = Array.from(new Set([
                 ...SearchService.generateKeywords(studentName),
@@ -130,10 +147,18 @@ export class EnterpriseStudentService {
                 console.warn("[EnterpriseStudentService] RTDB Sync missed on create:", e);
             }
 
-            return { success: true, schoolId: studentRecord.newSchoolId, uid: userRecord.uid };
+            return { success: true, schoolId: studentRecord.newSchoolId, uid: userRecord.uid, tempPassword };
         } catch (error: any) {
+            // ROLLBACK: Delete Auth user if downstream DB writes failed to prevent orphaned accounts.
+            if (userRecord?.uid) {
+                try {
+                    await adminAuth.deleteUser(userRecord.uid);
+                    console.info("[EnterpriseStudentService] Rolled back Auth user due to failure:", userRecord.uid);
+                } catch (rollbackError) {
+                    console.error("[EnterpriseStudentService] Critical Error: Rollback failed:", rollbackError);
+                }
+            }
             console.error("[EnterpriseStudentService] Core Failure:", error);
-            // Wrap in a more detailed error for the UI
             throw new Error(`Critical Admission Step Failed: ${error.message} (TraceID: ${Date.now()})`);
         }
     }

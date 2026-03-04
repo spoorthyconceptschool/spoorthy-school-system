@@ -89,17 +89,34 @@ export async function POST(req: NextRequest) {
                 // Fetch all users to identify who needs deletion
                 const userSnap = await adminDb.collection("users").get();
                 const uidsToDelete: string[] = [];
-                const userBatch = adminDb.batch();
+
+                console.log(`[Purge] Found ${userSnap.docs.length} users. Filtering...`);
+
+                // 3a. Firestore User Reset (Chunked commits to prevent batch limit crash)
+                let userBatch = adminDb.batch();
+                let batchCount = 0;
+                let totalDeleted = 0;
 
                 for (const doc of userSnap.docs) {
                     const data = doc.data();
                     if (!SAFE_UIDS.includes(doc.id) && !SAFE_EMAILS.includes(data.email?.toLowerCase())) {
                         uidsToDelete.push(doc.id);
                         userBatch.delete(doc.ref);
+                        batchCount++;
+                        totalDeleted++;
+
+                        // Commit every 450 operations (Firestore limit is 500)
+                        if (batchCount >= 450) {
+                            await userBatch.commit();
+                            userBatch = adminDb.batch();
+                            batchCount = 0;
+                        }
                     }
                 }
+                if (batchCount > 0) await userBatch.commit();
+                console.log(`[Purge] Firestore registry cleared (${totalDeleted} records).`);
 
-                // Delete Auth Users in chunks of 1000 (Firebase Admin Limit)
+                // 3b. Auth User Deletion (Admin SDK limit is 1000 per call)
                 console.log(`[Purge] Deleting ${uidsToDelete.length} Auth accounts...`);
                 for (let i = 0; i < uidsToDelete.length; i += 1000) {
                     const chunk = uidsToDelete.slice(i, i + 1000);
@@ -109,10 +126,6 @@ export async function POST(req: NextRequest) {
                         console.error("[Purge] Auth Chunk Delete Failure:", e.message);
                     }
                 }
-
-                // Commit Firestore User Deletions
-                await userBatch.commit();
-                console.log("[Purge] User Registry Cleared.");
 
                 // Reset Counters
                 await adminDb.collection("counters").doc("students").set({ current: 0 }, { merge: true });
