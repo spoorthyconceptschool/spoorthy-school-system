@@ -17,11 +17,23 @@ import {
     BookOpen,
     Calendar,
     Hash,
+    Users,
 } from "lucide-react";
 import Link from "next/link";
+import { useMasterData } from "@/context/MasterDataContext";
 
+/**
+ * TeacherProfilePage Component
+ * 
+ * Displays the comprehensive profile of the currently authenticated teacher.
+ * Fetches core profile data from Firestore and dynamically derives "Class Teacher"
+ * assignments from the Realtime Database master registry for live accuracy.
+ * 
+ * @returns {JSX.Element} The rendered teacher profile view.
+ */
 export default function TeacherProfilePage() {
     const { user, userData } = useAuth();
+    const { classSections, classes, sections } = useMasterData();
     const [profile, setProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
 
@@ -214,22 +226,37 @@ export default function TeacherProfilePage() {
                                         )}
                                     </div>
                                 </div>
-                                {profile.classTeacherOf && (
-                                    <div className="space-y-1">
-                                        <label className="text-xs text-muted-foreground uppercase tracking-wider">
-                                            Class Teacher Of
-                                        </label>
-                                        <div className="font-medium text-base text-white">
-                                            {[
-                                                profile.classTeacherOf.classId || profile.classTeacherOf.className,
-                                                profile.classTeacherOf.sectionId || profile.classTeacherOf.sectionName,
-                                            ]
-                                                .filter(Boolean)
-                                                .join(" - ")}
-                                        </div>
-                                    </div>
-                                )}
+                                {(() => {
+                                    const teacherId = profile.schoolId || profile.id;
+                                    const myClasses = Object.values(classSections || {}).filter((cs: any) => cs.classTeacherId === teacherId);
 
+                                    if (myClasses.length === 0) return null;
+
+                                    return (
+                                        <div className="col-span-2 space-y-2 mt-4 pt-4 border-t border-white/5">
+                                            <label className="text-xs text-muted-foreground uppercase tracking-wider flex items-center gap-1">
+                                                <Users className="w-3 h-3" /> Class Teacher Of
+                                            </label>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                                {myClasses.map((cs: any) => (
+                                                    <div key={cs.id} className="bg-white/5 border border-white/10 rounded-lg p-3 flex items-center justify-between group hover:border-emerald-500/50 transition-all">
+                                                        <div className="flex flex-col">
+                                                            <span className="text-sm font-bold text-white">
+                                                                {classes[cs.classId]?.name || "Class"}
+                                                            </span>
+                                                            <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-black">
+                                                                Section {sections[cs.sectionId]?.name || "A"}
+                                                            </span>
+                                                        </div>
+                                                        <Badge variant="outline" className="text-[9px] border-emerald-500/30 text-emerald-400 bg-emerald-500/5">
+                                                            In-charge
+                                                        </Badge>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    );
+                                })()}
                             </div>
                         </CardContent>
                     </Card>

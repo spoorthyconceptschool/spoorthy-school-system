@@ -1,6 +1,7 @@
 import { adminDb, adminAuth, adminRtdb, FieldValue, ServerValue, Timestamp } from "@/lib/firebase-admin";
 import { CreateStudentPayload, UpdateStudentPayload } from "@/lib/enterprise/schemas";
 import { AuditService } from "./audit-service";
+import { SearchService } from "./search-service";
 
 /**
  * Enterprise Student Service
@@ -21,121 +22,122 @@ export class EnterpriseStudentService {
      * @param createdBy Admin user ID creating the student
      */
     static async createStudent(payload: CreateStudentPayload, createdBy: string) {
-        // Enforce admission number uniqueness via counter or precise querying if required.
-        // For now, generating a structured admission number if not explicitly defined like in the legacy code.
-        const counterRef = adminDb.collection("counters").doc("students");
-
-        let newSchoolId = payload.admissionNumber;
-
-        // Atomic Transaction to safely increment student counter and guarantee no admission overlap
-        const studentRecord = await adminDb.runTransaction(async (transaction: FirebaseFirestore.Transaction) => {
-            const counterDoc = await transaction.get(counterRef as FirebaseFirestore.DocumentReference);
-            const nextIdNum = ((counterDoc.data() as any)?.current || 0) + 1;
-
-            // If the frontend didn't pass a strict admission number or we override it to guarantee sequence:
-            newSchoolId = `SHS${String(nextIdNum).padStart(5, "0")}`; // Example format
-
-            // Synthetic Auth mapping
-            const syntheticEmail = `${newSchoolId}@school.local`.toLowerCase();
-
-            // Note: Firebase Auth user creation cannot be wrapped in a Firestore transaction.
-            // So we execute it right before the batch, but if it fails, the transaction fails.
-
-            // Increment the counter atomically inside the transaction
-            transaction.set(counterRef, { current: nextIdNum }, { merge: true });
-
-            return {
-                newSchoolId,
-                syntheticEmail,
-                nextIdNum
-            };
-        });
-
-        // Outside transaction - hit Auth service (Idempotent enough for this flow, though edge cases exist if DB write fails next)
-        const userRecord = await adminAuth.createUser({
-            email: studentRecord.syntheticEmail,
-            password: payload.parentContact, // Default password
-            displayName: `${payload.firstName} ${payload.lastName || ''}`.trim()
-        });
-
-        await adminAuth.setCustomUserClaims(userRecord.uid, { role: "STUDENT" });
-
-        const finalStudentData = {
-            ...payload,
-            studentName: `${payload.firstName} ${payload.lastName || ''}`.trim(),
-            schoolId: studentRecord.newSchoolId, // Overriding the payload admissionNumber with system generated one
-            uid: userRecord.uid,
-            role: "STUDENT",
-            status: "ACTIVE",
-            version: 1, // Enterprise Versioning Start
-            createdAt: Timestamp.now(),
-            academicYear: payload.academicYear,
-            admissionDate: new Date().toISOString()
-        };
-
-        const batch = adminDb.batch();
-
-        // 1. Save Core Student Record
-        const studentRef = adminDb.collection("students").doc(studentRecord.newSchoolId);
-        batch.set(studentRef, finalStudentData);
-
-        // 2. Initial Version Record (For History/Audit)
-        const historyRef = adminDb.collection(`students/${studentRecord.newSchoolId}/history`).doc(`v1`);
-        batch.set(historyRef, {
-            ...finalStudentData,
-            snapshotTimestamp: Timestamp.now(),
-            snapshotReason: 'INITIAL_CREATION',
-            changedBy: createdBy
-        });
-
-        // 3. Save User Mapping
-        const userRef = adminDb.collection("users").doc(userRecord.uid);
-        batch.set(userRef, {
-            schoolId: studentRecord.newSchoolId,
-            role: "STUDENT",
-            status: "ACTIVE",
-            email: studentRecord.syntheticEmail
-        });
-
-        // 4. Initial Fee Ledger (Empty/Append-Only setup)
-        const ledgerYear = payload.academicYear;
-        const ledgerRef = adminDb.collection("student_fee_ledgers").doc(`${studentRecord.newSchoolId}_${ledgerYear}`);
-        batch.set(ledgerRef, {
-            studentId: studentRecord.newSchoolId,
-            academicYearId: ledgerYear, // Consistent with import API
-            totalFee: 0,
-            totalPaid: 0,
-            status: 'PENDING',
-            items: [],
-            createdAt: Timestamp.now(),
-            updatedAt: Timestamp.now()
-        });
-
-        // 5. Enterprise Audit Log
-        await AuditService.log({
-            userId: createdBy,
-            userRole: 'ADMIN',
-            action: 'CREATE_STUDENT',
-            entityId: studentRecord.newSchoolId,
-            entityType: 'student',
-            oldValue: null,
-            newValue: finalStudentData
-        }, batch);
-
-        await batch.commit();
-
-        // Bonus: Legacy RTDB sync (non-critical, fail gracefully)
         try {
-            await adminRtdb.ref(`students/${studentRecord.newSchoolId}`).set({
-                ...finalStudentData,
-                createdAt: ServerValue ? ServerValue.TIMESTAMP : new Date().getTime(),
-            });
-        } catch (e) {
-            console.warn("[EnterpriseStudentService] RTDB Sync missed on create:", e);
-        }
+            const counterRef = adminDb.collection("counters").doc("students");
+            let newSchoolId = payload.admissionNumber;
 
-        return { success: true, schoolId: studentRecord.newSchoolId, uid: userRecord.uid };
+            const studentRecord = await adminDb.runTransaction(async (transaction: FirebaseFirestore.Transaction) => {
+                const counterDoc = await transaction.get(counterRef as FirebaseFirestore.DocumentReference);
+                const nextIdNum = ((counterDoc.data() as any)?.current || 0) + 1;
+
+                newSchoolId = `SHS${String(nextIdNum).padStart(5, "0")}`;
+
+                const syntheticEmail = `${newSchoolId}@school.local`.toLowerCase();
+
+                transaction.set(counterRef, { current: nextIdNum }, { merge: true });
+
+                return {
+                    newSchoolId,
+                    syntheticEmail,
+                    nextIdNum
+                };
+            });
+
+            const userRecord = await adminAuth.createUser({
+                email: studentRecord.syntheticEmail,
+                password: payload.parentContact,
+                displayName: `${payload.firstName} ${payload.lastName || ''}`.trim()
+            });
+
+            await adminAuth.setCustomUserClaims(userRecord.uid, { role: "STUDENT" });
+
+            const studentName = `${payload.firstName} ${payload.lastName || ''}`.trim();
+
+            const keywords = Array.from(new Set([
+                ...SearchService.generateKeywords(studentName),
+                ...SearchService.generateKeywords(studentRecord.newSchoolId),
+                ...SearchService.generateKeywords(payload.parentContact || ""),
+                ...SearchService.generateKeywords(payload.classId || "")
+            ]));
+
+            const finalStudentData = {
+                ...payload,
+                studentName,
+                schoolId: studentRecord.newSchoolId,
+                uid: userRecord.uid,
+                role: "STUDENT",
+                status: "ACTIVE",
+                version: 1,
+                keywords,
+                createdAt: Timestamp.now(),
+                admissionDate: new Date().toISOString()
+            };
+
+            const batch = adminDb.batch();
+
+            const studentRef = adminDb.collection("students").doc(studentRecord.newSchoolId);
+            batch.set(studentRef, finalStudentData);
+
+            const historyRef = adminDb.collection(`students/${studentRecord.newSchoolId}/history`).doc(`v1`);
+            batch.set(historyRef, {
+                ...finalStudentData,
+                snapshotTimestamp: Timestamp.now(),
+                snapshotReason: 'INITIAL_CREATION',
+                changedBy: createdBy
+            });
+
+            const userRef = adminDb.collection("users").doc(userRecord.uid);
+            batch.set(userRef, {
+                schoolId: studentRecord.newSchoolId,
+                role: "STUDENT",
+                status: "ACTIVE",
+                email: studentRecord.syntheticEmail
+            });
+
+            const ledgerYear = payload.academicYear || "2026-2027";
+            const ledgerRef = adminDb.collection("student_fee_ledgers").doc(`${studentRecord.newSchoolId}_${ledgerYear}`);
+            batch.set(ledgerRef, {
+                studentId: studentRecord.newSchoolId,
+                studentName,
+                yearId: ledgerYear,
+                totalFee: 0,
+                totalPaid: 0,
+                status: 'PENDING',
+                createdAt: Timestamp.now(),
+                updatedAt: Timestamp.now()
+            });
+
+            await AuditService.log({
+                userId: createdBy,
+                userRole: 'ADMIN',
+                action: 'CREATE_STUDENT',
+                entityId: studentRecord.newSchoolId,
+                entityType: 'student',
+                oldValue: null,
+                newValue: finalStudentData
+            }, batch);
+
+            await SearchService.indexStudent(studentRecord.newSchoolId, finalStudentData, batch);
+
+            await batch.commit();
+
+            try {
+                await adminRtdb.ref(`students/${studentRecord.newSchoolId}`).set({
+                    ...finalStudentData,
+                    createdAt: ServerValue ? ServerValue.TIMESTAMP : new Date().getTime(),
+                });
+            } catch (e) {
+                console.warn("[EnterpriseStudentService] RTDB Sync missed on create:", e);
+            }
+
+            return { success: true, schoolId: studentRecord.newSchoolId, uid: userRecord.uid };
+        } catch (error: any) {
+            console.error("[EnterpriseStudentService] Core Failure:", error);
+            // Wrap in a more detailed error for the UI
+            throw new Error(`Critical Admission Step Failed: ${error.message} (TraceID: ${Date.now()})`);
+        }
     }
+
 
     /**
      * Updates an existing student strictly conforming to the UpdateStudentPayload schema.
@@ -161,10 +163,20 @@ export class EnterpriseStudentService {
             const cleanPayload = { ...payload };
             delete cleanPayload.versionContentHash;
 
+            const mergedData = { ...currentData, ...cleanPayload };
+            const keywords = Array.from(new Set([
+                ...SearchService.generateKeywords(mergedData.studentName || ""),
+                ...SearchService.generateKeywords(studentId),
+                ...SearchService.generateKeywords(mergedData.parentMobile || ""),
+                ...SearchService.generateKeywords(mergedData.className || ""),
+                ...SearchService.generateKeywords(mergedData.villageName || "")
+            ]));
+
             const updatedData = {
                 ...currentData,
                 ...cleanPayload,
                 version: nextVersion,
+                keywords,
                 updatedAt: Timestamp.now(),
             };
 
@@ -190,6 +202,9 @@ export class EnterpriseStudentService {
                 oldValue: currentData,
                 newValue: updatedData
             }, transaction);
+
+            // 4. Update Search Index
+            SearchService.indexStudent(studentId, updatedData, transaction as any);
 
             return { success: true, newVersion: nextVersion };
         });

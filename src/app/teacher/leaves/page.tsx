@@ -15,9 +15,21 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import Link from "next/link";
 import { Loader2, Users, User as UserIcon, History, Send, Check, X, ArrowLeft } from "lucide-react";
 import { formatDateToDDMMYYYY } from "@/lib/date-utils";
+import { useMasterData } from "@/context/MasterDataContext";
 
+/**
+ * LeaveManagementPage Component
+ * 
+ * Provides a dual-purpose interface for teachers:
+ * 1. Request personal leaves and track their own absence history.
+ * 2. Review and take action on leave requests from students in their 
+ *    assigned classes, resolved dynamically from the master registry.
+ * 
+ * @returns {JSX.Element} The rendered leave management interface.
+ */
 export default function LeaveManagementPage() {
     const { user } = useAuth();
+    const { classSections } = useMasterData();
     const [leaves, setLeaves] = useState<any[]>([]); // Teacher's own leaves
     const [studentLeaves, setStudentLeaves] = useState<any[]>([]); // Student leaves
     const [loading, setLoading] = useState(true);
@@ -244,9 +256,12 @@ export default function LeaveManagementPage() {
                                 <Users className="w-4 h-4 text-blue-400" /> Class Student Absences
                             </CardTitle>
                             <CardDescription>
-                                {teacherProfile?.classTeacherOf?.classId
-                                    ? `Showing leaves for your assigned class section`
-                                    : "You are not assigned as a Class In-charge."}
+                                {(() => {
+                                    const teacherId = teacherProfile?.schoolId || teacherProfile?.id;
+                                    const myClasses = Object.values(classSections || {}).filter((cs: any) => cs.classTeacherId === teacherId);
+                                    if (myClasses.length === 0) return "You are not assigned as a Class In-charge.";
+                                    return `Showing leaves for ${myClasses.length} assigned class section${myClasses.length > 1 ? 's' : ''}`;
+                                })()}
                             </CardDescription>
                         </CardHeader>
                         <CardContent className="p-0">

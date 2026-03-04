@@ -20,14 +20,25 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
 import { useAuth } from "@/context/AuthContext";
+import { useMasterData } from "@/context/MasterDataContext";
 import { AdjustSalaryModal } from "@/components/admin/adjust-salary-modal";
 import { EditTeacherModal } from "@/components/admin/edit-teacher-modal";
 import { AdminChangePasswordModal } from "@/components/admin/admin-change-password-modal";
 import { KeyRound, Settings } from "lucide-react";
 
+/**
+ * TeacherProfilePage Component (Administrative)
+ * 
+ * Provides an administrative view of a specific teacher's profile.
+ * Displays personal details, salary history, and dynamic assignments (Class/Subject)
+ * derived directly from the Realtime Database and Firestore registries.
+ * 
+ * @returns {JSX.Element} The rendered administrative teacher profile view.
+ */
 export default function TeacherProfilePage() {
     const { user } = useAuth();
     const { id } = useParams();
+    const { classSections, classes, sections, subjectTeachers, loading: masterLoading } = useMasterData();
     const router = useRouter();
     const [teacher, setTeacher] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -144,7 +155,10 @@ export default function TeacherProfilePage() {
         }
     };
 
-    if (loading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin" /></div>;
+    if (loading || masterLoading) return <div className="p-10 flex flex-col items-center justify-center gap-4 min-h-[400px]">
+        <Loader2 className="animate-spin text-accent w-8 h-8" />
+        <p className="text-muted-foreground text-xs uppercase tracking-widest font-black animate-pulse">Synchronizing Registry...</p>
+    </div>;
     if (!teacher) return null;
 
     return (
@@ -216,15 +230,77 @@ export default function TeacherProfilePage() {
                                     <span>{teacher.qualifications}</span>
                                 </div>
                             </div>
-                            {teacher.classTeacherOf && (
-                                <div className="col-span-2">
-                                    <Label className="text-muted-foreground">Class Teacher Assignment</Label>
-                                    <div className="flex items-center gap-2 mt-1 text-emerald-400 font-bold">
-                                        <CheckCircle className="w-4 h-4" />
-                                        <span>Class {teacher.classTeacherOf.classId.toUpperCase()} - Section {teacher.classTeacherOf.sectionId}</span>
+                            {(() => {
+                                const teacherId = teacher.schoolId || teacher.uid || id;
+                                const assignedClasses = Object.values(classSections || {}).filter((cs: any) =>
+                                    // Robust check: match teacher ID and ensure class/section exist in master data
+                                    (cs.classTeacherId === id || cs.classTeacherId === teacher.schoolId || cs.classTeacherId === teacherId) &&
+                                    classes[cs.classId] && sections[cs.sectionId]
+                                );
+
+                                if (assignedClasses.length === 0) return null;
+
+                                return (
+                                    <div className="col-span-2 space-y-3 mt-2">
+                                        <Label className="text-muted-foreground uppercase text-[10px] tracking-widest font-black flex items-center gap-2">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                                            Class Teacher Roles (Live)
+                                        </Label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {assignedClasses.map((cs: any) => (
+                                                <div key={cs.id} className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-xl group hover:border-emerald-500/50 transition-all shadow-sm">
+                                                    <div className="flex flex-col">
+                                                        <span className="font-bold text-white text-sm">
+                                                            {classes[cs.classId]?.name || cs.classId}
+                                                        </span>
+                                                        <span className="text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
+                                                            Section {sections[cs.sectionId]?.name || cs.sectionId}
+                                                        </span>
+                                                    </div>
+                                                    <Badge className="bg-emerald-500/10 text-emerald-400 border-none text-[9px] uppercase font-black px-2">In-charge</Badge>
+                                                </div>
+                                            ))}
+                                        </div>
                                     </div>
-                                </div>
-                            )}
+                                );
+                            })()}
+
+                            {(() => {
+                                const teacherId = teacher.schoolId || id;
+                                const assignments: any[] = [];
+
+                                Object.keys(subjectTeachers || {}).forEach(key => {
+                                    const subjectsObj = subjectTeachers[key];
+                                    Object.keys(subjectsObj).forEach(subId => {
+                                        if (subjectsObj[subId] === id || subjectsObj[subId] === teacher.schoolId) {
+                                            const [cId, sId] = key.split('_');
+                                            assignments.push({ classId: cId, sectionId: sId, subId });
+                                        }
+                                    });
+                                });
+
+                                if (assignments.length === 0) return null;
+
+                                return (
+                                    <div className="col-span-2 space-y-3 mt-4">
+                                        <Label className="text-muted-foreground uppercase text-[10px] tracking-widest font-black">Subject Assignments</Label>
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                                            {assignments.map((a: any, idx) => (
+                                                <div key={idx} className="flex items-center justify-between p-3 bg-white/5 border border-white/10 rounded-xl">
+                                                    <div className="flex flex-col">
+                                                        <span className="font-bold text-white text-sm">
+                                                            {classes[a.classId]?.name || a.classId} - {sections[a.sectionId]?.name || a.sectionId}
+                                                        </span>
+                                                        <span className="text-[10px] text-purple-400 uppercase tracking-tighter font-bold">
+                                                            {useMasterData().subjects[a.subId]?.name || a.subId}
+                                                        </span>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                );
+                            })()}
                         </div>
 
                         <div className="pt-4 border-t border-white/10 grid grid-cols-2 gap-4">
