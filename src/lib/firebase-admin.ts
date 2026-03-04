@@ -59,7 +59,12 @@ export const adminStorage = createLazyProxy(() => getStorage(getAdminApp()));
 export const adminRtdb = createLazyProxy(() => getDatabase(getAdminApp()));
 export const adminMessaging = createLazyProxy(() => getMessaging(getAdminApp()));
 
-// Connectivity check for API
+// Also keep the getters for compatibility
+export const getAdminDb = () => getFirestore(getAdminApp());
+export const getAdminAuth = () => getAuth(getAdminApp());
+export const getAdminStorage = () => getStorage(getAdminApp());
+export const getAdminRtdb = () => getDatabase(getAdminApp());
+
 export const getInitError = () => _initError;
 
 // Static helpers
