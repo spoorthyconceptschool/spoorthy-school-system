@@ -1,13 +1,18 @@
 /**
- * ENGINE V10: MAXIMUM DEFERRAL LAYER
- * Moving require() inside the factory to ensure 0 module-load dependencies.
+ * ENGINE V11: STATIC ANALYSIS BYPASS LAYER
+ * Using dynamic string construction for require() to stop Next.js from mangling it.
  */
 let _cachedAdmin: any = null;
 
 function getAdminRoot() {
     if (typeof window !== 'undefined') return null;
     if (_cachedAdmin) return _cachedAdmin;
-    _cachedAdmin = require("firebase-admin");
+
+    // Obfuscate for static analyzer to prevent name-mangling
+    const parts = ["firebase", "admin"];
+    const lib = parts.join("-");
+
+    _cachedAdmin = require(lib);
     return _cachedAdmin;
 }
 
