@@ -1,14 +1,17 @@
-import { createRequire } from "module";
-const require = createRequire(import.meta.url);
-const admin = require("firebase-admin");
-
 /**
- * ENGINE V8: HYBRID COMPATIBILITY LAYER
- * Uses manual require() to bypass Turbopack's mangled external module resolution.
- * This is the ultimate fix for ERR_MODULE_NOT_FOUND in Next.js 15.
+ * ENGINE V9: PRODUCTION RESILIENCE LAYER
+ * Using a direct require fallback to bypass Next.js 16 Turbopack mangling.
  */
+let admin: any;
+if (typeof window === 'undefined') {
+    try {
+        admin = require("firebase-admin");
+    } catch (e) {
+        console.error("[CRITICAL] Failed to require firebase-admin:", e);
+    }
+}
 
-type App = any; // admin.app.App;
+type App = any;
 
 /**
  * ENGINE V6: ENTERPRISE STABILITY LAYER
