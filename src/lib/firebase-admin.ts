@@ -1,22 +1,11 @@
 /**
- * ENGINE V11: STATIC ANALYSIS BYPASS LAYER
- * Using dynamic string construction for require() to stop Next.js from mangling it.
+ * ENGINE V12: STANDARD ESM EXTERNAL RESOLUTION
+ * Using purely static ESM imports combined with next.config.ts `serverExternalPackages`.
+ * This fixes the Turbopack dynamic string `require` enforcement preventing auth validations.
  */
-let _cachedAdmin: any = null;
+import * as admin from 'firebase-admin';
 
-function getAdminRoot() {
-    if (typeof window !== 'undefined') return null;
-    if (_cachedAdmin) return _cachedAdmin;
-
-    // Obfuscate for static analyzer to prevent name-mangling
-    const parts = ["firebase", "admin"];
-    const lib = parts.join("-");
-
-    _cachedAdmin = require(lib);
-    return _cachedAdmin;
-}
-
-type App = any;
+type App = admin.app.App;
 
 /**
  * ENGINE V6: ENTERPRISE STABILITY LAYER
@@ -32,9 +21,6 @@ const SERVICE_ACCOUNT = {
 let _initError: string | null = null;
 
 function getAdminApp(): App {
-    const admin = getAdminRoot();
-    if (!admin) throw new Error("Firebase Admin is not available on client-side");
-
     try {
         if (admin.apps.length > 0) return admin.apps[0] as App;
 
@@ -57,26 +43,11 @@ function getAdminApp(): App {
 }
 
 // 1. Direct Service Exports (Functional Callers for Stability)
-export const getAdminDb = () => {
-    const admin = getAdminRoot();
-    return admin.firestore(getAdminApp());
-};
-export const getAdminAuth = () => {
-    const admin = getAdminRoot();
-    return admin.auth(getAdminApp());
-};
-export const getAdminStorage = () => {
-    const admin = getAdminRoot();
-    return admin.storage(getAdminApp());
-};
-export const getAdminRtdb = () => {
-    const admin = getAdminRoot();
-    return admin.database(getAdminApp());
-};
-export const getAdminMessaging = () => {
-    const admin = getAdminRoot();
-    return admin.messaging(getAdminApp());
-};
+export const getAdminDb = () => admin.firestore(getAdminApp());
+export const getAdminAuth = () => admin.auth(getAdminApp());
+export const getAdminStorage = () => admin.storage(getAdminApp());
+export const getAdminRtdb = () => admin.database(getAdminApp());
+export const getAdminMessaging = () => admin.messaging(getAdminApp());
 
 // Lazy Loaders to prevent top-level module crash
 const createLazyProxy = (getService: () => any) => {
@@ -87,7 +58,7 @@ const createLazyProxy = (getService: () => any) => {
                 const value = service[prop];
                 return typeof value === 'function' ? value.bind(service) : value;
             } catch (e: any) {
-                console.error(`[Firebase Proxy] Error accessing property "${String(prop)}":`, e);
+                console.error(`[Firebase Proxy] Error accessing property "${String(prop)}": `, e);
                 throw e;
             }
         }
@@ -106,7 +77,7 @@ export const adminMessaging: any = createLazyProxy(() => getAdminMessaging());
 export const getInitError = () => _initError;
 
 // 2. Class/Constant Exports - lazy wrapped to prevent top-level require
-export const FieldValue = createLazyProxy(() => getAdminRoot().firestore.FieldValue);
-export const FieldPath = createLazyProxy(() => getAdminRoot().firestore.FieldPath);
-export const Timestamp = createLazyProxy(() => getAdminRoot().firestore.Timestamp);
-export const ServerValue = createLazyProxy(() => getAdminRoot().database.ServerValue);
+export const FieldValue = createLazyProxy(() => admin.firestore.FieldValue);
+export const FieldPath = createLazyProxy(() => admin.firestore.FieldPath);
+export const Timestamp = createLazyProxy(() => admin.firestore.Timestamp);
+export const ServerValue = createLazyProxy(() => admin.database.ServerValue);
