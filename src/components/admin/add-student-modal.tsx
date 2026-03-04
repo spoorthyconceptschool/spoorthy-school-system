@@ -51,6 +51,7 @@ export function AddStudentModal({ onSuccess }: { onSuccess?: () => void }) {
         if (!formData.studentName || formData.studentName.length < 2) return toast({ title: "Name Required", type: "error" });
         if (!/^\d{10}$/.test(formData.parentPhone)) return toast({ title: "Invalid Mobile", type: "error" });
         if (!formData.villageId || !formData.classId) return toast({ title: "Missing Fields", type: "error" });
+        if (formData.gender === "select") return toast({ title: "Gender Required", type: "error" });
 
         setLoading(true);
         try {

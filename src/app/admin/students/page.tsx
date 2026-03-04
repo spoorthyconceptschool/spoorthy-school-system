@@ -2,12 +2,12 @@
 
 import { useEffect, useState, useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { collection, onSnapshot, query, limit, orderBy, getDocs, where, doc, updateDoc, startAfter, writeBatch } from "firebase/firestore";
+import { collection, onSnapshot, query, limit, orderBy, getDocs, where, doc, updateDoc, startAfter } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { AddStudentModal } from "@/components/admin/add-student-modal";
 import { DeleteUserModal } from "@/components/admin/delete-user-modal";
 import { AdminChangePasswordModal } from "@/components/admin/admin-change-password-modal";
-import { Filter, Search as SearchIcon, Users, MoreVertical, Key, Trash2, Download, Loader2, User, MapPin, Phone, BookOpen } from "lucide-react";
+import { Filter, Search as SearchIcon, Users, MoreHorizontal, Key, Trash2, Download, Loader2, User, MapPin, Phone, BookOpen } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { StudentImportModal } from "@/components/admin/student-import-modal";
 import { DataTable } from "@/components/ui/data-table";
@@ -43,6 +43,9 @@ interface Student {
     uid: string;
     recoveryPassword?: string;
     studentDocId?: string;
+    dateOfBirth?: string;
+    gender?: string;
+    transportRequired?: boolean;
 }
 
 import { StudentLeavesManager } from "@/components/admin/student-leaves-manager";
@@ -50,7 +53,7 @@ import { StudentLeavesManager } from "@/components/admin/student-leaves-manager"
 export default function StudentsPage() {
     const router = useRouter();
     const { user, role } = useAuth();
-    const { villages: villagesData, classes: classesData, loading: masterLoading, selectedYear, setSelectedYear } = useMasterData();
+    const { villages: villagesData, classes: classesData, loading: masterLoading, selectedYear } = useMasterData();
     const [students, setStudents] = useState<Student[]>([]);
     const [localLoading, setLocalLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<"directory" | "leaves">("directory");
@@ -62,7 +65,7 @@ export default function StudentsPage() {
 
     // Filter State
     const [searchQuery, setSearchQuery] = useState("");
-    const [statusFilter, setStatusFilter] = useState("ACTIVE");
+    const [statusFilter, setStatusFilter] = useState("all");
     const [villageFilter, setVillageFilter] = useState("all");
     const [classFilter, setClassFilter] = useState("all");
 
@@ -80,7 +83,7 @@ export default function StudentsPage() {
 
     // Fetch Page
     const fetchPage = async (pageIndex: number, newTokens: any[] = pageTokens) => {
-        if (!selectedYear) return;
+        if (!selectedYear || !user) return;
         setLocalLoading(true);
 
         try {
@@ -96,12 +99,11 @@ export default function StudentsPage() {
             // If there's a search query, since we don't have Full Text Search, we do an exact match or prefix if needed.
             // But we will stick to exact match or basic startsWith on ID for enterprise reliability
             if (searchQuery.trim()) {
-                const q = searchQuery.trim().toLowerCase();
-                baseConstraints.push(where("keywords", "array-contains", q));
+                const q = searchQuery.trim().toUpperCase();
+                baseConstraints.push(where("schoolId", "==", q));
             } else {
                 // Order by name if no search
-                // Temporarily disabled to bypass index requirements
-                // baseConstraints.push(orderBy("studentName", "asc"));
+                baseConstraints.push(orderBy("studentName", "asc"));
             }
 
             if (pageIndex > 0 && newTokens[pageIndex - 1]) {
@@ -124,8 +126,15 @@ export default function StudentsPage() {
             }
 
             setCurrentPage(pageIndex);
-        } catch (error) {
-            console.error("Firebase Students Pagination Error:", error);
+        } catch (error: any) {
+            console.error("Firebase Students Pagination Error Details:", {
+                message: error.message,
+                code: error.code,
+                stack: error.stack
+            });
+            if (error.message?.includes("index")) {
+                console.warn("CRITICAL: Missing Firestore Index. Please check the browser console for the creation link.");
+            }
         } finally {
             setLocalLoading(false);
         }
@@ -140,7 +149,7 @@ export default function StudentsPage() {
         // Debounce fetching to avoid spamming if user types in search
         const timeout = setTimeout(() => {
             fetchPage(0, []);
-        }, 300);
+        }, 500);
         return () => clearTimeout(timeout);
     }, [selectedYear, statusFilter, classFilter, villageFilter, searchQuery]);
 
@@ -218,7 +227,6 @@ export default function StudentsPage() {
                                     <SelectItem value="all">All Status</SelectItem>
                                     <SelectItem value="ACTIVE">Active</SelectItem>
                                     <SelectItem value="INACTIVE">Inactive</SelectItem>
-                                    <SelectItem value="ALUMNI">Alumni</SelectItem>
                                 </SelectContent>
                             </Select>
 
@@ -248,18 +256,9 @@ export default function StudentsPage() {
                                 </SelectContent>
                             </Select>
 
-                            {(searchQuery || statusFilter !== "ACTIVE" || classFilter !== "all" || villageFilter !== "all") && (
-                                <Button
-                                    variant="ghost"
-                                    onClick={() => {
-                                        setSearchQuery("");
-                                        setStatusFilter("ACTIVE");
-                                        setClassFilter("all");
-                                        setVillageFilter("all");
-                                    }}
-                                    className="h-9 md:h-12 px-3 md:px-6 text-[8px] md:text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-lg md:rounded-xl border border-dashed border-white/10 transition-all shrink-0"
-                                >
-                                    Clear
+                            {(searchQuery || statusFilter !== "all" || classFilter !== "all" || villageFilter !== "all") && (
+                                <Button variant="ghost" size="sm" onClick={() => { setSearchQuery(""); setStatusFilter("all"); setClassFilter("all"); setVillageFilter("all"); }} className="h-9 md:h-12 px-3 md:px-6 text-[8px] md:text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-lg md:rounded-xl border border-dashed border-white/10 transition-all col-span-2 md:col-span-1">
+                                    Clear Filters
                                 </Button>
                             )}
                         </div>
@@ -279,7 +278,7 @@ export default function StudentsPage() {
                             columns={[
                                 {
                                     key: "studentInfo",
-                                    header: "STUDENT INFO",
+                                    header: "Student Info",
                                     render: (s) => (
                                         <div className="flex items-center gap-3">
                                             <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center border border-white/10 group-hover:border-accent/40 transition-colors">
@@ -294,7 +293,7 @@ export default function StudentsPage() {
                                 },
                                 {
                                     key: "classPlacement",
-                                    header: "CLASS & PLACEMENT",
+                                    header: "Class & Placement",
                                     render: (s) => (
                                         <div className="flex flex-col gap-1">
                                             <span className="text-[10px] uppercase font-black text-white/60 tracking-tighter bg-white/5 px-2 py-0.5 rounded border border-white/5 w-fit">{s.className}</span>
@@ -307,7 +306,7 @@ export default function StudentsPage() {
                                 },
                                 {
                                     key: "parentDetails",
-                                    header: "PARENT DETAILS",
+                                    header: "Parent Details",
                                     render: (s) => (
                                         <div className="flex flex-col gap-0.5">
                                             <span className="text-xs font-bold text-white/80">{s.parentName}</span>
@@ -320,7 +319,7 @@ export default function StudentsPage() {
                                 },
                                 {
                                     key: "credentials",
-                                    header: "LOGIN CREDENTIALS",
+                                    header: "Login Credentials",
                                     render: (s) => (
                                         <div className="flex flex-col gap-0.5">
                                             <div className="flex items-center gap-1.5 text-[10px] text-amber-400 font-bold">
@@ -332,61 +331,61 @@ export default function StudentsPage() {
                                 },
                                 {
                                     key: "status",
-                                    header: "STATUS",
+                                    header: "Status",
                                     cellClassName: "text-center",
                                     render: (s) => (
-                                        <div onClick={(e) => {
-                                            e.stopPropagation();
-                                            if (s.status === 'ACTIVE') {
-                                                setSelectedStudent(s);
-                                                setIsDeleteModalOpen(true);
-                                            }
-                                        }} className="cursor-pointer">
-                                            <Badge className={cn(
-                                                "text-[9px] font-black uppercase tracking-tighter py-0 h-5 border-none transition-all",
-                                                s.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20" :
-                                                    s.status === 'ALUMNI' ? "bg-indigo-500/10 text-indigo-400" :
-                                                        "bg-red-500/10 text-red-400"
-                                            )}>
-                                                {s.status}
-                                            </Badge>
-                                        </div>
+                                        <Badge className={cn(
+                                            "text-[9px] font-black uppercase tracking-tighter py-0 h-5 border-none transition-all",
+                                            s.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
+                                        )}>
+                                            {s.status}
+                                        </Badge>
                                     )
                                 },
                                 {
                                     key: "management",
-                                    header: "MANAGEMENT",
+                                    header: "Management",
                                     cellClassName: "text-right",
                                     render: (s) => (
                                         <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-white/10">
-                                                        <MoreVertical size={14} />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="bg-zinc-900 border-white/10 text-white min-w-[160px] p-1.5 rounded-xl shadow-2xl">
-                                                    <DropdownMenuItem onClick={() => {
-                                                        if (!s.uid) { alert("UID Missing"); return; }
-                                                        setResetUser({ uid: s.uid, schoolId: s.schoolId, name: s.studentName, role: "STUDENT" });
-                                                        setIsResetModalOpen(true);
-                                                    }} className="rounded-lg gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors">
-                                                        <Key size={14} /> Reset Password
-                                                    </DropdownMenuItem>
-                                                    <DropdownMenuItem onClick={() => {
-                                                        setSelectedStudent(s);
-                                                        setIsDeleteModalOpen(true);
-                                                    }} className="rounded-lg gap-2 text-xs font-bold text-red-500 hover:text-red-400 transition-colors">
-                                                        <Trash2 size={14} /> Delete / Deactivate
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
+                                            {(role?.toUpperCase() === "ADMIN" || role?.toUpperCase() === "MANAGER") && (
+                                                <DropdownMenu>
+                                                    <DropdownMenuTrigger asChild>
+                                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-white/10">
+                                                            <MoreHorizontal size={14} />
+                                                        </Button>
+                                                    </DropdownMenuTrigger>
+                                                    <DropdownMenuContent align="end" className="bg-zinc-900 border-white/10 text-white min-w-[160px] p-1.5 rounded-xl shadow-2xl">
+                                                        <DropdownMenuItem onClick={() => {
+                                                            router.push(`/admin/students/${s.schoolId}`);
+                                                        }} className="rounded-lg gap-2 text-xs font-bold text-white hover:text-accent transition-colors">
+                                                            <User size={14} /> Edit Profile
+                                                        </DropdownMenuItem>
+                                                        <DropdownMenuItem onClick={() => {
+                                                            if (!s.uid) { alert("UID Missing"); return; }
+                                                            setResetUser({ uid: s.uid, schoolId: s.schoolId, name: s.studentName, role: "STUDENT" });
+                                                            setIsResetModalOpen(true);
+                                                        }} className="rounded-lg gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors">
+                                                            <Key size={14} /> Reset Password
+                                                        </DropdownMenuItem>
+                                                        {(role?.toUpperCase() === "ADMIN" || role?.toUpperCase() === "MANAGER") && (
+                                                            <DropdownMenuItem onClick={() => {
+                                                                setSelectedStudent(s);
+                                                                setIsDeleteModalOpen(true);
+                                                            }} className="rounded-lg gap-2 text-xs font-bold text-red-500 hover:text-red-400 transition-colors">
+                                                                <Trash2 size={14} /> Delete Student
+                                                            </DropdownMenuItem>
+                                                        )}
+                                                    </DropdownMenuContent>
+                                                </DropdownMenu>
+                                            )}
                                         </div>
                                     )
                                 }
                             ]}
                         />
                     </div>
+
 
                     <AdminChangePasswordModal
                         isOpen={isResetModalOpen}
@@ -403,7 +402,7 @@ export default function StudentsPage() {
                                 setSelectedStudent(null);
                             }}
                             user={{
-                                id: selectedStudent.studentDocId || selectedStudent.schoolId,
+                                id: selectedStudent.schoolId,
                                 schoolId: selectedStudent.schoolId,
                                 name: selectedStudent.studentName,
                                 role: "student"
@@ -411,41 +410,28 @@ export default function StudentsPage() {
                             checkEligibility={async () => {
                                 const pQ = query(collection(db, "payments"), where("studentId", "==", selectedStudent.schoolId), limit(1));
                                 const caps = await getDocs(pQ);
-                                if (!caps.empty) return { canDelete: false, reason: "Payments exist. Use deactivation instead." };
+                                if (!caps.empty) return { canDelete: false, reason: "Payments exist." };
                                 return { canDelete: true };
                             }}
-                            onDeactivate={async (reason: string) => {
+                            onDeactivate={async (reason) => {
                                 if (!selectedStudent) return;
-                                try {
-                                    const batch = writeBatch(db);
-
-                                    // 1. Update Student Table
-                                    batch.update(doc(db, "students", selectedStudent.studentDocId || selectedStudent.schoolId), {
-                                        status: "INACTIVE",
-                                        deactivationReason: reason,
-                                        updatedAt: new Date().toISOString()
-                                    });
-
-                                    // 2. Update User Login Table
-                                    if (selectedStudent.uid) {
-                                        batch.update(doc(db, "users", selectedStudent.uid), {
-                                            status: "INACTIVE",
-                                            updatedAt: new Date().toISOString()
-                                        });
-                                    }
-
-                                    await batch.commit();
-                                } catch (e) {
-                                    console.error("Deactivation failed", e);
-                                    throw e;
-                                }
+                                await updateDoc(doc(db, "students", selectedStudent.studentDocId || selectedStudent.schoolId), {
+                                    status: "INACTIVE",
+                                    deactivationReason: reason,
+                                    updatedAt: new Date().toISOString()
+                                });
                             }}
                             onDelete={async (reason) => {
-                                if (!user) return;
+                                if (!selectedStudent) return;
+                                if (!user) { alert("You are not authenticated"); return; }
+
                                 const token = await user.getIdToken();
                                 const res = await fetch("/api/admin/users/delete", {
                                     method: "POST",
-                                    headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
+                                    headers: {
+                                        "Content-Type": "application/json",
+                                        "Authorization": `Bearer ${token}`
+                                    },
                                     body: JSON.stringify({
                                         targetUid: selectedStudent.uid,
                                         schoolId: selectedStudent.schoolId,
@@ -453,8 +439,11 @@ export default function StudentsPage() {
                                         collectionName: "students"
                                     })
                                 });
+
                                 const data = await res.json();
-                                if (!data.success) throw new Error(data.error || "Delete failed");
+                                if (!data.success) {
+                                    throw new Error(data.error || "Delete failed");
+                                }
                             }}
                         />
                     )}
@@ -465,3 +454,4 @@ export default function StudentsPage() {
         </div>
     );
 }
+

@@ -7,60 +7,34 @@ import { z } from 'zod';
  */
 
 // 1. Core Common Tyopes
-/** 
- * Standardized status set for all manageable application entities. 
- */
 const AppStatusSchema = z.enum(["ACTIVE", "INACTIVE", "ARCHIVED", "SUSPENDED"]);
+const MoneySchema = z.number().int().min(0).describe("Store money as integers (cents/paise) to prevent floating point errors");
 
-/**
- * Monetary representation schema.
- * Enforces use of integers (paise/cents) to eliminate float point precision errors
- * in financial calculations across the ledger.
- */
-const MoneySchema = z.number().int().min(0);
-
-/**
- * Strict schema for student enrollment and record creation.
- * Maps directly to the school's central admissions requirements.
- */
+// 2. Student Schemas
 export const CreateStudentSchema = z.object({
-    studentName: z.string().min(2, "Name must be at least 2 characters").max(100),
-    parentName: z.string().max(100).optional(),
-    parentMobile: z.string().regex(/^\d{10}$/, "Must be strictly 10 digits"),
-    dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD").or(z.literal("")).optional(),
-    gender: z.enum(["male", "female", "other", "select"]).optional(),
-    villageId: z.string().min(1),
-    villageName: z.string().optional(),
-    classId: z.string().min(1),
-    className: z.string().optional(),
+    firstName: z.string().min(2, "First name must be at least 2 characters").max(50),
+    lastName: z.string().max(50).optional(),
+    admissionNumber: z.string().min(4).max(20).describe("Primary Key equivalent"),
+    classId: z.string().min(1, "Class ID is required"),
     sectionId: z.string().min(1),
-    sectionName: z.string().optional(),
-    transportRequired: z.boolean().optional(),
-    academicYear: z.string().min(4),
-    admissionNumber: z.string().optional(),
+    dateOfBirth: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD"),
+    gender: z.enum(["male", "female", "other", "MALE", "FEMALE", "OTHER"]),
+    parentContact: z.string().regex(/^\+?[1-9]\d{1,14}$/, "Must be strict E.164 phone format"),
+    academicYear: z.string().min(1, "Academic year is required"),
+    emergencyContact: z.string().optional(),
     address: z.string().max(500).optional(),
-    firstName: z.string().optional(),
-    lastName: z.string().optional()
 });
 
-/** Data payload format for the Create Student endpoint. */
 export type CreateStudentPayload = z.infer<typeof CreateStudentSchema>;
 
-/** 
- * Flexible schema for modifying existing student attributes.
- * Includes concurrency control fields to prevent race condition overwrites.
- */
 export const UpdateStudentSchema = CreateStudentSchema.partial().extend({
     status: AppStatusSchema.optional(),
     versionContentHash: z.string().optional().describe("For optimistic concurrency control")
 });
 
-/** Data payload format for the Update Student endpoint. */
 export type UpdateStudentPayload = z.infer<typeof UpdateStudentSchema>;
 
-/** 
- * Schema for mass-marking of daily attendance.
- */
+// 3. Attendance Schemas
 export const MarkDailyAttendanceSchema = z.object({
     date: z.string().regex(/^\d{4}-\d{2}-\d{2}$/, "Must be YYYY-MM-DD"),
     classId: z.string().min(1),
@@ -68,13 +42,9 @@ export const MarkDailyAttendanceSchema = z.object({
     records: z.record(z.string(), z.enum(['P', 'A'])), // Map of studentId -> 'P' | 'A'
 });
 
-/** Data payload for internal attendance marking APIs. */
 export type MarkDailyAttendancePayload = z.infer<typeof MarkDailyAttendanceSchema>;
 
-/** 
- * Financial Ledger entry schema.
- * Strictly maps money flow to specific accounting codes (Fee Categories).
- */
+// 4. Ledger & Finance Schemas
 export const FeeLedgerEntrySchema = z.object({
     studentId: z.string().min(1),
     type: z.enum(['CREDIT', 'DEBIT']), // Debit = Fee Charged, Credit = Payment Received
@@ -84,7 +54,6 @@ export const FeeLedgerEntrySchema = z.object({
     referenceId: z.string().optional().describe("E.g., external razorpay transaction id or manual receipt num")
 });
 
-/** Data payload for posting financial transactions. */
 export type FeeLedgerEntryPayload = z.infer<typeof FeeLedgerEntrySchema>;
 
 // 5. Shared Validation Middlewares
@@ -96,7 +65,7 @@ export function validateEnterpriseSchema<T>(schema: z.ZodSchema<T>, data: any): 
     if (!result.success) {
         return {
             success: false,
-            errors: result.error.issues.map((e: any) => `${e.path.join('.')}: ${e.message}`)
+            errors: result.error.issues.map((e: z.ZodIssue) => `${e.path.join('.')}: ${e.message}`)
         };
     }
     return { success: true, data: result.data };

@@ -5,50 +5,35 @@ import { SearchService } from "./search-service";
 
 /**
  * Enterprise Student Service
+ * Strict 3-Layer Architecture | Backend Enforcement Only
  * 
- * Provides centralized administrative logic for managing the core student registry.
- * Encapsulates the complete student lifecycle (Admissions and Profile Updates).
- * 
- * Compliance Rules:
- * 1. Immutability & Audit: All historical states are versioned and preserved.
- * 2. Concurrency Shield: Updates are protected by optimistic version checks.
- * 3. Identity Generation: Student IDs are strictly sequenced via atomic counters.
- * 4. Audit Trail: Mandatory logging of all creation and modification events.
+ * Rules:
+ * - Student edits must be versioned.
+ * - Old data must remain accessible for audit.
+ * - No destructive deletes for critical data.
  */
 export class EnterpriseStudentService {
 
     /**
-     * Executes the formal admission and enrollment process for a new student.
+     * Creates a new student strictly conforming to the CreateStudentPayload schema.
+     * Uses atomic batches and centralized audit logging.
      * 
-     * Performs an atomic sequence of operations including generating a unique
-     * school ID, creating an authentication profile, and establishing a financial
-     * ledger for the student. Ensures that the entire process succeeds or fails
-     * as one unit, preventing orphaned data records.
-     * 
-     * @param payload - A verified student data map (conforming to CreateStudentSchema).
-     * @param createdBy - UID of the administrator executing the enrollment.
-     * @returns A promise resolving to the final assigned school ID and UID.
+     * @param payload Validated student payload
+     * @param createdBy Admin user ID creating the student
      */
     static async createStudent(payload: CreateStudentPayload, createdBy: string) {
         try {
-            // Enforce admission number uniqueness via counter or precise querying if required.
-            // For now, generating a structured admission number if not explicitly defined like in the legacy code.
             const counterRef = adminDb.collection("counters").doc("students");
-
             let newSchoolId = payload.admissionNumber;
 
-            // Atomic Transaction to safely increment student counter and guarantee no admission overlap
             const studentRecord = await adminDb.runTransaction(async (transaction: FirebaseFirestore.Transaction) => {
                 const counterDoc = await transaction.get(counterRef as FirebaseFirestore.DocumentReference);
                 const nextIdNum = ((counterDoc.data() as any)?.current || 0) + 1;
 
-                // If the frontend didn't pass a strict admission number or we override it to guarantee sequence:
-                newSchoolId = `SHS${String(nextIdNum).padStart(4, "0")}`; // Example format (continuation after SHS1200)
+                newSchoolId = `SHS${String(nextIdNum).padStart(5, "0")}`;
 
-                // Synthetic Auth mapping
                 const syntheticEmail = `${newSchoolId}@school.local`.toLowerCase();
 
-                // Increment the counter atomically inside the transaction
                 transaction.set(counterRef, { current: nextIdNum }, { merge: true });
 
                 return {
@@ -58,31 +43,31 @@ export class EnterpriseStudentService {
                 };
             });
 
-            // Outside transaction - hit Auth service 
             const userRecord = await adminAuth.createUser({
                 email: studentRecord.syntheticEmail,
-                password: payload.parentMobile, // Default password
-                displayName: payload.studentName
+                password: payload.parentContact,
+                displayName: `${payload.firstName} ${payload.lastName || ''}`.trim()
             });
 
             await adminAuth.setCustomUserClaims(userRecord.uid, { role: "STUDENT" });
 
+            const studentName = `${payload.firstName} ${payload.lastName || ''}`.trim();
+
             const keywords = Array.from(new Set([
-                ...SearchService.generateKeywords(payload.studentName || ""),
+                ...SearchService.generateKeywords(studentName),
                 ...SearchService.generateKeywords(studentRecord.newSchoolId),
-                ...SearchService.generateKeywords(payload.parentMobile || ""),
-                ...SearchService.generateKeywords(payload.className || ""),
-                ...SearchService.generateKeywords(payload.villageName || "")
+                ...SearchService.generateKeywords(payload.parentContact || ""),
+                ...SearchService.generateKeywords(payload.classId || "")
             ]));
 
             const finalStudentData = {
                 ...payload,
-                studentName: payload.studentName,
-                schoolId: studentRecord.newSchoolId, // Overriding the payload admissionNumber with system generated one
+                studentName,
+                schoolId: studentRecord.newSchoolId,
                 uid: userRecord.uid,
                 role: "STUDENT",
                 status: "ACTIVE",
-                version: 1, // Enterprise Versioning Start
+                version: 1,
                 keywords,
                 createdAt: Timestamp.now(),
                 admissionDate: new Date().toISOString()
@@ -90,11 +75,9 @@ export class EnterpriseStudentService {
 
             const batch = adminDb.batch();
 
-            // 1. Save Core Student Record
             const studentRef = adminDb.collection("students").doc(studentRecord.newSchoolId);
             batch.set(studentRef, finalStudentData);
 
-            // 2. Initial Version Record (For History/Audit)
             const historyRef = adminDb.collection(`students/${studentRecord.newSchoolId}/history`).doc(`v1`);
             batch.set(historyRef, {
                 ...finalStudentData,
@@ -103,7 +86,6 @@ export class EnterpriseStudentService {
                 changedBy: createdBy
             });
 
-            // 3. Save User Mapping
             const userRef = adminDb.collection("users").doc(userRecord.uid);
             batch.set(userRef, {
                 schoolId: studentRecord.newSchoolId,
@@ -112,21 +94,19 @@ export class EnterpriseStudentService {
                 email: studentRecord.syntheticEmail
             });
 
-            // 4. Initial Fee Ledger (Standardized yearId field)
             const ledgerYear = payload.academicYear || "2026-2027";
             const ledgerRef = adminDb.collection("student_fee_ledgers").doc(`${studentRecord.newSchoolId}_${ledgerYear}`);
             batch.set(ledgerRef, {
                 studentId: studentRecord.newSchoolId,
-                studentName: payload.studentName,
-                yearId: ledgerYear, // Standardized field name
-                totalFee: 0, // Explicit zero sum
+                studentName,
+                yearId: ledgerYear,
+                totalFee: 0,
                 totalPaid: 0,
                 status: 'PENDING',
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now()
             });
 
-            // 5. Enterprise Audit Log
             await AuditService.log({
                 userId: createdBy,
                 userRole: 'ADMIN',
@@ -137,12 +117,10 @@ export class EnterpriseStudentService {
                 newValue: finalStudentData
             }, batch);
 
-            // 6. Global Search Indexing
             await SearchService.indexStudent(studentRecord.newSchoolId, finalStudentData, batch);
 
             await batch.commit();
 
-            // Bonus: Legacy RTDB sync (non-critical, fail gracefully)
             try {
                 await adminRtdb.ref(`students/${studentRecord.newSchoolId}`).set({
                     ...finalStudentData,
@@ -162,17 +140,8 @@ export class EnterpriseStudentService {
 
 
     /**
-     * Updates an existing student record with integrated concurrency protection.
-     * 
-     * Validates the current version (Optimistic Concurrency Control) to prevent
-     * collisions with simultaneous edits. Each modify action increments the 
-     * record version and creates a point-in-time snapshot in the history store.
-     * 
-     * @param studentId - Unique key of the student to modify.
-     * @param payload - Verified map of fields to update.
-     * @param updatedBy - UID of the user performing the update.
-     * @returns A promise resolving to the new record version number.
-     * @throws Error if version mismatch (collision) or student does not exist.
+     * Updates an existing student strictly conforming to the UpdateStudentPayload schema.
+     * Enforces Optimistic Concurrency Control (Version checks) preventing silent overwrites.
      */
     static async updateStudent(studentId: string, payload: UpdateStudentPayload, updatedBy: string) {
         const studentRef = adminDb.collection("students").doc(studentId);
