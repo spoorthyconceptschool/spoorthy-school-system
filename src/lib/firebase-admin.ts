@@ -1,14 +1,14 @@
 /**
- * ENGINE V9: PRODUCTION RESILIENCE LAYER
- * Using a direct require fallback to bypass Next.js 16 Turbopack mangling.
+ * ENGINE V10: MAXIMUM DEFERRAL LAYER
+ * Moving require() inside the factory to ensure 0 module-load dependencies.
  */
-let admin: any;
-if (typeof window === 'undefined') {
-    try {
-        admin = require("firebase-admin");
-    } catch (e) {
-        console.error("[CRITICAL] Failed to require firebase-admin:", e);
-    }
+let _cachedAdmin: any = null;
+
+function getAdminRoot() {
+    if (typeof window !== 'undefined') return null;
+    if (_cachedAdmin) return _cachedAdmin;
+    _cachedAdmin = require("firebase-admin");
+    return _cachedAdmin;
 }
 
 type App = any;
@@ -27,6 +27,9 @@ const SERVICE_ACCOUNT = {
 let _initError: string | null = null;
 
 function getAdminApp(): App {
+    const admin = getAdminRoot();
+    if (!admin) throw new Error("Firebase Admin is not available on client-side");
+
     try {
         if (admin.apps.length > 0) return admin.apps[0] as App;
 
@@ -49,11 +52,26 @@ function getAdminApp(): App {
 }
 
 // 1. Direct Service Exports (Functional Callers for Stability)
-export const getAdminDb = () => admin.firestore(getAdminApp());
-export const getAdminAuth = () => admin.auth(getAdminApp());
-export const getAdminStorage = () => admin.storage(getAdminApp());
-export const getAdminRtdb = () => admin.database(getAdminApp());
-export const getAdminMessaging = () => admin.messaging(getAdminApp());
+export const getAdminDb = () => {
+    const admin = getAdminRoot();
+    return admin.firestore(getAdminApp());
+};
+export const getAdminAuth = () => {
+    const admin = getAdminRoot();
+    return admin.auth(getAdminApp());
+};
+export const getAdminStorage = () => {
+    const admin = getAdminRoot();
+    return admin.storage(getAdminApp());
+};
+export const getAdminRtdb = () => {
+    const admin = getAdminRoot();
+    return admin.database(getAdminApp());
+};
+export const getAdminMessaging = () => {
+    const admin = getAdminRoot();
+    return admin.messaging(getAdminApp());
+};
 
 // Lazy Loaders to prevent top-level module crash
 const createLazyProxy = (getService: () => any) => {
@@ -74,16 +92,16 @@ const createLazyProxy = (getService: () => any) => {
 /**
  * COMPATIBILITY LAYER - ROBUST LAZY PROXIES
  */
-export const adminDb: any = createLazyProxy(() => admin.firestore(getAdminApp()));
-export const adminAuth: any = createLazyProxy(() => admin.auth(getAdminApp()));
-export const adminStorage: any = createLazyProxy(() => admin.storage(getAdminApp()));
-export const adminRtdb: any = createLazyProxy(() => admin.database(getAdminApp()));
-export const adminMessaging: any = createLazyProxy(() => admin.messaging(getAdminApp()));
+export const adminDb: any = createLazyProxy(() => getAdminDb());
+export const adminAuth: any = createLazyProxy(() => getAdminAuth());
+export const adminStorage: any = createLazyProxy(() => getAdminStorage());
+export const adminRtdb: any = createLazyProxy(() => getAdminRtdb());
+export const adminMessaging: any = createLazyProxy(() => getAdminMessaging());
 
 export const getInitError = () => _initError;
 
-// 2. Class/Constant Exports
-export const FieldValue = admin.firestore.FieldValue;
-export const FieldPath = admin.firestore.FieldPath;
-export const Timestamp = admin.firestore.Timestamp;
-export const ServerValue = admin.database.ServerValue;
+// 2. Class/Constant Exports - lazy wrapped to prevent top-level require
+export const FieldValue = createLazyProxy(() => getAdminRoot().firestore.FieldValue);
+export const FieldPath = createLazyProxy(() => getAdminRoot().firestore.FieldPath);
+export const Timestamp = createLazyProxy(() => getAdminRoot().firestore.Timestamp);
+export const ServerValue = createLazyProxy(() => getAdminRoot().database.ServerValue);
