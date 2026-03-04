@@ -1,4 +1,4 @@
-import { initializeApp, cert, getApps, getApp } from "firebase-admin/app";
+import { initializeApp, cert, getApps, getApp, App } from "firebase-admin/app";
 import { getFirestore, FieldValue as FirestoreFieldValue, FieldPath as FirestoreFieldPath, Timestamp as FirestoreTimestamp } from "firebase-admin/firestore";
 import { getAuth } from "firebase-admin/auth";
 import { getDatabase, ServerValue as RTDBServerValue } from "firebase-admin/database";
@@ -6,9 +6,8 @@ import { getStorage } from "firebase-admin/storage";
 import { getMessaging } from "firebase-admin/messaging";
 
 /**
- * ENGINE V5: MODULAR COMPATIBILITY LAYER
- * Optimized for Next.js 15 + Firebase Hosting Frameworks.
- * Uses modular imports to prevent bundling errors in production.
+ * ENGINE V6: ENTERPRISE STABILITY LAYER
+ * Optimized for Next.js 15. Standardized for production deployments.
  */
 
 const SERVICE_ACCOUNT = {
@@ -18,56 +17,68 @@ const SERVICE_ACCOUNT = {
 };
 
 let _initError: string | null = null;
-let _cachedApp: any = null;
 
-function getAdminApp() {
-    if (_cachedApp) return _cachedApp;
+function getAdminApp(): App {
     try {
         const apps = getApps();
-        if (apps.length > 0) {
-            _cachedApp = apps[0];
-            return _cachedApp;
-        }
+        if (apps.length > 0) return apps[0];
 
-        _cachedApp = initializeApp({
-            credential: cert(SERVICE_ACCOUNT),
-            storageBucket: "spoorthy-school-live-55917.firebasestorage.app",
-            databaseURL: "https://spoorthy-school-live-55917-default-rtdb.firebaseio.com"
+        // Format private key correctly for the environment
+        const privateKey = (process.env.FIREBASE_PRIVATE_KEY || SERVICE_ACCOUNT.privateKey).replace(/\\n/g, '\n');
+
+        return initializeApp({
+            credential: cert({
+                projectId: process.env.FIREBASE_PROJECT_ID || SERVICE_ACCOUNT.projectId,
+                clientEmail: process.env.FIREBASE_CLIENT_EMAIL || SERVICE_ACCOUNT.clientEmail,
+                privateKey
+            }),
+            storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "spoorthy-school-live-55917.firebasestorage.app",
+            databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || "https://spoorthy-school-live-55917-default-rtdb.firebaseio.com"
         });
-        return _cachedApp;
     } catch (e: any) {
-        console.error("[FIREBASE ADMIN] Initialization Failed:", e);
         _initError = e.message || String(e);
-        throw e; // Re-throw so the caller knows it failed
+        console.error("[CRITICAL] Firebase Admin Init Error:", e);
+        throw e;
     }
 }
+
+// 1. Direct Service Exports (Functional Callers for Stability)
+export const getAdminDb = () => getFirestore(getAdminApp());
+export const getAdminAuth = () => getAuth(getAdminApp());
+export const getAdminStorage = () => getStorage(getAdminApp());
+export const getAdminRtdb = () => getDatabase(getAdminApp());
+export const getAdminMessaging = () => getMessaging(getAdminApp());
 
 // Lazy Loaders to prevent top-level module crash
 const createLazyProxy = (getService: () => any) => {
     return new Proxy({} as any, {
         get(_, prop) {
-            const service = getService();
-            const value = service[prop];
-            return typeof value === 'function' ? value.bind(service) : value;
+            try {
+                const service = getService();
+                const value = service[prop];
+                return typeof value === 'function' ? value.bind(service) : value;
+            } catch (e: any) {
+                console.error(`[Firebase Proxy] Error accessing property "${String(prop)}":`, e);
+                throw e;
+            }
         }
     });
 };
 
-export const adminDb = createLazyProxy(() => getFirestore(getAdminApp()));
-export const adminAuth = createLazyProxy(() => getAuth(getAdminApp()));
-export const adminStorage = createLazyProxy(() => getStorage(getAdminApp()));
-export const adminRtdb = createLazyProxy(() => getDatabase(getAdminApp()));
-export const adminMessaging = createLazyProxy(() => getMessaging(getAdminApp()));
-
-// Also keep the getters for compatibility
-export const getAdminDb = () => getFirestore(getAdminApp());
-export const getAdminAuth = () => getAuth(getAdminApp());
-export const getAdminStorage = () => getStorage(getAdminApp());
-export const getAdminRtdb = () => getDatabase(getAdminApp());
+/**
+ * COMPATIBILITY LAYER - ROBUST LAZY PROXIES
+ * These allow existing code using adminDb.collection() to work without triggering
+ * initialization until the moment a property is actually accessed.
+ */
+export const adminDb: any = createLazyProxy(() => getFirestore(getAdminApp()));
+export const adminAuth: any = createLazyProxy(() => getAuth(getAdminApp()));
+export const adminStorage: any = createLazyProxy(() => getStorage(getAdminApp()));
+export const adminRtdb: any = createLazyProxy(() => getDatabase(getAdminApp()));
+export const adminMessaging: any = createLazyProxy(() => getMessaging(getAdminApp()));
 
 export const getInitError = () => _initError;
 
-// Static helpers
+// 2. Class/Constant Exports
 export const FieldValue = FirestoreFieldValue;
 export const FieldPath = FirestoreFieldPath;
 export const Timestamp = FirestoreTimestamp;
