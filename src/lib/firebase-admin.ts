@@ -1,9 +1,12 @@
-import { initializeApp, cert, getApps, getApp, App } from "firebase-admin/app";
-import { getFirestore, FieldValue as FirestoreFieldValue, FieldPath as FirestoreFieldPath, Timestamp as FirestoreTimestamp } from "firebase-admin/firestore";
-import { getAuth } from "firebase-admin/auth";
-import { getDatabase, ServerValue as RTDBServerValue } from "firebase-admin/database";
-import { getStorage } from "firebase-admin/storage";
-import { getMessaging } from "firebase-admin/messaging";
+import * as admin from "firebase-admin";
+
+/**
+ * ENGINE V7: PRODUCTION MONOLITH LAYER
+ * Reverting to monolithic imports to solve ERR_MODULE_NOT_FOUND on Subpath exports
+ * which is a known issue with Next.js 15 Turbopack + External Modules.
+ */
+
+type App = admin.app.App;
 
 /**
  * ENGINE V6: ENTERPRISE STABILITY LAYER
@@ -20,14 +23,12 @@ let _initError: string | null = null;
 
 function getAdminApp(): App {
     try {
-        const apps = getApps();
-        if (apps.length > 0) return apps[0];
+        if (admin.apps.length > 0) return admin.apps[0] as App;
 
-        // Format private key correctly for the environment
         const privateKey = (process.env.FIREBASE_PRIVATE_KEY || SERVICE_ACCOUNT.privateKey).replace(/\\n/g, '\n');
 
-        return initializeApp({
-            credential: cert({
+        return admin.initializeApp({
+            credential: admin.credential.cert({
                 projectId: process.env.FIREBASE_PROJECT_ID || SERVICE_ACCOUNT.projectId,
                 clientEmail: process.env.FIREBASE_CLIENT_EMAIL || SERVICE_ACCOUNT.clientEmail,
                 privateKey
@@ -43,11 +44,11 @@ function getAdminApp(): App {
 }
 
 // 1. Direct Service Exports (Functional Callers for Stability)
-export const getAdminDb = () => getFirestore(getAdminApp());
-export const getAdminAuth = () => getAuth(getAdminApp());
-export const getAdminStorage = () => getStorage(getAdminApp());
-export const getAdminRtdb = () => getDatabase(getAdminApp());
-export const getAdminMessaging = () => getMessaging(getAdminApp());
+export const getAdminDb = () => admin.firestore(getAdminApp());
+export const getAdminAuth = () => admin.auth(getAdminApp());
+export const getAdminStorage = () => admin.storage(getAdminApp());
+export const getAdminRtdb = () => admin.database(getAdminApp());
+export const getAdminMessaging = () => admin.messaging(getAdminApp());
 
 // Lazy Loaders to prevent top-level module crash
 const createLazyProxy = (getService: () => any) => {
@@ -67,19 +68,17 @@ const createLazyProxy = (getService: () => any) => {
 
 /**
  * COMPATIBILITY LAYER - ROBUST LAZY PROXIES
- * These allow existing code using adminDb.collection() to work without triggering
- * initialization until the moment a property is actually accessed.
  */
-export const adminDb: any = createLazyProxy(() => getFirestore(getAdminApp()));
-export const adminAuth: any = createLazyProxy(() => getAuth(getAdminApp()));
-export const adminStorage: any = createLazyProxy(() => getStorage(getAdminApp()));
-export const adminRtdb: any = createLazyProxy(() => getDatabase(getAdminApp()));
-export const adminMessaging: any = createLazyProxy(() => getMessaging(getAdminApp()));
+export const adminDb: any = createLazyProxy(() => admin.firestore(getAdminApp()));
+export const adminAuth: any = createLazyProxy(() => admin.auth(getAdminApp()));
+export const adminStorage: any = createLazyProxy(() => admin.storage(getAdminApp()));
+export const adminRtdb: any = createLazyProxy(() => admin.database(getAdminApp()));
+export const adminMessaging: any = createLazyProxy(() => admin.messaging(getAdminApp()));
 
 export const getInitError = () => _initError;
 
 // 2. Class/Constant Exports
-export const FieldValue = FirestoreFieldValue;
-export const FieldPath = FirestoreFieldPath;
-export const Timestamp = FirestoreTimestamp;
-export const ServerValue = RTDBServerValue;
+export const FieldValue = admin.firestore.FieldValue;
+export const FieldPath = admin.firestore.FieldPath;
+export const Timestamp = admin.firestore.Timestamp;
+export const ServerValue = admin.database.ServerValue;
