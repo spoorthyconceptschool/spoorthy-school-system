@@ -1,6 +1,6 @@
 import { z } from 'zod';
 import { NextRequest, NextResponse } from 'next/server';
-import { adminAuth } from '@/lib/firebase-admin';
+import { adminAuth, adminDb } from '@/lib/firebase-admin';
 
 /**
  * Enterprise Route Authorization Middleware
@@ -46,7 +46,6 @@ export async function authenticateRoute(
         if (!roleStr) {
             // Fallback: Check Firestore if custom claims are not yet set (legacy admin accounts)
             try {
-                const { adminDb } = require('@/lib/firebase-admin');
                 const userDoc = await adminDb.collection('users').doc(decodedToken.uid).get();
                 if (userDoc.exists) {
                     const data = userDoc.data();
@@ -105,9 +104,14 @@ export async function withEnterpriseGuard(
     try {
         return await handler(req, user);
     } catch (error: any) {
-        console.error(`[Enterprise Backend] Unhandled Handler Exception:`, error);
+        console.error(`[Enterprise Backend] FATAL Exception:`, error);
         return NextResponse.json(
-            { error: 'Internal Server Error' },
+            {
+                success: false,
+                error: 'Internal Server Error (Backend Runtime)',
+                message: error.message,
+                status: 'CRITICAL_FAILURE'
+            },
             { status: 500 }
         );
     }
