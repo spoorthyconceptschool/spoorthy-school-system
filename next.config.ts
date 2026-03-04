@@ -7,7 +7,7 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
-  serverExternalPackages: [],
+  serverExternalPackages: ["firebase-admin"],
   images: {
     remotePatterns: [
       {
