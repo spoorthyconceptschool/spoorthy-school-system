@@ -143,7 +143,7 @@ export default function AdminDashboard() {
             key: "classId",
             header: "Class",
             render: (s: Student) => {
-                const cls = classes.find((c: any) => c.id === s.classId);
+                const cls = classes?.find((c: any) => c.id === s.classId);
                 return <span className="text-white/70">{cls ? cls.name : (s.className || s.classId || "—")}</span>
             }
         },
@@ -258,7 +258,7 @@ export default function AdminDashboard() {
                             </h3>
                             <div className="rounded-2xl border border-white/10 bg-black/40 backdrop-blur-md overflow-hidden">
                                 <DataTable
-                                    data={recentStudents.filter(s => classes.some((c: any) => c.id === s.classId)).slice(0, 3)}
+                                    data={recentStudents.filter(s => classes?.some((c: any) => c.id === s.classId)).slice(0, 3)}
                                     columns={columns}
                                     isLoading={false}
                                     onRowClick={(s) => router.push(`/admin/students`)}
@@ -411,10 +411,10 @@ export default function AdminDashboard() {
                             <Link href="/admin/students" className="text-[10px] font-black uppercase tracking-widest text-accent hover:underline">Full Database</Link>
                         </div>
 
-                        {recentStudents.filter(s => classes.some((c: any) => c.id === s.classId)).length > 0 ? (
+                        {recentStudents.filter(s => classes?.some((c: any) => c.id === s.classId)).length > 0 ? (
                             <div className="rounded-2xl border border-white/10 bg-black/40 shadow-2xl backdrop-blur-md overflow-hidden mobile-dense-table">
                                 <DataTable
-                                    data={recentStudents.filter(s => classes.some((c: any) => c.id === s.classId)).slice(0, 5)}
+                                    data={recentStudents.filter(s => classes?.some((c: any) => c.id === s.classId)).slice(0, 5)}
                                     columns={columns}
                                     isLoading={false}
                                     onRowClick={() => router.push("/admin/students")}
