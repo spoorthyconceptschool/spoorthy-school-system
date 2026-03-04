@@ -63,13 +63,13 @@ export async function POST(req: NextRequest) {
             const operationalCols = [
                 "student_fee_ledgers", "payments", "invoices", "transactions", "fee_structures", "fee_types", "ledger", "expenses", "payroll",
                 "attendance", "leaves", "class_timetables", "teacher_schedules", "substitutions", "coverage_tasks",
-                "homework", "homework_submissions", "exam_results", "grades",
+                "homework", "homework_submissions", "exam_results", "grades", "leave_requests",
                 "announcements", "events", "notifications", "audit_logs", "notices", "analytics", "reports",
                 "feedback", "enquiries", "applications", "custom_fees", "exams", "salaries", "teaching_assignments",
                 "timetable_settings", "search_index", "student_leaves"
             ];
 
-            const systemCols = ["students", "teachers", "staff", "user_actions", "student_keywords", "teacher_keywords"];
+            const systemCols = ["students", "teachers", "staff", "user_actions", "student_keywords", "teacher_keywords", "usersBySchoolId"];
 
             let collectionsToWipe = [...operationalCols];
             if (purgeType === 'FULL_SYSTEM') {
