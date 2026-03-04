@@ -45,21 +45,21 @@ export async function POST(req: NextRequest) {
             const normalizedBody = {
                 studentName: body.studentName || "Unknown",
                 firstName: body.studentName?.split(' ')[0] || "Unknown",
-                lastName: body.studentName?.split(' ').slice(1).join(' ') || undefined,
+                lastName: body.studentName?.split(' ').slice(1).join(' ') || "",
                 admissionNumber: body.admissionNumber || "PENDING",
                 classId: body.classId || "UNKNOWN_CLASS",
-                className: body.className || undefined,
+                className: body.className || "",
                 sectionId: body.sectionId || "A",
-                sectionName: body.sectionName || undefined,
-                villageId: body.villageId || undefined,
-                villageName: body.villageName || undefined,
+                sectionName: body.sectionName || "",
+                villageId: body.villageId || "",
+                villageName: body.villageName || "",
                 dateOfBirth: body.dateOfBirth || "2000-01-01",
                 gender: String(body.gender || "other").toLowerCase(), // Normalize to lowercase for schema enum
-                parentName: body.parentName || undefined,
-                parentMobile: body.parentMobile || undefined,
+                parentName: body.parentName || "",
+                parentMobile: body.parentMobile || "",
                 parentContact: body.parentMobile ? `+91${body.parentMobile.replace(/\D/g, '').slice(-10)}` : "+910000000000",
                 academicYear: body.academicYear || "2026-2027",
-                address: body.address || undefined,
+                address: body.address || "",
                 transportRequired: body.transportRequired === true
             };
 
