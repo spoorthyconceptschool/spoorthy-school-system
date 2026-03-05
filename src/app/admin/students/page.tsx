@@ -142,6 +142,7 @@ export default function StudentsPage() {
                 studentDocId: doc.id
             })) as Student[];
             setStudents(list);
+            setLocalLoading(false);
         }, (error: any) => {
             console.error("Directory Stream Error:", error);
             setLocalLoading(false);
@@ -386,12 +387,45 @@ export default function StudentsPage() {
                                     cellClassName: "text-center",
                                     render: (s) => (
                                         s.status === 'ACTIVE' ? (
-                                            <Badge className="text-[9px] font-black uppercase tracking-tighter py-0 h-5 border-none transition-all bg-emerald-500/10 text-emerald-400">
+                                            <button
+                                                type="button"
+                                                onClick={async (e) => {
+                                                    e.preventDefault();
+                                                    e.stopPropagation();
+                                                    if (!confirm("Are you sure you want to deactivate this student?")) return;
+                                                    try {
+                                                        const studentDocId = s.studentDocId || s.schoolId;
+                                                        await updateDoc(doc(db, "students", studentDocId), {
+                                                            status: "INACTIVE",
+                                                            deactivationReason: "Admin quick toggle",
+                                                            updatedAt: new Date().toISOString()
+                                                        });
+                                                        if (selectedYear) {
+                                                            try {
+                                                                const ledgerId = `${s.schoolId}_${selectedYear}`;
+                                                                await updateDoc(doc(db, "student_fee_ledgers", ledgerId), {
+                                                                    studentStatus: "INACTIVE",
+                                                                    updatedAt: new Date().toISOString()
+                                                                });
+                                                            } catch (err) {
+                                                                console.warn("Ledger update failed:", err);
+                                                            }
+                                                        }
+                                                        toast({ title: "Deactivated", description: `${s.studentName} is now inactive.`, type: "success" });
+                                                    } catch (err: any) {
+                                                        toast({ title: "Error", description: err.message, type: "error" });
+                                                    }
+                                                }}
+                                                className="inline-flex items-center justify-center rounded-md border px-2.5 py-0.5 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 text-[9px] font-black uppercase tracking-tighter h-5 border-none bg-emerald-500/10 text-emerald-400 hover:bg-red-500/20 hover:text-red-400 cursor-pointer shadow-sm hover:shadow-red-500/20"
+                                                title="Click to Deactivate"
+                                            >
                                                 ACTIVE
-                                            </Badge>
+                                            </button>
                                         ) : (
                                             <button
+                                                type="button"
                                                 onClick={async (e) => {
+                                                    e.preventDefault();
                                                     e.stopPropagation();
                                                     if (!confirm("Are you sure you want to reactivate this student?")) return;
                                                     try {
