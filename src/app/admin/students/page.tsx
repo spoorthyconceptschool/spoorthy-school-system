@@ -385,12 +385,45 @@ export default function StudentsPage() {
                                     header: "Status",
                                     cellClassName: "text-center",
                                     render: (s) => (
-                                        <Badge className={cn(
-                                            "text-[9px] font-black uppercase tracking-tighter py-0 h-5 border-none transition-all",
-                                            s.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-400" : "bg-red-500/10 text-red-400"
-                                        )}>
-                                            {s.status}
-                                        </Badge>
+                                        s.status === 'ACTIVE' ? (
+                                            <Badge className="text-[9px] font-black uppercase tracking-tighter py-0 h-5 border-none transition-all bg-emerald-500/10 text-emerald-400">
+                                                ACTIVE
+                                            </Badge>
+                                        ) : (
+                                            <button
+                                                onClick={async (e) => {
+                                                    e.stopPropagation();
+                                                    if (!confirm("Are you sure you want to reactivate this student?")) return;
+                                                    try {
+                                                        const studentDocId = s.studentDocId || s.schoolId;
+                                                        await updateDoc(doc(db, "students", studentDocId), {
+                                                            status: "ACTIVE",
+                                                            deactivationReason: null,
+                                                            updatedAt: new Date().toISOString()
+                                                        });
+
+                                                        if (selectedYear) {
+                                                            try {
+                                                                const ledgerId = `${s.schoolId}_${selectedYear}`;
+                                                                await updateDoc(doc(db, "student_fee_ledgers", ledgerId), {
+                                                                    studentStatus: "ACTIVE",
+                                                                    updatedAt: new Date().toISOString()
+                                                                });
+                                                            } catch (err) {
+                                                                console.warn("Ledger update failed:", err);
+                                                            }
+                                                        }
+                                                        toast({ title: "Reactivated", description: `${s.studentName} is now active.`, type: "success" });
+                                                    } catch (err: any) {
+                                                        toast({ title: "Error", description: err.message, type: "error" });
+                                                    }
+                                                }}
+                                                className="inline-flex items-center justify-center rounded-md border px-2.5 py-0.5 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 text-[9px] font-black uppercase tracking-tighter h-5 border-none bg-red-500/10 text-red-500 hover:bg-emerald-500/20 hover:text-emerald-400 cursor-pointer shadow-sm hover:shadow-emerald-500/20"
+                                                title="Click to Reactivate"
+                                            >
+                                                INACTIVE
+                                            </button>
+                                        )
                                     )
                                 },
                                 {
