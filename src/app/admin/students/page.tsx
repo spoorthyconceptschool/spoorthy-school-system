@@ -7,7 +7,7 @@ import { db } from "@/lib/firebase";
 import { AddStudentModal } from "@/components/admin/add-student-modal";
 import { DeleteUserModal } from "@/components/admin/delete-user-modal";
 import { AdminChangePasswordModal } from "@/components/admin/admin-change-password-modal";
-import { Filter, Search as SearchIcon, Plus, Download, IndianRupee, Users, MoreHorizontal, User, Key, Trash2, CreditCard, Loader2, MapPin, Phone, BookOpen, RefreshCw } from "lucide-react";
+import { Filter, Search as SearchIcon, Plus, Download, IndianRupee, Users, MoreHorizontal, User, Key, Trash2, CreditCard, Loader2, CheckCircle2, MapPin, Phone, BookOpen, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { StudentImportModal } from "@/components/admin/student-import-modal";
 import { DataTable } from "@/components/ui/data-table";
@@ -429,12 +429,43 @@ export default function StudentsPage() {
                                                             }} className="rounded-lg gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors">
                                                                 <Key size={14} /> Reset Password
                                                             </DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={() => {
-                                                                setSelectedStudent(s);
-                                                                setIsDeleteModalOpen(true);
-                                                            }} className="rounded-lg gap-2 text-xs font-bold text-red-500 hover:text-red-400 transition-colors">
-                                                                <Trash2 size={14} /> Delete Student
-                                                            </DropdownMenuItem>
+                                                            {s.status === "INACTIVE" ? (
+                                                                <DropdownMenuItem onClick={async () => {
+                                                                    if (!confirm("Are you sure you want to reactivate this student?")) return;
+                                                                    try {
+                                                                        const studentDocId = s.studentDocId || s.schoolId;
+                                                                        await updateDoc(doc(db, "students", studentDocId), {
+                                                                            status: "ACTIVE",
+                                                                            deactivationReason: null,
+                                                                            updatedAt: new Date().toISOString()
+                                                                        });
+
+                                                                        if (selectedYear) {
+                                                                            try {
+                                                                                const ledgerId = `${s.schoolId}_${selectedYear}`;
+                                                                                await updateDoc(doc(db, "student_fee_ledgers", ledgerId), {
+                                                                                    studentStatus: "ACTIVE",
+                                                                                    updatedAt: new Date().toISOString()
+                                                                                });
+                                                                            } catch (e) {
+                                                                                console.warn("Ledger update failed:", e);
+                                                                            }
+                                                                        }
+                                                                        toast({ title: "Reactivated", description: `${s.studentName} is now active.`, type: "success" });
+                                                                    } catch (err: any) {
+                                                                        toast({ title: "Error", description: err.message, type: "error" });
+                                                                    }
+                                                                }} className="rounded-lg gap-2 text-xs font-bold text-emerald-500 hover:text-emerald-400 transition-colors">
+                                                                    <CheckCircle2 size={14} /> Reactivate Student
+                                                                </DropdownMenuItem>
+                                                            ) : (
+                                                                <DropdownMenuItem onClick={() => {
+                                                                    setSelectedStudent(s);
+                                                                    setIsDeleteModalOpen(true);
+                                                                }} className="rounded-lg gap-2 text-xs font-bold text-red-500 hover:text-red-400 transition-colors">
+                                                                    <Trash2 size={14} /> Delete Student
+                                                                </DropdownMenuItem>
+                                                            )}
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
                                                 </>

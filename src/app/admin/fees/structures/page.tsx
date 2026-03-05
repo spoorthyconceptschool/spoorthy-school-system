@@ -53,12 +53,12 @@ export default function FeePaymentStructuresPage() {
 
     const filtered = ledgers.filter(l => {
         const matchesSearch = !search ||
-            l.studentId?.toLowerCase().includes(search.toLowerCase()) ||
-            l.studentName?.toLowerCase().includes(search.toLowerCase()) ||
-            l.parentName?.toLowerCase().includes(search.toLowerCase()) ||
-            l.parentMobile?.toLowerCase().includes(search.toLowerCase()) ||
-            l.villageName?.toLowerCase().includes(search.toLowerCase()) ||
-            l.className?.toLowerCase().includes(search.toLowerCase());
+            String(l.studentId || "").toLowerCase().includes(search.toLowerCase()) ||
+            String(l.studentName || "").toLowerCase().includes(search.toLowerCase()) ||
+            String(l.parentName || "").toLowerCase().includes(search.toLowerCase()) ||
+            String(l.parentMobile || "").toLowerCase().includes(search.toLowerCase()) ||
+            String(l.villageName || "").toLowerCase().includes(search.toLowerCase()) ||
+            String(l.className || "").toLowerCase().includes(search.toLowerCase());
 
         const matchesClass = classFilter === "all" || l.classId === classFilter || l.className === classFilter;
         const matchesVillage = villageFilter === "all" || l.villageId === villageFilter || l.villageName === villageFilter;
