@@ -142,11 +142,16 @@ export default function StudentsPage() {
                 studentDocId: doc.id
             })) as Student[];
             setStudents(list);
-            setLocalLoading(false);
         }, (error: any) => {
             console.error("Directory Stream Error:", error);
             setLocalLoading(false);
-            toast({ title: "Live Sync Error", description: "Database busy. Try again later.", type: "error" });
+            // Check if it's an index error (often contains a link or failed-precondition)
+            const isIndexError = error.message?.toLowerCase().includes("index") || error.code === "failed-precondition";
+            toast({
+                title: isIndexError ? "Sync Initializing" : "Live Sync Error",
+                description: isIndexError ? "Building database optimizations. Ready in 2-3 mins." : "Database busy. Try again later.",
+                type: isIndexError ? "info" : "error"
+            });
         });
 
         return () => unsubscribe();

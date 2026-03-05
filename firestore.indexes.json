@@ -221,6 +221,142 @@
                     "order": "ASCENDING"
                 }
             ]
+        },
+        {
+            "collectionGroup": "students",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "academicYear",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "students",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "academicYear",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "schoolId",
+                    "order": "ASCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "students",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "academicYear",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "schoolId",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "students",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "academicYear",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "status",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "students",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "academicYear",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "classId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "students",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "academicYear",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "villageId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "students",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "academicYear",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "sectionId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
+        },
+        {
+            "collectionGroup": "students",
+            "queryScope": "COLLECTION",
+            "fields": [
+                {
+                    "fieldPath": "academicYear",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "classId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "sectionId",
+                    "order": "ASCENDING"
+                },
+                {
+                    "fieldPath": "createdAt",
+                    "order": "DESCENDING"
+                }
+            ]
         }
     ],
     "fieldOverrides": []
