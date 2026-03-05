@@ -1,0 +1,27 @@
+[
+  {
+    "docId": "SHS0001",
+    "schoolId": "SHS0001",
+    "studentName": "bunny"
+  },
+  {
+    "docId": "SHS1001",
+    "schoolId": "SHS1001",
+    "studentName": "Advait Joshi"
+  },
+  {
+    "docId": "SHS1002",
+    "schoolId": "SHS1002",
+    "studentName": "Akash Malhotra"
+  },
+  {
+    "docId": "SHS1003",
+    "schoolId": "SHS1003",
+    "studentName": "Siya Nair"
+  },
+  {
+    "docId": "SHS1004",
+    "schoolId": "SHS1004",
+    "studentName": "Navya Khanna"
+  }
+]

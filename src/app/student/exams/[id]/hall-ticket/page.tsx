@@ -36,7 +36,7 @@ export default function StudentHallTicketPage({ params }: { params: Promise<{ id
             const schoolId = sData.schoolId || sData.id;
 
             // 2. Check Fees (Security)
-            const yearId = "2025-2026";
+            const yearId = sData.academicYear || "2025-2026";
             const ledgerRef = doc(db, "student_fee_ledgers", `${schoolId}_${yearId}`);
             const ledgerSnap = await getDoc(ledgerRef);
             let totalDue = 0;

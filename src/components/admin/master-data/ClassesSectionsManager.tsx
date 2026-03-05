@@ -106,12 +106,15 @@ export function ClassesSectionsManager() {
                     }));
 
                 return {
-                    className: classes[cs.classId]?.name || "N/A",
-                    sectionName: sections[cs.sectionId]?.name || "N/A",
+                    ...cs,
+                    className: classInfo.name || "N/A",
+                    classOrder: classInfo.order || 99,
+                    sectionName: sectionInfo.name || "N/A",
                     classTeacher: teachers.find(t => t.id === cs.classTeacherId)?.name || "N/A",
                     subjects: assignedSubjects
                 };
-            }).sort((a, b) => String(a.className || "").localeCompare(String(b.className || "")) || String(a.sectionName || "").localeCompare(String(b.sectionName || "")));
+            })
+            .sort((a, b) => (a.classOrder - b.classOrder) || (a.sectionName || "").localeCompare(b.sectionName || ""));
     };
 
     const handleExport = (ids: string[]) => {
@@ -229,8 +232,8 @@ export function ClassesSectionsManager() {
                                 </div>
 
                                 {getActiveCombinations().sort((a: any, b: any) => {
-                                    const cA = classes[a.classId]?.order || 0;
-                                    const cB = classes[b.classId]?.order || 0;
+                                    const cA = classes[a.classId]?.order || 99;
+                                    const cB = classes[b.classId]?.order || 99;
                                     if (cA !== cB) return cA - cB;
                                     return String(sections[a.sectionId]?.name || "").localeCompare(String(sections[b.sectionId]?.name || ""));
                                 }).map((cs: any) => {

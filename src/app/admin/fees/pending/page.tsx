@@ -36,14 +36,18 @@ export default function FeePendingsPage() {
     const [selectedVillages, setSelectedVillages] = useState<string[]>([]);
     const [sending, setSending] = useState(false);
 
-    const { classes: classesData, villages: villagesData, branding } = useMasterData();
+    const { classes: classesData, villages: villagesData, branding, selectedYear } = useMasterData();
     const classes = Object.values(classesData || {}).map((c: any) => ({ id: c.id, name: c.name, order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
     const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name || "Unknown Village" })).sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)));
 
     const fetchPendings = async () => {
         try {
-            // 1. Fetch ledgers with pending status
-            const q = query(collection(db, "student_fee_ledgers"), where("status", "==", "PENDING"));
+            // 1. Fetch ledgers with pending status for the current year
+            const q = query(
+                collection(db, "student_fee_ledgers"),
+                where("status", "==", "PENDING"),
+                where("academicYearId", "==", selectedYear || "2025-2026")
+            );
             const snap = await getDocs(q);
 
             const rawLedgers: any[] = snap.docs.map(d => {
@@ -87,7 +91,7 @@ export default function FeePendingsPage() {
 
     useEffect(() => {
         fetchPendings();
-    }, []);
+    }, [selectedYear]);
 
     const filtered = ledgers.filter(l => {
         const matchesSearch = !search ||

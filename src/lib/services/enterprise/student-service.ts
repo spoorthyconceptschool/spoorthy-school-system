@@ -1,7 +1,8 @@
-import { adminDb, adminAuth, adminRtdb, FieldValue, ServerValue, Timestamp } from "@/lib/firebase-admin";
+import { adminDb, adminAuth, adminRtdb, ServerValue, Timestamp } from "@/lib/firebase-admin";
 import { CreateStudentPayload, UpdateStudentPayload } from "@/lib/enterprise/schemas";
 import { AuditService } from "./audit-service";
 import { SearchService } from "./search-service";
+import { calculateStudentLedger } from "@/lib/fees/calculations";
 
 /**
  * Enterprise Student Service
@@ -111,18 +112,36 @@ export class EnterpriseStudentService {
                 email: studentRecord.syntheticEmail
             });
 
+            // --- REAL-TIME FEE LEDGER AUTOMATION ---
             const ledgerYear = payload.academicYear || "2026-2027";
             const ledgerRef = adminDb.collection("student_fee_ledgers").doc(`${studentRecord.newSchoolId}_${ledgerYear}`);
+
+            // Fetch fee context in parallel (Note: we use get() on adminDb here safely as it's outside the transaction above)
+            const [configSnap, customFeesSnap, classesSnap]: [any, any, any] = await Promise.all([
+                adminDb.collection("config").doc("fees").get(),
+                adminDb.collection("custom_fees").where("status", "==", "ACTIVE").where("academicYearId", "==", ledgerYear).get(),
+                adminDb.collection("master_classes").get()
+            ]);
+
+            const feeConfig = configSnap.exists ? configSnap.data() : { terms: [], transportFees: {} };
+            const activeCustomFees = customFeesSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as any));
+            const classMap = new Map<string, string>();
+            classesSnap.docs.forEach((d: any) => classMap.set(d.id, (d.data() as any).name));
+
+            const initialLedger = calculateStudentLedger(
+                finalStudentData,
+                feeConfig as any,
+                activeCustomFees,
+                classMap,
+                ledgerYear
+            );
+
             batch.set(ledgerRef, {
-                studentId: studentRecord.newSchoolId,
-                studentName,
-                yearId: ledgerYear,
-                totalFee: 0,
-                totalPaid: 0,
-                status: 'PENDING',
+                ...initialLedger,
                 createdAt: Timestamp.now(),
                 updatedAt: Timestamp.now()
             });
+            // ------------------------------------------
 
             await AuditService.log({
                 userId: createdBy,
@@ -188,22 +207,22 @@ export class EnterpriseStudentService {
             const cleanPayload = { ...payload };
             delete cleanPayload.versionContentHash;
 
-            const mergedData = { ...currentData, ...cleanPayload };
-            const keywords = Array.from(new Set([
-                ...SearchService.generateKeywords(mergedData.studentName || ""),
-                ...SearchService.generateKeywords(studentId),
-                ...SearchService.generateKeywords(mergedData.parentMobile || ""),
-                ...SearchService.generateKeywords(mergedData.className || ""),
-                ...SearchService.generateKeywords(mergedData.villageName || "")
-            ]));
-
             const updatedData = {
                 ...currentData,
                 ...cleanPayload,
                 version: nextVersion,
-                keywords,
                 updatedAt: Timestamp.now(),
             };
+
+            const keywords = Array.from(new Set([
+                ...SearchService.generateKeywords(updatedData.studentName || ""),
+                ...SearchService.generateKeywords(studentId),
+                ...SearchService.generateKeywords(updatedData.parentMobile || ""),
+                ...SearchService.generateKeywords(updatedData.className || ""),
+                ...SearchService.generateKeywords(updatedData.villageName || "")
+            ]));
+
+            updatedData.keywords = keywords;
 
             // 1. Core update inside transaction block
             transaction.set(studentRef, updatedData, { merge: true });
@@ -230,6 +249,44 @@ export class EnterpriseStudentService {
 
             // 4. Update Search Index
             SearchService.indexStudent(studentId, updatedData, transaction as any);
+
+            // 5. AUTO FEE SYNC (Triggered if class, village, or transport status changed)
+            const needsFeeSync =
+                cleanPayload.classId !== undefined ||
+                cleanPayload.villageId !== undefined ||
+                cleanPayload.transportRequired !== undefined;
+
+            if (needsFeeSync) {
+                const ledgerYear = updatedData.academicYear || "2026-2027";
+                const ledgerRef = adminDb.collection("student_fee_ledgers").doc(`${studentId}_${ledgerYear}`);
+
+                // Fetch context (Unfortunately we can't easily await inside transaction for external collections without performance hit, but for single record it's okay)
+                const [configDoc, customFeesSnap, classesSnap, ledgerDoc]: [any, any, any, any] = await Promise.all([
+                    adminDb.collection("config").doc("fees").get(),
+                    adminDb.collection("custom_fees").where("status", "==", "ACTIVE").where("academicYearId", "==", ledgerYear).get(),
+                    adminDb.collection("master_classes").get(),
+                    transaction.get(ledgerRef)
+                ]);
+
+                const feeConfig = configDoc.exists ? configDoc.data() : { terms: [], transportFees: {} };
+                const activeCustomFees = customFeesSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as any));
+                const classMap = new Map<string, string>();
+                classesSnap.docs.forEach((d: any) => classMap.set(d.id, (d.data() as any).name));
+
+                const updatedLedger = calculateStudentLedger(
+                    updatedData,
+                    feeConfig as any,
+                    activeCustomFees,
+                    classMap,
+                    ledgerYear,
+                    ledgerDoc.exists ? ledgerDoc.data() : undefined
+                );
+
+                transaction.set(ledgerRef, {
+                    ...updatedLedger,
+                    updatedAt: Timestamp.now()
+                }, { merge: true });
+            }
 
             return { success: true, newVersion: nextVersion };
         });

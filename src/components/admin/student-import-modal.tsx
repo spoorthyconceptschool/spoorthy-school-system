@@ -54,7 +54,7 @@ export function StudentImportModal({ onSuccess }: StudentImportModalProps) {
             const res = await fetch("/api/admin/students/import", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                body: JSON.stringify({ students: parsedData, academicYear: selectedYear || "2025-2026" })
+                body: JSON.stringify({ students: parsedData, academicYear: selectedYear || "2026-2027" })
             });
 
             const data = await res.json();

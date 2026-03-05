@@ -33,7 +33,7 @@ export default function CustomFeesPage() {
     const [submitting, setSubmitting] = useState(false);
 
     // Use Real-Time Master Data from Context
-    const { classes: masterClasses, villages: masterVillages } = useMasterData();
+    const { classes: masterClasses, villages: masterVillages, selectedYear } = useMasterData();
     const [allStudents, setAllStudents] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
 
@@ -102,6 +102,7 @@ export default function CustomFeesPage() {
                 // Create
                 await addDoc(collection(db, "custom_fees"), {
                     ...formData,
+                    academicYearId: selectedYear,
                     createdAt: serverTimestamp(),
                     status: "ACTIVE"
                 });
@@ -109,7 +110,7 @@ export default function CustomFeesPage() {
 
             // Auto-Sync
             const { syncAllStudentLedgers } = await import("@/lib/services/fee-service");
-            await syncAllStudentLedgers(db);
+            await syncAllStudentLedgers(db, selectedYear);
 
             alert(editingFeeId ? "Fee Updated & Synced" : "Fee Assigned & Synced Successfully");
             setIsWizardOpen(false);
@@ -146,7 +147,7 @@ export default function CustomFeesPage() {
 
             // Auto-Sync to remove from ledgers
             const { syncAllStudentLedgers } = await import("@/lib/services/fee-service");
-            await syncAllStudentLedgers(db);
+            await syncAllStudentLedgers(db, selectedYear);
 
             alert("Fee Deleted & Synced");
             fetchFees();

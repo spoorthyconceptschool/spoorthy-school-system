@@ -54,8 +54,15 @@ export async function GET(req: NextRequest) {
 
         const snap = await leavesQuery.limit(50).get();
 
+        // Robust Authorization Check: Filter in-memory to ensure section-level isolation.
+        // Line 52 queries by class for performance/index reasons, but we MUST respect section boundaries.
+        const docs = snap.docs
+            .map((doc: any) => ({ id: doc.id, ...doc.data() }))
+            .filter((d: any) =>
+                myAssignments.some((a: any) => a.classId === d.classId && a.sectionId === d.sectionId)
+            );
+
         // Sort in memory to bypass the missing Firebase generic index error
-        const docs = snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() }));
         docs.sort((a: any, b: any) => {
             const timeA = a.createdAt?.toMillis() || 0;
             const timeB = b.createdAt?.toMillis() || 0;

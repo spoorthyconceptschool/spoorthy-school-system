@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import { adminAuth, adminDb, adminRtdb } from "@/lib/firebase-admin";
 
 export async function POST(req: NextRequest) {
     try {
@@ -31,45 +31,63 @@ export async function POST(req: NextRequest) {
 
         const batch = adminDb.batch();
 
-        // 3. Disable Firebase Auth (if UID exists) - SOFT DELETE
+        // 3. HARD DELETE Implementation
         if (targetUid) {
             try {
-                // Disable instead of delete
-                await adminAuth.updateUser(targetUid, { disabled: true });
+                // Permanently delete Auth user
+                await adminAuth.deleteUser(targetUid);
 
-                // Update public user profile status
+                // Delete public user profile
                 const userRef = adminDb.collection("users").doc(targetUid);
-                batch.update(userRef, {
-                    status: "DELETED",
-                    deletedAt: new Date().toISOString(),
-                    deletedBy: decodedToken.uid
-                });
-                console.log(`- Auth user disabled & public profile marked DELETED`);
+                batch.delete(userRef);
+                console.log(`- Auth user deleted & public profile doc deleted`);
             } catch (authErr: any) {
                 if (authErr.code === 'auth/user-not-found') {
-                    console.warn(`- Auth user not found (already deleted?)`);
+                    console.warn(`- Auth user not found (already gone?)`);
+                    // Still try to delete Firestore doc
+                    const userRef = adminDb.collection("users").doc(targetUid);
+                    batch.delete(userRef);
                 } else {
-                    console.error("Auth Disable Error:", authErr);
-                    // Continue to update Firestore even if Auth update fails
+                    console.error("Auth Delete Error:", authErr);
                 }
             }
         }
 
-        // 4. Update Specific Collection (students/teachers/staff) - SOFT DELETE
+        // 4. Update Specific Collection & RTDB - HARD DELETE
         if (schoolId && collectionName) {
             const entityRef = adminDb.collection(collectionName).doc(schoolId);
-            batch.update(entityRef, {
-                status: "DELETED",
-                deletedAt: new Date().toISOString(),
-                deletedBy: decodedToken.uid
-            });
-            console.log(`- Main profile in ${collectionName} marked DELETED`);
+            batch.delete(entityRef);
+            console.log(`- Main profile in ${collectionName} hard deleted`);
+
+            // RTDB Cleanup
+            try {
+                const rtdbRef = adminRtdb.ref(`${collectionName}/${schoolId}`);
+                await rtdbRef.remove();
+                console.log(`- RTDB record removed from ${collectionName}/${schoolId}`);
+            } catch (rtdbErr) {
+                console.warn("- RTDB removal failed (non-critical):", rtdbErr);
+            }
+
+            // Student specific: Ledger cleanup if needed
+            if (collectionName === "students") {
+                // We keep ledgers for financial audit usually, but if "Hard Delete" is requested for reset:
+                // For now, only delete the identity records. 
+            }
         }
 
-        // 5. Audit Log
+        // 5. Search Index Cleanup
+        try {
+            const searchRef = adminDb.collection("search_index").doc(schoolId || targetUid);
+            batch.delete(searchRef);
+            console.log(`- Search index entry removed for ${schoolId || targetUid}`);
+        } catch (searchErr) {
+            console.warn("- Search index removal failed (non-critical):", searchErr);
+        }
+
+        // 6. Audit Log (as a separate record, since batch delete doesn't leave traces)
         const logRef = adminDb.collection("audit_logs").doc();
         batch.set(logRef, {
-            action: "ADMIN_SOFT_DELETE_USER",
+            action: "ADMIN_HARD_DELETE_USER",
             actorUid: decodedToken.uid,
             targetUid: targetUid || "N/A",
             targetSchoolId: schoolId || "N/A",
@@ -79,7 +97,7 @@ export async function POST(req: NextRequest) {
 
         await batch.commit();
 
-        return NextResponse.json({ success: true, message: "User deactivated successfully (Soft Delete)" });
+        return NextResponse.json({ success: true, message: "User permanently deleted successfully (Hard Delete)" });
 
     } catch (error: any) {
         console.error("Admin Delete User Error:", error);

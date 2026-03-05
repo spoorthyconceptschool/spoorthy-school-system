@@ -39,7 +39,7 @@ interface EditTeacherModalProps {
  * @returns {JSX.Element} The rendered modal component.
  */
 export function EditTeacherModal({ isOpen, onClose, teacher, onSuccess }: EditTeacherModalProps) {
-    const { subjects: masterSubjects, classes: masterClasses, sections: masterSections } = useMasterData();
+    const { subjects: masterSubjects, classes: masterClasses, sections: masterSections, classSections } = useMasterData();
     const [subjects, setSubjects] = useState<any[]>([]);
 
     // Form
@@ -103,6 +103,39 @@ export function EditTeacherModal({ isOpen, onClose, teacher, onSuccess }: EditTe
             if (form.primarySubject && form.primarySubject !== "NONE") selectedSubjects.push(form.primarySubject);
             if (form.secondarySubject && form.secondarySubject !== "NONE" && form.secondarySubject !== form.primarySubject) selectedSubjects.push(form.secondarySubject);
 
+            // 2. Perform RTDB sync FIRST (Canonical Registry)
+            const { ref, set, get, update } = await import("firebase/database");
+            const { rtdb } = await import("@/lib/firebase");
+            const teacherId = teacher.schoolId || teacher.id;
+
+            // Find all instances of this teacher in RTDB registry and clear them first
+            const registryRef = ref(rtdb, 'master/classSections');
+            const registrySnap = await get(registryRef);
+            if (registrySnap.exists()) {
+                const registry = registrySnap.val();
+                const updates: any = {};
+                Object.keys(registry).forEach(key => {
+                    if (registry[key].classTeacherId === teacherId) {
+                        updates[`${key}/classTeacherId`] = null;
+                        updates[`${key}/classTeacherName`] = null; // Also clear name for consistency
+                    }
+                });
+                if (Object.keys(updates).length > 0) {
+                    await update(registryRef, updates);
+                }
+            }
+
+            // Set new assignment if provided in RTDB
+            if (form.classTeacherClass && form.classTeacherClass !== "NONE") {
+                const csKey = `${form.classTeacherClass}_${form.classTeacherSection || "A"}`;
+                const rtdbRef = ref(rtdb, `master/classSections/${csKey}`);
+                await update(rtdbRef, {
+                    classTeacherId: teacherId,
+                    classTeacherName: form.name // Cache name for faster lookup
+                });
+            }
+
+            // 3. Update Firestore (Convenience Copy)
             const docRef = doc(db, "teachers", teacher.id);
             await updateDoc(docRef, {
                 name: form.name,
@@ -117,34 +150,6 @@ export function EditTeacherModal({ isOpen, onClose, teacher, onSuccess }: EditTe
                 } : null,
                 updatedAt: new Date().toISOString()
             });
-
-            // 2. Clear old RTDB assignment if any, and set new one
-            const { ref, set, get, update } = await import("firebase/database");
-            const { rtdb } = await import("@/lib/firebase");
-            const teacherId = teacher.schoolId || teacher.id;
-
-            // Find all instances of this teacher in RTDB registry and clear them first
-            const registryRef = ref(rtdb, 'master/classSections');
-            const registrySnap = await get(registryRef);
-            if (registrySnap.exists()) {
-                const registry = registrySnap.val();
-                const updates: any = {};
-                Object.keys(registry).forEach(key => {
-                    if (registry[key].classTeacherId === teacherId) {
-                        updates[`${key}/classTeacherId`] = null;
-                    }
-                });
-                if (Object.keys(updates).length > 0) {
-                    await update(registryRef, updates);
-                }
-            }
-
-            // Set new assignment if provided
-            if (form.classTeacherClass && form.classTeacherClass !== "NONE") {
-                const csKey = `${form.classTeacherClass}_${form.classTeacherSection || "A"}`;
-                const rtdbRef = ref(rtdb, `master/classSections/${csKey}/classTeacherId`);
-                await set(rtdbRef, teacherId);
-            }
 
             // Notification for Manager Action
             if (role === "MANAGER") {

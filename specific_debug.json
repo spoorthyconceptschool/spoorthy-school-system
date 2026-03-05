@@ -1,0 +1,61 @@
+{
+  "ledgerId": "SHS1199_2026-2027",
+  "exists": true,
+  "data": {
+    "studentId": "SHS1199",
+    "classId": "CLS_10",
+    "totalFee": 99000,
+    "totalPaid": 0,
+    "academicYearId": "2026-2027",
+    "className": "Class 7",
+    "items": [
+      {
+        "id": "TERM_term_1",
+        "type": "TERM",
+        "name": "I Term (Admission)",
+        "dueDate": "2026-06-15",
+        "amount": 33000,
+        "paidAmount": 0,
+        "status": "PENDING"
+      },
+      {
+        "id": "TERM_term_2",
+        "type": "TERM",
+        "name": "II Term (Mid-Year)",
+        "dueDate": "2026-10-15",
+        "amount": 33000,
+        "paidAmount": 0,
+        "status": "PENDING"
+      },
+      {
+        "id": "TERM_term_3",
+        "type": "TERM",
+        "name": "III Term (Final)",
+        "dueDate": "2027-02-15",
+        "amount": 33000,
+        "paidAmount": 0,
+        "status": "PENDING"
+      }
+    ],
+    "status": "PENDING",
+    "updatedAt": "2026-03-03T07:28:32.485Z"
+  },
+  "payments": [
+    {
+      "id": "PAY_SHS1199",
+      "date": {
+        "_seconds": 1772522912,
+        "_nanoseconds": 485000000
+      },
+      "studentId": "SHS1199",
+      "createdAt": {
+        "_seconds": 1772522912,
+        "_nanoseconds": 485000000
+      },
+      "amount": 5000,
+      "method": "cash",
+      "studentName": "Reyansh Malhotra",
+      "status": "success"
+    }
+  ]
+}

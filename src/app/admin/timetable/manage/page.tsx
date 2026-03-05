@@ -30,7 +30,7 @@ interface Slot {
 
 export default function TimetableManagePage() {
     const { user } = useAuth();
-    const { classes: classesData, sections: sectionsData, subjects: masterSubjects, classSubjects, subjectTeachers, branding } = useMasterData();
+    const { classes: classesData, sections: sectionsData, subjects: masterSubjects, classSubjects, subjectTeachers, branding, selectedYear } = useMasterData();
     const [activeTab, setActiveTab] = useState("settings");
     const [loading, setLoading] = useState(true);
 
@@ -115,7 +115,8 @@ export default function TimetableManagePage() {
     const fetchTimetable = async (classId: string, sectionId: string) => {
         setLoading(true);
         try {
-            const ttRef = doc(db, "class_timetables", `2025-2026_${classId}_${sectionId}`);
+            const currentYear = selectedYear || "2026-2027";
+            const ttRef = doc(db, "class_timetables", `${currentYear}_${classId}_${sectionId}`);
             const ttSnap = await getDoc(ttRef);
             if (ttSnap.exists()) {
                 setTimetable(ttSnap.data().schedule || {});
@@ -207,7 +208,7 @@ export default function TimetableManagePage() {
                     "Authorization": `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                    yearId: "2025-2026",
+                    yearId: selectedYear || "2026-2027",
                     classId: `${selectedClassId}_${selectedSectionId}`,
                     schedule: timetable
                 })

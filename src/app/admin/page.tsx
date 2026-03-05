@@ -75,7 +75,8 @@ export default function AdminDashboard() {
 
         const fetchEnterpriseStats = async () => {
             try {
-                const req = await fetch(`/api/admin/dashboard/stats?year=${encodeURIComponent(selectedYear || "2025-2026")}`);
+                const currentYear = selectedYear || "2026-2027";
+                const req = await fetch(`/api/admin/dashboard/stats?year=${encodeURIComponent(currentYear)}`);
                 const res = await req.json();
                 console.log("[AdminDashboard] Stats API response:", res);
                 if (res.success) {
@@ -351,14 +352,16 @@ export default function AdminDashboard() {
                     value={loading ? "..." : stats.totalStudents}
                     icon={<Users className="w-4 h-4 text-blue-400" />}
                     trend="Live Snapshot"
-                    className="bg-blue-500/5 border-blue-500/10"
+                    className="bg-blue-500/5 border-blue-500/10 cursor-pointer"
+                    onClick={() => router.push("/admin/students")}
                 />
                 <KPICard
-                    title="Collection"
-                    value={`₹${stats.todayCollection}`}
-                    icon={<IndianRupee className="w-4 h-4 text-emerald-400" />}
-                    trend="Today's Flow"
-                    className="bg-emerald-500/5 border-emerald-500/10"
+                    title="Active Grades"
+                    value={loading ? "..." : (stats as any).totalClasses || 0}
+                    icon={<Layers className="w-4 h-4 text-emerald-400" />}
+                    trend="Digital Registry"
+                    className="bg-emerald-500/5 border-emerald-500/10 cursor-pointer"
+                    onClick={() => router.push("/admin/master-data")}
                 />
                 <KPICard
                     title="Leave Requests"
@@ -366,16 +369,18 @@ export default function AdminDashboard() {
                     icon={<Calendar className={cn("w-4 h-4", stats.leaveRequests > 0 ? "text-rose-400" : "text-amber-400")} />}
                     trend={stats.leaveRequests > 0 ? `⚠️ Priority Action` : "✨ No Backlog"}
                     className={cn(
-                        "transition-all duration-500",
+                        "transition-all duration-500 cursor-pointer",
                         stats.leaveRequests > 0 ? "border-rose-500/40 bg-rose-500/10 shadow-[0_0_20px_-5px_rgba(244,63,94,0.3)] animate-pulse-subtle" : "bg-zinc-500/5"
                     )}
+                    onClick={() => router.push("/admin/faculty?tab=leaves")}
                 />
                 <KPICard
-                    title="Fee Payment Balance"
-                    value={`₹${stats.pendingFees}`}
-                    icon={<Database className="w-4 h-4 text-purple-400" />}
-                    trend="Outstanding"
-                    className="bg-purple-500/5 border-purple-500/10"
+                    title="Collection"
+                    value={`₹${stats.todayCollection}`}
+                    icon={<IndianRupee className="w-4 h-4 text-emerald-400" />}
+                    trend="Today's Flow"
+                    className="bg-emerald-500/5 border-emerald-500/10 cursor-pointer"
+                    onClick={() => router.push("/admin/payments")}
                 />
             </div>
 

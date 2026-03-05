@@ -259,6 +259,7 @@ export default function LeaveManagementPage() {
                                 {(() => {
                                     const teacherId = teacherProfile?.schoolId || teacherProfile?.id;
                                     const myClasses = Object.values(classSections || {}).filter((cs: any) => cs.classTeacherId === teacherId);
+                                    if (!teacherProfile && studentLoading) return "Loading assignments...";
                                     if (myClasses.length === 0) return "You are not assigned as a Class In-charge.";
                                     return `Showing leaves for ${myClasses.length} assigned class section${myClasses.length > 1 ? 's' : ''}`;
                                 })()}

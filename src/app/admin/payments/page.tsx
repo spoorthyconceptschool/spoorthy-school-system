@@ -31,7 +31,7 @@ export default function PaymentsPage() {
     const [payments, setPayments] = useState<Payment[]>([]);
     const [loading, setLoading] = useState(true);
     const [open, setOpen] = useState(false);
-    const { branding } = useMasterData();
+    const { branding, selectedYear } = useMasterData();
     const [role, setRole] = useState<string>("");
 
     useEffect(() => {
@@ -65,30 +65,41 @@ export default function PaymentsPage() {
     const [collectingFee, setCollectingFee] = useState(false);
 
     // Provide fetchAggregates and fetchPage as stable references/callbacks
-    const fetchAggregates = async () => {
+    const fetchAggregates = async (yearId: string) => {
+        if (!yearId) return;
         try {
+            console.log(`[PaymentsPage] Fetching aggregates for ${yearId}`);
             const colRef = collection(db, "payments");
+            const qBase = query(colRef, where("academicYear", "==", yearId));
 
             const [totalSnap, onlineSnap, cashSnap] = await Promise.all([
-                getAggregateFromServer(colRef, { total: sum("amount") }),
-                getAggregateFromServer(query(colRef, where("method", "==", "razorpay")), { total: sum("amount") }),
-                getAggregateFromServer(query(colRef, where("method", "==", "cash")), { total: sum("amount") })
+                getAggregateFromServer(qBase, { total: sum("amount") }),
+                getAggregateFromServer(query(qBase, where("method", "==", "razorpay")), { total: sum("amount") }),
+                getAggregateFromServer(query(qBase, where("method", "==", "cash")), { total: sum("amount") })
             ]);
 
-            setStats({
+            const statsData = {
                 total: totalSnap.data().total || 0,
                 online: onlineSnap.data().total || 0,
                 cash: cashSnap.data().total || 0
-            });
-        } catch (e) {
+            };
+            console.log("[PaymentsPage] Stats updated:", statsData);
+            setStats(statsData);
+        } catch (e: any) {
             console.error("Aggregation Failed:", e);
+            if (e.message?.includes("index")) {
+                console.warn("[PaymentsPage] Missing index for aggregates. Check console for URL.");
+            }
         }
     };
 
-    const fetchPage = async (pageIndex: number, newTokens: any[] = pageTokens) => {
+    const fetchPage = async (pageIndex: number, yearId: string, newTokens: any[] = pageTokens) => {
+        if (!yearId) return;
         setLoading(true);
         try {
+            console.log(`[PaymentsPage] Fetching payments for ${yearId}, page ${pageIndex}`);
             let baseConstraints: any[] = [
+                where("academicYear", "==", yearId),
                 orderBy("date", "desc"),
                 limit(PAGE_SIZE + 1)
             ];
@@ -118,21 +129,25 @@ export default function PaymentsPage() {
             }
 
             setCurrentPage(pageIndex);
-        } catch (err) {
+        } catch (err: any) {
             console.error("Payments Pagination error:", err);
+            if (err.message?.includes("index")) {
+                console.warn("[PaymentsPage] Missing index for payments query. Check console for URL.");
+            }
         } finally {
             setLoading(false);
         }
     };
 
     useEffect(() => {
+        if (!selectedYear) return;
         let isMounted = true;
 
-        fetchPage(0, []);
-        fetchAggregates();
+        fetchPage(0, selectedYear, []);
+        fetchAggregates(selectedYear);
 
         // 2. Fetch all active students for the autocomplete
-        const sq = query(collection(db, "students"), orderBy("studentName", "asc"));
+        const sq = query(collection(db, "students"), where("academicYear", "==", selectedYear), orderBy("studentName", "asc"));
         const unsubStudents = onSnapshot(sq, (snapshot) => {
             if (!isMounted) return;
             const loaded = snapshot.docs.map(doc => ({
@@ -142,14 +157,14 @@ export default function PaymentsPage() {
             setAllStudents(loaded);
         }, (err) => {
             if (!isMounted) return;
-            console.error("Students list listener error:", err);
+            console.warn("Students list listener error:", err.message);
         });
 
         return () => {
             isMounted = false;
             unsubStudents();
         };
-    }, []);
+    }, [selectedYear]);
 
     const handleSearch = (val: string) => {
         setSearchTerm(val);
@@ -172,7 +187,7 @@ export default function PaymentsPage() {
 
         // Fetch Ledger
         try {
-            const currentYearId = "2025-2026";
+            const currentYearId = selectedYear || "2025-2026";
             const ref = doc(db, "student_fee_ledgers", `${student.schoolId}_${currentYearId}`);
             const snap = await getDoc(ref);
             if (snap.exists()) {
@@ -209,7 +224,8 @@ export default function PaymentsPage() {
                     method: feeForm.method,
                     date: feeForm.date,
                     remarks: feeForm.remarks,
-                    adminId: user.uid
+                    adminId: user.uid,
+                    currentYearId: selectedYear || "2025-2026"
                 })
             });
 
@@ -222,8 +238,8 @@ export default function PaymentsPage() {
             setStudentLedger(null);
 
             // Refresh first page & Aggregates after correct payment processing
-            fetchPage(0, []);
-            fetchAggregates();
+            fetchPage(0, selectedYear, []);
+            fetchAggregates(selectedYear);
             alert("Payment Recorded & Ledger Updated");
 
         } catch (e: any) {
@@ -243,7 +259,8 @@ export default function PaymentsPage() {
             const sSnap = await getDoc(sRef);
             const student = sSnap.exists() ? { id: sSnap.id, ...sSnap.data() } : { studentName: payment.studentName, schoolId: payment.studentId, className: "N/A" };
 
-            const ledgerRef = doc(db, "student_fee_ledgers", `${payment.studentId}_2025-2026`);
+            const currentYearId = selectedYear || "2025-2026";
+            const ledgerRef = doc(db, "student_fee_ledgers", `${payment.studentId}_${currentYearId}`);
             const ledgerSnap = await getDoc(ledgerRef);
             const ledger = ledgerSnap.exists() ? ledgerSnap.data() : { totalFee: 0, totalPaid: 0 };
 
@@ -473,8 +490,8 @@ export default function PaymentsPage() {
                 serverPagination={true}
                 hasNextPage={pageTokens.length > currentPage}
                 hasPrevPage={currentPage > 0}
-                onNextPage={() => fetchPage(currentPage + 1)}
-                onPrevPage={() => fetchPage(currentPage - 1)}
+                onNextPage={() => fetchPage(currentPage + 1, selectedYear)}
+                onPrevPage={() => fetchPage(currentPage - 1, selectedYear)}
             />
         </div>
     );

@@ -228,7 +228,9 @@ export default function TeacherProfilePage() {
                                 </div>
                                 {(() => {
                                     const teacherId = profile.schoolId || profile.id;
-                                    const myClasses = Object.values(classSections || {}).filter((cs: any) => cs.classTeacherId === teacherId);
+                                    const myClasses = Object.values(classSections || {}).filter((cs: any) =>
+                                        cs.classTeacherId === teacherId && cs.isActive !== false
+                                    );
 
                                     if (myClasses.length === 0) return null;
 

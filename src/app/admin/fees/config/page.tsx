@@ -11,6 +11,7 @@ import { Switch } from "@/components/ui/switch";
 import { Loader2, Save, Plus, Trash2, RefreshCw, Bus } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { useMasterData } from "@/context/MasterDataContext";
+import { toast } from "@/lib/toast-store";
 
 interface FeeTerm {
     id: string;
@@ -29,7 +30,7 @@ interface ClassItem {
 }
 
 export default function FeesPage() {
-    const { classes: classesData } = useMasterData();
+    const { classes: classesData, selectedYear } = useMasterData();
     const [terms, setTerms] = useState<FeeTerm[]>([]);
     const [transportFees, setTransportFees] = useState<{ [villageId: string]: number }>({});
     const [loading, setLoading] = useState(true);
@@ -66,14 +67,14 @@ export default function FeesPage() {
             const docRef = doc(db, "config", "fees");
             await setDoc(docRef, { terms, transportFees }, { merge: true });
 
-            // 2. Auto-Sync (Immediate)
+            // 2. Real-time Background Sync (Automatic)
             const { syncAllStudentLedgers } = await import("@/lib/services/fee-service");
-            const updatedCount = await syncAllStudentLedgers(db);
+            const updatedCount = await syncAllStudentLedgers(db, selectedYear);
 
-            alert(`Fee structure saved and ${updatedCount} students synchronized successfully!`);
-        } catch (error) {
+            toast({ title: "Configuration Saved", description: `Internal registry updated and synced for ${updatedCount} students in real-time.`, type: "success" });
+        } catch (error: any) {
             console.error("Error saving fees:", error);
-            alert("Failed to save.");
+            toast({ title: "Save Failed", description: error.message, type: "error" });
         } finally {
             setSaving(false);
         }
@@ -123,7 +124,7 @@ export default function FeesPage() {
         setSyncing(true);
         try {
             const { syncAllStudentLedgers } = await import("@/lib/services/fee-service");
-            const updatedCount = await syncAllStudentLedgers(db);
+            const updatedCount = await syncAllStudentLedgers(db, selectedYear);
 
             alert(`Synced successfully for ${updatedCount} students.`);
 

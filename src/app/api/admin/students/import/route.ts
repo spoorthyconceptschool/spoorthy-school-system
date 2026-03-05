@@ -37,7 +37,7 @@ export async function POST(req: NextRequest) {
         }
 
         const { students, academicYear } = await req.json();
-        const currentYearId = academicYear || "2025-2026";
+        const currentYearId = academicYear || "2026-2027";
 
         if (!students || !Array.isArray(students)) {
             return NextResponse.json({ error: "Invalid data format" }, { status: 400 });

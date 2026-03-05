@@ -33,7 +33,7 @@ export default function StudentFeesPage() {
 
             // 1. Listen to Ledger
             if (unsubLedger) unsubLedger();
-            const yearId = "2025-2026";
+            const yearId = student.academicYear || "2025-2026";
             unsubLedger = onSnapshot(doc(db, "student_fee_ledgers", `${sId}_${yearId}`), (lSnap) => {
                 if (lSnap.exists()) setLedger(lSnap.data());
                 setLoading(false);

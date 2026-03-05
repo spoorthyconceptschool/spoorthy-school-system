@@ -38,7 +38,7 @@ export default function StudentExamsPage() {
             setStudentProfile(sData);
 
             // 2. Fetch Fee Status
-            const yearId = "2025-2026";
+            const yearId = sData.academicYear || "2025-2026";
             const ledgerRef = doc(db, "student_fee_ledgers", `${schoolId}_${yearId}`);
             const ledgerSnap = await getDoc(ledgerRef);
             let totalDue = 0;

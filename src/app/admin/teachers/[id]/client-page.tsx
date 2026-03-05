@@ -38,7 +38,7 @@ import { KeyRound, Settings } from "lucide-react";
 export default function TeacherProfilePage() {
     const { user } = useAuth();
     const { id } = useParams();
-    const { classSections, classes, sections, subjectTeachers, loading: masterLoading } = useMasterData();
+    const { classSections, classes, sections, subjectTeachers, subjects: masterSubjects, loading: masterLoading } = useMasterData();
     const router = useRouter();
     const [teacher, setTeacher] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -292,7 +292,7 @@ export default function TeacherProfilePage() {
                                                             {classes[a.classId]?.name || a.classId} - {sections[a.sectionId]?.name || a.sectionId}
                                                         </span>
                                                         <span className="text-[10px] text-purple-400 uppercase tracking-tighter font-bold">
-                                                            {useMasterData().subjects[a.subId]?.name || a.subId}
+                                                            {masterSubjects[a.subId]?.name || a.subId}
                                                         </span>
                                                     </div>
                                                 </div>

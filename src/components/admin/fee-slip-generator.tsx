@@ -19,7 +19,8 @@ export function FeeSlipGenerator({ students }: FeeSlipGeneratorProps) {
     const [slips, setSlips] = useState<any[]>([]);
     const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
     const [step, setStep] = useState<"SELECT" | "PREVIEW">("SELECT");
-    const { branding } = useMasterData();
+    const { branding, selectedYear } = useMasterData();
+    const router = useRouter();
 
     const availableClasses = Array.from(new Set(students.map(s => s.className))).filter(Boolean).sort();
 
@@ -48,7 +49,7 @@ export function FeeSlipGenerator({ students }: FeeSlipGeneratorProps) {
         setLoading(true);
         try {
             const ledgersRef = collection(db, "student_fee_ledgers");
-            const q = query(ledgersRef, where("academicYearId", "==", "2025-2026"));
+            const q = query(ledgersRef, where("academicYearId", "==", selectedYear));
             const lSnap = await getDocs(q);
             const ledgerMap: Record<string, any> = {};
             lSnap.forEach(doc => ledgerMap[doc.data().studentId] = doc.data());
@@ -66,6 +67,8 @@ export function FeeSlipGenerator({ students }: FeeSlipGeneratorProps) {
                 const customItems = sortedItems.filter((item: any) => item.type === "CUSTOM");
 
                 let totalPaidRemaining = ledger.totalPaid || 0;
+
+                // Find current term: either one due soonest, or the last one if all past.
                 let thisTerm = termItems.find((t: any) => t.dueDate >= today) || termItems[termItems.length - 1];
 
                 const pendingTerms: { name: string, total: number, pending: number, dueDate: string }[] = [];
@@ -100,14 +103,16 @@ export function FeeSlipGenerator({ students }: FeeSlipGeneratorProps) {
                     totalPaidRemaining -= paid;
                 });
 
-                const currentTermDueDate = thisTerm?.dueDate || "";
-                // Only show terms that are due or past due
+                const currentTermDueDate = thisTerm?.dueDate || "9999-99-99";
+                // Show terms that are due or past due relative to the 'current' Term
                 const activePendingTerms = pendingTerms.filter(pt => pt.dueDate <= currentTermDueDate);
 
                 if (activePendingTerms.length === 0 && busPending <= 0 && customPending <= 0) return null;
 
                 const activePendingTotal = activePendingTerms.reduce((sum: number, pt: any) => sum + pt.pending, 0);
                 const totalDisplayPending = activePendingTotal + busPending + customPending;
+
+                if (totalDisplayPending <= 0) return null;
 
                 return {
                     name: s.studentName,

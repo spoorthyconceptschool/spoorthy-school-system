@@ -1,0 +1,116 @@
+{
+  "payments": [
+    {
+      "id": "deilvUkoXztxa2pQfYlI",
+      "amount": 1000,
+      "type": "number",
+      "method": "cash"
+    },
+    {
+      "id": "5rvRuxuVjq7fZqhgkvQc",
+      "amount": 1000,
+      "type": "number",
+      "method": "cash"
+    },
+    {
+      "id": "l3PHpkULmAQhELLGZZHt",
+      "amount": 1000,
+      "type": "number",
+      "method": "cash"
+    },
+    {
+      "id": "CbbCvki4PKPL2AYPAaH3",
+      "amount": 1000,
+      "type": "number",
+      "method": "cash"
+    },
+    {
+      "id": "XpLsjgeN9NmEVv8TMOtO",
+      "amount": 10220,
+      "type": "number",
+      "method": "cash"
+    },
+    {
+      "id": "PAY_SHS1199",
+      "amount": 5000,
+      "type": "number",
+      "method": "cash"
+    },
+    {
+      "id": "PAY_SHS1196",
+      "amount": 5000,
+      "type": "number",
+      "method": "cash"
+    },
+    {
+      "id": "PAY_SHS1195",
+      "amount": 5000,
+      "type": "number",
+      "method": "cash"
+    },
+    {
+      "id": "PAY_SHS1193",
+      "amount": 5000,
+      "type": "number",
+      "method": "cash"
+    },
+    {
+      "id": "PAY_SHS1192",
+      "amount": 5000,
+      "type": "number",
+      "method": "cash"
+    }
+  ],
+  "ledgers": [
+    {
+      "id": "SHS0001_2025-2026",
+      "totalPaid": 2000,
+      "type": "number"
+    },
+    {
+      "id": "SHS0001_2026-2027",
+      "totalPaid": 0,
+      "type": "number"
+    },
+    {
+      "id": "SHS1001_2025-2026",
+      "totalPaid": 1000,
+      "type": "number"
+    },
+    {
+      "id": "SHS1001_2026-2027",
+      "totalPaid": 0,
+      "type": "number"
+    },
+    {
+      "id": "SHS1002_2026-2027",
+      "totalPaid": 0,
+      "type": "number"
+    },
+    {
+      "id": "SHS1003_2026-2027",
+      "totalPaid": 0,
+      "type": "number"
+    },
+    {
+      "id": "SHS1004_2026-2027",
+      "totalPaid": 0,
+      "type": "number"
+    },
+    {
+      "id": "SHS1005_2026-2027",
+      "totalPaid": 0,
+      "type": "number"
+    },
+    {
+      "id": "SHS1006_2026-2027",
+      "totalPaid": 0,
+      "type": "number"
+    },
+    {
+      "id": "SHS1007_2026-2027",
+      "totalPaid": 0,
+      "type": "number"
+    }
+  ]
+}

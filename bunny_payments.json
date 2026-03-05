@@ -1,0 +1,40 @@
+[
+  {
+    "id": "5rvRuxuVjq7fZqhgkvQc",
+    "studentId": "SHS0001",
+    "studentName": "bunny",
+    "amount": 1000,
+    "method": "cash",
+    "date": {
+      "_seconds": 1772496000,
+      "_nanoseconds": 0
+    },
+    "status": "success",
+    "remarks": "",
+    "createdAt": {
+      "_seconds": 1772529721,
+      "_nanoseconds": 256000000
+    },
+    "verifiedBy": "szFxo1AbbThGB6px6gMFxDG4orA2",
+    "type": "credit"
+  },
+  {
+    "id": "l3PHpkULmAQhELLGZZHt",
+    "studentId": "SHS0001",
+    "studentName": "bunny",
+    "amount": 1000,
+    "method": "cash",
+    "date": {
+      "_seconds": 1772496000,
+      "_nanoseconds": 0
+    },
+    "status": "success",
+    "remarks": "",
+    "createdAt": {
+      "_seconds": 1772529039,
+      "_nanoseconds": 972000000
+    },
+    "verifiedBy": "szFxo1AbbThGB6px6gMFxDG4orA2",
+    "type": "credit"
+  }
+]

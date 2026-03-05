@@ -13,9 +13,8 @@ import { useAuth } from "@/context/AuthContext";
 
 export default function TeachingAssignmentsPage() {
     const { user } = useAuth();
-    const { classes: classesData, subjects: masterSubjects } = useMasterData();
+    const { classes: classesData, subjects: masterSubjects, selectedYear } = useMasterData();
     const [loading, setLoading] = useState(true);
-    const [yearId, setYearId] = useState("2025-2026");
 
     // Convert master data objects to arrays
     const classes = Object.values(classesData).map((c: any) => ({ id: c.id, name: c.name, order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
@@ -65,7 +64,8 @@ export default function TeachingAssignmentsPage() {
     const fetchAssignments = async (classId: string) => {
         setLoading(true);
         try {
-            const res = await fetch(`/api/admin/timetable/assign?yearId=${yearId}&classId=${classId}`);
+            const currentYear = selectedYear || "2026-2027";
+            const res = await fetch(`/api/admin/timetable/assign?yearId=${currentYear}&classId=${classId}`);
             const data = await res.json();
             if (data.success && data.data) {
                 setAssignments(data.data.assignments || {});
@@ -93,7 +93,7 @@ export default function TeachingAssignmentsPage() {
                     "Authorization": `Bearer ${token}`
                 },
                 body: JSON.stringify({
-                    yearId,
+                    yearId: selectedYear || "2026-2027",
                     classId: selectedClassId,
                     assignments
                 })

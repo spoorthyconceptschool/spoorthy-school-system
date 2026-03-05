@@ -1,12 +1,14 @@
 import { adminDb, Timestamp } from "@/lib/firebase-admin";
 
-export async function syncAllStudentLedgersAdmin() {
+export async function syncAllStudentLedgersAdmin(academicYearId?: string) {
+    const currentYearId = academicYearId || "2025-2026";
+
     // 1. Fetch Necessary Data
-    const studentsSnap = await adminDb.collection("students").where("status", "==", "ACTIVE").get();
-    const customFeesSnap = await adminDb.collection("custom_fees").where("status", "==", "ACTIVE").get();
+    const studentsSnap = await adminDb.collection("students").where("status", "==", "ACTIVE").where("academicYear", "==", currentYearId).get();
+    const customFeesSnap = await adminDb.collection("custom_fees").where("status", "==", "ACTIVE").where("academicYearId", "==", currentYearId).get();
     const configSnap = await adminDb.collection("config").doc("fees").get();
     const classesSnap = await adminDb.collection("master_classes").get();
-    const ledgersSnap = await adminDb.collection("student_fee_ledgers").get();
+    const ledgersSnap = await adminDb.collection("student_fee_ledgers").where("academicYearId", "==", currentYearId).get();
 
     const students = studentsSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as any));
     const activeCustomFees = customFeesSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as any));
@@ -22,7 +24,6 @@ export async function syncAllStudentLedgersAdmin() {
     });
 
     let updatedCount = 0;
-    const currentYearId = "2025-2026";
 
     let batch = adminDb.batch();
     let batchCount = 0;

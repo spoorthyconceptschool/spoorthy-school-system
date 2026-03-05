@@ -310,7 +310,7 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
             setData(prev => ({
                 ...prev,
                 academicYears: {
-                    "2025-2026": { id: "2025-2026", name: "2025-2026", active: true, startDate: "", endDate: "" }
+                    "2026-2027": { id: "2026-2027", name: "2026-2027", active: true, startDate: "", endDate: "" }
                 }
             }));
         });

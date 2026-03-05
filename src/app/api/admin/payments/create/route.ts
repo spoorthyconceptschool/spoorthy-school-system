@@ -11,13 +11,13 @@ export async function POST(request: Request) {
         // Normally decode verifyIdToken(token) here, but assuming valid since middleware/layout protects
 
         const body = await request.json();
-        const { studentId, studentName, amount, method, date, remarks, adminId } = body;
+        const { studentId, studentName, amount, method, date, remarks, adminId, currentYearId: passedYear } = body;
 
         if (!studentId || !amount || amount <= 0) {
             return NextResponse.json({ success: false, error: "Invalid payment details" }, { status: 400 });
         }
 
-        const currentYearId = "2025-2026";
+        const currentYearId = passedYear || "2025-2026";
         const ledgerRef = adminDb.collection("student_fee_ledgers").doc(`${studentId}_${currentYearId}`);
         const studentRef = adminDb.collection("students").doc(studentId);
 
@@ -66,12 +66,13 @@ export async function POST(request: Request) {
                 studentName,
                 amount: Number(amount),
                 method,
-                date: new Date(date), // Firestore Admin SDK accepts native Dates directly
+                date: new Date(date),
                 status: "success",
                 remarks: remarks || "",
                 createdAt: new Date(),
                 verifiedBy: adminId || "admin",
                 type: "credit",
+                academicYear: currentYearId
             });
 
             // Notify Student (if UID exists)

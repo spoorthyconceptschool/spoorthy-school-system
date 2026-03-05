@@ -27,6 +27,7 @@ import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useMasterData } from "@/context/MasterDataContext";
+import { toast } from "@/lib/toast-store";
 
 interface Student {
     id: string;
@@ -58,16 +59,14 @@ export default function StudentsPage() {
     const [localLoading, setLocalLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<"directory" | "leaves">("directory");
 
-    // Pagination State
-    const [pageTokens, setPageTokens] = useState<any[]>([]);
-    const [currentPage, setCurrentPage] = useState(0);
-    const PAGE_SIZE = 20;
-
     // Filter State
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
     const [villageFilter, setVillageFilter] = useState("all");
     const [classFilter, setClassFilter] = useState("all");
+    const [sectionFilter, setSectionFilter] = useState("all");
+    const [sortBy, setSortBy] = useState<"createdAt" | "schoolId">("createdAt");
+    const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
     // Unified loading state
     const isTableLoading = (masterLoading && students.length === 0) || localLoading;
@@ -106,100 +105,61 @@ export default function StudentsPage() {
         return () => clearTimeout(watchdog);
     }, [localLoading]);
 
-    // Fetch Page
-    const fetchPage = async (pageIndex: number, newTokens: any[] = pageTokens) => {
-        if (!user) {
-            console.log("[StudentsPage] No user, skipping fetch.");
-            setLocalLoading(false);
-            return;
-        }
-        if (!selectedYear) {
-            console.log("[StudentsPage] No selectedYear, skipping fetch.");
-            setLocalLoading(false);
-            return;
-        }
+    // 1. Unified Real-time Listener (onSnapshot)
+    useEffect(() => {
+        if (!user || !selectedYear) return;
 
         setLocalLoading(true);
+        console.log(`[StudentsPage] Subscribing to students for ${selectedYear}`);
 
-        try {
-            console.log(`[StudentsPage] Fetching page ${pageIndex} for year ${selectedYear}`);
-            let baseConstraints: any[] = [
-                where("academicYear", "==", selectedYear),
-                limit(PAGE_SIZE + 1)
-            ];
+        let baseConstraints: any[] = [
+            where("academicYear", "==", selectedYear),
+        ];
 
-            if (statusFilter !== "all") baseConstraints.push(where("status", "==", statusFilter));
-            if (classFilter !== "all") baseConstraints.push(where("classId", "==", classFilter));
-            if (villageFilter !== "all") baseConstraints.push(where("villageId", "==", villageFilter));
+        if (statusFilter !== "all") baseConstraints.push(where("status", "==", statusFilter));
+        if (classFilter !== "all") baseConstraints.push(where("classId", "==", classFilter));
+        if (villageFilter !== "all") baseConstraints.push(where("villageId", "==", villageFilter));
+        if (sectionFilter !== "all") baseConstraints.push(where("sectionId", "==", sectionFilter));
 
-            // If there's a search query, use Enterprise Keyword Search (Prefix matching)
-            if (searchQuery.trim()) {
-                const qNormalized = searchQuery.trim().toLowerCase();
-                baseConstraints.push(where("keywords", "array-contains", qNormalized));
-            } else {
-                // Order by name if no search
-                baseConstraints.push(orderBy("studentName", "asc"));
-            }
-
-            if (pageIndex > 0 && newTokens[pageIndex - 1]) {
-                baseConstraints.push(startAfter(newTokens[pageIndex - 1]));
-            }
-
-            const q = query(collection(db, "students"), ...baseConstraints);
-            const snap = await getDocs(q);
-
-            const docs = snap.docs;
-            const hasMore = docs.length > PAGE_SIZE;
-            const displayDocs = hasMore ? docs.slice(0, PAGE_SIZE) : docs;
-
-            console.log(`[StudentsPage] Fetched ${displayDocs.length} students.`);
-            setStudents(displayDocs.map(d => ({ id: d.id, studentDocId: d.id, ...d.data() } as Student)));
-
-            if (hasMore) {
-                const nextTokens = [...newTokens];
-                nextTokens[pageIndex] = displayDocs[displayDocs.length - 1];
-                setPageTokens(nextTokens);
-            }
-
-            setCurrentPage(pageIndex);
-        } catch (error: any) {
-            console.error("Firebase Students Pagination Error Details:", {
-                message: error.message,
-                code: error.code
-            });
-
-            let errorMessage = "Unable to load student data.";
-            if (error.message?.includes("index")) {
-                errorMessage = "Database optimization (index) required. Please check developer console.";
-                console.warn("CRITICAL: Missing Firestore Index. Please check the browser console for the creation link.");
-            }
-
-            // @ts-ignore
-            import("@/lib/toast-store").then(m => m.toast({
-                title: "Loading Error",
-                description: errorMessage,
-                type: "error"
-            }));
-        } finally {
-            setLocalLoading(false);
+        // Sorting Logic
+        // If searching, we use keyword search (no order possible without specific index)
+        if (searchQuery.trim()) {
+            const qNormalized = searchQuery.trim().toLowerCase();
+            baseConstraints.push(where("keywords", "array-contains", qNormalized));
+        } else {
+            baseConstraints.push(orderBy(sortBy, sortOrder));
         }
-    };
 
-    // Reset pagination when filters change
-    useEffect(() => {
-        if (!selectedYear || !user) {
+        // Limit for safety/performance
+        baseConstraints.push(limit(100));
+
+        const q = query(collection(db, "students"), ...baseConstraints);
+        // Use onSnapshot for real-time reactivity as requested
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const list = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data(),
+                studentDocId: doc.id
+            })) as Student[];
+            setStudents(list);
             setLocalLoading(false);
-            return;
-        }
-        setPageTokens([]);
-        setCurrentPage(0);
+        }, (error: any) => {
+            console.error("Directory Stream Error:", error);
+            setLocalLoading(false);
+            toast({ title: "Live Sync Error", description: "Database busy. Try again later.", type: "error" });
+        });
 
-        // Debounce fetching to avoid spamming if user types in search
-        const timeout = setTimeout(() => {
-            fetchPage(0, []);
-        }, 500);
-        return () => clearTimeout(timeout);
-    }, [selectedYear, statusFilter, classFilter, villageFilter, searchQuery, user, role]);
+        return () => unsubscribe();
+    }, [user, selectedYear, statusFilter, classFilter, villageFilter, sectionFilter, searchQuery, sortBy, sortOrder]);
+
+    const sections = useMemo(() => {
+        if (classFilter === "all" || !classesData?.[classFilter]) return [];
+        const cls = classesData[classFilter];
+        return Object.values(cls.sections || {}).map((s: any) => ({
+            id: s.id,
+            name: s.name || "A"
+        }));
+    }, [classFilter, classesData]);
 
     return (
         <div className="space-y-4 md:space-y-6 animate-in fade-in duration-200 max-w-7xl mx-auto p-1 md:p-6 pb-20">
@@ -241,7 +201,7 @@ export default function StudentsPage() {
                         {isAdmin && (
                             <>
                                 <StudentImportModal onSuccess={() => { window.location.reload(); }} />
-                                <AddStudentModal onSuccess={() => fetchPage(0, [])} />
+                                <AddStudentModal onSuccess={() => { }} />
                             </>
                         )}
                     </div>
@@ -261,7 +221,7 @@ export default function StudentsPage() {
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
                         </div>
-                        <div className="grid grid-cols-2 md:grid-cols-4 lg:flex lg:flex-wrap gap-1.5 md:gap-2">
+                        <div className="flex flex-wrap gap-1.5 md:gap-2">
                             <Select value={statusFilter} onValueChange={setStatusFilter}>
                                 <SelectTrigger className="w-full lg:w-[160px] h-9 md:h-12 bg-white/5 border-white/10 rounded-lg md:rounded-xl text-xs md:text-sm">
                                     <div className="flex items-center gap-2">
@@ -276,7 +236,7 @@ export default function StudentsPage() {
                                 </SelectContent>
                             </Select>
 
-                            <Select value={classFilter} onValueChange={setClassFilter}>
+                            <Select value={classFilter} onValueChange={(val) => { setClassFilter(val); setSectionFilter("all"); }}>
                                 <SelectTrigger className="w-full lg:w-[160px] h-9 md:h-12 bg-white/5 border-white/10 rounded-lg md:rounded-xl text-xs md:text-sm">
                                     <div className="flex items-center gap-2">
                                         <BookOpen size={12} className="text-white/40" />
@@ -288,6 +248,20 @@ export default function StudentsPage() {
                                     {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                                 </SelectContent>
                             </Select>
+
+                            {sections.length > 0 && (
+                                <Select value={sectionFilter} onValueChange={setSectionFilter}>
+                                    <SelectTrigger className="w-full lg:w-[160px] h-9 md:h-12 bg-white/5 border-white/10 rounded-lg md:rounded-xl text-xs md:text-sm animate-in slide-in-from-left-2 duration-300">
+                                        <SelectValue placeholder="Section" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                                        <SelectItem value="all">All Sections</SelectItem>
+                                        {sections.map(s => (
+                                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            )}
 
                             <Select value={villageFilter} onValueChange={setVillageFilter}>
                                 <SelectTrigger className="w-full lg:w-[180px] h-9 md:h-12 bg-white/5 border-white/10 rounded-lg md:rounded-xl text-xs md:text-sm">
@@ -302,24 +276,40 @@ export default function StudentsPage() {
                                 </SelectContent>
                             </Select>
 
-                            {(searchQuery || statusFilter !== "all" || classFilter !== "all" || villageFilter !== "all") && (
-                                <Button
-                                    variant="ghost"
-                                    size="sm"
-                                    onClick={() => { setSearchQuery(""); setStatusFilter("all"); setClassFilter("all"); setVillageFilter("all"); }}
-                                    className="h-9 md:h-12 px-3 md:px-6 text-[8px] md:text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-lg md:rounded-xl border border-dashed border-white/10 transition-all col-span-2 md:col-span-1"
-                                >
-                                    Clear Filters
-                                </Button>
-                            )}
+                            <div className="h-9 md:h-12 w-px bg-white/10 mx-1 hidden sm:block" />
+
+                            <Select value={`${sortBy}-${sortOrder}`} onValueChange={(val) => {
+                                const [field, order] = val.split('-');
+                                setSortBy(field as "createdAt" | "schoolId");
+                                setSortOrder(order as "asc" | "desc");
+                            }}>
+                                <SelectTrigger className="w-full lg:w-[160px] h-9 md:h-12 bg-white/5 border-white/10 rounded-lg md:rounded-xl text-xs md:text-sm">
+                                    <SelectValue placeholder="Sort By" />
+                                </SelectTrigger>
+                                <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                                    <SelectItem value="createdAt-desc">Newest First</SelectItem>
+                                    <SelectItem value="createdAt-asc">Oldest First</SelectItem>
+                                    <SelectItem value="schoolId-asc">ID (Low to High)</SelectItem>
+                                    <SelectItem value="schoolId-desc">ID (High to Low)</SelectItem>
+                                </SelectContent>
+                            </Select>
+
                             <Button
                                 variant="ghost"
                                 size="sm"
-                                onClick={() => fetchPage(0, [])}
+                                onClick={() => {
+                                    setSearchQuery("");
+                                    setStatusFilter("all");
+                                    setClassFilter("all");
+                                    setVillageFilter("all");
+                                    setSectionFilter("all");
+                                    setSortBy("createdAt");
+                                    setSortOrder("desc");
+                                }}
                                 className="h-9 md:h-12 px-3 md:px-6 text-[8px] md:text-[10px] font-black uppercase tracking-widest text-accent hover:text-accent/80 rounded-lg md:rounded-xl border border-accent/20 transition-all"
                             >
                                 <RefreshCw className={cn("w-3 h-3 md:w-4 md:h-4 mr-2", localLoading && "animate-spin")} />
-                                Refresh
+                                Reset Filters
                             </Button>
                         </div>
                     </div>
@@ -329,11 +319,7 @@ export default function StudentsPage() {
                         <DataTable<Student>
                             data={students}
                             isLoading={isTableLoading}
-                            serverPagination={true}
-                            onNextPage={() => fetchPage(currentPage + 1)}
-                            onPrevPage={() => fetchPage(currentPage - 1)}
-                            hasNextPage={pageTokens.length > currentPage}
-                            hasPrevPage={currentPage > 0}
+                            pageSize={20}
                             onRowClick={(s) => router.push(`/admin/students/${s.schoolId}`)}
                             columns={[
                                 {

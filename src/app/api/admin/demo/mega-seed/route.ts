@@ -248,7 +248,7 @@ export async function GET(req: NextRequest) {
 
         // --- PHASE 6: LEDGERS ---
         logs.push("6. Syncing Financial Ledgers...");
-        const syncCount = await syncAllStudentLedgersAdmin();
+        const syncCount = await syncAllStudentLedgersAdmin("2026-2027");
         logs.push(`... Synchronized ${syncCount} ledgers.`);
 
         const duration = (Date.now() - startTime) / 1000;

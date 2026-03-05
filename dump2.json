@@ -1,0 +1,274 @@
+{
+  "sections": {
+    "CLS_01_SEC_A": {
+      "classId": "CLS_01",
+      "className": "Nursery",
+      "createdAt": {
+        "_nanoseconds": 269000000,
+        "_seconds": 1772522909
+      },
+      "displayName": "Nursery - A",
+      "id": "CLS_01_SEC_A",
+      "isActive": true,
+      "sectionId": "SEC_A",
+      "sectionName": "A"
+    },
+    "CLS_01_SEC_B": {
+      "classId": "CLS_01",
+      "className": "Nursery",
+      "createdAt": {
+        "_nanoseconds": 269000000,
+        "_seconds": 1772522909
+      },
+      "displayName": "Nursery - B",
+      "id": "CLS_01_SEC_B",
+      "isActive": true,
+      "sectionId": "SEC_B",
+      "sectionName": "B"
+    },
+    "CLS_02_SEC_A": {
+      "classId": "CLS_02",
+      "className": "LKG",
+      "createdAt": {
+        "_nanoseconds": 270000000,
+        "_seconds": 1772522909
+      },
+      "displayName": "LKG - A",
+      "id": "CLS_02_SEC_A",
+      "isActive": true,
+      "sectionId": "SEC_A",
+      "sectionName": "A"
+    },
+    "CLS_02_SEC_B": {
+      "classId": "CLS_02",
+      "className": "LKG",
+      "createdAt": {
+        "_nanoseconds": 270000000,
+        "_seconds": 1772522909
+      },
+      "displayName": "LKG - B",
+      "id": "CLS_02_SEC_B",
+      "isActive": true,
+      "sectionId": "SEC_B",
+      "sectionName": "B"
+    },
+    "CLS_03_SEC_A": {
+      "classId": "CLS_03",
+      "className": "UKG",
+      "createdAt": {
+        "_nanoseconds": 270000000,
+        "_seconds": 1772522909
+      },
+      "displayName": "UKG - A",
+      "id": "CLS_03_SEC_A",
+      "isActive": true,
+      "sectionId": "SEC_A",
+      "sectionName": "A"
+    },
+    "CLS_03_SEC_B": {
+      "classId": "CLS_03",
+      "className": "UKG",
+      "createdAt": {
+        "_nanoseconds": 270000000,
+        "_seconds": 1772522909
+      },
+      "displayName": "UKG - B",
+      "id": "CLS_03_SEC_B",
+      "isActive": true,
+      "sectionId": "SEC_B",
+      "sectionName": "B"
+    },
+    "CLS_04_SEC_A": {
+      "classId": "CLS_04",
+      "className": "Class 1",
+      "createdAt": {
+        "_nanoseconds": 270000000,
+        "_seconds": 1772522909
+      },
+      "displayName": "Class 1 - A",
+      "id": "CLS_04_SEC_A",
+      "isActive": true,
+      "sectionId": "SEC_A",
+      "sectionName": "A"
+    },
+    "CLS_04_SEC_B": {
+      "classId": "CLS_04",
+      "className": "Class 1",
+      "createdAt": {
+        "_nanoseconds": 270000000,
+        "_seconds": 1772522909
+      },
+      "displayName": "Class 1 - B",
+      "id": "CLS_04_SEC_B",
+      "isActive": true,
+      "sectionId": "SEC_B",
+      "sectionName": "B"
+    },
+    "CLS_05_SEC_A": {
+      "classId": "CLS_05",
+      "className": "Class 2",
+      "classTeacherId": "SHST0011",
+      "createdAt": {
+        "_nanoseconds": 270000000,
+        "_seconds": 1772522909
+      },
+      "displayName": "Class 2 - A",
+      "id": "CLS_05_SEC_A",
+      "isActive": true,
+      "sectionId": "SEC_A",
+      "sectionName": "A"
+    },
+    "CLS_05_SEC_B": {
+      "classId": "CLS_05",
+      "className": "Class 2",
+      "createdAt": {
+        "_nanoseconds": 270000000,
+        "_seconds": 1772522909
+      },
+      "displayName": "Class 2 - B",
+      "id": "CLS_05_SEC_B",
+      "isActive": true,
+      "sectionId": "SEC_B",
+      "sectionName": "B"
+    },
+    "CLS_06_SEC_A": {
+      "classId": "CLS_06",
+      "className": "Class 3",
+      "classTeacherId": "TCH103",
+      "createdAt": {
+        "_nanoseconds": 270000000,
+        "_seconds": 1772522909
+      },
+      "displayName": "Class 3 - A",
+      "id": "CLS_06_SEC_A",
+      "isActive": true,
+      "sectionId": "SEC_A",
+      "sectionName": "A"
+    },
+    "CLS_06_SEC_B": {
+      "classId": "CLS_06",
+      "className": "Class 3",
+      "classTeacherId": "TCH102",
+      "createdAt": {
+        "_nanoseconds": 271000000,
+        "_seconds": 1772522909
+      },
+      "displayName": "Class 3 - B",
+      "id": "CLS_06_SEC_B",
+      "isActive": true,
+      "sectionId": "SEC_B",
+      "sectionName": "B"
+    },
+    "CLS_07_SEC_A": {
+      "active": true,
+      "classId": "CLS_07",
+      "className": "Class 4",
+      "classTeacherId": "SHST0011",
+      "createdAt": {
+        "_nanoseconds": 271000000,
+        "_seconds": 1772522909
+      },
+      "displayName": "Class 4 - A",
+      "id": "CLS_07_SEC_A",
+      "isActive": true,
+      "sectionId": "SEC_A",
+      "sectionName": "A"
+    },
+    "CLS_07_SEC_B": {
+      "classId": "CLS_07",
+      "className": "Class 4",
+      "createdAt": {
+        "_nanoseconds": 271000000,
+        "_seconds": 1772522909
+      },
+      "displayName": "Class 4 - B",
+      "id": "CLS_07_SEC_B",
+      "isActive": true,
+      "sectionId": "SEC_B",
+      "sectionName": "B"
+    },
+    "CLS_08_SEC_A": {
+      "classId": "CLS_08",
+      "className": "Class 5",
+      "createdAt": {
+        "_nanoseconds": 272000000,
+        "_seconds": 1772522909
+      },
+      "displayName": "Class 5 - A",
+      "id": "CLS_08_SEC_A",
+      "isActive": true,
+      "sectionId": "SEC_A",
+      "sectionName": "A"
+    },
+    "CLS_08_SEC_B": {
+      "classId": "CLS_08",
+      "className": "Class 5",
+      "createdAt": {
+        "_nanoseconds": 272000000,
+        "_seconds": 1772522909
+      },
+      "displayName": "Class 5 - B",
+      "id": "CLS_08_SEC_B",
+      "isActive": true,
+      "sectionId": "SEC_B",
+      "sectionName": "B"
+    },
+    "CLS_09_SEC_A": {
+      "classId": "CLS_09",
+      "className": "Class 6",
+      "createdAt": {
+        "_nanoseconds": 272000000,
+        "_seconds": 1772522909
+      },
+      "displayName": "Class 6 - A",
+      "id": "CLS_09_SEC_A",
+      "isActive": true,
+      "sectionId": "SEC_A",
+      "sectionName": "A"
+    },
+    "CLS_09_SEC_B": {
+      "classId": "CLS_09",
+      "className": "Class 6",
+      "createdAt": {
+        "_nanoseconds": 272000000,
+        "_seconds": 1772522909
+      },
+      "displayName": "Class 6 - B",
+      "id": "CLS_09_SEC_B",
+      "isActive": true,
+      "sectionId": "SEC_B",
+      "sectionName": "B"
+    },
+    "CLS_10_SEC_A": {
+      "classId": "CLS_10",
+      "className": "Class 7",
+      "classTeacherId": "SHST0011",
+      "createdAt": {
+        "_nanoseconds": 272000000,
+        "_seconds": 1772522909
+      },
+      "displayName": "Class 7 - A",
+      "id": "CLS_10_SEC_A",
+      "isActive": true,
+      "sectionId": "SEC_A",
+      "sectionName": "A"
+    },
+    "CLS_10_SEC_B": {
+      "classId": "CLS_10",
+      "className": "Class 7",
+      "createdAt": {
+        "_nanoseconds": 272000000,
+        "_seconds": 1772522909
+      },
+      "displayName": "Class 7 - B",
+      "id": "CLS_10_SEC_B",
+      "isActive": true,
+      "sectionId": "SEC_B",
+      "sectionName": "B"
+    }
+  },
+  "teacher": {
+    "classId": "CLS_05",
+    "sectionId": "SEC_A"
+  }
+}
