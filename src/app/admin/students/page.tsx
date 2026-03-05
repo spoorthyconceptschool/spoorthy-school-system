@@ -61,7 +61,7 @@ export default function StudentsPage() {
 
     // Filter State
     const [searchQuery, setSearchQuery] = useState("");
-    const [statusFilter, setStatusFilter] = useState("all");
+    const [statusFilter, setStatusFilter] = useState("ACTIVE");
     const [villageFilter, setVillageFilter] = useState("all");
     const [classFilter, setClassFilter] = useState("all");
     const [sectionFilter, setSectionFilter] = useState("all");
@@ -475,11 +475,23 @@ export default function StudentsPage() {
                             }}
                             onDeactivate={async (reason) => {
                                 if (!selectedStudent) return;
-                                await updateDoc(doc(db, "students", selectedStudent.studentDocId || selectedStudent.schoolId), {
+                                const studentDocId = selectedStudent.studentDocId || selectedStudent.schoolId;
+                                await updateDoc(doc(db, "students", studentDocId), {
                                     status: "INACTIVE",
                                     deactivationReason: reason,
                                     updatedAt: new Date().toISOString()
                                 });
+
+                                // Also update status in student_fee_ledgers if exists to hide from fee reports
+                                try {
+                                    const ledgerId = `${selectedStudent.schoolId}_${selectedYear}`;
+                                    await updateDoc(doc(db, "student_fee_ledgers", ledgerId), {
+                                        studentStatus: "INACTIVE",
+                                        updatedAt: new Date().toISOString()
+                                    });
+                                } catch (e) {
+                                    console.warn("Ledger not found or update failed during deactivation:", e);
+                                }
                             }}
                             onDelete={async (reason) => {
                                 if (!selectedStudent) return;

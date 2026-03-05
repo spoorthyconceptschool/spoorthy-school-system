@@ -14,7 +14,7 @@ export async function GET(req: NextRequest) {
         const academicYear = url.searchParams.get("year") || "2026-2027";
 
         const [studentsSnap, staffSnap, classesSnap] = await Promise.all([
-            adminDb.collection("students").count().get(),
+            adminDb.collection("students").where("status", "==", "ACTIVE").count().get(),
             adminDb.collection("users").where("role", "==", "TEACHER").where("status", "==", "ACTIVE").count().get(),
             adminRtdb.ref("master/classes").get()
         ]);

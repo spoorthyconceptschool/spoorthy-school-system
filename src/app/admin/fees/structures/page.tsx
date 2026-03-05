@@ -62,8 +62,9 @@ export default function FeePaymentStructuresPage() {
 
         const matchesClass = classFilter === "all" || l.classId === classFilter || l.className === classFilter;
         const matchesVillage = villageFilter === "all" || l.villageId === villageFilter || l.villageName === villageFilter;
+        const isActive = l.studentStatus !== "INACTIVE";
 
-        return matchesSearch && matchesClass && matchesVillage;
+        return matchesSearch && matchesClass && matchesVillage && isActive;
     });
 
     const exportToCSV = (targetData: any[]) => {
