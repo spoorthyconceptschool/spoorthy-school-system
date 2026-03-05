@@ -7,7 +7,7 @@ import { db } from "@/lib/firebase";
 import { AddStudentModal } from "@/components/admin/add-student-modal";
 import { DeleteUserModal } from "@/components/admin/delete-user-modal";
 import { AdminChangePasswordModal } from "@/components/admin/admin-change-password-modal";
-import { Filter, Search as SearchIcon, Users, MoreHorizontal, Key, Trash2, Download, Loader2, User, MapPin, Phone, BookOpen } from "lucide-react";
+import { Filter, Search as SearchIcon, Plus, Download, IndianRupee, Users, MoreHorizontal, User, Key, Trash2, CreditCard, Loader2, MapPin, Phone, BookOpen, RefreshCw } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { StudentImportModal } from "@/components/admin/student-import-modal";
 import { DataTable } from "@/components/ui/data-table";
@@ -52,7 +52,7 @@ import { StudentLeavesManager } from "@/components/admin/student-leaves-manager"
 
 export default function StudentsPage() {
     const router = useRouter();
-    const { user, role } = useAuth();
+    const { user, role, isAdmin } = useAuth();
     const { villages: villagesData, classes: classesData, loading: masterLoading, selectedYear } = useMasterData();
     const [students, setStudents] = useState<Student[]>([]);
     const [localLoading, setLocalLoading] = useState(true);
@@ -70,7 +70,18 @@ export default function StudentsPage() {
     const [classFilter, setClassFilter] = useState("all");
 
     // Unified loading state
-    const isTableLoading = masterLoading || localLoading;
+    const isTableLoading = (masterLoading && students.length === 0) || localLoading;
+
+    // Watchdog for master data
+    useEffect(() => {
+        if (masterLoading) {
+            const t = setTimeout(() => {
+                // If master data is still loading after 5s, we might already have local data or cache.
+                // We'll proceed with localLoading only.
+            }, 5000);
+            return () => clearTimeout(t);
+        }
+    }, [masterLoading]);
 
     const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name || "Unknown Village" })).sort((a, b) => String(a.name).localeCompare(String(b.name)));
     const classes = Object.values(classesData || {}).map((c: any) => ({ id: c.id, name: c.name || "Unknown Class", order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
@@ -81,12 +92,37 @@ export default function StudentsPage() {
     const [resetUser, setResetUser] = useState<{ uid: string, schoolId: string, name: string, role: string } | null>(null);
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
 
+    // Loading Watchdog
+    useEffect(() => {
+        let watchdog: any;
+        if (localLoading) {
+            watchdog = setTimeout(() => {
+                if (localLoading) {
+                    console.warn("[Watchdog] Student fetch taking too long (>10s), forcing loading to false.");
+                    setLocalLoading(false);
+                }
+            }, 10000);
+        }
+        return () => clearTimeout(watchdog);
+    }, [localLoading]);
+
     // Fetch Page
     const fetchPage = async (pageIndex: number, newTokens: any[] = pageTokens) => {
-        if (!selectedYear || !user) return;
+        if (!user) {
+            console.log("[StudentsPage] No user, skipping fetch.");
+            setLocalLoading(false);
+            return;
+        }
+        if (!selectedYear) {
+            console.log("[StudentsPage] No selectedYear, skipping fetch.");
+            setLocalLoading(false);
+            return;
+        }
+
         setLocalLoading(true);
 
         try {
+            console.log(`[StudentsPage] Fetching page ${pageIndex} for year ${selectedYear}`);
             let baseConstraints: any[] = [
                 where("academicYear", "==", selectedYear),
                 limit(PAGE_SIZE + 1)
@@ -96,11 +132,10 @@ export default function StudentsPage() {
             if (classFilter !== "all") baseConstraints.push(where("classId", "==", classFilter));
             if (villageFilter !== "all") baseConstraints.push(where("villageId", "==", villageFilter));
 
-            // If there's a search query, since we don't have Full Text Search, we do an exact match or prefix if needed.
-            // But we will stick to exact match or basic startsWith on ID for enterprise reliability
+            // If there's a search query, use Enterprise Keyword Search (Prefix matching)
             if (searchQuery.trim()) {
-                const q = searchQuery.trim().toUpperCase();
-                baseConstraints.push(where("schoolId", "==", q));
+                const qNormalized = searchQuery.trim().toLowerCase();
+                baseConstraints.push(where("keywords", "array-contains", qNormalized));
             } else {
                 // Order by name if no search
                 baseConstraints.push(orderBy("studentName", "asc"));
@@ -117,6 +152,7 @@ export default function StudentsPage() {
             const hasMore = docs.length > PAGE_SIZE;
             const displayDocs = hasMore ? docs.slice(0, PAGE_SIZE) : docs;
 
+            console.log(`[StudentsPage] Fetched ${displayDocs.length} students.`);
             setStudents(displayDocs.map(d => ({ id: d.id, studentDocId: d.id, ...d.data() } as Student)));
 
             if (hasMore) {
@@ -129,12 +165,21 @@ export default function StudentsPage() {
         } catch (error: any) {
             console.error("Firebase Students Pagination Error Details:", {
                 message: error.message,
-                code: error.code,
-                stack: error.stack
+                code: error.code
             });
+
+            let errorMessage = "Unable to load student data.";
             if (error.message?.includes("index")) {
+                errorMessage = "Database optimization (index) required. Please check developer console.";
                 console.warn("CRITICAL: Missing Firestore Index. Please check the browser console for the creation link.");
             }
+
+            // @ts-ignore
+            import("@/lib/toast-store").then(m => m.toast({
+                title: "Loading Error",
+                description: errorMessage,
+                type: "error"
+            }));
         } finally {
             setLocalLoading(false);
         }
@@ -142,7 +187,10 @@ export default function StudentsPage() {
 
     // Reset pagination when filters change
     useEffect(() => {
-        if (!selectedYear) return;
+        if (!selectedYear || !user) {
+            setLocalLoading(false);
+            return;
+        }
         setPageTokens([]);
         setCurrentPage(0);
 
@@ -151,7 +199,7 @@ export default function StudentsPage() {
             fetchPage(0, []);
         }, 500);
         return () => clearTimeout(timeout);
-    }, [selectedYear, statusFilter, classFilter, villageFilter, searchQuery]);
+    }, [selectedYear, statusFilter, classFilter, villageFilter, searchQuery, user, role]);
 
     return (
         <div className="space-y-4 md:space-y-6 animate-in fade-in duration-200 max-w-7xl mx-auto p-1 md:p-6 pb-20">
@@ -190,12 +238,10 @@ export default function StudentsPage() {
                 {activeTab === "directory" && (
                     <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
                         <StudentExportModal students={students} />
-                        {role !== "MANAGER" && (
+                        {isAdmin && (
                             <>
                                 <StudentImportModal onSuccess={() => { window.location.reload(); }} />
-                                <AddStudentModal onSuccess={() => {
-                                    console.log("Student added, onSnapshot should render it instantly.");
-                                }} />
+                                <AddStudentModal onSuccess={() => fetchPage(0, [])} />
                             </>
                         )}
                     </div>
@@ -257,10 +303,24 @@ export default function StudentsPage() {
                             </Select>
 
                             {(searchQuery || statusFilter !== "all" || classFilter !== "all" || villageFilter !== "all") && (
-                                <Button variant="ghost" size="sm" onClick={() => { setSearchQuery(""); setStatusFilter("all"); setClassFilter("all"); setVillageFilter("all"); }} className="h-9 md:h-12 px-3 md:px-6 text-[8px] md:text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-lg md:rounded-xl border border-dashed border-white/10 transition-all col-span-2 md:col-span-1">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => { setSearchQuery(""); setStatusFilter("all"); setClassFilter("all"); setVillageFilter("all"); }}
+                                    className="h-9 md:h-12 px-3 md:px-6 text-[8px] md:text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-white rounded-lg md:rounded-xl border border-dashed border-white/10 transition-all col-span-2 md:col-span-1"
+                                >
                                     Clear Filters
                                 </Button>
                             )}
+                            <Button
+                                variant="ghost"
+                                size="sm"
+                                onClick={() => fetchPage(0, [])}
+                                className="h-9 md:h-12 px-3 md:px-6 text-[8px] md:text-[10px] font-black uppercase tracking-widest text-accent hover:text-accent/80 rounded-lg md:rounded-xl border border-accent/20 transition-all"
+                            >
+                                <RefreshCw className={cn("w-3 h-3 md:w-4 md:h-4 mr-2", localLoading && "animate-spin")} />
+                                Refresh
+                            </Button>
                         </div>
                     </div>
 
@@ -348,36 +408,45 @@ export default function StudentsPage() {
                                     cellClassName: "text-right",
                                     render: (s) => (
                                         <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
-                                            {(role?.toUpperCase() === "ADMIN" || role?.toUpperCase() === "MANAGER") && (
-                                                <DropdownMenu>
-                                                    <DropdownMenuTrigger asChild>
-                                                        <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-white/10">
-                                                            <MoreHorizontal size={14} />
-                                                        </Button>
-                                                    </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="bg-zinc-900 border-white/10 text-white min-w-[160px] p-1.5 rounded-xl shadow-2xl">
-                                                        <DropdownMenuItem onClick={() => {
-                                                            router.push(`/admin/students/${s.schoolId}`);
-                                                        }} className="rounded-lg gap-2 text-xs font-bold text-white hover:text-accent transition-colors">
-                                                            <User size={14} /> Edit Profile
-                                                        </DropdownMenuItem>
-                                                        <DropdownMenuItem onClick={() => {
-                                                            if (!s.uid) { alert("UID Missing"); return; }
-                                                            setResetUser({ uid: s.uid, schoolId: s.schoolId, name: s.studentName, role: "STUDENT" });
-                                                            setIsResetModalOpen(true);
-                                                        }} className="rounded-lg gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors">
-                                                            <Key size={14} /> Reset Password
-                                                        </DropdownMenuItem>
-                                                        {(role?.toUpperCase() === "ADMIN" || role?.toUpperCase() === "MANAGER") && (
+                                            {isAdmin && (
+                                                <>
+                                                    <Button
+                                                        variant="ghost"
+                                                        size="icon"
+                                                        onClick={() => router.push(`/admin/students/${s.schoolId}?action=collect-fee`)}
+                                                        className="h-8 w-8 rounded-lg hover:bg-emerald-500/10 text-emerald-500"
+                                                        title="Collect Fee"
+                                                    >
+                                                        <CreditCard size={14} />
+                                                    </Button>
+                                                    <DropdownMenu>
+                                                        <DropdownMenuTrigger asChild>
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-white/10">
+                                                                <MoreHorizontal size={14} />
+                                                            </Button>
+                                                        </DropdownMenuTrigger>
+                                                        <DropdownMenuContent align="end" className="bg-zinc-900 border-white/10 text-white min-w-[160px] p-1.5 rounded-xl shadow-2xl">
+                                                            <DropdownMenuItem onClick={() => {
+                                                                router.push(`/admin/students/${s.schoolId}`);
+                                                            }} className="rounded-lg gap-2 text-xs font-bold text-white hover:text-accent transition-colors">
+                                                                <User size={14} /> Edit Profile
+                                                            </DropdownMenuItem>
+                                                            <DropdownMenuItem onClick={() => {
+                                                                if (!s.uid) { alert("UID Missing"); return; }
+                                                                setResetUser({ uid: s.uid, schoolId: s.schoolId, name: s.studentName, role: "STUDENT" });
+                                                                setIsResetModalOpen(true);
+                                                            }} className="rounded-lg gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors">
+                                                                <Key size={14} /> Reset Password
+                                                            </DropdownMenuItem>
                                                             <DropdownMenuItem onClick={() => {
                                                                 setSelectedStudent(s);
                                                                 setIsDeleteModalOpen(true);
                                                             }} className="rounded-lg gap-2 text-xs font-bold text-red-500 hover:text-red-400 transition-colors">
                                                                 <Trash2 size={14} /> Delete Student
                                                             </DropdownMenuItem>
-                                                        )}
-                                                    </DropdownMenuContent>
-                                                </DropdownMenu>
+                                                        </DropdownMenuContent>
+                                                    </DropdownMenu>
+                                                </>
                                             )}
                                         </div>
                                     )

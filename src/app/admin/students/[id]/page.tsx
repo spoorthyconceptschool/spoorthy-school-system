@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { doc, getDoc, collection, query, where, getDocs, deleteDoc, updateDoc, addDoc, Timestamp, orderBy, setDoc, onSnapshot, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { motion } from "framer-motion";
@@ -98,7 +98,8 @@ export default function StudentDetailsPage() {
     const [payments, setPayments] = useState<Payment[]>([]);
     const [ledger, setLedger] = useState<FeeLedger | null>(null);
     const [loading, setLoading] = useState(true);
-    const { user, role } = useAuth();
+    const { user, role, isAdmin } = useAuth();
+    const searchParams = useSearchParams();
 
     // UI State
     const [isEditing, setIsEditing] = useState(false);
@@ -127,6 +128,13 @@ export default function StudentDetailsPage() {
     useEffect(() => {
         setFeeForm(prev => ({ ...prev, date: new Date().toISOString().split('T')[0] }));
     }, []);
+
+    // Auto-open collect fee modal if action=collect-fee is present
+    useEffect(() => {
+        if (searchParams.get('action') === 'collect-fee') {
+            setIsFeeModalOpen(true);
+        }
+    }, [searchParams]);
 
     // Initial Fetch
     useEffect(() => {
@@ -197,7 +205,7 @@ export default function StudentDetailsPage() {
         };
 
         fetchAll();
-    }, [studentId, router, selectedYear]);
+    }, [studentId, router, selectedYear, searchParams]);
 
     // Update Profile
     const handleUpdate = async () => {
@@ -625,7 +633,7 @@ export default function StudentDetailsPage() {
 
                 {!loading && student && (
                     <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
-                        {(role?.toUpperCase() === "ADMIN" || role?.toUpperCase() === "MANAGER") && (
+                        {isAdmin && (
                             <Dialog open={isFeeModalOpen} onOpenChange={setIsFeeModalOpen}>
                                 <DialogTrigger asChild>
                                     <Button size="sm" className="h-8 md:h-11 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg text-[10px] md:text-sm font-bold flex-1 md:flex-none">
@@ -683,12 +691,12 @@ export default function StudentDetailsPage() {
                             </Dialog>
                         )}
 
-                        {(role?.toUpperCase() === "ADMIN" || role?.toUpperCase() === "MANAGER") && !isEditing && (
+                        {isAdmin && !isEditing && (
                             <div className="flex items-center gap-1.5 md:gap-2">
                                 <Button variant="outline" size="sm" onClick={() => setIsResetModalOpen(true)} className="h-8 md:h-9 border-white/10 bg-white/5 text-[9px] md:text-sm px-1.5 md:px-4">
                                     <Lock className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> <span className="hidden sm:inline">Reset</span>
                                 </Button>
-                                {(role?.toUpperCase() === "ADMIN" || role?.toUpperCase() === "MANAGER") && (
+                                {isAdmin && (
                                     <Button
                                         variant="destructive"
                                         size="sm"
@@ -718,7 +726,7 @@ export default function StudentDetailsPage() {
                                     </span>
                                 )}
                             </div>
-                            {!loading && (role === "ADMIN" || role === "MANAGER") && (
+                            {!loading && isAdmin && (
                                 <div className="flex gap-2">
                                     {isEditing ? (
                                         <div className="flex gap-1.5 md:gap-2">
@@ -738,7 +746,7 @@ export default function StudentDetailsPage() {
                             )}
                         </CardHeader>
                         <CardContent className="grid grid-cols-2 gap-x-2 md:gap-x-3 gap-y-2 md:gap-y-3 px-1.5 md:px-6 pb-3 md:pb-6">
-                {loading ? (
+                            {loading ? (
                                 <div className="col-span-2 space-y-4">
                                     <div className="grid grid-cols-2 gap-4">
                                         <div className="h-10 bg-white/5 animate-pulse rounded-lg" />
@@ -830,7 +838,7 @@ export default function StudentDetailsPage() {
                             <CardTitle className="text-xs md:text-xl font-bold text-accent italic">Fee Structure</CardTitle>
                             {!loading && (
                                 <div className="flex gap-1">
-                                    {(role === "ADMIN" || role === "MANAGER") && (
+                                    {isAdmin && (
                                         <Button variant="outline" size="sm" onClick={handleRecalculateFees} disabled={recalculating} className="h-6 px-1.5 md:h-7 md:px-2 border-white/10 bg-white/5 text-[8px] md:text-[9px] font-bold">
                                             <RefreshCw className={`w-2.5 h-2.5 md:w-3 md:h-3 mr-1 ${recalculating ? "animate-spin" : ""}`} /> Sync
                                         </Button>
@@ -838,7 +846,7 @@ export default function StudentDetailsPage() {
                                     <Button variant="outline" size="sm" className="h-6 px-1.5 md:h-7 md:px-2 border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-[8px] md:text-[9px] font-bold" onClick={() => ledger && student && printStudentFeeStructure({ studentName: student.studentName, schoolId: student.schoolId, className: student.className, items: ledger.items || [], totalPaid: ledger.totalPaid || 0, schoolLogo: branding?.schoolLogo, schoolName: branding?.schoolName })}>
                                         <Printer className="w-2.5 h-2.5 md:w-3 md:h-3 mr-1" />
                                     </Button>
-                                    {(role === "ADMIN" || role === "MANAGER") && (
+                                    {isAdmin && (
                                         <Button variant="outline" size="sm" className="h-6 px-1.5 md:h-7 md:px-2 border-white/10 bg-white/5 text-[8px] md:text-[9px] font-bold" onClick={() => setIsAdjustModalOpen(true)}>
                                             <Settings2 className="w-2.5 h-2.5 md:w-3 md:h-3 mr-1" /> Adjust
                                         </Button>

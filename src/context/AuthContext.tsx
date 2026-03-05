@@ -21,6 +21,8 @@ interface AuthContextType {
     userData: any | null;
     /** Computed permission role (e.g., 'ADMIN', 'STUDENT'). */
     role: string;
+    /** Whether the user has any administrative role. */
+    isAdmin: boolean;
     /** Global authentication loading state. */
     loading: boolean;
     /** Function to execute email/password sign-in. */
@@ -29,7 +31,7 @@ interface AuthContextType {
     signOut: () => Promise<void>;
 }
 
-const AuthContext = createContext<AuthContextType>({} as AuthContextType);
+const AuthContext = createContext<AuthContextType>({ isAdmin: false } as AuthContextType);
 
 const STORAGE_KEY = "spoorthy_user_cache";
 
@@ -123,8 +125,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return <div className="min-h-screen bg-[#0A192F]" />;
     }
 
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'SUPERADMIN', 'OWNER', 'DEVELOPER', 'MANAGER'].includes(String(userData?.role || "").toUpperCase());
+
     return (
-        <AuthContext.Provider value={{ user, userData, role: userData?.role || "", loading, signIn, signOut }}>
+        <AuthContext.Provider value={{ user, userData, role: userData?.role || "", isAdmin, loading, signIn, signOut }}>
             {children}
         </AuthContext.Provider>
     );
