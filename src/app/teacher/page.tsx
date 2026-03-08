@@ -116,8 +116,11 @@ export default function TeacherDashboard() {
     // --- CLASS TEACHER HELPERS ---
     const getManagedClasses = () => {
         if (!teacherProfile) return [];
-        const tId = teacherProfile.schoolId || teacherProfile.id;
-        return Object.values(classSections).filter((cs: any) => cs.active && cs.classTeacherId === tId);
+        const tId = teacherProfile.schoolId;
+        const tDocId = teacherProfile.id;
+        return Object.values(classSections).filter((cs: any) =>
+            cs.active && (cs.classTeacherId === tId || cs.classTeacherId === tDocId)
+        );
     };
 
     const toggleHomeworkSubject = async (classKey: string, subjectId: string, currentVal: boolean) => {

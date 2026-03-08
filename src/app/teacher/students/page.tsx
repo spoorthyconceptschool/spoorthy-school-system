@@ -61,12 +61,14 @@ export default function TeacherStudentsPage() {
 
     const getAuthorizedClasses = (tProfile: any) => {
         if (!tProfile || !classSections || !subjectTeachers) return [];
-        const tId = tProfile.schoolId || tProfile.id;
+        const tId = tProfile.schoolId;
+        const tDocId = tProfile.id;
         const set = new Map<string, { classId: string, sectionId: string, key: string, isClassTeacher: boolean }>();
 
         // 1. Classes where I am Class Teacher
         Object.values(classSections).forEach((cs: any) => {
-            if (cs.classTeacherId === tId && (cs.active || cs.isActive)) {
+            const isMatch = (tId && cs.classTeacherId === tId) || (tDocId && cs.classTeacherId === tDocId);
+            if (isMatch && (cs.active || cs.isActive)) {
                 set.set(cs.id, { classId: cs.classId, sectionId: cs.sectionId, key: cs.id, isClassTeacher: true });
             }
         });
@@ -74,7 +76,10 @@ export default function TeacherStudentsPage() {
         // 2. Classes where I teach subjects
         Object.keys(subjectTeachers).forEach(key => {
             const subjectsObj = subjectTeachers[key];
-            if (Object.values(subjectsObj).includes(tId)) {
+            const teacherIds = Object.values(subjectsObj);
+            const isMatch = (tId && teacherIds.includes(tId)) || (tDocId && teacherIds.includes(tDocId));
+
+            if (isMatch) {
                 const [cId, sId] = key.split('_');
                 if (!set.has(key)) {
                     set.set(key, { classId: cId, sectionId: sId, key, isClassTeacher: false });

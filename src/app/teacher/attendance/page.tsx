@@ -66,12 +66,14 @@ export default function MarkAttendancePage() {
      */
     const getAuthorizedClasses = (tProfile: any) => {
         if (!tProfile || !classSections) return [];
-        const tId = tProfile.schoolId || tProfile.id;
+        const tId = tProfile.schoolId;
+        const tDocId = tProfile.id;
         const set = new Map<string, { classId: string, sectionId: string, key: string, isClassTeacher: boolean }>();
 
         // 1. Classes where I am Class Teacher (Dynamic from RTDB)
         Object.values(classSections).forEach((cs: any) => {
-            if (cs.classTeacherId === tId && (cs.active || cs.isActive)) {
+            const isMatch = (tId && cs.classTeacherId === tId) || (tDocId && cs.classTeacherId === tDocId);
+            if (isMatch && (cs.active || cs.isActive)) {
                 set.set(cs.id, { classId: cs.classId, sectionId: cs.sectionId, key: cs.id, isClassTeacher: true });
             }
         });
