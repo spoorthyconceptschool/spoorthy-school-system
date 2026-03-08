@@ -68,7 +68,7 @@ export default function TeacherStudentsPage() {
         // 1. Classes where I am Class Teacher
         Object.values(classSections).forEach((cs: any) => {
             const isMatch = (tId && cs.classTeacherId === tId) || (tDocId && cs.classTeacherId === tDocId);
-            if (isMatch && (cs.active || cs.isActive)) {
+            if (isMatch && cs.isActive !== false) {
                 set.set(cs.id, { classId: cs.classId, sectionId: cs.sectionId, key: cs.id, isClassTeacher: true });
             }
         });

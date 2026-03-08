@@ -73,7 +73,7 @@ export default function MarkAttendancePage() {
         // 1. Classes where I am Class Teacher (Dynamic from RTDB)
         Object.values(classSections).forEach((cs: any) => {
             const isMatch = (tId && cs.classTeacherId === tId) || (tDocId && cs.classTeacherId === tDocId);
-            if (isMatch && (cs.active || cs.isActive)) {
+            if (isMatch && cs.isActive !== false) {
                 set.set(cs.id, { classId: cs.classId, sectionId: cs.sectionId, key: cs.id, isClassTeacher: true });
             }
         });

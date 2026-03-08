@@ -119,7 +119,7 @@ export default function TeacherDashboard() {
         const tId = teacherProfile.schoolId;
         const tDocId = teacherProfile.id;
         return Object.values(classSections).filter((cs: any) =>
-            cs.active && (cs.classTeacherId === tId || cs.classTeacherId === tDocId)
+            (cs.isActive !== false) && (cs.classTeacherId === tId || cs.classTeacherId === tDocId)
         );
     };
 
