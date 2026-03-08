@@ -4,6 +4,13 @@
 
 @custom-variant dark (&:where(.dark, .dark *));
 
+/* Base PWA Layout Utilities */
+body {
+  @apply overflow-x-hidden;
+  touch-action: manipulation;
+  -webkit-tap-highlight-color: transparent;
+}
+
 @theme {
   --breakpoint-xs: 400px;
   --font-sans: var(--font-body);

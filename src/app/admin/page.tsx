@@ -193,13 +193,13 @@ export default function AdminDashboard() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 px-2 md:px-0">
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6 px-3 md:px-0">
                     <KPICard
                         title="Today's Collection"
                         value={`₹${stats.todayCollection.toLocaleString()}`}
                         icon={<IndianRupee className="w-6 h-6 text-emerald-400" />}
                         trend="Live Sync"
-                        className="glass-panel-emerald group border-emerald-500/10 rounded-[2rem] hover:border-emerald-500/30"
+                        className="glass-panel-emerald group border-emerald-500/10 rounded-2xl md:rounded-[2rem] hover:border-emerald-500/30"
                         onClick={() => router.push("/admin/payments")}
                     />
                     <KPICard
@@ -207,7 +207,7 @@ export default function AdminDashboard() {
                         value={`₹${stats.pendingFees.toLocaleString()}`}
                         icon={<Database className="w-6 h-6 text-rose-400" />}
                         trend="Total Dues"
-                        className="glass-panel-rose group border-rose-500/10 rounded-[2rem] hover:border-rose-500/30"
+                        className="glass-panel-rose group border-rose-500/10 rounded-2xl md:rounded-[2rem] hover:border-rose-500/30"
                         onClick={() => router.push("/admin/fees/pending")}
                     />
                     <KPICard
@@ -215,7 +215,7 @@ export default function AdminDashboard() {
                         value={stats.totalStaff}
                         icon={<Users className="w-6 h-6 text-blue-400" />}
                         trend="Staff Strength"
-                        className="glass-panel-blue group border-blue-500/10 rounded-[2rem] hover:border-blue-500/30"
+                        className="glass-panel-blue group border-blue-500/10 rounded-2xl md:rounded-[2rem] hover:border-blue-500/30"
                         onClick={() => router.push("/admin/faculty")}
                     />
                     <KPICard
@@ -223,7 +223,7 @@ export default function AdminDashboard() {
                         value={stats.totalStudents}
                         icon={<TrendingUp className="w-6 h-6 text-purple-400" />}
                         trend="Enrollment"
-                        className="glass-panel-purple group border-purple-500/10 rounded-[2rem] hover:border-purple-500/30"
+                        className="glass-panel-purple group border-purple-500/10 rounded-2xl md:rounded-[2rem] hover:border-purple-500/30"
                         onClick={() => router.push("/admin/students")}
                     />
                 </div>
@@ -235,26 +235,26 @@ export default function AdminDashboard() {
 
                             <div className="relative z-10 space-y-10">
                                 <div className="flex items-center gap-4">
-                                    <div className="w-2 h-10 bg-blue-500 rounded-full shadow-[0_0_20px_rgba(59,130,246,0.3)]" />
-                                    <h2 className="text-3xl font-display font-black italic tracking-tight text-white">
+                                    <div className="w-1.5 h-8 md:w-2 md:h-10 bg-blue-500 rounded-full shadow-[0_0_20px_rgba(59,130,246,0.3)]" />
+                                    <h2 className="text-xl md:text-3xl font-display font-black italic tracking-tight text-white">
                                         Academic Management
                                     </h2>
                                 </div>
 
-                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-5">
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 md:gap-5">
                                     {[
                                         { label: "Faculty Directory", desc: "Staff profiles & records", href: "/admin/faculty", icon: Users, color: "text-blue-400", bg: "bg-blue-500/10" },
                                         { label: "Master Records", desc: "Classes, sections & setup", href: "/admin/master-data", icon: Database, color: "text-emerald-400", bg: "bg-emerald-500/10" },
                                         { label: "Timetable & Roaster", desc: "Weekly schedules & classes", href: "/admin/timetable/manage", icon: Clock, color: "text-amber-400", bg: "bg-amber-500/10" },
                                         { label: "Exam Portal", desc: "Assessments & results", href: "/admin/exams", icon: ClipboardList, color: "text-purple-400", bg: "bg-purple-500/10" }
                                     ].map((action, i) => (
-                                        <Link key={i} href={action.href} className="flex items-start gap-5 p-6 rounded-[2rem] bg-white/[0.03] border border-white/5 hover:border-white/20 hover:bg-white/[0.08] transition-all group/card shadow-xl hover:-translate-y-1.5 active:scale-95 duration-300">
-                                            <div className={cn("p-5 rounded-2xl transition-all duration-500 group-hover/card:scale-110 group-hover/card:rotate-3 shadow-lg", action.bg, action.color)}>
-                                                <action.icon size={26} />
+                                        <Link key={i} href={action.href} className="flex items-start gap-4 md:gap-5 p-5 md:p-6 rounded-2xl md:rounded-[2rem] bg-white/[0.03] border border-white/5 hover:border-white/20 hover:bg-white/[0.08] transition-all group/card shadow-xl hover:-translate-y-1.5 active:scale-95 duration-300">
+                                            <div className={cn("p-4 md:p-5 rounded-2xl transition-all duration-500 group-hover/card:scale-110 group-hover/card:rotate-3 shadow-lg", action.bg, action.color)}>
+                                                <action.icon className="w-5 h-5 md:w-6 md:h-6" />
                                             </div>
                                             <div className="pt-1">
-                                                <div className="font-black text-white text-lg mb-1 tracking-tight leading-tight">{action.label}</div>
-                                                <div className="text-[11px] text-white/30 font-medium leading-relaxed uppercase tracking-wider">{action.desc}</div>
+                                                <div className="font-black text-white text-base md:text-lg mb-0.5 md:mb-1 tracking-tight leading-tight">{action.label}</div>
+                                                <div className="text-[9px] md:text-[11px] text-white/30 font-medium leading-relaxed uppercase tracking-wider">{action.desc}</div>
                                             </div>
                                         </Link>
                                     ))}

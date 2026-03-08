@@ -47,10 +47,10 @@ export function TopBar() {
         if (!main) return;
 
         const handleScroll = () => {
-            setScrolled(main.scrollTop > 20);
+            if (main) setScrolled(main.scrollTop > 20);
         };
 
-        main.addEventListener('scroll', handleScroll);
+        main.addEventListener('scroll', handleScroll, { passive: true });
         return () => main.removeEventListener('scroll', handleScroll);
     }, []);
 

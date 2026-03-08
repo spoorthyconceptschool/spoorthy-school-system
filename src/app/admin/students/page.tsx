@@ -224,10 +224,22 @@ export default function StudentsPage() {
                         )}
                         <StudentExportModal students={students} />
                         {isAdmin && (
-                            <div className="flex items-center gap-3 md:gap-4">
-                                <StudentImportModal onSuccess={() => { window.location.reload(); }} />
-                                <AddStudentModal onSuccess={() => { }} />
-                            </div>
+                            <>
+                                {/* Desktop Buttons */}
+                                <div className="hidden md:flex items-center gap-3 md:gap-4">
+                                    <StudentImportModal onSuccess={() => { window.location.reload(); }} />
+                                    <AddStudentModal onSuccess={() => { }} />
+                                </div>
+
+                                {/* Mobile FAB for Add Student */}
+                                <div className="fixed bottom-24 right-6 z-50 md:hidden">
+                                    <AddStudentModal onSuccess={() => { }}>
+                                        <Button className="w-16 h-16 rounded-full bg-accent text-black shadow-2xl shadow-accent/40 border-none transition-all active:scale-90 flex items-center justify-center p-0">
+                                            <Plus className="w-8 h-8" />
+                                        </Button>
+                                    </AddStudentModal>
+                                </div>
+                            </>
                         )}
                     </div>
                 )}
