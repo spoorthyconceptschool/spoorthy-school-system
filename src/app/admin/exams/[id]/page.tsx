@@ -194,47 +194,50 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
     if (!exam) return null;
 
     return (
-        <div className="space-y-6 max-w-7xl mx-auto p-6 animate-in fade-in">
-            <div className="flex items-center gap-4 mb-6">
-                <Button variant="ghost" size="icon" onClick={() => router.push("/admin/exams")}>
-                    <ArrowLeft className="w-5 h-5" />
-                </Button>
-                <div className="flex-1">
-                    <div className="flex items-center gap-3">
-                        <h1 className="text-3xl font-display font-bold">{exam.name}</h1>
-                        <div className="flex items-center gap-2">
-                            <span className={`px-2 py-0.5 rounded text-xs font-bold border ${exam.status === 'RESULTS_RELEASED'
-                                ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                                : 'bg-blue-500/10 border-blue-500/20 text-blue-400'
-                                }`}>
-                                {exam.status === 'RESULTS_RELEASED' ? 'RESULTS PUBLISHED' : exam.status || 'ACTIVE'}
-                            </span>
-                            <Button size="sm" variant="outline" className="h-6 text-xs bg-white/5 border-white/10" onClick={() => setEditOpen(true)}>
-                                Edit
-                            </Button>
-                            <Link href={`/admin/exams/${examId}/marks`}>
-                                <Button size="sm" variant="secondary" className="h-6 text-xs gap-1">
-                                    <ClipboardCheck className="w-3 h-3" /> Enter Marks
-                                </Button>
-                            </Link>
-                        </div>
+        <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-6 animate-in fade-in">
+            <div className="flex flex-col md:flex-row md:items-center gap-4 mb-6 border-b border-white/5 pb-6">
+                <div className="flex items-center gap-4">
+                    <Button variant="ghost" size="icon" onClick={() => router.push("/admin/exams")} className="shrink-0">
+                        <ArrowLeft className="w-5 h-5" />
+                    </Button>
+                    <div>
+                        <h1 className="text-2xl md:text-3xl font-display font-bold tracking-tight">{exam.name}</h1>
+                        <p className="text-[10px] md:text-sm text-muted-foreground flex items-center gap-2 mt-0.5">
+                            <Calendar className="w-3 h-3 md:w-4 md:h-4" />
+                            {new Date(exam.startDate).toLocaleDateString()} - {new Date(exam.endDate).toLocaleDateString()}
+                        </p>
                     </div>
-                    <p className="text-muted-foreground flex items-center gap-2">
-                        <Calendar className="w-4 h-4" />
-                        {new Date(exam.startDate).toLocaleDateString()} - {new Date(exam.endDate).toLocaleDateString()}
-                    </p>
                 </div>
-                <div className="flex gap-2">
+
+                <div className="flex flex-wrap items-center gap-2 md:ml-auto">
+                    <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest border shrink-0 ${exam.status === 'RESULTS_RELEASED'
+                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
+                        : 'bg-blue-500/10 border-blue-500/20 text-blue-400'
+                        }`}>
+                        {exam.status === 'RESULTS_RELEASED' ? 'PUBLISHED' : exam.status || 'ACTIVE'}
+                    </span>
+                    <Button size="sm" variant="outline" className="h-9 px-4 text-[10px] font-bold uppercase tracking-widest bg-white/5 border-white/10 shrink-0" onClick={() => setEditOpen(true)}>
+                        Edit
+                    </Button>
+                    <Link href={`/admin/exams/${examId}/marks`} className="shrink-0">
+                        <Button size="sm" variant="secondary" className="h-9 px-4 text-[10px] font-bold uppercase tracking-widest gap-2">
+                            <ClipboardCheck className="w-4 h-4" /> Marks
+                        </Button>
+                    </Link>
                     <Button
+                        size="sm"
                         onClick={async () => {
                             if (!confirm(exam.status === 'RESULTS_RELEASED' ? "Hide results from students?" : "Release results to students?")) return;
                             const newStatus = exam.status === 'RESULTS_RELEASED' ? 'ACTIVE' : 'RESULTS_RELEASED';
                             await setDoc(doc(db, "exams", examId), { status: newStatus }, { merge: true });
                             setExam({ ...exam, status: newStatus });
                         }}
-                        className={exam.status === 'RESULTS_RELEASED' ? "bg-yellow-600 hover:bg-yellow-700" : "bg-emerald-600 hover:bg-emerald-700"}
+                        className={cn(
+                            "h-9 px-4 text-[10px] font-bold uppercase tracking-widest shrink-0",
+                            exam.status === 'RESULTS_RELEASED' ? "bg-amber-600 hover:bg-amber-700" : "bg-emerald-600 hover:bg-emerald-700"
+                        )}
                     >
-                        {exam.status === 'RESULTS_RELEASED' ? "Unpublish Results" : "Release Results"}
+                        {exam.status === 'RESULTS_RELEASED' ? "Unpublish" : "Release Results"}
                     </Button>
                 </div>
             </div>
@@ -280,10 +283,16 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
             </Dialog>
 
             <Tabs defaultValue="timetable" className="space-y-6">
-                <TabsList className="bg-black/20 border-white/10">
-                    <TabsTrigger value="timetable"><Clock className="w-4 h-4 mr-2" /> Exam Timetable</TabsTrigger>
-                    <TabsTrigger value="syllabus"><FileText className="w-4 h-4 mr-2" /> Exam Syllabus</TabsTrigger>
-                    <TabsTrigger value="documents"><FileText className="w-4 h-4 mr-2" /> Documents (Tickets/Reports)</TabsTrigger>
+                <TabsList className="bg-white/5 border border-white/10 w-full h-auto p-1 rounded-xl">
+                    <TabsTrigger value="timetable" className="flex-1 py-2.5 text-[10px] md:text-sm font-bold uppercase tracking-wider rounded-lg data-[state=active]:bg-white data-[state=active]:text-black transition-all">
+                        <Clock className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" /> Timetable
+                    </TabsTrigger>
+                    <TabsTrigger value="syllabus" className="flex-1 py-2.5 text-[10px] md:text-sm font-bold uppercase tracking-wider rounded-lg data-[state=active]:bg-white data-[state=active]:text-black transition-all">
+                        <FileText className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" /> Syllabus
+                    </TabsTrigger>
+                    <TabsTrigger value="documents" className="flex-1 py-2.5 text-[10px] md:text-sm font-bold uppercase tracking-wider rounded-lg data-[state=active]:bg-white data-[state=active]:text-black transition-all">
+                        <FileText className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" /> Documents
+                    </TabsTrigger>
                 </TabsList>
 
                 {/* TIMETABLE TAB */}
