@@ -176,35 +176,35 @@ export default function StudentsPage() {
                     <h1 className="text-2xl md:text-5xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic leading-tight">
                         Student Center
                     </h1>
-                    <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 w-fit mt-2">
+                    <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 w-full mt-2">
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => setActiveTab("directory")}
                             className={cn(
-                                "rounded-lg text-[10px] font-black uppercase tracking-widest px-4 h-8",
+                                "flex-1 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest h-8",
                                 activeTab === "directory" ? "bg-white text-black hover:bg-white" : "text-white/40 hover:text-white"
                             )}
                         >
-                            Active Directory
+                            Directory
                         </Button>
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => setActiveTab("leaves")}
                             className={cn(
-                                "rounded-lg text-[10px] font-black uppercase tracking-widest px-4 h-8",
+                                "flex-1 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest h-8",
                                 activeTab === "leaves" ? "bg-white text-black hover:bg-white" : "text-white/40 hover:text-white"
                             )}
                         >
-                            Leave Requests
+                            Leaves
                         </Button>
                         <Button
                             variant="ghost"
                             size="sm"
                             onClick={() => setActiveTab("approvals")}
                             className={cn(
-                                "rounded-lg text-[10px] font-black uppercase tracking-widest px-4 h-8",
+                                "flex-1 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest h-8",
                                 activeTab === "approvals" ? "bg-amber-500 text-black hover:bg-amber-500" : "text-white/40 hover:text-white"
                             )}
                         >
@@ -214,7 +214,7 @@ export default function StudentsPage() {
                 </div>
 
                 {activeTab === "directory" && (
-                    <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+                    <div className="hidden md:flex flex-wrap items-center gap-1.5 md:gap-2">
                         <StudentExportModal students={students} />
                         {isAdmin && (
                             <>
@@ -222,6 +222,17 @@ export default function StudentsPage() {
                                 <AddStudentModal onSuccess={() => { }} />
                             </>
                         )}
+                    </div>
+                )}
+
+                {/* Mobile FAB */}
+                {activeTab === "directory" && isAdmin && (
+                    <div className="fixed bottom-20 right-4 z-50 md:hidden">
+                        <AddStudentModal onSuccess={() => { }}>
+                            <button className="w-14 h-14 rounded-full bg-accent text-black shadow-2xl shadow-accent/40 flex items-center justify-center">
+                                <Plus className="w-7 h-7" />
+                            </button>
+                        </AddStudentModal>
                     </div>
                 )}
             </div>
