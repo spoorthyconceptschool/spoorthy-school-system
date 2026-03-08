@@ -78,10 +78,15 @@ export class EnterpriseStudentService {
                 ...SearchService.generateKeywords(payload.classId || "")
             ]));
 
+            const resolvedAdmissionNumber = (!payload.admissionNumber || payload.admissionNumber === "PENDING")
+                ? studentRecord.newSchoolId
+                : payload.admissionNumber;
+
             const finalStudentData = {
                 ...payload,
                 studentName,
                 schoolId: studentRecord.newSchoolId,
+                admissionNumber: resolvedAdmissionNumber,
                 uid: userRecord.uid,
                 role: "STUDENT",
                 status: "ACTIVE",

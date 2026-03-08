@@ -39,7 +39,7 @@ import { useMasterData } from "@/context/MasterDataContext";
 // High-Tech Grouping
 const NAV_ITEMS = [
     { label: "Overview", icon: LayoutDashboard, href: "/admin", exact: true },
-    { type: "separator", label: "Entities" },
+    { type: "separator", label: "Directory" },
     { label: "Students", icon: GraduationCap, href: "/admin/students" },
     { label: "Staff Members", icon: Users, href: "/admin/faculty" },
     { label: "Groups", icon: Users, href: "/admin/groups" },
@@ -47,13 +47,13 @@ const NAV_ITEMS = [
     { type: "separator", label: "Financials" },
     { label: "Fee Payment", icon: Banknote, href: "/admin/fees" },
     { label: "Payroll", icon: Wallet, href: "/admin/salary" },
-    { type: "separator", label: "Operations" },
+    { type: "separator", label: "School Management" },
     { label: "Schedules", icon: Clock, href: "/admin/timetable/manage" },
     { label: "Academics", icon: BookOpen, href: "/admin/homework" },
     { label: "Exams & Halls", icon: ClipboardCheck, href: "/admin/exams" },
     { type: "separator", label: "Master Data" },
     { label: "Master Data", icon: Database, href: "/admin/master-data" },
-    { type: "separator", label: "System Control" },
+    { type: "separator", label: "System Administration" },
     { label: "Settings", icon: Settings, href: "/admin/settings" },
     { label: "Notices", icon: Bell, href: "/admin/notices" },
     { label: "Content", icon: FileText, href: "/admin/cms" },
@@ -103,7 +103,7 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
                     : null;
 
             if (role === "MANAGER" && item.type === "separator") {
-                const forbiddenSeparators = ["System Control"];
+                const forbiddenSeparators = ["System Administration"];
                 if (forbiddenSeparators.includes(item.label || "")) return false;
             }
 
@@ -144,7 +144,7 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
                         </div>
                         <div className="flex flex-col min-w-0">
                             <span className="font-black text-[10px] tracking-[0.2em] text-[#64FFDA] uppercase truncate leading-none mb-1">
-                                Control Center
+                                Management
                             </span>
                             <span className="font-display font-black text-sm tracking-tight text-white md:truncate md:max-w-[140px]">
                                 {branding.schoolName || "Spoorthy School"}

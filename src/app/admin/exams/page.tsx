@@ -80,27 +80,27 @@ export default function ExamsListPage() {
                 <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-blue-500/10 blur-[100px] rounded-full -mr-20 -mt-20 px-4" />
                 <div className="absolute bottom-0 left-0 w-[200px] h-[200px] bg-emerald-500/5 blur-[80px] rounded-full -ml-10 -mb-10" />
 
-                <div className="relative z-10 flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
-                    <div className="space-y-2">
-                        <div className="flex items-center gap-2 mb-2">
+                <div className="relative z-10 flex flex-col lg:flex-row justify-between items-start lg:items-center gap-8">
+                    <div className="space-y-3 w-full lg:max-w-xl">
+                        <div className="flex items-center gap-2 mb-1">
                             <span className="p-1.5 bg-blue-500/20 rounded-lg text-blue-400">
-                                <GraduationCap className="w-5 h-5" />
+                                <GraduationCap className="w-4 h-4 md:w-5 md:h-5" />
                             </span>
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400/80">Academic Portal</span>
+                            <span className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-blue-400/80">Academic Portal</span>
                         </div>
-                        <h1 className="text-4xl md:text-5xl font-display font-black text-white tracking-tight">
+                        <h1 className="text-3xl md:text-5xl font-display font-black text-white tracking-tight leading-none">
                             Examinations
                         </h1>
-                        <p className="text-[#8892B0] max-w-xl text-sm md:text-base font-medium leading-relaxed">
-                            Orchestrate academic excellence. Manage examination schedules, student roll numbers, and propagate hall tickets in real-time across the school system.
+                        <p className="text-[#8892B0] text-xs md:text-base font-medium leading-relaxed">
+                            Manage examination schedules, student roll numbers, and generate hall tickets for students.
                         </p>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto mt-4 md:mt-0">
+                    <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
                         <HallTicketGenerator />
                         <Button
                             onClick={() => setCreateOpen(true)}
-                            className="bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest text-[10px] h-12 px-8 rounded-xl shadow-[0_0_20px_-5px_theme(colors.emerald.500/0.5)] transition-all hover:scale-[1.02] active:scale-[0.98]"
+                            className="bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest text-[9px] md:text-[10px] h-12 px-6 md:px-8 rounded-xl shadow-[0_0_20px_-5px_theme(colors.emerald.500/0.5)] transition-all hover:scale-[1.02] active:scale-[0.98]"
                         >
                             <Plus className="mr-2 h-4 w-4 stroke-[3px]" /> Create New Exam
                         </Button>
@@ -133,43 +133,43 @@ export default function ExamsListPage() {
                     ) : (
                         exams.map(exam => (
                             <Link key={exam.id} href={`/admin/exams/${exam.id}`}>
-                                <Card className="group relative bg-[#1E293B]/40 hover:bg-[#1E293B]/60 border-white/5 hover:border-blue-500/30 transition-all duration-300 backdrop-blur-xl overflow-hidden rounded-3xl shadow-xl h-full flex flex-col">
+                                <Card className="group relative bg-[#1E293B]/40 hover:bg-[#1E293B]/60 border-white/5 hover:border-blue-500/30 transition-all duration-500 backdrop-blur-xl overflow-hidden rounded-[2rem] shadow-xl h-full flex flex-col">
                                     {/* Status Glow Background */}
                                     <div className={cn(
                                         "absolute top-0 right-0 w-32 h-32 blur-[60px] rounded-full -mr-10 -mt-10 transition-opacity opacity-20 group-hover:opacity-40",
                                         exam.status === "ACTIVE" ? "bg-emerald-500" : "bg-blue-500"
                                     )} />
 
-                                    <CardHeader className="relative z-10 pb-2">
+                                    <CardHeader className="relative z-10 pb-4 p-5 md:p-6">
                                         <div className="flex justify-between items-start">
-                                            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-500/20 group-hover:scale-110 transition-all duration-300">
-                                                <ClipboardCheck className="w-6 h-6" />
+                                            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-500/20 group-hover:scale-110 transition-all duration-300">
+                                                <ClipboardCheck className="w-5 h-5 md:w-6 md:h-6" />
                                             </div>
                                             <Badge
                                                 variant="outline"
                                                 className={cn(
-                                                    "text-[8px] font-black uppercase tracking-widest px-3 py-1 rounded-full border-none",
+                                                    "text-[7px] md:text-[8px] font-black uppercase tracking-widest px-2 md:px-3 py-1 rounded-full border-none",
                                                     exam.status === "ACTIVE"
                                                         ? "bg-emerald-500/10 text-emerald-400"
                                                         : "bg-blue-500/10 text-blue-400"
                                                 )}
                                             >
-                                                <Sparkle className="w-2.5 h-2.5 mr-1 animate-pulse" /> {exam.status}
+                                                <Sparkle className="w-2 md:w-2.5 h-2 md:h-2.5 mr-1 animate-pulse" /> {exam.status}
                                             </Badge>
                                         </div>
-                                        <CardTitle className="mt-6 text-xl md:text-2xl font-black text-white group-hover:text-blue-400 transition-colors tracking-tight">
+                                        <CardTitle className="mt-4 md:mt-6 text-lg md:text-2xl font-black text-white group-hover:text-blue-400 transition-colors tracking-tight leading-tight">
                                             {exam.name}
                                         </CardTitle>
-                                        <CardDescription className="flex items-center gap-2 text-[#8892B0] font-medium text-xs mt-1">
-                                            <Calendar className="w-3.5 h-3.5" />
+                                        <CardDescription className="flex items-center gap-2 text-[#8892B0] font-medium text-[10px] md:text-xs mt-1">
+                                            <Calendar className="w-3 md:w-3.5 h-3 md:h-3.5" strokeWidth={2.5} />
                                             {new Date(exam.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {new Date(exam.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
                                         </CardDescription>
                                     </CardHeader>
-                                    <CardContent className="relative z-10 mt-auto pt-6 border-t border-white/5 bg-white/[0.02]">
-                                        <div className="flex items-center justify-between text-[10px] font-black uppercase tracking-widest text-white/40 group-hover:text-white transition-colors">
-                                            <span>System Node v1.0</span>
-                                            <div className="flex items-center gap-2">
-                                                Manage <ChevronRight className="w-4 h-4 text-blue-500 group-hover:translate-x-1 transition-transform" />
+                                    <CardContent className="relative z-10 mt-auto pt-4 md:pt-6 p-5 md:p-6 border-t border-white/5 bg-white/[0.02]">
+                                        <div className="flex items-center justify-between text-[9px] md:text-[10px] font-black uppercase tracking-widest text-white/40 group-hover:text-white transition-colors">
+                                            <span className="opacity-50">Standard Logic</span>
+                                            <div className="flex items-center gap-1.5 md:gap-2">
+                                                Profile <ChevronRight className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-500 group-hover:translate-x-1 transition-transform" />
                                             </div>
                                         </div>
                                     </CardContent>
@@ -195,7 +195,7 @@ export default function ExamsListPage() {
                                         onClick={() => setCreateOpen(true)}
                                         className="bg-white text-black hover:bg-blue-400 hover:text-white font-black uppercase tracking-[0.2em] text-[10px] h-11 px-8 rounded-xl shadow-2xl transition-all"
                                     >
-                                        Deploy Examination
+                                        Schedule Exam
                                     </Button>
                                 </div>
                             </div>
@@ -205,38 +205,38 @@ export default function ExamsListPage() {
             </div>
 
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-                <DialogContent className="bg-[#0F172A] border-white/10 text-white rounded-[32px] max-w-lg p-0 overflow-hidden shadow-2xl backdrop-blur-2xl">
-                    <div className="bg-blue-600/10 p-8 border-b border-white/5 relative">
+                <DialogContent className="bg-[#0F172A] border-white/10 text-white rounded-[2rem] md:rounded-[32px] max-w-[95vw] md:max-w-lg p-0 overflow-hidden shadow-2xl backdrop-blur-2xl border-white/5">
+                    <div className="bg-blue-600/10 p-6 md:p-8 border-b border-white/5 relative">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/20 blur-[60px] rounded-full -mr-10 -mt-10" />
-                        <DialogTitle className="text-3xl font-black tracking-tight relative z-10">New Session</DialogTitle>
-                        <p className="text-blue-400 font-bold uppercase tracking-[0.2em] text-[10px] mt-1 relative z-10">Initializing Examination Node</p>
+                        <DialogTitle className="text-2xl md:text-3xl font-black tracking-tight relative z-10 italic">Schedule Exam</DialogTitle>
+                        <p className="text-blue-400 font-bold uppercase tracking-[0.2em] text-[8px] md:text-[10px] mt-1 relative z-10 opacity-70">Initialize Academic Assessment</p>
                     </div>
 
-                    <div className="p-8 space-y-6">
+                    <div className="p-6 md:p-8 space-y-5 md:space-y-6">
                         <div className="space-y-2">
-                            <Label className="text-[10px] font-black uppercase tracking-widest text-[#8892B0]">Examination Identity</Label>
+                            <Label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-[#8892B0]">Examination Name</Label>
                             <Input
                                 placeholder="e.g. ANNUAL EXAMS 2026"
-                                className="bg-white/5 border-white/10 h-14 rounded-2xl text-lg font-bold placeholder:text-white/20 focus:ring-blue-500/50"
+                                className="bg-white/5 border-white/10 h-12 md:h-14 rounded-xl md:rounded-2xl text-base md:text-lg font-bold placeholder:text-white/20 focus:ring-blue-500/50 transition-all focus:bg-white/10"
                                 value={form.name}
                                 onChange={e => setForm({ ...form, name: e.target.value })}
                             />
                         </div>
-                        <div className="grid grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                             <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest text-[#8892B0]">Launch Date</Label>
+                                <Label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-[#8892B0]">Start Date</Label>
                                 <Input
                                     type="date"
-                                    className="bg-white/5 border-white/10 h-14 rounded-2xl font-bold focus:ring-blue-500/50"
+                                    className="bg-white/5 border-white/10 h-12 md:h-14 rounded-xl md:rounded-2xl font-bold focus:ring-blue-500/50 transition-all focus:bg-white/10"
                                     value={form.startDate}
                                     onChange={e => setForm({ ...form, startDate: e.target.value })}
                                 />
                             </div>
                             <div className="space-y-2">
-                                <Label className="text-[10px] font-black uppercase tracking-widest text-[#8892B0]">Final Date</Label>
+                                <Label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-[#8892B0]">End Date</Label>
                                 <Input
                                     type="date"
-                                    className="bg-white/5 border-white/10 h-14 rounded-2xl font-bold focus:ring-blue-500/50"
+                                    className="bg-white/5 border-white/10 h-12 md:h-14 rounded-xl md:rounded-2xl font-bold focus:ring-blue-500/50 transition-all focus:bg-white/10"
                                     value={form.endDate}
                                     onChange={e => setForm({ ...form, endDate: e.target.value })}
                                 />
@@ -244,20 +244,20 @@ export default function ExamsListPage() {
                         </div>
                     </div>
 
-                    <div className="p-6 bg-white/[0.02] border-t border-white/5 flex gap-3">
+                    <div className="p-5 md:p-6 bg-white/[0.02] border-t border-white/5 flex flex-col md:flex-row gap-3">
                         <Button
                             variant="ghost"
                             onClick={() => setCreateOpen(false)}
-                            className="flex-1 h-12 rounded-xl font-bold text-white/40 hover:text-white"
+                            className="flex-1 h-12 rounded-xl font-black text-[10px] uppercase tracking-widest text-white/40 hover:text-white hover:bg-white/5"
                         >
-                            Abort
+                            Cancel
                         </Button>
                         <Button
                             onClick={handleCreate}
                             disabled={submitting || !form.name || !form.startDate || !form.endDate}
-                            className="flex-[2] bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest text-[10px] h-12 rounded-xl shadow-[0_0_20px_-5px_theme(colors.blue.600/0.5)] transition-all"
+                            className="flex-[2] bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest text-[10px] h-12 rounded-xl shadow-[0_0_20px_-5px_theme(colors.blue.600/0.5)] transition-all active:scale-95"
                         >
-                            {submitting ? <Loader2 className="animate-spin" /> : "Authorize & Deploy"}
+                            {submitting ? <Loader2 className="animate-spin" /> : "Save & Schedule"}
                         </Button>
                     </div>
                 </DialogContent>

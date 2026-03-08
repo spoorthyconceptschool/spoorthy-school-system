@@ -25,7 +25,7 @@ export default function AdminSettingsPage() {
     if (loading && !userData) return (
         <div className="flex flex-col items-center justify-center h-[60vh] gap-4">
             <Loader2 className="w-8 h-8 animate-spin text-accent" />
-            <p className="text-muted-foreground animate-pulse">Verifying credentials...</p>
+            <p className="text-muted-foreground animate-pulse">Checking permissions...</p>
         </div>
     );
 
@@ -46,7 +46,7 @@ export default function AdminSettingsPage() {
             </div>
             <div className="space-y-2">
                 <h1 className="text-3xl font-display font-bold text-white">Restricted Access</h1>
-                <p className="text-muted-foreground max-w-md mx-auto">This terminal is restricted to Level 1 Administrators. Your current clearance does not permit modification of system-wide settings.</p>
+                <p className="text-muted-foreground max-w-md mx-auto">This section is restricted to School Administrators. You do not have the necessary permissions to modify system settings.</p>
             </div>
             <Button asChild variant="outline" className="border-white/10 hover:bg-white/5">
                 <Link href="/admin">Return to Dashboard</Link>
@@ -58,7 +58,7 @@ export default function AdminSettingsPage() {
         <div className="flex flex-col gap-4 md:gap-8 p-3 md:p-8 max-w-7xl mx-auto pb-20">
             <div className="flex-none">
                 <h1 className="text-xl md:text-3xl font-display font-bold text-white italic tracking-tight">System <span className="text-accent underline decoration-accent/20">Settings</span></h1>
-                <p className="text-[10px] md:text-sm text-muted-foreground uppercase tracking-widest font-bold opacity-100">L1 Administrative Control Panel</p>
+                <p className="text-[10px] md:text-sm text-muted-foreground uppercase tracking-widest font-bold opacity-100">School Administrative Settings</p>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8 items-start">

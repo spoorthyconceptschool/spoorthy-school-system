@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, Clock, Video, Coffee, AlertTriangle, FileText, ChevronRight, GraduationCap } from "lucide-react";
@@ -12,6 +12,7 @@ import { db } from "@/lib/firebase";
 import { useMasterData } from "@/context/MasterDataContext";
 
 import { Skeleton } from "@/components/ui/skeleton";
+import { cn } from "@/lib/utils";
 
 export default function TeacherDashboard() {
     const { user } = useAuth();
@@ -162,49 +163,47 @@ export default function TeacherDashboard() {
                                 .filter(sid => classSubjects[cs.classId][sid] && subjects[sid]);
 
                             return (
-                                <Card key={cs.id} className="bg-black/40 border-amber-500/20 backdrop-blur-md overflow-hidden animate-in slide-in-from-top duration-500">
-                                    <div className="bg-amber-500/5 border-b border-amber-500/10 p-3 md:p-4 flex justify-between items-center">
+                                <div key={cs.id} className="bg-black/40 border border-amber-500/20 rounded-2xl backdrop-blur-md overflow-hidden animate-in slide-in-from-top duration-500 shadow-xl">
+                                    <div className="bg-amber-500/5 border-b border-amber-500/10 p-4 md:p-5 flex justify-between items-center">
                                         <div>
-                                            <h3 className="text-base md:text-lg font-bold flex items-center gap-2 text-white">
-                                                <GraduationCap className="w-4 h-4 md:w-5 md:h-5 text-amber-500" />
+                                            <h3 className="text-lg md:text-xl font-bold flex items-center gap-2 text-white/90">
+                                                <GraduationCap className="w-5 h-5 text-amber-500" />
                                                 {className} - {sectionName}
                                             </h3>
-                                            <p className="text-[10px] md:text-xs text-amber-500/60 font-medium tracking-tight">Daily homework control</p>
+                                            <p className="text-[10px] md:text-xs text-amber-500/60 font-medium tracking-tight mt-0.5">Daily homework control</p>
                                         </div>
-                                        <Badge className="bg-amber-500 text-black font-black uppercase text-[8px] md:text-[9px] tracking-widest shrink-0">Class Teacher</Badge>
+                                        <Badge className="bg-amber-500 text-black font-black uppercase text-[9px] tracking-widest shrink-0">Class Teacher</Badge>
                                     </div>
-                                    <CardContent className="p-3 md:p-4 space-y-4">
-                                        <div className="space-y-2">
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
-                                                {assignedSubjects.length > 0 ? assignedSubjects.map(sid => {
-                                                    const isGiving = homeworkSubjects[classKey]?.[sid];
-                                                    return (
-                                                        <div
-                                                            key={sid}
-                                                            onClick={() => toggleHomeworkSubject(classKey, sid, isGiving)}
-                                                            className={`flex items-center justify-between p-2 rounded-xl border cursor-pointer transition-all group ${isGiving
-                                                                ? "bg-[#10B981]/10 border-[#10B981]/30"
-                                                                : "bg-white/5 border-white/10 opacity-60 hover:opacity-100"
-                                                                }`}
-                                                        >
-                                                            <div className="flex items-center gap-2">
-                                                                <div className={`p-1.5 rounded-lg ${isGiving ? "bg-[#10B981]/20 text-[#10B981]" : "bg-white/5 text-white/20"}`}>
-                                                                    <FileText className="w-3 h-3" />
-                                                                </div>
-                                                                <span className="font-bold text-xs text-white/90">{subjects[sid]?.name}</span>
+                                    <div className="p-4 md:p-5">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            {assignedSubjects.length > 0 ? assignedSubjects.map(sid => {
+                                                const isGiving = homeworkSubjects[classKey]?.[sid];
+                                                return (
+                                                    <div
+                                                        key={sid}
+                                                        onClick={() => toggleHomeworkSubject(classKey, sid, isGiving)}
+                                                        className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all group shadow-sm ${isGiving
+                                                            ? "bg-[#10B981]/15 border-[#10B981]/40"
+                                                            : "bg-white/5 border-white/10 opacity-70 hover:opacity-100 hover:bg-white/10"
+                                                            }`}
+                                                    >
+                                                        <div className="flex items-center gap-3">
+                                                            <div className={`p-2 rounded-lg ${isGiving ? "bg-[#10B981]/20 text-[#10B981]" : "bg-black/20 text-white/40"}`}>
+                                                                <FileText className="w-4 h-4" />
                                                             </div>
-                                                            {isGiving && <div className="w-2 h-2 rounded-full bg-[#10B981] animate-pulse shadow-[0_0_8px_#10B981]"></div>}
+                                                            <span className="font-bold text-sm text-white/90">{subjects[sid]?.name}</span>
                                                         </div>
-                                                    );
-                                                }) : (
-                                                    <div className="col-span-full py-4 text-center text-white/20 text-[10px] uppercase font-bold border border-dashed border-white/10 rounded-xl">
-                                                        No subjects assigned to this class
+                                                        {isGiving && <div className="w-2.5 h-2.5 rounded-full bg-[#10B981] animate-pulse shadow-[0_0_8px_#10B981]"></div>}
                                                     </div>
-                                                )}
-                                            </div>
+                                                );
+                                            }) : (
+                                                <div className="col-span-full py-6 text-center text-white/30 text-xs font-bold border border-dashed border-white/10 rounded-xl bg-black/20">
+                                                    No subjects assigned to this class
+                                                </div>
+                                            )}
                                         </div>
-                                    </CardContent>
-                                </Card>
+                                    </div>
+                                </div>
                             );
                         })}
                     </div>
@@ -238,184 +237,201 @@ export default function TeacherDashboard() {
 
                 {/* 2. Today's Schedule (Priority) */}
                 <div className="lg:col-span-2 space-y-6">
-                    <Card className="bg-black/20 border-white/10 h-fit">
-                        <CardHeader className="flex flex-row items-center justify-between">
-                            <CardTitle className="flex items-center gap-2"><Clock className="w-5 h-5 text-emerald-500" /> Today's Schedule</CardTitle>
-                            <Button variant="ghost" size="sm" className="text-muted-foreground" asChild>
-                                <Link href="/teacher/timetable">Full Timetable <ChevronRight className="w-4 h-4" /></Link>
-                            </Button>
-                        </CardHeader>
-                        <CardContent>
+                    <div className="bg-black/20 border border-white/10 rounded-2xl p-5 backdrop-blur-md shadow-xl flex flex-col gap-4 h-fit">
+                        <div className="flex flex-row items-center justify-between border-b border-white/5 pb-3">
+                            <h3 className="flex items-center gap-2 font-bold text-lg text-white"><Clock className="w-5 h-5 text-emerald-500" /> Today's Schedule</h3>
+                            <Link href="/teacher/timetable" className="text-xs text-white/50 hover:text-white transition-colors flex items-center gap-1 font-medium bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-lg">
+                                Full Timetable <ChevronRight className="w-3 h-3" />
+                            </Link>
+                        </div>
+                        <div>
                             {loading ? (
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
-                                    <Skeleton className="h-24 w-full rounded-lg" />
-                                    <Skeleton className="h-24 w-full rounded-lg" />
-                                    <Skeleton className="h-24 w-full rounded-lg" />
-                                    <Skeleton className="h-24 w-full rounded-lg" />
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    <Skeleton className="h-24 w-full rounded-xl bg-white/5" />
+                                    <Skeleton className="h-24 w-full rounded-xl bg-white/5" />
+                                    <Skeleton className="h-24 w-full rounded-xl bg-white/5" />
+                                    <Skeleton className="h-24 w-full rounded-xl bg-white/5" />
                                 </div>
                             ) : (
                                 todaySlots.length === 0 ? (
-                                    <div className="text-center py-10 text-muted-foreground">
-                                        No classes scheduled for today.
+                                    <div className="text-center py-12 text-muted-foreground bg-white/5 rounded-xl border border-white/5 border-dashed">
+                                        No classes scheduled for today. Take a break!
                                     </div>
                                 ) : (
-                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                         {todaySlots.map(slot => (
-                                            <div key={slot.id} className={`p-4 rounded-lg flex items-center justify-between
-                                                ${slot.type === "SUBSTITUTION" ? "bg-yellow-500/10 border border-yellow-500/20" :
-                                                    slot.type === "LEAVE" ? "bg-red-500/5 border border-red-500/10 opacity-90" : "bg-white/5 border border-white/10"}
+                                            <div key={slot.id} className={`p-4 rounded-xl flex items-center justify-between shadow-sm transition-all hover:scale-[1.01]
+                                                ${slot.type === "SUBSTITUTION" ? "bg-yellow-500/10 border border-yellow-500/30" :
+                                                    slot.type === "LEAVE" ? "bg-red-500/10 border border-red-500/20 opacity-90" : "bg-white/5 border border-white/10 hover:bg-white/10"}
                                             `}>
-                                                <div className="flex items-center gap-3">
-                                                    <Badge variant="outline" className="h-8 w-8 flex items-center justify-center rounded-full bg-white/5 border-white/10">
+                                                <div className="flex items-center gap-4">
+                                                    <div className="h-10 w-10 flex items-center justify-center rounded-xl bg-black/40 border border-white/10 font-black text-white/80 shrink-0">
                                                         {slot.id}
-                                                    </Badge>
-                                                    <div>
-                                                        <div className="font-bold text-lg">Class {slot.classId}</div>
-                                                        <div className="text-xs text-muted-foreground">
+                                                    </div>
+                                                    <div className="flex flex-col">
+                                                        <div className="font-bold text-lg text-white/90 leading-tight">Class {slot.classId}</div>
+                                                        <div className="text-[11px] font-medium text-white/50 tracking-wide uppercase mt-0.5">
                                                             {slot.type === "SUBSTITUTION" ? "Substitution" : (subjects[slot.subjectId]?.name || slot.subjectId || "Regular Class")}
                                                         </div>
                                                     </div>
                                                 </div>
-                                                {slot.type === "SUBSTITUTION" && <Badge className="bg-yellow-500 text-black">SUB</Badge>}
-                                                {slot.type === "LEAVE" && <Badge variant="destructive" className="scale-75">LEAVE</Badge>}
+                                                {slot.type === "SUBSTITUTION" && <Badge className="bg-yellow-500 text-black font-black tracking-widest text-[9px]">SUB</Badge>}
+                                                {slot.type === "LEAVE" && <Badge variant="destructive" className="scale-75 font-black uppercase">LEAVE</Badge>}
                                             </div>
                                         ))}
                                     </div>
                                 )
                             )}
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </div>
 
                     {/* 2b. Upcoming Coverage Card */}
                     {upcomingSubs.length > 0 && (
-                        <Card className="bg-blue-600/5 border-blue-500/20">
-                            <CardHeader className="py-4">
-                                <CardTitle className="text-lg flex items-center gap-2 text-blue-400">
+                        <div className="bg-blue-600/10 border border-blue-500/20 rounded-2xl p-5 backdrop-blur-md shadow-xl flex flex-col gap-4">
+                            <div className="border-b border-blue-500/20 pb-3">
+                                <h3 className="text-lg font-bold flex items-center gap-2 text-blue-400">
                                     <AlertTriangle className="w-5 h-5" /> Upcoming Coverage
-                                </CardTitle>
-                                <CardDescription className="text-blue-300/60">Coverage assignments for the coming days.</CardDescription>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-3">
-                                    {upcomingSubs.slice(0, 3).map((sub, idx) => (
-                                        <div key={idx} className="flex items-center justify-between p-3 bg-blue-500/5 rounded-lg border border-blue-500/10">
-                                            <div className="flex items-center gap-4">
-                                                <div className="bg-blue-500/20 px-2 py-1 rounded text-[10px] font-bold text-blue-400 uppercase">
-                                                    {new Date(sub.date).toLocaleDateString([], { weekday: 'short', day: 'numeric', month: 'short' })}
-                                                </div>
-                                                <div>
-                                                    <div className="font-bold text-sm text-white/90">Class {sub.classId}</div>
-                                                    <div className="text-[10px] text-muted-foreground">Period {sub.slotId} • Covering for {sub.originalTeacherId}</div>
-                                                </div>
+                                </h3>
+                                <p className="text-[11px] text-blue-300/60 mt-1 uppercase tracking-wider font-semibold">Coverage assignments for the coming days.</p>
+                            </div>
+                            <div className="space-y-3 pt-1">
+                                {upcomingSubs.slice(0, 3).map((sub, idx) => (
+                                    <div key={idx} className="flex items-center justify-between p-3.5 bg-blue-500/10 rounded-xl border border-blue-500/20 hover:bg-blue-500/20 transition-colors">
+                                        <div className="flex items-center gap-4">
+                                            <div className="bg-blue-500/20 px-3 py-1.5 rounded-lg text-[10px] font-black text-blue-300 uppercase tracking-widest text-center min-w-[50px]">
+                                                {new Date(sub.date).toLocaleDateString([], { weekday: 'short' })}<br />
+                                                <span className="text-white">{new Date(sub.date).toLocaleDateString([], { day: 'numeric', month: 'short' })}</span>
                                             </div>
-                                            <Badge variant="outline" className="text-[10px] border-blue-500/30 text-blue-400">ASSIGNED</Badge>
+                                            <div className="flex flex-col">
+                                                <div className="font-bold text-base text-white/90 leading-tight">Class {sub.classId}</div>
+                                                <div className="text-[11px] font-medium text-blue-300/60 uppercase tracking-wider mt-0.5">Period {sub.slotId} • Covering for {sub.originalTeacherId}</div>
+                                            </div>
                                         </div>
-                                    ))}
-                                    {upcomingSubs.length > 3 && (
-                                        <p className="text-[10px] text-center text-muted-foreground italic">And {upcomingSubs.length - 3} more assigned classes...</p>
-                                    )}
-                                </div>
-                            </CardContent>
-                        </Card>
+                                        <Badge variant="outline" className="text-[10px] border-blue-500/50 text-blue-400 bg-blue-500/10 font-bold uppercase tracking-widest shrink-0">ASSIGNED</Badge>
+                                    </div>
+                                ))}
+                                {upcomingSubs.length > 3 && (
+                                    <p className="text-[10px] text-center text-blue-400/50 italic font-medium pt-2">And {upcomingSubs.length - 3} more assigned classes...</p>
+                                )}
+                            </div>
+                        </div>
                     )}
                 </div>
 
                 {/* 3. Right Column: Quick Widgets */}
                 <div className="space-y-6">
 
-                    {/* Actions */}
-                    <div className="grid grid-cols-2 gap-3">
-                        <Button className="h-24 flex flex-col gap-2 bg-emerald-600 hover:bg-emerald-700" asChild>
-                            <Link href="/teacher/homework">
-                                <Plus className="w-6 h-6" />
-                                <span>Post Homework</span>
-                            </Link>
-                        </Button>
-                        <Button className="h-24 flex flex-col gap-2 bg-blue-600 hover:bg-blue-700" asChild>
-                            <Link href="/teacher/notices">
-                                <FileText className="w-6 h-6" />
-                                <span>Send Notice</span>
-                            </Link>
-                        </Button>
+                    {/* Actions Grid */}
+                    <div className="grid grid-cols-2 gap-4">
+                        <Link href="/teacher/homework" className="group flex flex-col items-center justify-center gap-3 p-5 glass-panel-emerald rounded-2xl transition-all text-center aspect-square md:aspect-auto md:min-h-[120px]">
+                            <div className="bg-emerald-500/20 p-3 rounded-xl group-hover:scale-110 transition-transform shadow-lg shadow-emerald-500/10">
+                                <Plus className="w-6 h-6 text-emerald-400" />
+                            </div>
+                            <span className="font-bold text-xs md:text-sm text-emerald-100 tracking-wide">Post Homework</span>
+                        </Link>
+
+                        <Link href="/teacher/notices" className="group flex flex-col items-center justify-center gap-3 p-5 glass-panel-blue rounded-2xl transition-all text-center aspect-square md:aspect-auto md:min-h-[120px]">
+                            <div className="bg-blue-500/20 p-3 rounded-xl group-hover:scale-110 transition-transform shadow-lg shadow-blue-500/10">
+                                <FileText className="w-6 h-6 text-blue-400" />
+                            </div>
+                            <span className="font-bold text-xs md:text-sm text-blue-100 tracking-wide">Send Notice</span>
+                        </Link>
+
                         {managedClasses.length > 0 && (
-                            <Button className="h-24 flex flex-col gap-2 bg-amber-600 hover:bg-amber-700" asChild>
-                                <Link href="/teacher/add-students">
-                                    <GraduationCap className="w-6 h-6" />
-                                    <span>Add Students</span>
-                                </Link>
-                            </Button>
-                        )}
-                        <Button className="h-24 flex flex-col gap-2 bg-purple-600 hover:bg-purple-700 col-span-2" asChild>
-                            <Link href="/teacher/exams">
-                                <FileText className="w-6 h-6" />
-                                <span>Examinations & Results</span>
+                            <Link href="/teacher/students/add" className="group flex flex-col items-center justify-center gap-3 p-5 glass-panel-accent rounded-2xl transition-all text-center aspect-square md:aspect-auto md:min-h-[120px]">
+                                <div className="bg-accent/20 p-3 rounded-xl group-hover:scale-110 transition-transform shadow-lg shadow-accent/10">
+                                    <GraduationCap className="w-6 h-6 text-accent" />
+                                </div>
+                                <span className="font-bold text-xs md:text-sm text-accent tracking-wide">Add Student</span>
                             </Link>
-                        </Button>
+                        )}
+
+                        <Link href="/teacher/exams" className={cn(
+                            "group flex flex-col items-center justify-center gap-3 p-5 glass-panel-purple rounded-2xl transition-all text-center md:min-h-[120px]",
+                            managedClasses.length > 0 ? "aspect-square md:aspect-auto" : "col-span-2 h-auto py-6"
+                        )}>
+                            <div className="bg-purple-500/20 p-3 rounded-xl group-hover:scale-110 transition-transform shadow-lg shadow-purple-500/10">
+                                <FileText className="w-6 h-6 text-purple-400" />
+                            </div>
+                            <span className="font-bold text-xs md:text-sm text-purple-100 tracking-wide">Examinations & Results</span>
+                        </Link>
                     </div>
 
                     {/* Student Leave Tracker */}
-                    <Card className="bg-black/20 border-white/10">
-                        <CardHeader className="py-4 flex flex-row items-center justify-between">
-                            <CardTitle className="text-base">Student Absences</CardTitle>
-                            <Button variant="ghost" size="sm" asChild>
-                                <Link href="/teacher/leaves"><ChevronRight className="w-4 h-4" /></Link>
+                    <div className="bg-black/20 border border-white/10 rounded-2xl p-5 backdrop-blur-md shadow-xl flex flex-col gap-4">
+                        <div className="flex items-center justify-between">
+                            <h3 className="font-bold text-white text-lg">Student Absences</h3>
+                            <Link href="/teacher/leaves" className="text-white/50 hover:text-white transition-colors bg-white/5 hover:bg-white/10 p-1.5 rounded-lg border border-white/5">
+                                <ChevronRight className="w-4 h-4" />
+                            </Link>
+                        </div>
+                        <p className="text-xs text-muted-foreground leading-relaxed">
+                            Review and manage recent or pending leave requests from students enrolled in your class.
+                        </p>
+                        <Link href="/teacher/leaves" className="w-full">
+                            <Button variant="outline" className="w-full text-xs h-10 border-white/10 hover:bg-white/10 hover:text-white transition-all rounded-xl shadow-sm">
+                                Manage Student Leaves
                             </Button>
-                        </CardHeader>
-                        <CardContent className="py-2">
-                            <p className="text-[10px] text-muted-foreground mb-2">Recent/Pending leaves in your class.</p>
-                            <Button variant="outline" className="w-full text-xs h-8 border-white/5" asChild>
-                                <Link href="/teacher/leaves">View Student Leaves</Link>
-                            </Button>
-                        </CardContent>
-                    </Card>
+                        </Link>
+                    </div>
 
                     {/* Leave Status (Self) */}
-                    <Card className="bg-black/20 border-white/10">
-                        <CardHeader className="py-4"><CardTitle className="text-base line-clamp-1">My Leave Status</CardTitle></CardHeader>
-                        <CardContent className="py-2 space-y-3">
-                            {leaves.length === 0 ? <p className="text-xs text-muted-foreground">No recent requests.</p> : leaves.map(l => (
-                                <div key={l.id} className="flex justify-between items-center text-sm">
-                                    <div className="flex flex-col">
-                                        <span className="font-medium text-xs">{l.fromDate}</span>
-                                        <span className="text-[10px] text-muted-foreground">{l.type}</span>
+                    <div className="bg-black/20 border border-white/10 rounded-2xl p-5 backdrop-blur-md shadow-xl flex flex-col gap-4">
+                        <div className="flex items-center justify-between border-b border-white/5 pb-3">
+                            <h3 className="font-bold text-white text-lg">My Leave Status</h3>
+                        </div>
+                        <div className="space-y-3">
+                            {leaves.length === 0 ? (
+                                <p className="text-xs text-muted-foreground py-2 text-center border-y border-white/5 border-dashed">No recent requests.</p>
+                            ) : leaves.map(l => (
+                                <div key={l.id} className="flex justify-between items-center p-2.5 rounded-xl bg-white/5 border border-white/5 hover:bg-white/10 transition-colors">
+                                    <div className="flex flex-col gap-1">
+                                        <span className="font-bold text-xs text-white/90">{l.fromDate}</span>
+                                        <span className="text-[10px] text-white/50 uppercase tracking-wider font-semibold">{l.type}</span>
                                     </div>
-                                    <Badge variant={l.status === 'APPROVED' ? 'default' : l.status === 'REJECTED' ? 'destructive' : 'secondary'} className="text-[10px]">
+                                    <Badge variant="outline" className={`text-[9px] uppercase tracking-widest px-2 py-0.5 border-opacity-50 ${l.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500' :
+                                        l.status === 'REJECTED' ? 'bg-red-500/10 text-red-400 border-red-500' : 'bg-amber-500/10 text-amber-400 border-amber-500'
+                                        }`}>
                                         {l.status}
                                     </Badge>
                                 </div>
                             ))}
-                            <Button variant="outline" className="w-full text-xs mt-2" asChild>
-                                <Link href="/teacher/leaves">Request Leave</Link>
+                        </div>
+                        <Link href="/teacher/leaves" className="w-full pt-2">
+                            <Button variant="outline" className="w-full text-xs h-10 border-white/10 hover:bg-white/10 hover:text-white transition-all rounded-xl shadow-sm">
+                                Request Leave
                             </Button>
-                        </CardContent>
-                    </Card>
+                        </Link>
+                    </div>
 
                     {/* Upcoming Holidays (Dynamic) */}
-                    <Card className="bg-emerald-900/10 border-emerald-500/20">
-                        <CardHeader className="py-4"><CardTitle className="text-base text-emerald-500">Upcoming Holidays</CardTitle></CardHeader>
-                        <CardContent className="py-2">
-                            <div className="space-y-2">
-                                {loading ? (
-                                    <Skeleton className="h-4 w-full" />
-                                ) : holidays.length === 0 ? (
-                                    <p className="text-xs text-muted-foreground whitespace-normal">No holidays scheduled soon.</p>
-                                ) : (
-                                    holidays.slice(0, 2).map((h: any, i: number) => (
-                                        <div key={i} className="flex justify-between text-sm">
-                                            <span className="truncate mr-2">{h.title || h.name}</span>
-                                            <span className="text-muted-foreground whitespace-nowrap">
-                                                {h.date?.seconds ? new Date(h.date.seconds * 1000).toLocaleDateString([], { month: 'short', day: 'numeric' }) :
-                                                    h.createdAt?.seconds ? new Date(h.createdAt.seconds * 1000).toLocaleDateString([], { month: 'short', day: 'numeric' }) : "TBD"}
-                                            </span>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                            <Button variant="link" className="text-xs text-emerald-500 px-0 mt-2 block" asChild>
-                                <Link href="/teacher/holidays">View Calendar</Link>
+                    <div className="bg-emerald-900/10 border border-emerald-500/20 rounded-2xl p-5 backdrop-blur-md shadow-xl flex flex-col gap-4">
+                        <div className="flex items-center justify-between border-b border-emerald-500/10 pb-3">
+                            <h3 className="font-bold text-emerald-400 text-lg">Upcoming Holidays</h3>
+                        </div>
+                        <div className="space-y-2">
+                            {loading ? (
+                                <Skeleton className="h-4 w-full bg-emerald-500/10" />
+                            ) : holidays.length === 0 ? (
+                                <p className="text-xs text-emerald-500/60 py-2 text-center border-y border-emerald-500/10 border-dashed">No holidays scheduled soon.</p>
+                            ) : (
+                                holidays.slice(0, 3).map((h: any, i: number) => (
+                                    <div key={i} className="flex justify-between items-center p-2.5 rounded-xl bg-emerald-500/5 border border-emerald-500/10 hover:bg-emerald-500/10 transition-colors">
+                                        <span className="truncate font-semibold text-xs text-emerald-100 mr-2">{h.title || h.name}</span>
+                                        <Badge variant="outline" className="text-[9px] font-mono text-emerald-400 border-emerald-500/30 bg-emerald-500/10 shrink-0">
+                                            {h.date?.seconds ? new Date(h.date.seconds * 1000).toLocaleDateString([], { month: 'short', day: 'numeric' }) :
+                                                h.createdAt?.seconds ? new Date(h.createdAt.seconds * 1000).toLocaleDateString([], { month: 'short', day: 'numeric' }) : "TBD"}
+                                        </Badge>
+                                    </div>
+                                ))
+                            )}
+                        </div>
+                        <Link href="/teacher/holidays" className="w-full pt-2">
+                            <Button variant="outline" className="w-full text-xs h-10 border-emerald-500/20 text-emerald-400 hover:bg-emerald-500/20 hover:text-emerald-300 transition-all rounded-xl shadow-sm">
+                                View Calendar
                             </Button>
-                        </CardContent>
-                    </Card>
+                        </Link>
+                    </div>
 
                 </div>
             </div>

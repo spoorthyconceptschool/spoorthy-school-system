@@ -48,6 +48,26 @@ export function DeclareHolidayModal() {
                 status: 'ACTIVE'
             });
 
+            // Notify Students and Teachers
+            await addDoc(collection(db, "notifications"), {
+                title: `🎉 Holiday Declared: ${title}`,
+                message: description || `A holiday has been declared for ${format(date, "PPP")}.`,
+                type: "HOLIDAY",
+                target: "ALL",
+                status: "UNREAD",
+                createdAt: Timestamp.now()
+            });
+
+            // Notify Admins
+            await addDoc(collection(db, "notifications"), {
+                title: `🎉 Holiday Declared: ${title}`,
+                message: description || `A holiday has been declared for ${format(date, "PPP")}.`,
+                type: "HOLIDAY",
+                target: "ALL_ADMINS",
+                status: "UNREAD",
+                createdAt: Timestamp.now()
+            });
+
             toast({ title: "Holiday Declared", description: `Holiday '${title}' on ${format(date, "PPP")} added.`, type: "success" });
             setOpen(false);
             setTitle("");

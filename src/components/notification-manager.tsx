@@ -18,25 +18,8 @@ export function NotificationManager() {
         const handleSnapshot = (snapshot: any) => {
             if (isFirstRun.current) {
                 isFirstRun.current = false;
-                snapshot.docs.forEach((doc: any) => {
-                    const data = doc.data();
-                    const hDate = data.date?.seconds ? new Date(data.date.seconds * 1000) : null;
-                    if (hDate) {
-                        const today = new Date();
-                        today.setHours(0, 0, 0, 0);
-                        const diff = hDate.getTime() - today.getTime();
-                        const days = diff / (1000 * 60 * 60 * 24);
-
-                        if (days >= 0 && days <= 2) {
-                            toast({
-                                title: hDate.getTime() === today.getTime() ? "Today is a Holiday!" : "Upcoming Holiday",
-                                description: `${data.title} on ${hDate.toLocaleDateString()}`,
-                                type: "info",
-                                duration: 8000
-                            });
-                        }
-                    }
-                });
+                // No longer showing a toast popup on every reload for existing holidays.
+                // Notifications are now handled by the NotificationCenter bell icon.
                 return;
             }
 

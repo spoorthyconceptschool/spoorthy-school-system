@@ -12,6 +12,7 @@ import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
+import { ManageRollNumbersModal } from "@/components/teacher/manage-roll-numbers-modal";
 
 export default function TeacherStudentsPage() {
     const { user } = useAuth();
@@ -27,6 +28,9 @@ export default function TeacherStudentsPage() {
     // Filters
     const [searchQuery, setSearchQuery] = useState("");
     const [statusFilter, setStatusFilter] = useState("ACTIVE");
+
+    // Modal States
+    const [isManageRollsOpen, setIsManageRollsOpen] = useState(false);
 
     useEffect(() => {
         if (user) {
@@ -111,7 +115,7 @@ export default function TeacherStudentsPage() {
         };
 
         fetchStudents();
-    }, [currentClassInfo, selectedYear]);
+    }, [currentClassInfo, selectedYear, isManageRollsOpen]);
 
     const filteredStudents = useMemo(() => {
         return students.filter(s => {
@@ -200,15 +204,36 @@ export default function TeacherStudentsPage() {
                     </div>
 
                     {isClassTeacher && (
-                        <Button
-                            onClick={() => router.push(`/teacher/students/add?classId=${currentClassInfo?.classId}&sectionId=${currentClassInfo?.sectionId}`)}
-                            className="bg-accent hover:bg-accent/90 text-black font-bold h-10 px-5 rounded-xl transition-all shadow-lg hover:shadow-accent/20 hover:-translate-y-0.5"
-                        >
-                            <Plus className="w-4 h-4 mr-2" /> Add Student
-                        </Button>
+                        <div className="flex items-center gap-2">
+                            <Button
+                                onClick={() => setIsManageRollsOpen(true)}
+                                variant="outline"
+                                className="h-10 px-4 bg-white/5 border-white/10 hover:bg-white/10 text-white font-medium"
+                            >
+                                <Users className="w-4 h-4 mr-2" /> Manage Rolls
+                            </Button>
+                            <Button
+                                onClick={() => router.push(`/teacher/students/add?classId=${currentClassInfo?.classId}&sectionId=${currentClassInfo?.sectionId}`)}
+                                className="bg-accent hover:bg-accent/90 text-black font-bold h-10 px-5 rounded-xl transition-all shadow-lg hover:shadow-accent/20 hover:-translate-y-0.5"
+                            >
+                                <Plus className="w-4 h-4 mr-2" /> Add Student
+                            </Button>
+                        </div>
                     )}
                 </div>
             </div>
+
+            {isManageRollsOpen && (
+                <ManageRollNumbersModal
+                    students={students}
+                    classId={currentClassInfo?.classId || ""}
+                    sectionId={currentClassInfo?.sectionId || ""}
+                    className={currentClassName}
+                    sectionName={currentSectionName}
+                    onClose={() => setIsManageRollsOpen(false)}
+                    onSuccess={() => setIsManageRollsOpen(false)}
+                />
+            )}
 
             {/* 2. Statistics Summary Cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

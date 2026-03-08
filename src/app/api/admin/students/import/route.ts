@@ -139,10 +139,15 @@ export async function POST(req: NextRequest) {
                     ...SearchService.generateKeywords(villageName || "")
                 ]));
 
+                const resolvedAdmissionNumber = student.admissionNumber && student.admissionNumber !== "PENDING"
+                    ? student.admissionNumber
+                    : schoolId;
+
                 // 3. /students/{schoolId}
                 batch.set(db.collection("students").doc(schoolId), {
                     ...student,
                     schoolId,
+                    admissionNumber: resolvedAdmissionNumber,
                     uid,
                     studentName: student.studentName,
                     className,

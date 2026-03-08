@@ -71,7 +71,7 @@ export default function FeesPage() {
             const { syncAllStudentLedgers } = await import("@/lib/services/fee-service");
             const updatedCount = await syncAllStudentLedgers(db, selectedYear);
 
-            toast({ title: "Configuration Saved", description: `Internal registry updated and synced for ${updatedCount} students in real-time.`, type: "success" });
+            toast({ title: "Configuration Saved", description: `Student fee settings updated for ${updatedCount} students.`, type: "success" });
         } catch (error: any) {
             console.error("Error saving fees:", error);
             toast({ title: "Save Failed", description: error.message, type: "error" });

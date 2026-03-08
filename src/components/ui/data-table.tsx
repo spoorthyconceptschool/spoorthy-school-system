@@ -41,11 +41,13 @@ interface DataTableProps<T> {
     hasNextPage?: boolean;
     hasPrevPage?: boolean;
     totalServerItems?: number;
+    className?: string;
 }
 
 export function DataTable<T>({
     data, columns, isLoading, onRowClick, actions, pageSize = 20,
-    serverPagination = false, onNextPage, onPrevPage, hasNextPage, hasPrevPage, totalServerItems
+    serverPagination = false, onNextPage, onPrevPage, hasNextPage, hasPrevPage, totalServerItems,
+    className
 }: DataTableProps<T>) {
     const [currentPage, setCurrentPage] = useState(1);
 
@@ -64,7 +66,7 @@ export function DataTable<T>({
     }
 
     return (
-        <div className="w-full space-y-3">
+        <div className={cn("w-full space-y-3", className)}>
             <div className="overflow-x-auto rounded-xl md:rounded-2xl border border-white/10 bg-black/20 backdrop-blur-md custom-scrollbar">
                 <Table className="w-full">
                     <TableHeader className="bg-white/5">

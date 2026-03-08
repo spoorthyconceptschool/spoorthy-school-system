@@ -157,7 +157,7 @@ export default function TeacherProfilePage() {
 
     if (loading || masterLoading) return <div className="p-10 flex flex-col items-center justify-center gap-4 min-h-[400px]">
         <Loader2 className="animate-spin text-accent w-8 h-8" />
-        <p className="text-muted-foreground text-xs uppercase tracking-widest font-black animate-pulse">Synchronizing Registry...</p>
+        <p className="text-muted-foreground text-xs uppercase tracking-widest font-black animate-pulse">Loading Profile...</p>
     </div>;
     if (!teacher) return null;
 

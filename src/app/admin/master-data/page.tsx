@@ -98,14 +98,14 @@ export default function MasterDataPage() {
                 <h1 className="text-2xl md:text-5xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic leading-tight">
                     Master Data Center
                 </h1>
-                <p className="text-muted-foreground text-[10px] md:text-lg">Central control for school architecture and foundational configurations.</p>
+                <p className="text-muted-foreground text-[10px] md:text-lg">Manage core school settings, classes, and subjects.</p>
             </div>
 
             {/* Quick Stats Highlights */}
             <div className="grid grid-cols-2 md:grid-cols-3 gap-3 md:gap-4">
                 <Card className="bg-black/20 border-white/5 backdrop-blur-md">
                     <CardHeader className="p-3 md:pb-2 space-y-0">
-                        <CardTitle className="text-[8px] md:text-xs font-black text-muted-foreground uppercase tracking-widest">Digital Registry</CardTitle>
+                        <CardTitle className="text-[8px] md:text-xs font-black text-muted-foreground uppercase tracking-widest">System Status</CardTitle>
                     </CardHeader>
                     <CardContent className="px-3 pb-3 md:p-6 md:pt-0">
                         <div className="flex items-center gap-2">
@@ -188,7 +188,7 @@ export default function MasterDataPage() {
             {/* Bottom Footer Section */}
             <div className="rounded-2xl md:rounded-3xl border border-white/5 bg-gradient-to-br from-blue-500/10 via-transparent to-purple-500/5 p-6 md:p-12 flex flex-col md:flex-row items-center justify-between gap-6 md:gap-10 overflow-hidden relative group">
                 <div className="space-y-2 md:space-y-3 relative z-10 text-center md:text-left">
-                    <h3 className="text-xl md:text-3xl font-bold text-white italic">Architecture Sync</h3>
+                    <h3 className="text-xl md:text-3xl font-bold text-white italic">Data Synchronization</h3>
                     <p className="text-xs md:text-base text-muted-foreground max-w-2xl font-medium">
                         Changes to Master Data automatically propagate across Attendance, Fee Payment, and Exams.
                         Ensure all grades and subjects are mapped correctly for seamless operations.

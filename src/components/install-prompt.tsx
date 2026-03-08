@@ -4,20 +4,28 @@ import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { X, Download, Smartphone } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
+import { useAuth } from "@/context/AuthContext";
 
 export function InstallPrompt() {
+    const { user } = useAuth();
     const [deferredPrompt, setDeferredPrompt] = useState<any>(null);
     const [isVisible, setIsVisible] = useState(false);
     const [isIOS, setIsIOS] = useState(false);
 
     useEffect(() => {
-        // Check if already dismissed in this session
-        if (sessionStorage.getItem("pwa_prompt_dismissed")) {
+        if (!user) {
+            setIsVisible(false);
             return;
         }
 
-        // Check if already installed
-        if (window.matchMedia('(display-mode: standalone)').matches) {
+        // Check if already dismissed or installed persistently
+        if (localStorage.getItem("pwa_prompt_dismissed") || localStorage.getItem("pwa_prompt_installed")) {
+            return;
+        }
+
+        // Check if currently running as installed app
+        if (window.matchMedia('(display-mode: standalone)').matches || (navigator as any).standalone) {
+            localStorage.setItem("pwa_prompt_installed", "true");
             return;
         }
 
@@ -40,7 +48,7 @@ export function InstallPrompt() {
         window.addEventListener("beforeinstallprompt", handler);
 
         return () => window.removeEventListener("beforeinstallprompt", handler);
-    }, []);
+    }, [user]);
 
     const handleInstall = async () => {
         if (!deferredPrompt) return;
@@ -50,12 +58,13 @@ export function InstallPrompt() {
 
         if (outcome === 'accepted') {
             setIsVisible(false);
+            localStorage.setItem("pwa_prompt_installed", "true");
         }
         setDeferredPrompt(null);
     };
 
     const handleDismiss = () => {
-        sessionStorage.setItem("pwa_prompt_dismissed", "true");
+        localStorage.setItem("pwa_prompt_dismissed", "true");
         setIsVisible(false);
     };
 
