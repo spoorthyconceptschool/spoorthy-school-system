@@ -333,7 +333,76 @@ export const exportAcademicLoad = (data: any[]) => {
         alert("Failed to export academic load report");
     }
 };
-// ... existing code ...
+
+export const printAcademicLoadReport = (data: any[], branding?: any) => {
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) {
+        alert("Please allow popups to view and print the report.");
+        return;
+    }
+
+    const html = `
+        <html>
+            <head>
+                <title>Academic Assignments Report</title>
+                <style>
+                    body { font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; padding: 20px; color: #333; }
+                    table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+                    th, td { border: 1px solid #ddd; padding: 12px; text-align: left; font-size: 13px; }
+                    th { background-color: #f8f9fa; font-weight: bold; text-transform: uppercase; font-size: 11px; }
+                    .header { display: flex; align-items: center; justify-content: center; gap: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
+                    .logo { height: 80px; width: auto; object-fit: contain; }
+                    .header-text { text-align: left; }
+                    h1 { margin: 0; font-size: 24px; color: #000; }
+                    .page-container { page-break-after: always; padding-bottom: 40px; }
+                    .page-container:last-child { page-break-after: auto; }
+                    .meta-info { text-align: right; font-size: 10px; color: #666; margin-bottom: 10px; }
+                </style>
+            </head>
+            <body>
+                ${data.map(item => `
+                    <div class="page-container">
+                        <div class="header">
+                            ${branding?.schoolLogo ? `<img src="${branding.schoolLogo}" class="logo" />` : ''}
+                            <div class="header-text">
+                                <h1>${branding?.schoolName || 'Spoorthy Concept School'}</h1>
+                                <h3 style="margin: 5px 0 0 0; color: #444;">Academic Assignments: ${item.className} - ${item.sectionName}</h3>
+                                <p style="margin: 2px 0 0 0; font-size: 12px; color: #666;">${branding?.address || ''}</p>
+                            </div>
+                        </div>
+                        <div class="meta-info">Generated: ${new Date().toLocaleString()}</div>
+                        
+                        <p style="font-size: 14px; margin-bottom: 15px;"><strong>Primary Class Teacher:</strong> <span style="color: #2e7d32;">${item.classTeacher}</span></p>
+                        <table>
+                            <thead>
+                                <tr>
+                                    <th style="width: 50%">Subject</th>
+                                    <th>Assigned Teacher</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${item.subjects.length > 0
+            ? item.subjects.map((s: any) => `<tr><td>${s.name}</td><td>${s.teacher}</td></tr>`).join('')
+            : '<tr><td colspan="2" style="text-align:center; color: #999; padding: 20px;">No Subjects Assigned</td></tr>'
+        }
+                            </tbody>
+                        </table>
+                    </div>
+                `).join('')}
+                <script>
+                    window.onload = () => {
+                        setTimeout(() => {
+                            window.print();
+                        }, 800);
+                    };
+                </script>
+            </body>
+        </html>
+    `;
+
+    printWindow.document.write(html);
+    printWindow.document.close();
+};
 
 export const printPaymentReceipt = ({
     payment,

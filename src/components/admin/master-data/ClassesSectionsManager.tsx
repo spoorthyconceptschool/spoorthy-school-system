@@ -11,7 +11,7 @@ import { rtdb, db } from "@/lib/firebase";
 import { ref, update, push, set, remove } from "firebase/database";
 import { Trash2, Plus, Edit, BookOpen, CheckCircle2, GraduationCap, Users, Download, Printer, Check } from "lucide-react";
 import { collection, getDocs, query, orderBy } from "firebase/firestore";
-import { exportAcademicLoad } from "@/lib/export-utils";
+import { exportAcademicLoad, printAcademicLoadReport } from "@/lib/export-utils";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Label } from "@/components/ui/label";
@@ -120,71 +120,33 @@ export function ClassesSectionsManager() {
     };
 
     const handleExport = (ids: string[]) => {
-        const data = getProcessedData(ids);
-        exportAcademicLoad(data);
-        setIsReportOpen(false);
+        try {
+            const data = getProcessedData(ids);
+            if (data.length === 0) {
+                alert("No classes matches the selection. Please ensure classes are active.");
+                return;
+            }
+            exportAcademicLoad(data);
+            setIsReportOpen(false);
+        } catch (error) {
+            console.error(error);
+            alert("Export failed. Please try again.");
+        }
     };
 
     const handlePrint = (ids: string[]) => {
-        const data = getProcessedData(ids);
-        const printWindow = window.open('', '_blank');
-        if (!printWindow) return;
-
-        const html = `
-            <html>
-                <head>
-                    <title>Academic Assignments Report</title>
-                    <style>
-                        body { font-family: sans-serif; padding: 20px; }
-                        table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
-                        th, td { border: 1px solid #ddd; padding: 10px; text-align: left; }
-                        th { background-color: #f4f4f4; }
-                        .header { display: flex; align-items: center; justify-content: center; gap: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
-                        .logo { height: 80px; width: auto; object-fit: contain; }
-                        .header-text { text-align: left; }
-                        h1 { margin: 0; font-size: 28px; }
-                        .section-title { font-size: 20px; font-weight: bold; margin-top: 10px; border-bottom: 2px solid #333; padding-bottom: 5px; }
-                        .page-container { page-break-after: always; padding-bottom: 40px; }
-                        /* Don't add a page break after the last item */
-                        .page-container:last-child { page-break-after: auto; }
-                    </style>
-                </head>
-                <body>
-                    ${data.map(item => `
-                        <div class="page-container">
-                            <div class="header">
-                                ${branding?.schoolLogo ? `<img src="${branding.schoolLogo}" class="logo" />` : ''}
-                                <div class="header-text">
-                                    <h1>${branding?.schoolName || 'Spoorthy Concept School'}</h1>
-                                    <h3 style="margin: 5px 0 0 0; color: #666;">Academic Assignments: ${item.className} - ${item.sectionName}</h3>
-                                </div>
-                            </div>
-                            <p style="text-align: right; font-size: 10px;">Generated: ${new Date().toLocaleString()}</p>
-                            
-                            <p><strong>Primary Class Teacher:</strong> ${item.classTeacher}</p>
-                            <table>
-                                <thead>
-                                    <tr>
-                                        <th style="width: 50%">Subject</th>
-                                        <th>Assigned Teacher</th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    ${item.subjects.length > 0
-                ? item.subjects.map(s => `<tr><td>${s.name}</td><td>${s.teacher}</td></tr>`).join('')
-                : '<tr><td colspan="2" style="text-align:center;">No Subjects Assigned</td></tr>'
+        try {
+            const data = getProcessedData(ids);
+            if (data.length === 0) {
+                alert("No classes matches the selection.");
+                return;
             }
-                                </tbody>
-                            </table>
-                        </div>
-                    `).join('')}
-                    <script>window.onload = () => { window.print(); window.close(); };</script>
-                </body>
-            </html>
-        `;
-        printWindow.document.write(html);
-        printWindow.document.close();
-        setIsReportOpen(false);
+            printAcademicLoadReport(data, branding);
+            setIsReportOpen(false);
+        } catch (error) {
+            console.error(error);
+            alert("Failed to initialize print view.");
+        }
     };
 
     if (loading) return <div className="p-10 text-center animate-pulse text-white">Loading Academy Data...</div>;
