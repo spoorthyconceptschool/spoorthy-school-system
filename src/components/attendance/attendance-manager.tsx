@@ -294,9 +294,13 @@ export default function AttendanceManager({
     const handleSubmit = async () => {
         setSubmitting(true);
         try {
+            const token = await user?.getIdToken();
             const res = await fetch("/api/attendance/mark", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
                 body: JSON.stringify({
                     classId,
                     sectionId,

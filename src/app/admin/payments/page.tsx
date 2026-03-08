@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, onSnapshot, query, orderBy, limit, doc, getDoc, updateDoc, addDoc, Timestamp, getAggregateFromServer, sum, where, startAfter, getDocs } from "firebase/firestore";
+import { collection, onSnapshot, query, orderBy, limit, doc, getDoc, updateDoc, addDoc, Timestamp, where, startAfter, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { DataTable } from "@/components/ui/data-table";
 import { Loader2, Plus, Search, ArrowLeft, Printer } from "lucide-react";
@@ -66,40 +66,16 @@ export default function PaymentsPage() {
 
     // Provide fetchAggregates and fetchPage as stable references/callbacks
     const fetchAggregates = async (yearId: string) => {
-        if (!yearId) return;
-        try {
-            console.log(`[PaymentsPage] Fetching aggregates for ${yearId}`);
-            const colRef = collection(db, "payments");
-            const qBase = query(colRef, where("academicYear", "==", yearId));
-
-            const [totalSnap, onlineSnap, cashSnap] = await Promise.all([
-                getAggregateFromServer(qBase, { total: sum("amount") }),
-                getAggregateFromServer(query(qBase, where("method", "==", "razorpay")), { total: sum("amount") }),
-                getAggregateFromServer(query(qBase, where("method", "==", "cash")), { total: sum("amount") })
-            ]);
-
-            const statsData = {
-                total: totalSnap.data().total || 0,
-                online: onlineSnap.data().total || 0,
-                cash: cashSnap.data().total || 0
-            };
-            console.log("[PaymentsPage] Stats updated:", statsData);
-            setStats(statsData);
-        } catch (e: any) {
-            console.error("Aggregation Failed:", e);
-            if (e.message?.includes("index")) {
-                console.warn("[PaymentsPage] Missing index for aggregates. Check console for URL.");
-            }
-        }
+        // Client-side aggregation from loaded payments to avoid Firestore index requirements
+        // Stats will update as payments are loaded
     };
 
     const fetchPage = async (pageIndex: number, yearId: string, newTokens: any[] = pageTokens) => {
         if (!yearId) return;
         setLoading(true);
         try {
-            console.log(`[PaymentsPage] Fetching payments for ${yearId}, page ${pageIndex}`);
+            console.log(`[PaymentsPage] Fetching payments page ${pageIndex}`);
             let baseConstraints: any[] = [
-                where("academicYear", "==", yearId),
                 orderBy("date", "desc"),
                 limit(PAGE_SIZE + 1)
             ];
@@ -144,9 +120,24 @@ export default function PaymentsPage() {
         let isMounted = true;
 
         fetchPage(0, selectedYear, []);
-        fetchAggregates(selectedYear);
 
-        // 2. Fetch all active students for the autocomplete
+        // Compute stats client-side: fetch ALL payments for this purpose
+        const allPaymentsQ = query(collection(db, "payments"), orderBy("date", "desc"));
+        const unsubPayments = onSnapshot(allPaymentsQ, (snapshot) => {
+            if (!isMounted) return;
+            let total = 0, online = 0, cash = 0;
+            snapshot.docs.forEach(doc => {
+                const d = doc.data();
+                const amt = d.amount || 0;
+                total += amt;
+                if (d.method === "razorpay" || d.method === "upi") online += amt;
+                if (d.method === "cash") cash += amt;
+            });
+            setStats({ total, online, cash });
+        }, (err) => {
+            if (!isMounted) return;
+            console.warn("Stats listener error:", err.message);
+        });
         const sq = query(collection(db, "students"), where("academicYear", "==", selectedYear), orderBy("studentName", "asc"));
         const unsubStudents = onSnapshot(sq, (snapshot) => {
             if (!isMounted) return;
@@ -162,6 +153,7 @@ export default function PaymentsPage() {
 
         return () => {
             isMounted = false;
+            unsubPayments();
             unsubStudents();
         };
     }, [selectedYear]);

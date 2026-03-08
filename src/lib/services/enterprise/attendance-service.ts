@@ -59,7 +59,7 @@ export class EnterpriseAttendanceService {
 
         // Enforce Read-Only After Marking Rule
         if (existingSnap.exists) {
-            throw new Error("Business Rule Violation: Attendance is read-only after being marked and cannot be updated dynamically.");
+            throw new Error("Business Rule Violation: Attendance for this class has already been submitted today.");
         }
 
         // Validate and filter students (Ignore unknown persons)

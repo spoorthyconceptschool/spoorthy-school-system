@@ -41,7 +41,8 @@ export const seedDemoData = async () => {
     console.log("[Seeding] Purging old data...");
     const coreCols = [
         "students", "master_villages", "master_classes", "master_sections", "master_class_sections",
-        "payments", "applications", "leaves", "teachers", "staff", "student_fee_ledgers", "search_index", "notices"
+        "payments", "applications", "leaves", "teachers", "staff", "student_fee_ledgers", "search_index", "notices",
+        "attendance_daily", "student_change_requests", "exams", "exam_results"
     ];
     for (const col of coreCols) {
         await nukeCollection(col);
@@ -150,12 +151,13 @@ export const seedDemoData = async () => {
     };
     await addOp(adminDb.collection("config").doc("fees"), feeConfig);
 
-    // 5. Students (Exactly 200)
+    // 5. Students (Exactly ~400)
     let studentIdCounter = 1000;
-    console.log("[Seeding] Generating 200 students with financial records...");
+    console.log("[Seeding] Generating ~400 students with financial records...");
     for (const cls of classData) {
         for (const sec of sections) {
-            for (let i = 1; i <= 10; i++) {
+            // Approx 20 students per section
+            for (let i = 1; i <= 20; i++) {
                 studentIdCounter++;
                 const schoolId = `SHS${studentIdCounter}`;
                 const fName = getRandom(firstNames);
@@ -192,7 +194,7 @@ export const seedDemoData = async () => {
                     gender: getRandom(genders), dateOfBirth: `201${Math.floor(Math.random() * 9)}-06-01`,
                     transportRequired: Math.random() > 0.7, admissionNumber: `ADM/26/${studentIdCounter}`,
                     address: `${i}, Main Street, ${vName}`, createdAt: Timestamp.now(), recoveryPassword: mobile, type: "student",
-                    keywords: Array.from(searchTags)
+                    rollNumber: String(i), keywords: Array.from(searchTags)
                 };
                 await addOp(adminDb.collection("students").doc(schoolId), studentData);
 
@@ -241,13 +243,17 @@ export const seedDemoData = async () => {
         await addOp(adminDb.collection("master_staff_roles").doc(r.code), r);
     }
 
-    // 7. Teachers
+    // 7. Teachers (25 Teachers)
     const teacherNames = [
         "Dr. Venkat Rao", "Mrs. Lakshmi Devi", "Mr. Satyanarayana M", "Dr. Geeta Pillai",
         "Prof. K. Subramaniam", "Ms. Rajeshwari Reddy", "Mr. Anand Murthy", "Mrs. Shanthi Bhushan",
         "Dr. Pradeep Kumar", "Ms. Nirmala Sitharaman", "Mr. Jagadeesh Chandra", "Mrs. Padmaja Naidu",
-        "Mr. Bhaskar Rao", "Ms. Srilatha V", "Dr. Murali Manohar"
+        "Mr. Bhaskar Rao", "Ms. Srilatha V", "Dr. Murali Manohar", "Mrs. Aruna Kumari",
+        "Mr. Srinivasa Reddy", "Ms. Bhavani T", "Mr. Kiran Kumar", "Mrs. Sowmya K",
+        "Dr. Raghavendra Rao", "Ms. Divya S", "Mr. Vinay Kumar", "Mrs. Sushma R", "Mr. Praveen T"
     ];
+
+    // Create Teachers in Firestore
     for (let i = 0; i < teacherNames.length; i++) {
         const id = `TCH${100 + i}`;
         const name = teacherNames[i];
@@ -264,7 +270,7 @@ export const seedDemoData = async () => {
 
         await addOp(adminDb.collection("teachers").doc(id), {
             id, schoolId: id, name, mobile, status: "ACTIVE",
-            salary: 25000 + (i * 500), recoveryPassword: mobile,
+            salary: 35000 + (i * 1000), recoveryPassword: mobile,
             createdAt: Timestamp.now(), keywords: Array.from(tags)
         });
         await addOp(adminDb.collection("search_index").doc(id), {
@@ -300,7 +306,129 @@ export const seedDemoData = async () => {
         });
     }
 
-    // 9. Notices
+    // 9. Assign Teachers to Classes (Class Teachers & Subject Teachers)
+    rtdbMaster.subjectTeachers = {};
+    let teacherIndex = 0;
+
+    // Get all student records grouped by class/section for attendance generation
+    // We already added them to the batch, but let's query the ones we generated logic-wise.
+    // Instead of querying, we can simulate attendance directly by iterating the pattern.
+    const studentRefsByClassSec: Record<string, string[]> = {};
+    const classSectionsReal: any[] = [];
+
+    for (const csKey in rtdbMaster.classSections) {
+        const cs = rtdbMaster.classSections[csKey];
+        // Assign Class Teacher
+        const ctId = `TCH${100 + (teacherIndex % teacherNames.length)}`;
+        cs.classTeacherId = ctId;
+        classSectionsReal.push(cs);
+
+        // Assign Subject Teachers for this class section
+        rtdbMaster.subjectTeachers[csKey] = {
+            "math": `TCH${100 + ((teacherIndex + 1) % teacherNames.length)}`,
+            "science": `TCH${100 + ((teacherIndex + 2) % teacherNames.length)}`,
+            "english": `TCH${100 + ((teacherIndex + 3) % teacherNames.length)}`
+        };
+
+        teacherIndex++;
+        studentRefsByClassSec[csKey] = [];
+    }
+
+    // Since we know the students we generated, we can map them directly:
+    let tempStudentCounter = 1000;
+    for (const c of classData) {
+        for (const s of sections) {
+            const csKey = `${c.id}_${s.id}`;
+            for (let i = 1; i <= 20; i++) {
+                tempStudentCounter++;
+                studentRefsByClassSec[csKey].push(`SHS${tempStudentCounter}`);
+            }
+        }
+    }
+
+    // 10. Generate 5 Days of Attendance
+    console.log("[Seeding] Generating recent attendance records...");
+    const today = new Date();
+    for (let daysAgo = 5; daysAgo >= 1; daysAgo--) {
+        const dateObj = new Date(today);
+        dateObj.setDate(dateObj.getDate() - daysAgo);
+        // skip sundays
+        if (dateObj.getDay() === 0) continue;
+        const dateStr = dateObj.toISOString().split('T')[0];
+
+        for (const cs of classSectionsReal) {
+            const csKey = cs.id;
+            const studentsInSec = studentRefsByClassSec[csKey];
+            if (!studentsInSec || studentsInSec.length === 0) continue;
+
+            const records: Record<string, 'P' | 'A' | 'L'> = {};
+            let presentCount = 0;
+            let absentCount = 0;
+
+            studentsInSec.forEach(sid => {
+                const rand = Math.random();
+                if (rand > 0.95) {
+                    records[sid] = 'A';
+                    absentCount++;
+                } else if (rand > 0.90) {
+                    records[sid] = 'L'; // Late
+                    presentCount++;     // Late is technically marked present for total count
+                } else {
+                    records[sid] = 'P';
+                    presentCount++;
+                }
+            });
+
+            const docId = `${dateStr}_${cs.classId}_${cs.sectionId}`;
+            await addOp(adminDb.collection("attendance_daily").doc(docId), {
+                date: dateStr,
+                classId: cs.classId,
+                sectionId: cs.sectionId,
+                records,
+                markedBy: cs.classTeacherId,
+                timestamp: Timestamp.fromDate(dateObj),
+                stats: { total: studentsInSec.length, present: presentCount, absent: absentCount }
+            });
+        }
+    }
+
+    // 11. Generate Student Change Requests
+    console.log("[Seeding] Generating pending student change requests...");
+    const dummyReqs = [
+        {
+            type: "EDIT",
+            studentId: "SHS1001",
+            classId: classData[0].id,
+            sectionId: sections[0].id,
+            requestedBy: rtdbMaster.classSections[`${classData[0].id}_${sections[0].id}`].classTeacherId,
+            status: "PENDING",
+            timestamp: Timestamp.now(),
+            differences: { mobile: { old: "9999999999", new: "9888888888" }, address: { old: "Hyderabad", new: "Secunderabad" } },
+            requestPayload: { parentMobile: "9888888888", address: "Secunderabad" },
+            studentName: getRandom(firstNames) + " " + getRandom(lastNames),
+            className: classData[0].name,
+            sectionName: sections[0].name
+        },
+        {
+            type: "ADD",
+            classId: classData[1].id,
+            sectionId: sections[1].id,
+            requestedBy: rtdbMaster.classSections[`${classData[1].id}_${sections[1].id}`].classTeacherId,
+            status: "PENDING",
+            timestamp: Timestamp.now(),
+            differences: {},
+            requestPayload: { studentName: "New Student Entry", gender: "male", parentName: "Father Name", parentMobile: "9000000000" },
+            studentName: "New Student Entry",
+            className: classData[1].name,
+            sectionName: sections[1].name
+        }
+    ];
+
+    for (const req of dummyReqs) {
+        await addOp(adminDb.collection("student_change_requests").doc(), req);
+    }
+
+    // 12. Notices
     const notices = [
         { title: "Academic Year 2026-27 Enrollment", content: "Admissions open.", audience: "ALL", urgency: "IMPORTANT" },
         { title: "Annual Day 2026", content: "Coming soon.", audience: "STUDENTS", urgency: "NORMAL" }
@@ -311,7 +439,7 @@ export const seedDemoData = async () => {
 
     await commitBatch();
 
-    // 10. RTDB Sync
+    // 13. RTDB Sync
     console.log("[Seeding] Syncing Master Data to Realtime Database...");
     try {
         await adminRtdb.ref("master").set(rtdbMaster);
@@ -319,6 +447,6 @@ export const seedDemoData = async () => {
         console.warn("[Seeding] RTDB Sync skipped or failed:", e);
     }
 
-    console.log("[Seeding] Success. 200 student ecosystem built.");
+    console.log("[Seeding] Success. ~400 student ecosystem built with hierarchy and attendance.");
     return true;
 };

@@ -162,7 +162,8 @@ export default function StudentDetailsPage() {
         amount: "",
         method: "cash",
         date: "",
-        remarks: ""
+        remarks: "",
+        termId: "" // Which specific fee term this is for, if any
     });
     const [collectingFee, setCollectingFee] = useState(false);
 
@@ -395,6 +396,7 @@ export default function StudentDetailsPage() {
                 date: Timestamp.fromDate(new Date(feeForm.date)),
                 status: "success",
                 remarks: (feeForm.remarks || "") + managerRemark,
+                academicYear: selectedYear || "2025-2026",
                 createdAt: Timestamp.now(),
                 verifiedBy: isManager ? `manager:${user?.displayName || 'Manager'}` : "admin"
             };
@@ -459,7 +461,7 @@ export default function StudentDetailsPage() {
             }
 
             setIsFeeModalOpen(false);
-            setFeeForm({ amount: "", method: "cash", date: new Date().toISOString().split('T')[0], remarks: "" });
+            setFeeForm({ amount: "", method: "cash", date: new Date().toISOString().split('T')[0], remarks: "", termId: "" });
             alert("Payment Recorded & Ledger Updated");
 
         } catch (e: any) {
@@ -520,7 +522,10 @@ export default function StudentDetailsPage() {
             customPending: processed.filter(i => i.type !== "TERM").reduce((s, i) => s + i.distributedDue, 0),
             pending: processed.filter(i => i.distributedDue > 0).map(i => ({
                 name: i.name,
-                due: i.distributedDue
+                due: i.distributedDue,
+                id: i.id, // Add id for selection
+                type: i.type, // Add type for filtering
+                dueDate: i.dueDate // Add dueDate for sorting
             }))
         };
     };
@@ -598,23 +603,103 @@ export default function StudentDetailsPage() {
                                         <CreditCard className="w-3 md:w-4 h-3 md:h-4 mr-1 md:mr-2" /> Collect Fee
                                     </Button>
                                 </DialogTrigger>
-                                <DialogContent className="bg-black/95 border-white/10 text-white sm:max-w-md">
-                                    <DialogHeader><DialogTitle>Collect Payment</DialogTitle></DialogHeader>
-                                    <form onSubmit={handleCollectFee} className="space-y-4 py-4">
-                                        <div className="p-4 bg-emerald-500/10 border border-emerald-500/20 rounded-lg text-emerald-400 text-sm flex justify-between">
-                                            <span>Current Due:</span>
-                                            <span className="font-bold font-mono">₹{dueAmount.toLocaleString()}</span>
+                                <DialogContent className="bg-[#0A192F] text-white border-white/10 sm:max-w-md">
+                                    <DialogHeader>
+                                        <DialogTitle>Collect Payment</DialogTitle>
+                                    </DialogHeader>
+                                    <form onSubmit={handleCollectFee} className="space-y-4 pt-4">
+                                        <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl flex items-center justify-between">
+                                            <span className="text-emerald-400 font-bold text-sm">Total Due Balance:</span>
+                                            <span className="text-emerald-400 font-black">₹{dueAmount.toLocaleString()}</span>
                                         </div>
+
                                         <div className="space-y-2">
-                                            <Label>Amount Received (₹) <span className="text-red-500">*</span></Label>
+                                            <Label>Select Terms to Auto-fill Amount</Label>
+                                            <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
+                                                {breakdown.pending.length > 0 ? (
+                                                    (() => {
+                                                        const pendingItems = breakdown.items.filter((i: any) => i.distributedDue > 0);
+                                                        const userAmount = Number(feeForm.amount) || 0;
+                                                        let remainingAllocation = userAmount;
+
+                                                        return pendingItems.map((item: any, index: number) => {
+                                                            // Calculate how much of the user's entered amount applies to this term
+                                                            const allocatedToThisTerm = Math.min(remainingAllocation, item.distributedDue);
+                                                            remainingAllocation = Math.max(0, remainingAllocation - allocatedToThisTerm);
+
+                                                            // Calculate cumulative sum up to this term for the click-to-fill action
+                                                            const sumUpToHere = pendingItems.slice(0, index + 1).reduce((sum: number, i: any) => sum + i.distributedDue, 0);
+
+                                                            const isFullyCovered = allocatedToThisTerm === item.distributedDue;
+                                                            const isPartiallyCovered = allocatedToThisTerm > 0 && allocatedToThisTerm < item.distributedDue;
+
+                                                            return (
+                                                                <button
+                                                                    type="button"
+                                                                    key={item.id}
+                                                                    onClick={() => setFeeForm({ ...feeForm, amount: sumUpToHere.toString() })}
+                                                                    className={cn(
+                                                                        "w-full flex items-center justify-between p-3 border rounded-xl cursor-pointer transition-all",
+                                                                        isFullyCovered ? "border-emerald-500 bg-emerald-500/10" :
+                                                                            isPartiallyCovered ? "border-amber-500 bg-amber-500/10" : "border-white/10 bg-white/5 hover:border-white/30"
+                                                                    )}
+                                                                >
+                                                                    <div className="flex flex-col items-start gap-1">
+                                                                        <div className="flex items-center gap-2">
+                                                                            <div className={cn(
+                                                                                "w-4 h-4 rounded-full border flex items-center justify-center transition-colors",
+                                                                                isFullyCovered ? "border-emerald-500 bg-emerald-500/20" :
+                                                                                    isPartiallyCovered ? "border-amber-500 bg-amber-500/20" : "border-white/20"
+                                                                            )}>
+                                                                                {isFullyCovered && <div className="w-2 h-2 rounded-full bg-emerald-500" />}
+                                                                                {isPartiallyCovered && <div className="w-2 h-2 rounded-full bg-amber-500" />}
+                                                                            </div>
+                                                                            <div className="font-bold text-sm text-left">{item.name}</div>
+                                                                        </div>
+                                                                        {(isFullyCovered || isPartiallyCovered) && (
+                                                                            <div className="text-[10px] pl-6 text-emerald-400 font-medium">
+                                                                                paying ₹{allocatedToThisTerm.toLocaleString()}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                    <div className="text-right">
+                                                                        <div className="font-black text-emerald-400">₹{item.distributedDue.toLocaleString()}</div>
+                                                                        {allocatedToThisTerm > 0 && (
+                                                                            <div className="text-[10px] text-muted-foreground mr-1">
+                                                                                rem: ₹{(item.distributedDue - allocatedToThisTerm).toLocaleString()}
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
+                                                                </button>
+                                                            );
+                                                        });
+                                                    })()
+                                                ) : (
+                                                    <div className="text-center p-4 border border-white/10 bg-white/5 rounded-xl text-muted-foreground text-sm">
+                                                        No pending fees.
+                                                    </div>
+                                                )}
+                                            </div>
+                                        </div>
+
+                                        <div className="space-y-2">
+                                            <Label className="flex items-center gap-1.5 text-red-500">Amount Received (₹) <span className="font-black text-lg">*</span></Label>
                                             <Input
                                                 required
-                                                type="number"
                                                 min="1"
+                                                max={dueAmount}
+                                                type="number"
                                                 placeholder="Enter amount..."
-                                                className="bg-white/5 border-white/10 font-mono text-lg"
+                                                className="bg-white/5 border-white/10 h-10"
                                                 value={feeForm.amount}
-                                                onChange={e => setFeeForm({ ...feeForm, amount: e.target.value })}
+                                                onChange={e => {
+                                                    const val = Number(e.target.value);
+                                                    if (val > dueAmount) {
+                                                        setFeeForm({ ...feeForm, amount: dueAmount.toString() });
+                                                    } else {
+                                                        setFeeForm({ ...feeForm, amount: e.target.value });
+                                                    }
+                                                }}
                                             />
                                         </div>
                                         <div className="grid grid-cols-2 gap-4">
@@ -673,10 +758,11 @@ export default function StudentDetailsPage() {
                                     )}
                                 </div>
                             )
-                        )}
-                    </div>
+                        )
+                        }
+                    </div >
                 )}
-            </div>
+            </div >
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4">
                 {/* Left Column */}
@@ -822,7 +908,7 @@ export default function StudentDetailsPage() {
                                 </div>
                             ) : !ledger || !ledger.items || ledger.items.length === 0 ? (
                                 <div className="text-center py-6 text-muted-foreground border border-dashed border-white/10 rounded-lg text-xs bg-white/5">
-                                    No fee structure assigned. Update details or click Sync.
+                                    No fee structure assigned. Please update details.
                                 </div>
                             ) : (
                                 <div className="w-full overflow-x-auto custom-scrollbar">
@@ -977,69 +1063,73 @@ export default function StudentDetailsPage() {
                 </div>
             </div>
 
-            {student && (
-                <DeleteUserModal
-                    isOpen={isDeleteModalOpen}
-                    onClose={() => setIsDeleteModalOpen(false)}
-                    user={{
-                        id: student.schoolId,
-                        schoolId: student.schoolId,
-                        name: student.studentName,
-                        role: "student"
-                    }}
-                    checkEligibility={async () => {
-                        const pQ = query(collection(db, "payments"), where("studentId", "==", student.schoolId), limit(1));
-                        const caps = await getDocs(pQ);
-                        if (!caps.empty) return { canDelete: false, reason: "Payments exist. Use Deactivate instead." };
-                        return { canDelete: true };
-                    }}
-                    onDeactivate={async (reason) => {
-                        await updateDoc(doc(db, "students", student.id), {
-                            status: "INACTIVE",
-                            deactivationReason: reason,
-                            updatedAt: new Date().toISOString()
-                        });
-                        setStudent({ ...student, status: "INACTIVE" });
-                    }}
-                    onDelete={async (reason) => {
-                        if (!user) { alert("You are not authenticated"); return; }
-                        const token = await user.getIdToken();
-                        const res = await fetch("/api/admin/users/delete", {
-                            method: "POST",
-                            headers: {
-                                "Content-Type": "application/json",
-                                "Authorization": `Bearer ${token}`
-                            },
-                            body: JSON.stringify({
-                                targetUid: student.uid,
-                                schoolId: student.schoolId,
-                                role: "STUDENT",
-                                collectionName: "students"
-                            })
-                        });
+            {
+                student && (
+                    <DeleteUserModal
+                        isOpen={isDeleteModalOpen}
+                        onClose={() => setIsDeleteModalOpen(false)}
+                        user={{
+                            id: student.schoolId,
+                            schoolId: student.schoolId,
+                            name: student.studentName,
+                            role: "student"
+                        }}
+                        checkEligibility={async () => {
+                            const pQ = query(collection(db, "payments"), where("studentId", "==", student.schoolId), limit(1));
+                            const caps = await getDocs(pQ);
+                            if (!caps.empty) return { canDelete: false, reason: "Payments exist. Use Deactivate instead." };
+                            return { canDelete: true };
+                        }}
+                        onDeactivate={async (reason) => {
+                            await updateDoc(doc(db, "students", student.id), {
+                                status: "INACTIVE",
+                                deactivationReason: reason,
+                                updatedAt: new Date().toISOString()
+                            });
+                            setStudent({ ...student, status: "INACTIVE" });
+                        }}
+                        onDelete={async (reason) => {
+                            if (!user) { alert("You are not authenticated"); return; }
+                            const token = await user.getIdToken();
+                            const res = await fetch("/api/admin/users/delete", {
+                                method: "POST",
+                                headers: {
+                                    "Content-Type": "application/json",
+                                    "Authorization": `Bearer ${token}`
+                                },
+                                body: JSON.stringify({
+                                    targetUid: student.uid,
+                                    schoolId: student.schoolId,
+                                    role: "STUDENT",
+                                    collectionName: "students"
+                                })
+                            });
 
-                        const data = await res.json();
-                        if (data.success) {
-                            router.push("/admin/students");
-                        } else {
-                            throw new Error(data.error || "Delete failed");
-                        }
-                    }}
-                />
-            )}
+                            const data = await res.json();
+                            if (data.success) {
+                                router.push("/admin/students");
+                            } else {
+                                throw new Error(data.error || "Delete failed");
+                            }
+                        }}
+                    />
+                )
+            }
 
-            {student && ledger && (
-                <AdjustFeesModal
-                    isOpen={isAdjustModalOpen}
-                    onClose={() => setIsAdjustModalOpen(false)}
-                    studentId={student.schoolId}
-                    academicYearId={selectedYear}
-                    ledgerItems={ledger.items || []}
-                    onSuccess={() => {
-                        window.location.reload();
-                    }}
-                />
-            )}
-        </div>
+            {
+                student && ledger && (
+                    <AdjustFeesModal
+                        isOpen={isAdjustModalOpen}
+                        onClose={() => setIsAdjustModalOpen(false)}
+                        studentId={student.schoolId}
+                        academicYearId={selectedYear}
+                        ledgerItems={ledger.items || []}
+                        onSuccess={() => {
+                            window.location.reload();
+                        }}
+                    />
+                )
+            }
+        </div >
     );
 }

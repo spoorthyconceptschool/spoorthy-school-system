@@ -337,6 +337,14 @@ export default function TeacherDashboard() {
                                 <span>Send Notice</span>
                             </Link>
                         </Button>
+                        {managedClasses.length > 0 && (
+                            <Button className="h-24 flex flex-col gap-2 bg-amber-600 hover:bg-amber-700" asChild>
+                                <Link href="/teacher/add-students">
+                                    <GraduationCap className="w-6 h-6" />
+                                    <span>Add Students</span>
+                                </Link>
+                            </Button>
+                        )}
                         <Button className="h-24 flex flex-col gap-2 bg-purple-600 hover:bg-purple-700 col-span-2" asChild>
                             <Link href="/teacher/exams">
                                 <FileText className="w-6 h-6" />

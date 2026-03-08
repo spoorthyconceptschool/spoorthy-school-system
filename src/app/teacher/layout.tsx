@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { Loader2, LayoutDashboard, Clock, BookOpen, Bell, Calendar, Wallet, User, LogOut, Lock, Users, Menu, X, MessageSquare } from "lucide-react";
+import { Loader2, LayoutDashboard, Clock, BookOpen, Bell, Calendar, Wallet, User, LogOut, Lock, Users, Menu, X, MessageSquare, GraduationCap } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { db } from "@/lib/firebase";
@@ -22,6 +22,7 @@ import { NotificationCenter } from "@/components/NotificationCenter";
 
 const TEACHER_NAV = [
     { label: "Dashboard", icon: LayoutDashboard, href: "/teacher", exact: true },
+    { label: "Students", icon: GraduationCap, href: "/teacher/students" },
     { label: "Attendance", icon: CheckCircle, href: "/teacher/attendance" },
     { label: "My Schedule", icon: Clock, href: "/teacher/timetable" },
     { label: "Homework", icon: BookOpen, href: "/teacher/homework" },

@@ -50,6 +50,7 @@ interface Student {
 }
 
 import { StudentLeavesManager } from "@/components/admin/student-leaves-manager";
+import { StudentApprovalsManager } from "@/components/admin/student-approvals-manager";
 
 export default function StudentsPage() {
     const router = useRouter();
@@ -57,7 +58,7 @@ export default function StudentsPage() {
     const { villages: villagesData, classes: classesData, loading: masterLoading, selectedYear } = useMasterData();
     const [students, setStudents] = useState<Student[]>([]);
     const [localLoading, setLocalLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<"directory" | "leaves">("directory");
+    const [activeTab, setActiveTab] = useState<"directory" | "leaves" | "approvals">("directory");
 
     // Filter State
     const [searchQuery, setSearchQuery] = useState("");
@@ -197,6 +198,17 @@ export default function StudentsPage() {
                             )}
                         >
                             Leave Requests
+                        </Button>
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setActiveTab("approvals")}
+                            className={cn(
+                                "rounded-lg text-[10px] font-black uppercase tracking-widest px-4 h-8",
+                                activeTab === "approvals" ? "bg-amber-500 text-black hover:bg-amber-500" : "text-white/40 hover:text-white"
+                            )}
+                        >
+                            Approvals
                         </Button>
                     </div>
                 </div>
@@ -618,8 +630,10 @@ export default function StudentsPage() {
                         />
                     )}
                 </>
-            ) : (
+            ) : activeTab === "leaves" ? (
                 <StudentLeavesManager />
+            ) : (
+                <StudentApprovalsManager />
             )}
         </div>
     );

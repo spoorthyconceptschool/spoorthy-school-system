@@ -74,6 +74,12 @@ service cloud.firestore {
       allow write: if isManager();
     }
 
+    match /student_change_requests/{id} {
+      allow create: if isTeacher() && request.resource.data.teacherId == request.auth.uid;
+      allow read: if isManager() || (isSignedIn() && resource.data.teacherId == request.auth.uid);
+      allow update, delete: if isManager();
+    }
+
     // Academic & Operations
     match /exam_results/{id} {
       allow read: if isSignedIn() && (request.auth.uid == resource.data.studentId || isManager() || isTeacher());

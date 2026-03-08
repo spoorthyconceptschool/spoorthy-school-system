@@ -65,7 +65,7 @@ export default function MarkAttendancePage() {
      *          List of authorized class objects.
      */
     const getAuthorizedClasses = (tProfile: any) => {
-        if (!tProfile || !classSections || !subjectTeachers) return [];
+        if (!tProfile || !classSections) return [];
         const tId = tProfile.schoolId || tProfile.id;
         const set = new Map<string, { classId: string, sectionId: string, key: string, isClassTeacher: boolean }>();
 
@@ -76,16 +76,7 @@ export default function MarkAttendancePage() {
             }
         });
 
-        // 2. Classes where I teach subjects
-        Object.keys(subjectTeachers).forEach(key => {
-            const subjectsObj = subjectTeachers[key];
-            if (Object.values(subjectsObj).includes(tId)) {
-                const [cId, sId] = key.split('_');
-                if (!set.has(key)) {
-                    set.set(key, { classId: cId, sectionId: sId, key, isClassTeacher: false });
-                }
-            }
-        });
+        // Subject Teacher logic has been removed to restrict attendance strictly to Class Teachers ONLY.
 
         return Array.from(set.values());
     };

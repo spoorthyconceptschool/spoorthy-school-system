@@ -27,6 +27,7 @@ interface Student {
     classId?: string;
     className?: string;
     admissionNumber?: string;
+    schoolId?: string;
     createdAt?: { seconds: number };
     status?: string;
 }
@@ -124,7 +125,7 @@ export default function AdminDashboard() {
             limit(10)
         );
         const unsubscribe = onSnapshot(studentsQ, (snapshot) => {
-            const list = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() } as Student));
+            const list = snapshot.docs.map(doc => ({ id: doc.id, schoolId: doc.id, ...doc.data() } as Student));
             console.log("[AdminDashboard] Recent students fetched:", list.length);
             setRecentStudents(list);
         }, (err) => {
@@ -151,7 +152,10 @@ export default function AdminDashboard() {
         {
             key: "admissionNumber",
             header: "Adm. No.",
-            render: (s: Student) => <span className="font-mono text-xs text-white/60">{s.admissionNumber || "—"}</span>
+            render: (s: any) => {
+                const adm = (!s.admissionNumber || s.admissionNumber === "PENDING") ? null : s.admissionNumber;
+                return <span className="font-mono text-xs text-white/60">{adm || s.schoolId || "PENDING"}</span>
+            }
         },
         {
             key: "createdAt",

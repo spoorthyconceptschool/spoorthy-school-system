@@ -20,7 +20,6 @@ export function FeeSlipGenerator({ students }: FeeSlipGeneratorProps) {
     const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
     const [step, setStep] = useState<"SELECT" | "PREVIEW">("SELECT");
     const { branding, selectedYear } = useMasterData();
-    const router = useRouter();
 
     const availableClasses = Array.from(new Set(students.map(s => s.className))).filter(Boolean).sort();
 
