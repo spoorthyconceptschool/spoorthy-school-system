@@ -88,7 +88,7 @@ export function ClassesSectionsManager() {
     };
 
     const getActiveCombinations = () => {
-        return Object.values(classSections).filter((cs: any) => cs.active);
+        return Object.values(classSections).filter((cs: any) => cs.isActive !== false);
     };
 
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
@@ -96,8 +96,10 @@ export function ClassesSectionsManager() {
 
     const getProcessedData = (ids: string[]) => {
         return Object.values(classSections)
-            .filter((cs: any) => cs.active && ids.includes(cs.id))
+            .filter((cs: any) => cs.isActive !== false && ids.includes(cs.id))
             .map((cs: any) => {
+                const classInfo = classes[cs.classId] || {};
+                const sectionInfo = sections[cs.sectionId] || {};
                 const assignedSubjects = Object.keys(classSubjects[cs.classId] || {})
                     .filter(sid => sid !== 'id' && classSubjects[cs.classId][sid] && subjects[sid])
                     .map(sid => ({
