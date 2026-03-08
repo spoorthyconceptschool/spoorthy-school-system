@@ -206,13 +206,13 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
 
     return (
         <div className="space-y-6 animate-in fade-in">
-            <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" onClick={() => router.push(backUrl)}>
+            <div className="flex flex-col md:flex-row md:items-center gap-4 border-b border-white/5 pb-6 mb-2">
+                <Button variant="ghost" size="icon" onClick={() => router.push(backUrl)} className="shrink-0 w-10 h-10">
                     <ArrowLeft className="w-5 h-5" />
                 </Button>
                 <div>
-                    <h1 className="text-2xl font-bold font-display">{exam.name}</h1>
-                    <p className="text-muted-foreground text-sm">Marks Entry</p>
+                    <h1 className="text-2xl md:text-3xl font-bold font-display tracking-tight">{exam.name}</h1>
+                    <p className="text-xs md:text-sm text-muted-foreground font-medium uppercase tracking-widest opacity-70">Marks Entry Console</p>
                 </div>
             </div>
 
@@ -221,32 +221,32 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
                     <CardTitle className="text-lg">Select Class & Subject</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                    <div className="flex flex-wrap gap-4 items-end">
-                        <div className="space-y-2 w-[200px]">
-                            <label className="text-xs font-bold text-muted-foreground uppercase">Class</label>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 items-end">
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] italic ml-1">Class</label>
                             <Select value={selectedClassId} onValueChange={(v) => { setSelectedClassId(v); setSelectedSectionId(""); setSelectedSubjectId(""); }}>
-                                <SelectTrigger className="bg-white/5 border-white/10"><SelectValue placeholder="Class" /></SelectTrigger>
-                                <SelectContent>
+                                <SelectTrigger className="bg-white/5 border-white/10 h-11 md:h-10 rounded-xl focus:ring-emerald-500/20"><SelectValue placeholder="Class" /></SelectTrigger>
+                                <SelectContent className="bg-slate-900 border-white/10 text-white">
                                     {Object.values(classes).map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                                 </SelectContent>
                             </Select>
                         </div>
 
-                        <div className="space-y-2 w-[200px]">
-                            <label className="text-xs font-bold text-muted-foreground uppercase">Section</label>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] italic ml-1">Section</label>
                             <Select value={selectedSectionId} onValueChange={setSelectedSectionId} disabled={!selectedClassId}>
-                                <SelectTrigger className="bg-white/5 border-white/10"><SelectValue placeholder="Section" /></SelectTrigger>
-                                <SelectContent>
+                                <SelectTrigger className="bg-white/5 border-white/10 h-11 md:h-10 rounded-xl focus:ring-emerald-500/20"><SelectValue placeholder="Section" /></SelectTrigger>
+                                <SelectContent className="bg-slate-900 border-white/10 text-white">
                                     {availableSections.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                                 </SelectContent>
                             </Select>
                         </div>
 
-                        <div className="space-y-2 w-[200px]">
-                            <label className="text-xs font-bold text-muted-foreground uppercase">Subject</label>
+                        <div className="space-y-2">
+                            <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] italic ml-1">Subject</label>
                             <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId} disabled={!selectedClassId}>
-                                <SelectTrigger className="bg-white/5 border-white/10"><SelectValue placeholder="Subject" /></SelectTrigger>
-                                <SelectContent>
+                                <SelectTrigger className="bg-white/5 border-white/10 h-11 md:h-10 rounded-xl focus:ring-emerald-500/20"><SelectValue placeholder="Subject" /></SelectTrigger>
+                                <SelectContent className="bg-slate-900 border-white/10 text-white">
                                     {availableSubjects.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                                 </SelectContent>
                             </Select>
@@ -255,7 +255,7 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
                         <Button
                             onClick={handleLoadStudents}
                             disabled={fetchingStudents || !selectedClassId || !selectedSectionId || !selectedSubjectId}
-                            className="bg-emerald-600 hover:bg-emerald-700 text-white"
+                            className="bg-emerald-600 hover:bg-emerald-500 text-white font-black uppercase tracking-widest text-[10px] h-11 md:h-10 rounded-xl shadow-lg transition-all active:scale-95"
                         >
                             {fetchingStudents ? <Loader2 className="animate-spin" /> : "Load Data"}
                         </Button>
@@ -265,43 +265,88 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
 
             {students.length > 0 && (
                 <div className="space-y-4">
-                    <div className="flex justify-between items-center bg-white/5 p-4 rounded-lg border border-white/10">
-                        <div className="flex items-center gap-4">
-                            <span className="font-bold text-lg">{students.length} Students Found</span>
-                            <div className="flex items-center gap-2">
-                                <span className="text-sm text-muted-foreground">Max Marks:</span>
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/5 p-4 md:p-5 rounded-2xl border border-white/10 backdrop-blur-md">
+                        <div className="flex items-center justify-between md:justify-start gap-4 flex-1">
+                            <span className="font-bold text-lg text-white">{students.length} Students</span>
+                            <div className="flex items-center gap-3 bg-black/40 px-3 py-1.5 rounded-xl border border-white/5">
+                                <span className="text-[10px] font-black uppercase text-white/40 tracking-widest italic">Max:</span>
                                 <Input
-                                    className="w-20 h-8 bg-black border-white/20 text-center"
+                                    className="w-16 h-7 bg-transparent border-none text-center font-bold text-emerald-400 p-0 focus-visible:ring-0"
                                     value={maxMarks}
                                     onChange={e => setMaxMarks(e.target.value)}
                                 />
                             </div>
                         </div>
-                        <Button onClick={handleSave} disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
+                        <Button onClick={handleSave} disabled={saving} className="w-full md:w-auto bg-blue-600 hover:bg-blue-500 text-white gap-2 h-11 md:h-10 rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-blue-500/20 transition-all active:scale-95">
                             {saving ? <Loader2 className="animate-spin w-4 h-4" /> : <Save className="w-4 h-4" />}
                             Save All Marks
                         </Button>
                     </div>
 
-                    <div className="rounded-lg border border-white/10 overflow-hidden bg-black/20">
+                    {/* Mobile Card View */}
+                    <div className="md:hidden space-y-4">
+                        {students.map(student => (
+                            <div key={student.id} className="bg-black/20 border border-white/10 rounded-3xl p-5 space-y-5 backdrop-blur-xl relative overflow-hidden group">
+                                <div className="absolute top-0 right-0 w-24 h-24 bg-blue-500/10 blur-3xl rounded-full -mr-12 -mt-12 transition-all group-hover:bg-blue-500/20" />
+
+                                <div className="flex items-center justify-between relative z-10">
+                                    <div className="space-y-1">
+                                        <div className="flex items-center gap-2">
+                                            <span className="text-[10px] font-black uppercase text-white/30 tracking-[0.2em]">Roll No: {student.rollNo || "-"}</span>
+                                        </div>
+                                        <h3 className="font-bold text-lg text-white tracking-tight">{student.studentName}</h3>
+                                    </div>
+                                    <SingleReportCardButton exam={exam} student={student} />
+                                </div>
+
+                                <div className="grid grid-cols-1 gap-4 pt-4 border-t border-white/5 relative z-10">
+                                    <div className="space-y-2">
+                                        <label className="text-[9px] font-black text-white/40 uppercase tracking-[0.3em] flex items-center gap-2">
+                                            Obtained Marks
+                                            <span className="text-[8px] text-emerald-500/60 lowercase font-normal italic">/ {maxMarks} max</span>
+                                        </label>
+                                        <Input
+                                            className="h-12 bg-white/5 border-white/10 text-center text-xl font-bold text-emerald-400 rounded-2xl focus:ring-emerald-500/20"
+                                            value={marks[student.id] || ""}
+                                            onChange={e => setMarks({ ...marks, [student.id]: e.target.value })}
+                                            placeholder="0"
+                                            type="number"
+                                        />
+                                    </div>
+                                    <div className="space-y-2">
+                                        <label className="text-[9px] font-black text-white/40 uppercase tracking-[0.3em]">Remarks</label>
+                                        <Input
+                                            className="h-12 bg-white/5 border-white/10 text-sm font-medium rounded-2xl focus:ring-blue-500/20"
+                                            value={remarks[student.id] || ""}
+                                            onChange={e => setRemarks({ ...remarks, [student.id]: e.target.value })}
+                                            placeholder="Performance notes..."
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        ))}
+                    </div>
+
+                    {/* Desktop Table View */}
+                    <div className="hidden md:block rounded-2xl border border-white/10 overflow-hidden bg-black/20 backdrop-blur-md">
                         <table className="w-full text-sm">
-                            <thead className="bg-white/5 font-bold text-muted-foreground">
+                            <thead className="bg-white/5 font-black text-white/40 uppercase tracking-[0.2em] text-[10px] italic">
                                 <tr>
-                                    <th className="p-4 text-left w-20">Roll No</th>
-                                    <th className="p-4 text-left">Student Name</th>
-                                    <th className="p-4 text-center w-32">Obtained Marks</th>
+                                    <th className="p-4 text-left w-20">Roll</th>
+                                    <th className="p-4 text-left">Student</th>
+                                    <th className="p-4 text-center w-32">Marks</th>
                                     <th className="p-4 text-left">Remarks</th>
                                     <th className="p-4 text-center w-16">Print</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5">
                                 {students.map(student => (
-                                    <tr key={student.id} className="hover:bg-white/[0.02] transition-colors">
-                                        <td className="p-4 font-mono text-xs">{student.rollNo || "-"}</td>
-                                        <td className="p-4 font-bold">{student.studentName}</td>
+                                    <tr key={student.id} className="hover:bg-white/[0.02] transition-colors group">
+                                        <td className="p-4 font-mono text-xs opacity-50">{student.rollNo || "-"}</td>
+                                        <td className="p-4 font-bold text-white tracking-tight">{student.studentName}</td>
                                         <td className="p-4 text-center">
                                             <Input
-                                                className="w-24 text-center bg-black/40 border-white/10 focus:border-emerald-500 mx-auto"
+                                                className="w-24 h-9 text-center bg-black/40 border-white/10 focus:border-emerald-500 mx-auto rounded-lg font-bold text-emerald-400"
                                                 value={marks[student.id] || ""}
                                                 onChange={e => setMarks({ ...marks, [student.id]: e.target.value })}
                                                 placeholder="0"
@@ -309,7 +354,7 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
                                         </td>
                                         <td className="p-4">
                                             <Input
-                                                className="w-full bg-transparent border-transparent hover:border-white/10 focus:border-white/20"
+                                                className="w-full h-9 bg-transparent border-transparent hover:border-white/10 focus:border-white/20 transition-all font-medium text-white/80"
                                                 value={remarks[student.id] || ""}
                                                 onChange={e => setRemarks({ ...remarks, [student.id]: e.target.value })}
                                                 placeholder="Add remark..."
@@ -324,8 +369,8 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
                         </table>
                     </div>
 
-                    <div className="flex justify-end pt-4">
-                        <Button onClick={handleSave} disabled={saving} className="bg-blue-600 hover:bg-blue-700 text-white gap-2 w-40">
+                    <div className="flex justify-end pt-4 pb-10">
+                        <Button onClick={handleSave} disabled={saving} className="w-full md:w-48 bg-blue-600 hover:bg-blue-500 text-white gap-2 h-12 md:h-11 rounded-2xl font-black uppercase tracking-[0.2em] text-[10px] shadow-xl shadow-blue-500/20 active:scale-95 transition-all">
                             {saving ? <Loader2 className="animate-spin w-4 h-4" /> : <Save className="w-4 h-4" />}
                             Save All
                         </Button>

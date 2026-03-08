@@ -303,17 +303,19 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                             <CardDescription>Select a class to set exam dates and times for each subject.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            <div className="flex items-center gap-4">
-                                <Label>Select Class:</Label>
-                                <Select value={selectedClassId} onValueChange={setSelectedClassId}>
-                                    <SelectTrigger className="w-[200px] bg-white/5 border-white/10"><SelectValue placeholder="Choose Class" /></SelectTrigger>
-                                    <SelectContent>
-                                        {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                                    </SelectContent>
-                                </Select>
+                            <div className="flex flex-col md:flex-row md:items-center gap-4">
+                                <div className="flex items-center gap-4 flex-1">
+                                    <Label className="shrink-0 text-xs md:text-sm">Select Class:</Label>
+                                    <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+                                        <SelectTrigger className="w-full md:w-[200px] bg-white/5 border-white/10 h-10 md:h-9"><SelectValue placeholder="Choose Class" /></SelectTrigger>
+                                        <SelectContent>
+                                            {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
                                 {selectedClassId && (
-                                    <Button onClick={handleSaveTimetable} disabled={saving} className="bg-emerald-600 hover:bg-emerald-700 text-white ml-auto">
-                                        {saving ? <Loader2 className="animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                                    <Button onClick={handleSaveTimetable} disabled={saving} className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white h-11 md:h-9 text-[10px] font-bold uppercase tracking-widest gap-2">
+                                        {saving ? <Loader2 className="animate-spin w-4 h-4" /> : <Save className="w-4 h-4" />}
                                         Save Timetable
                                     </Button>
                                 )}
@@ -492,9 +494,9 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                         <CardContent className="space-y-6">
                             <div className="flex flex-col md:flex-row md:items-center gap-4">
                                 <div className="flex items-center gap-4 flex-1">
-                                    <Label className="shrink-0">Select Class:</Label>
+                                    <Label className="shrink-0 text-xs md:text-sm">Select Class:</Label>
                                     <Select value={selectedClassId} onValueChange={setSelectedClassId}>
-                                        <SelectTrigger className="w-full md:w-[200px] bg-white/5 border-white/10"><SelectValue placeholder="Choose Class" /></SelectTrigger>
+                                        <SelectTrigger className="w-full md:w-[200px] bg-white/5 border-white/10 h-10 md:h-9"><SelectValue placeholder="Choose Class" /></SelectTrigger>
                                         <SelectContent>
                                             {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                                         </SelectContent>
@@ -510,7 +512,7 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                                             onClick={() => {
                                                 window.open(`/admin/exams/${examId}/print/${selectedClassId}`, '_blank');
                                             }}
-                                            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white gap-2 h-11"
+                                            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white gap-2 h-11 md:h-9 text-[10px] font-bold uppercase tracking-widest"
                                         >
                                             <Printer className="w-4 h-4" /> Print Hall Tickets
                                         </Button>
