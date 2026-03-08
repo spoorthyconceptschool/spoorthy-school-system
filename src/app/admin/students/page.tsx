@@ -173,13 +173,13 @@ export default function StudentsPage() {
     }, [classFilter, classesData]);
 
     return (
-        <div className="space-y-10 md:space-y-16 animate-in fade-in slide-in-from-bottom-6 duration-700 max-w-[1600px] mx-auto p-4 md:p-12 pb-32">
+        <div className="space-y-6 md:space-y-10 animate-in fade-in duration-200 pb-24">
             {/* Header Area */}
             <div className="flex flex-col xl:flex-row xl:items-end xl:justify-between gap-10">
                 <div className="space-y-6">
                     <div className="space-y-1.5 px-1">
-                        <h1 className="text-6xl md:text-9xl font-display font-black tracking-tighter italic leading-none text-white drop-shadow-2xl">
-                            Student <span className="text-accent underline underline-offset-8 decoration-accent/20">Directory</span>
+                        <h1 className="text-2xl md:text-5xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic leading-tight">
+                            Student Directory
                         </h1>
                         <p className="text-[10px] md:text-xs font-black uppercase tracking-[0.4em] text-white/30 flex items-center gap-3">
                             <span className="w-2 h-2 rounded-full bg-accent animate-pulse" />
@@ -187,7 +187,7 @@ export default function StudentsPage() {
                         </p>
                     </div>
 
-                    <div className="flex bg-black/40 p-2 rounded-[1.5rem] border border-white/5 backdrop-blur-3xl w-fit shadow-2xl">
+                    <div className="flex w-full bg-black/20 p-1 rounded-2xl border border-white/5 gap-1">
                         {[
                             { id: "directory", label: "Directory", icon: Users },
                             { id: "leaves", label: "Leave Requests", icon: Calendar },
@@ -198,13 +198,13 @@ export default function StudentsPage() {
                                 variant="ghost"
                                 onClick={() => setActiveTab(tab.id as any)}
                                 className={cn(
-                                    "rounded-xl text-[10px] font-black uppercase tracking-[0.15em] px-6 h-12 transition-all duration-500 gap-3",
+                                    "flex-1 flex flex-col md:flex-row items-center justify-center gap-1 md:gap-2 rounded-xl text-[10px] md:text-sm font-bold h-10 md:h-11 transition-all",
                                     activeTab === tab.id
-                                        ? "bg-white text-black hover:bg-white shadow-xl scale-105"
-                                        : "text-white/40 hover:text-white hover:bg-white/5"
+                                        ? "bg-white text-black hover:bg-white shadow-lg"
+                                        : "text-white/50 hover:text-white hover:bg-white/5"
                                 )}
                             >
-                                <tab.icon size={14} className={cn(activeTab === tab.id ? "text-black" : "text-white/20")} />
+                                <tab.icon size={14} />
                                 {tab.label}
                             </Button>
                         ))}
@@ -212,7 +212,7 @@ export default function StudentsPage() {
                 </div>
 
                 {activeTab === "directory" && (
-                    <div className="flex flex-wrap items-center gap-3 md:gap-4 px-2">
+                    <div className="hidden md:flex flex-wrap items-center gap-2">
                         {isAdmin && classFilter !== "all" && sectionFilter !== "all" && (
                             <Button
                                 onClick={() => setIsManageRollsOpen(true)}
