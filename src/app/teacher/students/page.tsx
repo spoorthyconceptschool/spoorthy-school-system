@@ -140,25 +140,26 @@ export default function TeacherStudentsPage() {
         });
 
         // 2. Listen for Pending Addition Requests
+        // Simplified query to avoid complex index requirements (filter client-side)
         const pendingQ = query(
             collection(db, "student_change_requests"),
             where("classId", "==", currentClassInfo.classId),
-            where("sectionId", "==", currentClassInfo.sectionId),
-            where("requestType", "==", "ADD"),
-            where("status", "==", "PENDING")
+            where("sectionId", "==", currentClassInfo.sectionId)
         );
 
         const unsubPending = onSnapshot(pendingQ, (snap) => {
-            pendingList = snap.docs.map(doc => {
-                const data = doc.data();
-                return {
-                    id: doc.id,
-                    ...data.newData,
-                    status: "PENDING",
-                    requestId: doc.id,
-                    isPending: true
-                };
-            });
+            pendingList = snap.docs
+                .map(doc => ({ id: doc.id, ...doc.data() }))
+                .filter((d: any) => d.requestType === "ADD" && d.status === "PENDING")
+                .map((data: any) => {
+                    return {
+                        id: data.id,
+                        ...(data.newData || {}),
+                        status: "PENDING",
+                        requestId: data.id,
+                        isPending: true
+                    };
+                });
             processResults(approvedList, pendingList);
         }, (error) => {
             console.error("Pending requests sync error:", error);
