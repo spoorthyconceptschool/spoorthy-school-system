@@ -6,7 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Loader2, Upload, Save, Image as ImageIcon, Building2, CheckCircle2, RefreshCw } from "lucide-react";
+import { Loader2, Upload, Save, Image as ImageIcon, Building2, CheckCircle2, RotateCw } from "lucide-react";
 import { toast } from "@/lib/toast-store";
 import { useMasterData } from "@/context/MasterDataContext";
 
@@ -393,7 +393,7 @@ export function BrandingSettings() {
                                 onClick={() => setShowMigrateConfirm(true)}
                                 className="border-amber-500/20 text-amber-500 bg-amber-500/5 hover:bg-amber-500/10 h-10 px-4 rounded-xl flex items-center justify-center gap-2 group transition-all w-full md:w-auto"
                             >
-                                <RefreshCw className={`w-4 h-4 ${migrating ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-500"}`} />
+                                <RotateCw className={`w-4 h-4 ${migrating ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-500"}`} />
                                 <span className="text-[10px] font-bold uppercase tracking-wider">Sync Existing Profiles</span>
                             </Button>
                         ) : (
