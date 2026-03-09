@@ -172,7 +172,7 @@ export default function AdminDashboard() {
     if (authRole === "MANAGER") {
         return (
             <div className="space-y-6 md:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-200 pb-10">
-                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 px-2 md:px-0">
+                <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 w-full">
                     <div className="space-y-1">
                         <h1 className="text-2xl sm:text-3xl md:text-6xl font-display font-bold bg-gradient-to-r from-blue-400 via-indigo-400 to-purple-400 bg-clip-text text-transparent italic leading-tight">
                             Operations Central
@@ -334,7 +334,7 @@ export default function AdminDashboard() {
 
     // === ADMIN VIEW ===
     return (
-        <div className="space-y-6 md:space-y-8 animate-in fade-in duration-200 pb-10 px-2 md:px-0">
+        <div className="space-y-6 md:space-y-8 animate-in fade-in duration-200 pb-10 w-full">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="font-display text-3xl md:text-5xl font-bold tracking-tighter italic pb-1 text-white">

@@ -25,18 +25,23 @@ export class EnterpriseStudentService {
     static async createStudent(payload: CreateStudentPayload, createdBy: string) {
         let userRecord: any = null;
         try {
-            const counterRef = adminDb.collection("counters").doc("students");
+            const academicYear = payload.academicYear || "2026-2027";
+            const yearPart = academicYear.split("-")[0] || "2026";
+            const counterId = `students_${yearPart}`;
+            const counterRef = adminDb.collection("counters").doc(counterId);
+
             let newSchoolId = payload.admissionNumber;
 
             const studentRecord = await adminDb.runTransaction(async (transaction: FirebaseFirestore.Transaction) => {
                 const counterDoc = await transaction.get(counterRef as FirebaseFirestore.DocumentReference);
                 const nextIdNum = ((counterDoc.data() as any)?.current || 0) + 1;
 
-                newSchoolId = `SHS${String(nextIdNum).padStart(5, "0")}`;
+                // New Format: SCS-2026-00001
+                newSchoolId = `SCS-${yearPart}-${String(nextIdNum).padStart(5, "0")}`;
 
                 const syntheticEmail = `${newSchoolId}@school.local`.toLowerCase();
 
-                transaction.set(counterRef, { current: nextIdNum }, { merge: true });
+                transaction.set(counterRef, { current: nextIdNum, year: yearPart }, { merge: true });
 
                 return {
                     newSchoolId,

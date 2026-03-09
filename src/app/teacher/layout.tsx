@@ -233,8 +233,8 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
                     </div>
                 </header>
 
-                <div className="flex-1 p-4 lg:p-8 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20">
-                    <div className="max-w-7xl mx-auto">
+                <div className="flex-1 px-4 md:px-5 lg:px-8 py-4 md:py-6 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20">
+                    <div className="w-full">
                         {children}
                     </div>
                 </div>

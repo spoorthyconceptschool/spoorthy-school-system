@@ -7,7 +7,7 @@ import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import { Loader2, Plus, Clock, Video, Coffee, AlertTriangle, FileText, ChevronRight, GraduationCap } from "lucide-react";
 import Link from "next/link";
-import { collection, query, where, getDocs, limit, orderBy } from "firebase/firestore";
+import { collection, query, where, getDocs, limit, orderBy, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useMasterData } from "@/context/MasterDataContext";
 
@@ -25,7 +25,7 @@ export default function TeacherDashboard() {
     const [upcomingSubs, setUpcomingSubs] = useState<any[]>([]);
     const [teacherProfile, setTeacherProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const { classSections, classes, sections, classSubjects, subjects, homeworkSubjects, loading: masterLoading } = useMasterData();
+    const { classSections, classes, sections, classSubjects, subjects, homeworkSubjects, selectedYear, loading: masterLoading } = useMasterData();
 
     useEffect(() => {
         if (user) {
@@ -42,52 +42,24 @@ export default function TeacherDashboard() {
 
             if (!user?.uid) return;
 
-            // Parallel Execution
-            const [scheduleRes, teacherSnap, leaveSnap] = await Promise.all([
-                fetch("/api/timetable/my-schedule", { headers: { "Authorization": `Bearer ${token}` } }).then(res => res.json()),
-                getDocs(query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1))),
+            // Parallel Execution (Removed timetable API fetch to avoid duplicate data)
+            const [teacherSnapBySchoolId, leaveSnap] = await Promise.all([
+                userData?.schoolId ? getDocs(query(collection(db, "teachers"), where("schoolId", "==", userData.schoolId), limit(1))) : Promise.resolve({ empty: true, docs: [] }),
                 getDocs(query(collection(db, "leave_requests"), where("teacherId", "==", user.uid), orderBy("createdAt", "desc"), limit(2))).catch(e => { console.warn("[Dashboard] Leaves fetch error:", e.message); return { docs: [] }; })
             ]);
 
+            let finalTeacherSnap = teacherSnapBySchoolId;
+            // Fallback for extremely old records without schoolId matched
+            if (finalTeacherSnap.empty && user.uid) {
+                finalTeacherSnap = await getDocs(query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1)));
+            }
+
             // 0. Process Teacher Profile
-            if (!teacherSnap.empty) {
-                const tData = teacherSnap.docs[0].data();
-                setTeacherProfile({ id: teacherSnap.docs[0].id, ...tData });
+            if (!finalTeacherSnap.empty && finalTeacherSnap.docs) {
+                const tData = finalTeacherSnap.docs[0].data();
+                setTeacherProfile({ id: finalTeacherSnap.docs[0].id, ...tData });
             }
 
-            // 1. Process Schedule
-            if (scheduleRes.success) {
-                setScheduleData(scheduleRes.data);
-
-                // Process Today's Slots (Simple Helper)
-                const dayName = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
-                const rawDay = scheduleRes.data.weeklySchedule?.[dayName] || {};
-                const subs = scheduleRes.data.substitutions || [];
-
-                const slots = [];
-                for (let i = 1; i <= 8; i++) {
-                    const amReplaced = subs.find((s: any) => s.date === todayKey && s.slotId === i && s.role === "ORIGINAL");
-                    const amSub = subs.find((s: any) => s.date === todayKey && s.slotId === i && s.role === "SUBSTITUTE");
-
-                    if (amSub) {
-                        slots.push({ id: i, type: "SUBSTITUTION", classId: amSub.classId, note: "Sub Assigned" });
-                    } else if (amReplaced) {
-                        slots.push({ id: i, type: "LEAVE", classId: typeof rawDay[i] === 'object' ? rawDay[i].classId : rawDay[i] });
-                    } else if (rawDay[i]) {
-                        slots.push({
-                            id: i,
-                            type: "REGULAR",
-                            classId: typeof rawDay[i] === 'object' ? rawDay[i].classId : rawDay[i],
-                            subjectId: typeof rawDay[i] === 'object' ? rawDay[i].subjectId : null
-                        });
-                    }
-                }
-                setTodaySlots(slots);
-                setSubstitutionsToday(subs.filter((s: any) => s.date === todayKey && s.role === "SUBSTITUTE"));
-
-                // Upcoming Coverage (Next 7 days excluding today)
-                setUpcomingSubs(subs.filter((s: any) => s.role === "SUBSTITUTE" && s.date > todayKey).sort((a: any, b: any) => String(a.date || "").localeCompare(String(b.date || ""))));
-            }
             // 2. Process Leaves
             // @ts-ignore - catch block handles real errors, this is safe fallback
             if (leaveSnap.docs) {
@@ -103,7 +75,6 @@ export default function TeacherDashboard() {
                 // @ts-ignore
                 setHolidays(hSnap.docs.map(d => ({ id: d.id, ...d.data() })));
             }
-
             setNotices([]);
 
         } catch (e: any) {
@@ -135,7 +106,100 @@ export default function TeacherDashboard() {
     };
 
     const managedClasses = getManagedClasses();
+
+    // --- HOMEWORK SUBMISSION TRACKER ---
+    const [todayHomeworks, setTodayHomeworks] = useState<Record<string, Record<string, boolean>>>({});
+    useEffect(() => {
+        if (!managedClasses || managedClasses.length === 0) return;
+        const now = new Date();
+        now.setHours(0, 0, 0, 0); // Start of today
+
+        // Listen for all homeworks created today. (If this gets large, a composite index on classId + createdAt may be needed)
+        const hwQuery = query(collection(db, "homework"), where("createdAt", ">=", now));
+        const unsub = onSnapshot(hwQuery, (snap: any) => {
+            const submitted: any = {};
+            snap.docs.forEach((d: any) => {
+                const data = d.data();
+                if (data.classId && data.sectionId && data.subjectId) {
+                    const cKey = `${data.classId}_${data.sectionId}`;
+                    if (!submitted[cKey]) submitted[cKey] = {};
+                    submitted[cKey][data.subjectId] = true;
+                }
+            });
+            setTodayHomeworks(submitted);
+        }, (err: any) => console.log("Homework error:", err));
+
+        return () => unsub();
+    }, [teacherProfile]); // dependent on teacherProfile loading which resolves managedClasses
+
     // ----------------------------
+
+    // --- TIMETABLE REAL-TIME LISTENER ---
+    useEffect(() => {
+        if (!teacherProfile) return;
+        const currentYear = selectedYear || "2026-2027";
+        const possibleIds = [teacherProfile.id, teacherProfile.schoolId, teacherProfile.teacherId].filter(Boolean);
+        if (possibleIds.length === 0) return;
+
+        const ttQuery = query(collection(db, "timetable_entries"), where("teacherId", "in", possibleIds));
+        const subQuery1 = query(collection(db, "substitutions"), where("originalTeacherId", "in", possibleIds));
+        const subQuery2 = query(collection(db, "substitutions"), where("substituteTeacherId", "in", possibleIds));
+
+        let lastEntries = [] as any[];
+        let lastOrig = [] as any[];
+        let lastSub = [] as any[];
+
+        const processData = () => {
+            const now = new Date();
+            // Adjust to local time matching server if needed, simple local date:
+            const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+            const dayName = now.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+
+            const allSubs = [
+                ...lastOrig.map(s => ({ ...s, role: "ORIGINAL" })),
+                ...lastSub.map(s => ({ ...s, role: "SUBSTITUTE" }))
+            ];
+
+            const weeklySchedule: any = { MONDAY: {}, TUESDAY: {}, WEDNESDAY: {}, THURSDAY: {}, FRIDAY: {}, SATURDAY: {} };
+            lastEntries.forEach(e => {
+                if (!weeklySchedule[e.day]) weeklySchedule[e.day] = {};
+                weeklySchedule[e.day][e.period] = { classId: e.classKey, subjectId: e.subjectId, id: e.period, ...e };
+            });
+            setScheduleData({ weeklySchedule, substitutions: allSubs });
+
+            const slots = [];
+            for (let i = 1; i <= 8; i++) {
+                const amReplaced = allSubs.find((s: any) => s.date === todayKey && s.slotId === i && s.role === "ORIGINAL");
+                const amSub = allSubs.find((s: any) => s.date === todayKey && s.slotId === i && s.role === "SUBSTITUTE");
+
+                const regularEntry = lastEntries.find(e => e.day === dayName && String(e.period) === String(i));
+
+                if (amSub) {
+                    slots.push({ id: i, type: "SUBSTITUTION", classId: amSub.classId, note: "Sub Assigned", subjectName: "Coverage", time: "" });
+                } else if (amReplaced) {
+                    slots.push({ id: i, type: "LEAVE", classId: amReplaced.classId, subjectName: "On Leave", time: "" });
+                } else if (regularEntry) {
+                    slots.push({
+                        id: i,
+                        type: "REGULAR",
+                        classId: regularEntry.class ? `${regularEntry.class} ${regularEntry.section}` : regularEntry.classKey,
+                        subjectId: regularEntry.subjectId,
+                        subjectName: regularEntry.subject,
+                        time: `${regularEntry.startTime} - ${regularEntry.endTime}`
+                    });
+                }
+            }
+            setTodaySlots(slots.sort((a, b) => a.id - b.id));
+            setSubstitutionsToday(allSubs.filter((s: any) => s.date === todayKey && s.role === "SUBSTITUTE"));
+            setUpcomingSubs(allSubs.filter((s: any) => s.role === "SUBSTITUTE" && s.date > todayKey).sort((a: any, b: any) => String(a.date || "").localeCompare(String(b.date || ""))));
+        };
+
+        const unsubTT = onSnapshot(ttQuery, (snap: any) => { lastEntries = snap.docs.map((d: any) => d.data()); processData(); }, (e: any) => console.log(e));
+        const unsubSub1 = onSnapshot(subQuery1, (snap: any) => { lastOrig = snap.docs.map((d: any) => d.data()); processData(); });
+        const unsubSub2 = onSnapshot(subQuery2, (snap: any) => { lastSub = snap.docs.map((d: any) => d.data()); processData(); });
+
+        return () => { unsubTT(); unsubSub1(); unsubSub2(); };
+    }, [teacherProfile, selectedYear]);
 
     if (loading || masterLoading) {
         return (
@@ -149,7 +213,7 @@ export default function TeacherDashboard() {
     }
 
     return (
-        <div className="p-4 md:p-6 space-y-6 animate-in fade-in max-w-7xl mx-auto pb-16">
+        <div className="space-y-6 animate-in fade-in w-full pb-16">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="font-display text-3xl md:text-5xl font-bold tracking-tight">Teacher Dashboard</h1>
@@ -192,22 +256,30 @@ export default function TeacherDashboard() {
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                                             {assignedSubjects.length > 0 ? assignedSubjects.map(sid => {
                                                 const isGiving = homeworkSubjects[classKey]?.[sid];
+                                                const isSubmitted = todayHomeworks[classKey]?.[sid];
+
                                                 return (
                                                     <div
                                                         key={sid}
                                                         onClick={() => toggleHomeworkSubject(classKey, sid, isGiving)}
-                                                        className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all group shadow-sm ${isGiving
-                                                            ? "bg-[#10B981]/15 border-[#10B981]/40"
-                                                            : "bg-white/5 border-white/10 opacity-70 hover:opacity-100 hover:bg-white/10"
+                                                        className={`flex items-center justify-between p-3 rounded-xl border cursor-pointer transition-all group shadow-sm ${isSubmitted
+                                                            ? "bg-[#10B981]/20 border-[#10B981]/50 shadow-[0_0_15px_rgba(16,185,129,0.15)]"
+                                                            : isGiving
+                                                                ? "bg-amber-500/15 border-amber-500/40"
+                                                                : "bg-white/5 border-white/10 opacity-70 hover:opacity-100 hover:bg-white/10"
                                                             }`}
                                                     >
                                                         <div className="flex items-center gap-3">
-                                                            <div className={`p-2 rounded-lg ${isGiving ? "bg-[#10B981]/20 text-[#10B981]" : "bg-black/20 text-white/40"}`}>
+                                                            <div className={`p-2 rounded-lg ${isSubmitted ? "bg-[#10B981]/30 text-[#10B981]" : isGiving ? "bg-amber-500/20 text-amber-500" : "bg-black/20 text-white/40"}`}>
                                                                 <FileText className="w-4 h-4" />
                                                             </div>
                                                             <span className="font-bold text-sm text-white/90">{subjects[sid]?.name}</span>
                                                         </div>
-                                                        {isGiving && <div className="w-2.5 h-2.5 rounded-full bg-[#10B981] animate-pulse shadow-[0_0_8px_#10B981]"></div>}
+                                                        {isSubmitted ? (
+                                                            <div className="w-2.5 h-2.5 rounded-full bg-[#10B981] shadow-[0_0_8px_#10B981]"></div>
+                                                        ) : isGiving ? (
+                                                            <div className="w-2.5 h-2.5 rounded-full bg-amber-500 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)]"></div>
+                                                        ) : null}
                                                     </div>
                                                 );
                                             }) : (
@@ -285,8 +357,9 @@ export default function TeacherDashboard() {
                                                     <div className="flex flex-col">
                                                         <div className="font-bold text-lg text-white/90 leading-tight">Class {slot.classId}</div>
                                                         <div className="text-[11px] font-medium text-white/50 tracking-wide uppercase mt-0.5">
-                                                            {slot.type === "SUBSTITUTION" ? "Substitution" : (subjects[slot.subjectId]?.name || slot.subjectId || "Regular Class")}
+                                                            {slot.type === "SUBSTITUTION" ? "Substitution" : (slot.subjectName || subjects[slot.subjectId]?.name || slot.subjectId || "Regular Class")}
                                                         </div>
+                                                        {slot.time && <div className="text-[9px] font-mono text-white/30 mt-0.5">{slot.time}</div>}
                                                     </div>
                                                 </div>
                                                 {slot.type === "SUBSTITUTION" && <Badge className="bg-yellow-500 text-black font-black tracking-widest text-[9px]">SUB</Badge>}

@@ -169,7 +169,7 @@ export default function StudentsPage() {
     }, [classFilter, classesData]);
 
     return (
-        <div className="space-y-4 md:space-y-6 animate-in fade-in duration-200 max-w-7xl mx-auto p-1 md:p-6 pb-20">
+        <div className="space-y-4 md:space-y-6 animate-in fade-in duration-200 w-full pb-20 px-0">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between pt-2 md:pt-4 gap-4 md:gap-6 px-1 md:px-0">
                 <div className="space-y-0.5 md:space-y-1">

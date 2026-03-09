@@ -59,8 +59,8 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
             {/* Main Application Shell */}
             <div className="flex-1 flex flex-col relative min-w-0 overflow-hidden">
                 <TopBar />
-                <main className="flex-1 p-1 md:p-2 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20 pb-20 lg:pb-2">
-                    <div className="max-w-none space-y-4 md:space-y-6 px-1 md:px-2">
+                <main className="flex-1 px-4 md:px-5 lg:px-8 py-4 md:py-6 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20 pb-20 lg:pb-6">
+                    <div className="w-full space-y-4 md:space-y-6">
                         {children}
                     </div>
                 </main>

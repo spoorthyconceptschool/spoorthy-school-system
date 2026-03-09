@@ -15,7 +15,7 @@ import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigge
 import { ManageRollNumbersModal } from "@/components/teacher/manage-roll-numbers-modal";
 
 export default function TeacherStudentsPage() {
-    const { user } = useAuth();
+    const { user, userData } = useAuth();
     const router = useRouter();
     const { classes, sections, classSections, subjectTeachers, selectedYear, loading: masterLoading } = useMasterData();
     const [teacher, setTeacher] = useState<any>(null);
@@ -33,16 +33,23 @@ export default function TeacherStudentsPage() {
     const [isManageRollsOpen, setIsManageRollsOpen] = useState(false);
 
     useEffect(() => {
-        if (user) {
+        if (user && userData?.schoolId) {
             fetchTeacher();
         }
-    }, [user]);
+    }, [user, userData]);
 
     const fetchTeacher = async () => {
         setLoadingTeacher(true);
         try {
-            const q = query(collection(db, "teachers"), where("uid", "==", user!.uid), limit(1));
-            const snap = await getDocs(q);
+            // Priority lookup by schoolId, fallback to UID if old records exist
+            let q = query(collection(db, "teachers"), where("schoolId", "==", userData.schoolId), limit(1));
+            let snap = await getDocs(q);
+
+            if (snap.empty && user?.uid) {
+                q = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
+                snap = await getDocs(q);
+            }
+
             if (!snap.empty) {
                 const tData = { id: snap.docs[0].id, ...snap.docs[0].data() };
                 setTeacher(tData);
@@ -90,8 +97,6 @@ export default function TeacherStudentsPage() {
         return Array.from(set.values());
     };
 
-    if (loadingTeacher || masterLoading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-accent" /></div>;
-
     const authorizedClasses = useMemo(() => getAuthorizedClasses(teacher), [teacher, classSections, subjectTeachers]);
     const currentClassInfo = useMemo(() => authorizedClasses.find(c => c.key === selectedClassKey), [authorizedClasses, selectedClassKey]);
 
@@ -101,7 +106,7 @@ export default function TeacherStudentsPage() {
         const fetchStudents = async () => {
             setLoadingStudents(true);
             try {
-                // Fetch all students for the class to allow client-side status filtering
+                // 1. Fetch Approved Students
                 const q = query(
                     collection(db, "students"),
                     where("classId", "==", currentClassInfo.classId),
@@ -109,8 +114,31 @@ export default function TeacherStudentsPage() {
                     where("academicYear", "==", selectedYear)
                 );
 
-                const snap = await getDocs(q);
-                const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                // 2. Fetch Pending Addition Requests
+                const pendingQ = query(
+                    collection(db, "student_change_requests"),
+                    where("classId", "==", currentClassInfo.classId),
+                    where("sectionId", "==", currentClassInfo.sectionId),
+                    where("requestType", "==", "ADD"),
+                    where("status", "==", "PENDING")
+                );
+
+                const [snap, pendingSnap] = await Promise.all([getDocs(q), getDocs(pendingQ)]);
+
+                const approvedList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                const pendingList = pendingSnap.docs.map(doc => {
+                    const data = doc.data();
+                    return {
+                        id: doc.id,
+                        ...data.newData,
+                        status: "PENDING",
+                        requestId: doc.id,
+                        isPending: true
+                    };
+                });
+
+                const list = [...approvedList, ...pendingList];
+
                 // Sort by roll number if available
                 list.sort((a: any, b: any) => (a.rollNumber || Number.MAX_SAFE_INTEGER) - (b.rollNumber || Number.MAX_SAFE_INTEGER));
                 setStudents(list);
@@ -144,7 +172,7 @@ export default function TeacherStudentsPage() {
         return { total, active, boys, girls };
     }, [students]);
 
-    if (loadingTeacher) {
+    if (loadingTeacher || masterLoading) {
         return <div className="p-10 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
     }
 
@@ -293,6 +321,7 @@ export default function TeacherStudentsPage() {
                             <SelectContent className="bg-slate-900 border-white/10 text-white">
                                 <SelectItem value="all">All Status</SelectItem>
                                 <SelectItem value="ACTIVE">Active</SelectItem>
+                                <SelectItem value="PENDING">Pending Approval</SelectItem>
                                 <SelectItem value="INACTIVE">Inactive</SelectItem>
                             </SelectContent>
                         </Select>
@@ -344,8 +373,8 @@ export default function TeacherStudentsPage() {
                                 {filteredStudents.map((s, i) => (
                                     <tr
                                         key={s.id}
-                                        className={`group hover:bg-white/[0.03] transition-colors cursor-pointer ${i % 2 === 0 ? 'bg-transparent' : 'bg-black/20'}`}
-                                        onClick={() => router.push(`/teacher/students/${s.schoolId}`)}
+                                        className={`group hover:bg-white/[0.03] transition-colors cursor-pointer ${i % 2 === 0 ? 'bg-transparent' : 'bg-black/20'} ${s.isPending ? 'opacity-80' : ''}`}
+                                        onClick={() => !s.isPending && router.push(`/teacher/students/${s.schoolId}`)}
                                     >
                                         <td className="px-6 py-4 whitespace-nowrap">
                                             <span className="text-xs font-mono font-medium text-white/50">{s.rollNumber || '-'}</span>
@@ -357,7 +386,9 @@ export default function TeacherStudentsPage() {
                                                 </div>
                                                 <div className="flex flex-col min-w-0">
                                                     <span className="font-bold text-sm text-white group-hover:text-accent transition-colors truncate">{s.studentName}</span>
-                                                    <span className="text-[10px] font-mono text-muted-foreground mt-0.5">ID: {s.schoolId}</span>
+                                                    <span className="text-[10px] font-mono text-muted-foreground mt-0.5">
+                                                        {s.isPending ? "ID: GENERATING..." : `ID: ${s.schoolId}`}
+                                                    </span>
                                                 </div>
                                             </div>
                                         </td>
@@ -377,35 +408,47 @@ export default function TeacherStudentsPage() {
                                             </div>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap">
-                                            <Badge className={s.status === 'ACTIVE' ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 font-bold tracking-wider text-[9px] uppercase shadow-sm" : "bg-red-500/10 text-red-400 border-red-500/20 font-bold tracking-wider text-[9px] uppercase shadow-sm"}>
-                                                {s.status}
+                                            <Badge className={
+                                                s.status === 'ACTIVE'
+                                                    ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 font-bold tracking-wider text-[9px] uppercase shadow-sm"
+                                                    : s.status === 'PENDING'
+                                                        ? "bg-amber-500/10 text-amber-500 border-amber-500/20 font-bold tracking-wider text-[9px] uppercase shadow-sm animate-pulse"
+                                                        : "bg-red-500/10 text-red-400 border-red-500/20 font-bold tracking-wider text-[9px] uppercase shadow-sm"
+                                            }>
+                                                {s.status === 'PENDING' ? "PENDING APPROVAL" : s.status}
                                             </Badge>
                                         </td>
                                         <td className="px-6 py-4 whitespace-nowrap text-right text-sm font-medium">
                                             <div className="flex justify-end gap-2" onClick={e => e.stopPropagation()}>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="icon"
-                                                    className="w-8 h-8 rounded-lg text-white/60 hover:text-white relative group"
-                                                    onClick={() => router.push(`/teacher/students/${s.schoolId}`)}
-                                                >
-                                                    <Eye className="w-4 h-4" />
-                                                    <span className="sr-only">View</span>
-                                                </Button>
+                                                {!s.isPending ? (
+                                                    <>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="w-8 h-8 rounded-lg text-white/60 hover:text-white relative group"
+                                                            onClick={() => router.push(`/teacher/students/${s.schoolId}`)}
+                                                        >
+                                                            <Eye className="w-4 h-4" />
+                                                            <span className="sr-only">View</span>
+                                                        </Button>
 
-                                                {isClassTeacher && (
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        className="w-8 h-8 rounded-lg text-amber-500/80 hover:text-amber-400 hover:bg-amber-500/10"
-                                                        onClick={(e) => {
-                                                            e.stopPropagation();
-                                                            router.push(`/teacher/students/${s.schoolId}?edit=true`);
-                                                        }}
-                                                    >
-                                                        <Edit className="w-4 h-4" />
-                                                        <span className="sr-only">Edit</span>
-                                                    </Button>
+                                                        {isClassTeacher && (
+                                                            <Button
+                                                                variant="ghost"
+                                                                size="icon"
+                                                                className="w-8 h-8 rounded-lg text-amber-500/80 hover:text-amber-400 hover:bg-amber-500/10"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    router.push(`/teacher/students/${s.schoolId}?edit=true`);
+                                                                }}
+                                                            >
+                                                                <Edit className="w-4 h-4" />
+                                                                <span className="sr-only">Edit</span>
+                                                            </Button>
+                                                        )}
+                                                    </>
+                                                ) : (
+                                                    <span className="text-[10px] text-muted-foreground italic mr-2">Waiting for Admin</span>
                                                 )}
 
                                                 <DropdownMenu>

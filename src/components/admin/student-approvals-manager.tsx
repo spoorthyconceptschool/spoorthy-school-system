@@ -42,10 +42,17 @@ export function StudentApprovalsManager() {
 
     // Group by teacher
     const grouped: Record<string, { teacherName: string; requests: any[] }> = {};
+    const { teachers } = useMasterData();
+
     changeRequests.forEach(req => {
         const key = req.teacherId || "unknown";
+
+        // Lookup teacher name
+        const teacherProfile = teachers?.find((t: any) => t.id === key || t.uid === key);
+        const resolvedName = teacherProfile?.name || req.teacherName || key;
+
         if (!grouped[key]) {
-            grouped[key] = { teacherName: req.teacherName || key, requests: [] };
+            grouped[key] = { teacherName: resolvedName, requests: [] };
         }
         grouped[key].requests.push(req);
     });
@@ -228,7 +235,7 @@ export function StudentApprovalsManager() {
                                         <GraduationCap className="w-5 h-5 md:w-6 md:h-6 text-amber-500" />
                                     </div>
                                     <div className="text-left">
-                                        <p className="font-bold text-white text-sm md:text-base">ID: {teacherKey}</p>
+                                        <p className="font-bold text-white text-sm md:text-base capitalize">{group.teacherName}</p>
                                         <p className="text-[10px] md:text-xs text-muted-foreground mt-0.5">{group.requests.length} pending actions</p>
                                     </div>
                                 </div>
@@ -297,25 +304,25 @@ export function StudentApprovalsManager() {
                                                         )}
                                                     </div>
 
-                                                    <div className="flex flex-row md:flex-col gap-3 pt-4 border-t border-white/5">
-                                                        <Button
-                                                            size="sm"
-                                                            onClick={() => handleApprove(req)}
-                                                            disabled={processingId === req.id}
-                                                            className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2 flex-1 justify-center font-black uppercase tracking-widest text-[10px] h-11 rounded-xl shadow-lg shadow-emerald-900/20 transition-all active:scale-95"
-                                                        >
-                                                            {processingId === req.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
-                                                            Approve
-                                                        </Button>
+                                                    <div className="flex flex-col md:flex-row justify-end md:items-center gap-3 pt-4 border-t border-white/5">
                                                         <Button
                                                             size="sm"
                                                             variant="ghost"
                                                             onClick={() => handleReject(req)}
                                                             disabled={processingId === req.id}
-                                                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10 gap-2 flex-1 justify-center font-black uppercase tracking-widest text-[10px] h-11 rounded-xl transition-all"
+                                                            className="text-red-400 hover:text-red-300 hover:bg-red-500/10 gap-2 w-full md:w-auto md:px-6 justify-center font-black uppercase tracking-widest text-[10px] h-11 rounded-xl transition-all order-2 md:order-1"
                                                         >
                                                             <XCircle className="w-4 h-4" />
                                                             Reject
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            onClick={() => handleApprove(req)}
+                                                            disabled={processingId === req.id}
+                                                            className="bg-emerald-600 hover:bg-emerald-500 text-white gap-2 w-full md:w-auto md:px-8 justify-center font-black uppercase tracking-widest text-[10px] h-11 rounded-xl shadow-lg shadow-emerald-900/20 transition-all active:scale-95 order-1 md:order-2"
+                                                        >
+                                                            {processingId === req.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <CheckCircle2 className="w-4 h-4" />}
+                                                            Approve
                                                         </Button>
                                                     </div>
                                                 </div>

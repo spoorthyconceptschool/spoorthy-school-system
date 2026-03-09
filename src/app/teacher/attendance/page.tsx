@@ -20,7 +20,7 @@ import AttendanceManager from "@/components/attendance/attendance-manager";
  * @returns {JSX.Element} The rendered attendance management view.
  */
 export default function MarkAttendancePage() {
-    const { user } = useAuth();
+    const { user, userData } = useAuth();
     const { classes, sections, classSections, subjectTeachers } = useMasterData();
     const [teacher, setTeacher] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -29,16 +29,22 @@ export default function MarkAttendancePage() {
     const today = new Date().toISOString().split('T')[0];
 
     useEffect(() => {
-        if (user) {
+        if (user && userData?.schoolId) {
             fetchTeacher();
         }
-    }, [user]);
+    }, [user, userData]);
 
     const fetchTeacher = async () => {
         setLoading(true);
         try {
-            const q = query(collection(db, "teachers"), where("uid", "==", user!.uid), limit(1));
-            const snap = await getDocs(q);
+            let q = query(collection(db, "teachers"), where("schoolId", "==", userData.schoolId), limit(1));
+            let snap = await getDocs(q);
+
+            if (snap.empty && user?.uid) {
+                q = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
+                snap = await getDocs(q);
+            }
+
             if (!snap.empty) {
                 const tData = { id: snap.docs[0].id, ...snap.docs[0].data() };
                 setTeacher(tData);
