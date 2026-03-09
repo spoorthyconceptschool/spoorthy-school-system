@@ -132,7 +132,7 @@ export default function CMSPage() {
             const token = await user?.getIdToken();
             if (!token) throw new Error("Not authenticated");
 
-            const url = await uploadFile(file, `siteMedia/home/${pathPrefix}/${Date.now()}_${file.name.replace(/[^a-zA-Z0-9.]/g, '_')}`, token);
+            const url = await uploadFile(file, `siteMedia/home/${pathPrefix}`, token);
             onUpload(url);
         } catch (e: any) {
             console.error(e);
@@ -144,7 +144,7 @@ export default function CMSPage() {
 
 
     return (
-        <div className="space-y-6 md:space-y-8 max-w-7xl mx-auto animate-in fade-in pb-20 px-3 md:px-8">
+        <div className="space-y-6 md:space-y-8 max-w-[1600px] mx-auto animate-in fade-in pb-24 p-6 md:p-10 lg:p-12">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6 mb-10">
                 <div>
                     <h1 className="text-3xl md:text-5xl font-display font-bold text-white tracking-tight">Website CMS</h1>

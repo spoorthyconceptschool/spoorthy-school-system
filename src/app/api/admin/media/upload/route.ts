@@ -15,6 +15,7 @@ export async function POST(req: NextRequest) {
         const formData = await req.formData();
         const file = formData.get("file") as File;
         const type = formData.get("type") as string || "media";
+        const customPath = formData.get("path") as string; // NEW: Allow custom path from CMS
 
         if (!file) {
             return NextResponse.json({ success: false, error: "No file provided" }, { status: 400 });
@@ -41,10 +42,11 @@ export async function POST(req: NextRequest) {
                         file: base64File,
                         name: file.name,
                         type: file.type,
-                        size: file.size
+                        size: file.size,
+                        path: customPath || `settings/branding/${file.name}` // Pass custom path
                     })
                 });
-
+                // ... (rest of logic remains same)
                 if (!vaultRes.ok) {
                     const errText = await vaultRes.text();
                     throw new Error(`MediaVault Error (${vaultRes.status}): ${errText}`);
@@ -80,7 +82,7 @@ export async function POST(req: NextRequest) {
 
         const buffer = Buffer.from(await file.arrayBuffer());
         const fileName = `${type}_${Date.now()}_${file.name.replace(/\s+/g, "_")}`;
-        const filePath = `settings/branding/${fileName}`;
+        const filePath = customPath ? (customPath.endsWith('/') ? `${customPath}${fileName}` : customPath) : `settings/branding/${fileName}`;
 
         const possibleBuckets = [
             process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "",

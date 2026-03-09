@@ -46,6 +46,7 @@ export async function uploadFile(file: File, path: string, token: string): Promi
         const formData = new FormData();
         formData.append("file", file);
         formData.append("path", path);
+        formData.append("type", file.type.split('/')[0] || "media");
 
         const response = await fetch("/api/admin/media/upload", {
             method: "POST",
