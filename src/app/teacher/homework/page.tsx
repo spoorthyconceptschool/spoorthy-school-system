@@ -17,7 +17,7 @@ import { cn } from "@/lib/utils";
 
 export default function TeacherHomeworkPage() {
     const { user } = useAuth();
-    const { subjects, classes, sections, subjectTeachers } = useMasterData();
+    const { subjects, classes, sections, classSections, subjectTeachers } = useMasterData();
     const [homeworkHistory, setHomeworkHistory] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
     const [teacherId, setTeacherId] = useState<string | null>(null);
@@ -73,13 +73,16 @@ export default function TeacherHomeworkPage() {
     }, [user, teacherId, useFallback]);
 
     const getAuthorizedClasses = () => {
-        if (!teacherId || !subjectTeachers) return [];
+        if (!teacherId || !subjectTeachers || !classSections) return [];
         const set = new Map<string, { classId: string, sectionId: string, key: string }>();
 
         Object.keys(subjectTeachers).forEach(key => {
             const subjectsObj = subjectTeachers[key];
             if (Object.values(subjectsObj).includes(teacherId)) {
-                const [cId, sId] = key.split('_');
+                // BUG FIX: Don't split by underscore
+                const cs = classSections[key];
+                const cId = cs?.classId || key.split('_')[0];
+                const sId = cs?.sectionId || key.split('_')[1];
                 set.set(key, { classId: cId, sectionId: sId, key });
             }
         });

@@ -92,7 +92,11 @@ export default function MarkAttendancePage() {
                 const isMatch = (tId && teacherIds.includes(tId)) || (tDocId && teacherIds.includes(tDocId));
 
                 if (isMatch) {
-                    const [cId, sId] = key.split('_');
+                    // BUG FIX: Don't split by underscore as IDs often contain them (e.g. CLS_01)
+                    const cs = classSections[key];
+                    const cId = cs?.classId || key.split('_')[0];
+                    const sId = cs?.sectionId || key.split('_')[1];
+
                     if (!set.has(key)) {
                         set.set(key, { classId: cId, sectionId: sId, key, isClassTeacher: false });
                     }
