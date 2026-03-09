@@ -6,28 +6,99 @@ import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import Link from "next/link";
 import { Loader2, Calendar, MapPin, ArrowLeft } from "lucide-react";
-import { collection, query, getDocs, where } from "firebase/firestore";
+import { collection, query, getDocs, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useMasterData } from "@/context/MasterDataContext";
 
 export default function TeacherTimetablePage() {
     const { user } = useAuth();
-    const { subjects } = useMasterData();
+    const { subjects, selectedYear } = useMasterData();
     const [schedule, setSchedule] = useState<any>(null); // weeklySchedule
     const [substitutions, setSubstitutions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [teacherMap, setTeacherMap] = useState<Record<string, string>>({});
     const [holidays, setHolidays] = useState<any[]>([]);
+    const [teacherProfile, setTeacherProfile] = useState<any>(null);
 
     const DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
 
     useEffect(() => {
         if (user) {
-            fetchMySchedule();
+            fetchTeacherProfile();
             fetchTeachers();
             fetchHolidays();
         }
     }, [user]);
+
+    const fetchTeacherProfile = async () => {
+        if (!user?.uid) return;
+        const q = query(collection(db, "teachers"), where("uid", "==", user.uid));
+        const snap = await getDocs(q);
+        if (!snap.empty) {
+            setTeacherProfile({ id: snap.docs[0].id, ...snap.docs[0].data() });
+        }
+    };
+
+    // Real-time Timetable Listener
+    useEffect(() => {
+        if (!teacherProfile) return;
+
+        const currentYear = selectedYear || "2025-2026";
+        const possibleIds = [teacherProfile.id, teacherProfile.schoolId, teacherProfile.teacherId].filter(Boolean);
+        if (possibleIds.length === 0) return;
+
+        setLoading(true);
+
+        const ttQuery = query(
+            collection(db, "timetable_entries"),
+            where("teacherId", "in", possibleIds),
+            where("academicYear", "==", currentYear)
+        );
+        const subQuery1 = query(collection(db, "substitutions"), where("originalTeacherId", "in", possibleIds));
+        const subQuery2 = query(collection(db, "substitutions"), where("substituteTeacherId", "in", possibleIds));
+
+        let lastEntries = [] as any[];
+        let lastOrig = [] as any[];
+        let lastSub = [] as any[];
+
+        const processAll = () => {
+            const weekly: any = {};
+            lastEntries.forEach(entry => {
+                if (!weekly[entry.day]) weekly[entry.day] = {};
+                weekly[entry.day][entry.period] = {
+                    classId: entry.classKey || `${entry.classId}_${entry.sectionId}`,
+                    subjectId: entry.subjectId
+                };
+            });
+            setSchedule(weekly);
+            setSubstitutions([...lastOrig.map(s => ({ ...s, role: "ORIGINAL" })), ...lastSub.map(s => ({ ...s, role: "SUBSTITUTE" }))]);
+            setLoading(false);
+        };
+
+        const unsubTT = onSnapshot(ttQuery, (snap) => {
+            lastEntries = snap.docs.map(d => d.data());
+            processAll();
+        }, (err) => {
+            console.error("Timetable sync error:", err);
+            setLoading(false);
+        });
+
+        const unsubSub1 = onSnapshot(subQuery1, (snap) => {
+            lastOrig = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            processAll();
+        });
+
+        const unsubSub2 = onSnapshot(subQuery2, (snap) => {
+            lastSub = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            processAll();
+        });
+
+        return () => {
+            unsubTT();
+            unsubSub1();
+            unsubSub2();
+        };
+    }, [teacherProfile, selectedYear]);
 
     const fetchHolidays = async () => {
         try {
@@ -49,20 +120,6 @@ export default function TeacherTimetablePage() {
             });
             setTeacherMap(map);
         } catch (e) { console.warn("[Timetable] Teachers Fetch Error:", e); }
-    };
-
-    const fetchMySchedule = async () => {
-        try {
-            const res = await fetch("/api/timetable/my-schedule", {
-                headers: { "Authorization": `Bearer ${await user?.getIdToken()}` }
-            });
-            const data = await res.json();
-            if (data.success) {
-                setSchedule(data.data.weeklySchedule || {});
-                setSubstitutions(data.data.substitutions || []);
-            }
-        } catch (e) { console.warn("[Timetable] My Schedule Fetch Error", e); }
-        finally { setLoading(false); }
     };
 
     const isDateHoliday = (date: Date) => {
@@ -115,10 +172,10 @@ export default function TeacherTimetablePage() {
 
     const todayData = getTodaySchedule();
 
-    if (loading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin" /></div>;
+    if (loading && !schedule) return <div className="p-10 flex justify-center bg-transparent"><Loader2 className="animate-spin text-emerald-500" /></div>;
 
     return (
-        <div className="space-y-6 max-w-5xl mx-auto p-4 md:p-6 animate-in fade-in">
+        <div className="space-y-6 max-w-full mx-auto p-4 md:p-6 animate-in fade-in">
             <div>
                 <Link href="/teacher" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-white transition-colors mb-2">
                     <ArrowLeft className="w-4 h-4" /> Back to Dashboard

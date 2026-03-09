@@ -145,7 +145,7 @@ export default function NoticesPage() {
     };
 
     return (
-        <div className="max-w-4xl mx-auto p-6 space-y-6 animate-in fade-in">
+        <div className="max-w-full mx-auto p-6 space-y-6 animate-in fade-in">
             <div className="flex justify-between items-center">
                 <div>
                     <Link href="/teacher" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-white transition-colors mb-2">

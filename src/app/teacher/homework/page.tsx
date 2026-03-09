@@ -162,7 +162,7 @@ export default function TeacherHomeworkPage() {
     const authorized = getAuthorizedClasses();
 
     return (
-        <div className="max-w-[1600px] mx-auto p-4 md:p-8 space-y-8 animate-in fade-in duration-700 pb-20">
+        <div className="max-w-full mx-auto p-4 md:p-8 space-y-8 animate-in fade-in duration-700 pb-20">
             <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-6">
                 <div className="space-y-2">
                     <Link href="/teacher" className="group flex items-center gap-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground hover:text-accent transition-all mb-1">

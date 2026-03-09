@@ -142,7 +142,7 @@ export default function LeaveManagementPage() {
     };
 
     return (
-        <div className="space-y-6 max-w-6xl mx-auto p-6 animate-in fade-in">
+        <div className="space-y-6 max-w-full mx-auto p-6 animate-in fade-in">
             <div className="flex justify-between items-center">
                 <div className="space-y-1">
                     <Link href="/teacher" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-white transition-colors mb-2">
