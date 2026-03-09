@@ -36,6 +36,8 @@ interface MasterDataState {
         address: string;
         schoolLogo: string;
         principalSignature: string;
+        studentIdPrefix?: string;
+        teacherIdPrefix?: string;
     };
     /** Configured academic cycles and their timeline status. */
     academicYears: Record<string, { id: string, name: string, active: boolean, startDate: string, endDate: string }>;
@@ -72,7 +74,9 @@ const initialState: MasterDataState = {
         schoolName: "",
         address: "",
         schoolLogo: "",
-        principalSignature: ""
+        principalSignature: "",
+        studentIdPrefix: "SCS",
+        teacherIdPrefix: "SHST"
     },
     academicYears: {},
     systemConfig: {

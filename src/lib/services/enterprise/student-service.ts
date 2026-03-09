@@ -27,6 +27,12 @@ export class EnterpriseStudentService {
         try {
             const academicYear = payload.academicYear || "2026-2027";
             const yearPart = academicYear.split("-")[0] || "2026";
+
+            // Fetch Dynamic Prefix from settings
+            const settingsRef = adminDb.collection("settings").doc("branding");
+            const settingsSnap = await settingsRef.get();
+            const prefix = settingsSnap.data()?.studentIdPrefix || "SCS";
+
             const counterId = `students_${yearPart}`;
             const counterRef = adminDb.collection("counters").doc(counterId);
 
@@ -36,8 +42,8 @@ export class EnterpriseStudentService {
                 const counterDoc = await transaction.get(counterRef as FirebaseFirestore.DocumentReference);
                 const nextIdNum = ((counterDoc.data() as any)?.current || 0) + 1;
 
-                // New Format: SCS-2026-00001
-                newSchoolId = `SCS-${yearPart}-${String(nextIdNum).padStart(5, "0")}`;
+                // New Format: SCS-2026-00001 (Configurable Prefix)
+                newSchoolId = `${prefix}-${yearPart}-${String(nextIdNum).padStart(5, "0")}`;
 
                 const syntheticEmail = `${newSchoolId}@school.local`.toLowerCase();
 

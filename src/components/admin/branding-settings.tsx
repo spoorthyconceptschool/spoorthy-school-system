@@ -19,6 +19,8 @@ export function BrandingSettings() {
     const [address, setAddress] = useState("");
     const [logoUrl, setLogoUrl] = useState("");
     const [signatureUrl, setSignatureUrl] = useState("");
+    const [studentIdPrefix, setStudentIdPrefix] = useState("SCS");
+    const [teacherIdPrefix, setTeacherIdPrefix] = useState("SHST");
 
     // Preview and Upload States
     const [logoUploading, setLogoUploading] = useState(false);
@@ -35,6 +37,7 @@ export function BrandingSettings() {
         // AND if the form hasn't been touched yet (all fields empty)
         // or if we explicitly want to refresh data
         const isFormPristine = !schoolName && !address && !logoUrl && !signatureUrl;
+        const isPrefixPristine = studentIdPrefix === "SCS" && teacherIdPrefix === "SHST";
 
         if (branding && (isFormPristine || !saving)) {
             // If the user hasn't typed anything yet, or we're not saving, sync from DB
@@ -46,6 +49,8 @@ export function BrandingSettings() {
                 setAddress(branding.address || "");
                 setLogoUrl(branding.schoolLogo || "");
                 setSignatureUrl(branding.principalSignature || "");
+                setStudentIdPrefix(branding.studentIdPrefix || "SCS");
+                setTeacherIdPrefix(branding.teacherIdPrefix || "SHST");
             }
         }
     }, [branding, saving, schoolName, address, logoUrl, signatureUrl]);
@@ -120,7 +125,14 @@ export function BrandingSettings() {
             const res = await fetch("/api/admin/settings/branding", {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                body: JSON.stringify({ schoolName, address, schoolLogo: logoUrl, principalSignature: signatureUrl })
+                body: JSON.stringify({
+                    schoolName,
+                    address,
+                    schoolLogo: logoUrl,
+                    principalSignature: signatureUrl,
+                    studentIdPrefix,
+                    teacherIdPrefix
+                })
             });
 
             const result = await res.json();
@@ -140,7 +152,9 @@ export function BrandingSettings() {
     const hasChanges = (schoolName !== (branding.schoolName || "")) ||
         (address !== (branding.address || "")) ||
         logoUrl !== (branding.schoolLogo || "") ||
-        signatureUrl !== (branding.principalSignature || "");
+        signatureUrl !== (branding.principalSignature || "") ||
+        studentIdPrefix !== (branding.studentIdPrefix || "SCS") ||
+        teacherIdPrefix !== (branding.teacherIdPrefix || "SHST");
 
     return (
         <Card className="bg-zinc-900/40 border-white/10 overflow-hidden shadow-2xl relative backdrop-blur-xl ring-1 ring-white/5">
@@ -184,6 +198,29 @@ export function BrandingSettings() {
                             onChange={e => setAddress(e.target.value)}
                             className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700"
                             placeholder="City, State, Country"
+                        />
+                    </div>
+
+                    <div className="space-y-2">
+                        <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                            Student ID Prefix
+                        </Label>
+                        <Input
+                            value={studentIdPrefix}
+                            onChange={e => setStudentIdPrefix(e.target.value.toUpperCase())}
+                            className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700 font-mono"
+                            placeholder="e.g. SCS"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                            Teacher ID Prefix
+                        </Label>
+                        <Input
+                            value={teacherIdPrefix}
+                            onChange={e => setTeacherIdPrefix(e.target.value.toUpperCase())}
+                            className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700 font-mono"
+                            placeholder="e.g. SHST"
                         />
                     </div>
                 </div>

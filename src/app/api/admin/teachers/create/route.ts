@@ -16,8 +16,13 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Invalid Data: Name and 10-digit mobile required." }, { status: 400 });
         }
 
-        // 2. Transaction for Atomic ID Generation (SHSTxxxx)
+        // 2. Transaction for Atomic ID Generation
         const result = await adminDb.runTransaction(async (t: any) => {
+            // Fetch Dynamic Prefix from settings
+            const settingsRef = adminDb.collection("settings").doc("branding");
+            const settingsSnap = await t.get(settingsRef);
+            const prefix = settingsSnap.data()?.teacherIdPrefix || "SHST";
+
             const counterRef = adminDb.collection("counters").doc("teachers");
             const counterSnap = await t.get(counterRef);
 
@@ -26,9 +31,9 @@ export async function POST(req: Request) {
                 newCount = counterSnap.data()?.count + 1;
             }
 
-            // Padded ID: SHST0005
+            // Padded ID: SHST0005 (Configurable Prefix)
             const paddedId = String(newCount).padStart(4, "0");
-            const teacherId = `SHST${paddedId}`;
+            const teacherId = `${prefix}${paddedId}`;
 
             // 3. Create Firebase Auth User
             // Email: SHST0005@school.local
