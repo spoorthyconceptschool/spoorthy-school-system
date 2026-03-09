@@ -21,6 +21,8 @@ export function BrandingSettings() {
     const [signatureUrl, setSignatureUrl] = useState("");
     const [studentIdPrefix, setStudentIdPrefix] = useState("SCS");
     const [teacherIdPrefix, setTeacherIdPrefix] = useState("SHST");
+    const [migrating, setMigrating] = useState(false);
+    const [showMigrateConfirm, setShowMigrateConfirm] = useState(false);
 
     // Preview and Upload States
     const [logoUploading, setLogoUploading] = useState(false);
@@ -115,6 +117,32 @@ export function BrandingSettings() {
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>, type: 'logo' | 'signature') => {
         if (e.target.files && e.target.files[0]) {
             handleFileUpload(e.target.files[0], type);
+        }
+    };
+
+    const handleMigrate = async () => {
+        setMigrating(true);
+        try {
+            const token = await auth.currentUser?.getIdToken();
+            const res = await fetch("/api/admin/settings/migrate-prefixes", {
+                method: "POST",
+                headers: { "Authorization": `Bearer ${token}` }
+            });
+            const result = await res.json();
+            if (result.success) {
+                toast({
+                    title: "Migration Complete",
+                    description: `Successfully migrated ${result.stats.students} students and ${result.stats.teachers} teachers.`,
+                    type: "success"
+                });
+                setShowMigrateConfirm(false);
+            } else {
+                throw new Error(result.error || "Migration failed");
+            }
+        } catch (err: any) {
+            toast({ title: "Migration Error", description: err.message, type: "error" });
+        } finally {
+            setMigrating(false);
         }
     };
 
@@ -355,7 +383,45 @@ export function BrandingSettings() {
                     </div>
                 </div>
 
-                <div className="flex justify-end pt-4 border-t border-white/5">
+                <div className="flex flex-col md:flex-row justify-between items-center gap-4 pt-4 border-t border-white/5">
+                    <div className="flex items-center gap-4 w-full md:w-auto">
+                        {!showMigrateConfirm ? (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={migrating || saving}
+                                onClick={() => setShowMigrateConfirm(true)}
+                                className="border-amber-500/20 text-amber-500 bg-amber-500/5 hover:bg-amber-500/10 h-10 px-4 rounded-xl flex items-center justify-center gap-2 group transition-all w-full md:w-auto"
+                            >
+                                <RefreshCw className={`w-4 h-4 ${migrating ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-500"}`} />
+                                <span className="text-[10px] font-bold uppercase tracking-wider">Sync Existing Profiles</span>
+                            </Button>
+                        ) : (
+                            <div className="flex items-center gap-3 bg-amber-500/10 p-2 pl-3 rounded-xl border border-amber-500/20 w-full md:w-auto justify-between">
+                                <span className="text-[10px] font-bold text-amber-500 uppercase tracking-tighter">Sync IDs now?</span>
+                                <div className="flex gap-1.5">
+                                    <Button
+                                        size="sm"
+                                        onClick={handleMigrate}
+                                        disabled={migrating}
+                                        className="bg-amber-500 hover:bg-amber-600 text-black h-7 px-3 text-[10px] font-bold uppercase rounded-lg"
+                                    >
+                                        {migrating ? <Loader2 className="w-3 h-3 animate-spin" /> : "Confirm"}
+                                    </Button>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        onClick={() => setShowMigrateConfirm(false)}
+                                        disabled={migrating}
+                                        className="text-zinc-400 hover:text-white h-7 px-2 text-[10px] font-bold uppercase"
+                                    >
+                                        Cancel
+                                    </Button>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+
                     <Button
                         onClick={handleSave}
                         disabled={saving || isUploading || !hasChanges}
