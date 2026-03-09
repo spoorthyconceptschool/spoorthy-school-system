@@ -79,7 +79,7 @@ const initialState: MasterDataState = {
         testingMode: false,
         developerMaintenance: false,
     },
-    selectedYear: "2026-2027",
+    selectedYear: "2025-2026",
     setSelectedYear: () => { },
     students: [],
     teachers: [],
@@ -124,7 +124,7 @@ const MASTER_CACHE_KEY = "spoorthy_master_cache";
  */
 export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
     const [data, setData] = useState<Omit<MasterDataState, 'selectedYear' | 'setSelectedYear'>>(initialState);
-    const [selectedYear, setSelectedYear] = useState("2026-2027");
+    const [selectedYear, setSelectedYear] = useState("2025-2026");
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
@@ -310,7 +310,7 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
             setData(prev => ({
                 ...prev,
                 academicYears: {
-                    "2026-2027": { id: "2026-2027", name: "2026-2027", active: true, startDate: "", endDate: "" }
+                    "2025-2026": { id: "2025-2026", name: "2025-2026", active: true, startDate: "", endDate: "" }
                 }
             }));
         });

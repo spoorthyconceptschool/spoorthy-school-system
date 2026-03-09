@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, useMemo } from "react";
-import { collection, query, where, getDocs, limit } from "firebase/firestore";
+import { collection, query, where, getDocs, limit, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useMasterData } from "@/context/MasterDataContext";
 import { useAuth } from "@/context/AuthContext";
@@ -106,57 +106,68 @@ export default function TeacherStudentsPage() {
     const currentClassInfo = useMemo(() => authorizedClasses.find(c => c.key === selectedClassKey), [authorizedClasses, selectedClassKey]);
 
     useEffect(() => {
-        if (!currentClassInfo || !selectedYear) return;
+        if (!currentClassInfo) return;
 
-        const fetchStudents = async () => {
-            setLoadingStudents(true);
-            try {
-                // 1. Fetch Approved Students
-                const q = query(
-                    collection(db, "students"),
-                    where("classId", "==", currentClassInfo.classId),
-                    where("sectionId", "==", currentClassInfo.sectionId),
-                    where("academicYear", "==", selectedYear)
-                );
+        setLoadingStudents(true);
+        let approvedList: any[] = [];
+        let pendingList: any[] = [];
 
-                // 2. Fetch Pending Addition Requests
-                const pendingQ = query(
-                    collection(db, "student_change_requests"),
-                    where("classId", "==", currentClassInfo.classId),
-                    where("sectionId", "==", currentClassInfo.sectionId),
-                    where("requestType", "==", "ADD"),
-                    where("status", "==", "PENDING")
-                );
+        const processResults = (approved: any[], pending: any[]) => {
+            // Merge and filter by academic year client-side to be safer and avoid complex indexes
+            const filteredApproved = approved.filter((s: any) => !selectedYear || s.academicYear === selectedYear);
+            const filteredPending = pending.filter((p: any) => !selectedYear || p.academicYear === selectedYear);
 
-                const [snap, pendingSnap] = await Promise.all([getDocs(q), getDocs(pendingQ)]);
-
-                const approvedList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-                const pendingList = pendingSnap.docs.map(doc => {
-                    const data = doc.data();
-                    return {
-                        id: doc.id,
-                        ...data.newData,
-                        status: "PENDING",
-                        requestId: doc.id,
-                        isPending: true
-                    };
-                });
-
-                // Merge and filter by academic year client-side to be safer
-                const fullApproved = approvedList.filter((s: any) => !selectedYear || s.academicYear === selectedYear);
-                const list = [...fullApproved, ...pendingList];
-
-                // Sort by roll number if available
-                list.sort((a: any, b: any) => (a.rollNumber || Number.MAX_SAFE_INTEGER) - (b.rollNumber || Number.MAX_SAFE_INTEGER));
-                setStudents(list);
-            } catch (error) {
-                console.error("Failed to fetch students:", error);
-            } finally {
-                setLoadingStudents(false);
-            }
+            const combined = [...filteredApproved, ...filteredPending];
+            // Sort by roll number if available
+            combined.sort((a: any, b: any) => (a.rollNumber || Number.MAX_SAFE_INTEGER) - (b.rollNumber || Number.MAX_SAFE_INTEGER));
+            setStudents(combined);
+            setLoadingStudents(false);
         };
 
-        fetchStudents();
+        // 1. Listen for Approved Students
+        const q = query(
+            collection(db, "students"),
+            where("classId", "==", currentClassInfo.classId),
+            where("sectionId", "==", currentClassInfo.sectionId)
+        );
+
+        const unsubApproved = onSnapshot(q, (snap) => {
+            approvedList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            processResults(approvedList, pendingList);
+        }, (error) => {
+            console.error("Approved students sync error:", error);
+            setLoadingStudents(false);
+        });
+
+        // 2. Listen for Pending Addition Requests
+        const pendingQ = query(
+            collection(db, "student_change_requests"),
+            where("classId", "==", currentClassInfo.classId),
+            where("sectionId", "==", currentClassInfo.sectionId),
+            where("requestType", "==", "ADD"),
+            where("status", "==", "PENDING")
+        );
+
+        const unsubPending = onSnapshot(pendingQ, (snap) => {
+            pendingList = snap.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    ...data.newData,
+                    status: "PENDING",
+                    requestId: doc.id,
+                    isPending: true
+                };
+            });
+            processResults(approvedList, pendingList);
+        }, (error) => {
+            console.error("Pending requests sync error:", error);
+        });
+
+        return () => {
+            unsubApproved();
+            unsubPending();
+        };
     }, [currentClassInfo, selectedYear, isManageRollsOpen]);
 
     const filteredStudents = useMemo(() => {
