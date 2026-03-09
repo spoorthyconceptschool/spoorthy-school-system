@@ -132,6 +132,7 @@ export default function TeacherStudentsPage() {
         let pendingList: any[] = [];
 
         // 1. Listen for Approved Students
+        console.log(`[DEBUG] Fetching students for Class: ${currentClassInfo.classId}, Section: ${currentClassInfo.sectionId}`);
         const q = query(
             collection(db, "students"),
             where("classId", "==", currentClassInfo.classId),
@@ -140,6 +141,10 @@ export default function TeacherStudentsPage() {
 
         const unsubApproved = onSnapshot(q, (snap) => {
             approvedList = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            console.log(`[DEBUG] Approved Students for ${currentClassInfo.classId}:`, approvedList.length);
+            if (approvedList.length === 0) {
+                console.log(`[DEBUG] Query used: classId==${currentClassInfo.classId}, sectionId==${currentClassInfo.sectionId}`);
+            }
             processResults(approvedList, pendingList);
         }, (error) => {
             console.error("Approved students sync error:", error);
