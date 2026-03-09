@@ -10,7 +10,7 @@ import { Loader2, Upload, Save, Image as ImageIcon, Building2, CheckCircle2, Rot
 import { toast } from "@/lib/toast-store";
 import { useMasterData } from "@/context/MasterDataContext";
 
-export function BrandingSettings() {
+export function BrandingSettingsV2() {
     const { branding } = useMasterData();
     const [saving, setSaving] = useState(false);
 
@@ -391,10 +391,10 @@ export function BrandingSettings() {
                                 size="sm"
                                 disabled={migrating || saving}
                                 onClick={() => setShowMigrateConfirm(true)}
-                                className="border-amber-500/20 text-amber-500 bg-amber-500/5 hover:bg-amber-500/10 h-10 px-4 rounded-xl flex items-center justify-center gap-2 group transition-all w-full md:w-auto"
+                                className="border-indigo-500/20 text-indigo-400 bg-indigo-500/5 hover:bg-indigo-500/10 h-10 px-4 rounded-xl flex items-center justify-center gap-2 group transition-all w-full md:w-auto"
                             >
-                                <RotateCw className={`w-4 h-4 ${migrating ? "animate-spin" : "group-hover:rotate-180 transition-transform duration-500"}`} />
-                                <span className="text-[10px] font-bold uppercase tracking-wider">Sync Existing Profiles</span>
+                                <Loader2 className={`w-4 h-4 ${migrating ? "animate-spin" : ""}`} />
+                                <span className="text-[10px] font-bold uppercase tracking-wider">Sync Profiles</span>
                             </Button>
                         ) : (
                             <div className="flex items-center gap-3 bg-amber-500/10 p-2 pl-3 rounded-xl border border-amber-500/20 w-full md:w-auto justify-between">

@@ -2,7 +2,7 @@
 "use client";
 
 import { AcademicYearManager } from "@/components/admin/academic-year-manager";
-import { BrandingSettings } from "@/components/admin/branding-settings";
+import { BrandingSettingsV2 as BrandingSettings } from "@/components/admin/branding-settings";
 import { SystemUsersManager } from "@/components/admin/system-users-manager";
 import { InactiveUsersManager } from "@/components/admin/inactive-users-manager";
 import { SystemToggles } from "@/components/admin/system-toggles";
