@@ -248,7 +248,7 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
                     </DropdownMenu>
                 </header>
 
-                <div className="flex-1 p-4 lg:p-8 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20">
+                <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20">
                     {children}
                 </div>
             </main>

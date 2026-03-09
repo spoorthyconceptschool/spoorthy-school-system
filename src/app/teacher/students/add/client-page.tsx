@@ -22,7 +22,7 @@ export default function AddStudentClientPage() {
     const sectionIdFromUrl = searchParams.get("sectionId");
 
     const { user } = useAuth();
-    const { classes, sections, villages } = useMasterData();
+    const { classes, sections, villages, selectedYear } = useMasterData();
     const [submitting, setSubmitting] = useState(false);
 
     const [formData, setFormData] = useState({
@@ -65,10 +65,11 @@ export default function AddStudentClientPage() {
                 teacherId: user?.uid,
                 classId: formData.classId,
                 sectionId: formData.sectionId,
+                academicYear: selectedYear || "2026-2027",
                 requestType: "ADD",
                 status: "PENDING",
                 oldData: null,
-                newData: formData,
+                newData: { ...formData, academicYear: selectedYear || "2026-2027" },
                 createdAt: Timestamp.now()
             });
 

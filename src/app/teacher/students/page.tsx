@@ -42,8 +42,13 @@ export default function TeacherStudentsPage() {
         setLoadingTeacher(true);
         try {
             // Priority lookup by schoolId, fallback to UID if old records exist
-            let q = query(collection(db, "teachers"), where("schoolId", "==", userData.schoolId), limit(1));
-            let snap = await getDocs(q);
+            let q;
+            let snap: any = { empty: true };
+
+            if (userData?.schoolId) {
+                q = query(collection(db, "teachers"), where("schoolId", "==", userData.schoolId), limit(1));
+                snap = await getDocs(q);
+            }
 
             if (snap.empty && user?.uid) {
                 q = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
@@ -137,7 +142,9 @@ export default function TeacherStudentsPage() {
                     };
                 });
 
-                const list = [...approvedList, ...pendingList];
+                // Merge and filter by academic year client-side to be safer
+                const fullApproved = approvedList.filter((s: any) => !selectedYear || s.academicYear === selectedYear);
+                const list = [...fullApproved, ...pendingList];
 
                 // Sort by roll number if available
                 list.sort((a: any, b: any) => (a.rollNumber || Number.MAX_SAFE_INTEGER) - (b.rollNumber || Number.MAX_SAFE_INTEGER));

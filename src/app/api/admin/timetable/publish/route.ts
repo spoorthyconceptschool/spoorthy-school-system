@@ -143,10 +143,13 @@ export async function POST(req: NextRequest) {
                 const entryRef = adminDb.collection("timetable_entries").doc();
                 batch.set(entryRef, {
                     yearId,
+                    academicYear: yearId, // Consistency
+                    classId: cId,
+                    sectionId: sId,
                     classKey: classId,
-                    class: className,
-                    section: sectionName,
-                    subject: subjectName,
+                    className: className,
+                    sectionName: sectionName,
+                    subjectName: subjectName,
                     subjectId: cell.subjectId,
                     teacherId: actualTeacherId,
                     teacherName: teacherName,
@@ -154,7 +157,7 @@ export async function POST(req: NextRequest) {
                     period: parseInt(slotId),
                     startTime: slotConfig.startTime,
                     endTime: slotConfig.endTime,
-                    createdAt: FieldValue.serverTimestamp()
+                    updatedAt: FieldValue.serverTimestamp()
                 });
             }
         }

@@ -151,7 +151,6 @@ export default function TeacherDashboard() {
 
         const processData = () => {
             const now = new Date();
-            // Adjust to local time matching server if needed, simple local date:
             const todayKey = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
             const dayName = now.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
 
@@ -163,7 +162,18 @@ export default function TeacherDashboard() {
             const weeklySchedule: any = { MONDAY: {}, TUESDAY: {}, WEDNESDAY: {}, THURSDAY: {}, FRIDAY: {}, SATURDAY: {} };
             lastEntries.forEach(e => {
                 if (!weeklySchedule[e.day]) weeklySchedule[e.day] = {};
-                weeklySchedule[e.day][e.period] = { classId: e.classKey, subjectId: e.subjectId, id: e.period, ...e };
+                // Match new document structure: classId, sectionId, subjectName, teacherName
+                weeklySchedule[e.day][e.period] = {
+                    classId: e.classId,
+                    sectionId: e.sectionId,
+                    className: e.className,
+                    sectionName: e.sectionName,
+                    subjectId: e.subjectId,
+                    subjectName: e.subjectName,
+                    teacherName: e.teacherName,
+                    id: e.period,
+                    ...e
+                };
             });
             setScheduleData({ weeklySchedule, substitutions: allSubs });
 
@@ -182,10 +192,10 @@ export default function TeacherDashboard() {
                     slots.push({
                         id: i,
                         type: "REGULAR",
-                        classId: regularEntry.class ? `${regularEntry.class} ${regularEntry.section}` : regularEntry.classKey,
+                        classId: regularEntry.className ? `${regularEntry.className} - ${regularEntry.sectionName}` : `${regularEntry.classId} ${regularEntry.sectionId}`,
                         subjectId: regularEntry.subjectId,
-                        subjectName: regularEntry.subject,
-                        time: `${regularEntry.startTime} - ${regularEntry.endTime}`
+                        subjectName: regularEntry.subjectName || regularEntry.subject,
+                        time: regularEntry.startTime ? `${regularEntry.startTime} - ${regularEntry.endTime}` : ""
                     });
                 }
             }

@@ -99,7 +99,7 @@ export function StudentApprovalsManager() {
 
                 if (req.teacherId) {
                     const notifRef = doc(collection(db, "notifications"));
-                    await updateDoc(notifRef, {
+                    await setDoc(notifRef, {
                         userId: req.teacherId,
                         title: "Student Added",
                         message: `Your request to add ${req.newData?.studentName || 'a student'} was approved.`,
@@ -131,7 +131,7 @@ export function StudentApprovalsManager() {
 
                 if (req.teacherId) {
                     const notifRef = doc(collection(db, "notifications"));
-                    await updateDoc(notifRef, {
+                    await setDoc(notifRef, {
                         userId: req.teacherId,
                         title: "Student Updated",
                         message: `Your edit request for ${req.newData?.studentName || 'a student'} was approved.`,
