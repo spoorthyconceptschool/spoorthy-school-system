@@ -8,9 +8,9 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent } from "@/components/ui/card";
 import { useMasterData } from "@/context/MasterDataContext";
 import { rtdb, db } from "@/lib/firebase";
-import { ref, update, push, set, remove } from "firebase/database";
+import { ref, update, push, set, remove, get } from "firebase/database";
 import { Trash2, Plus, Edit, BookOpen, CheckCircle2, GraduationCap, Users, Download, Printer, Check } from "lucide-react";
-import { collection, getDocs, query, orderBy } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, doc, updateDoc } from "firebase/firestore";
 import { exportAcademicLoad, printAcademicLoadReport } from "@/lib/export-utils";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -79,8 +79,37 @@ export function ClassesSectionsManager() {
 
     const assignClassTeacher = async (key: string, teacherId: string) => {
         if (!key) return;
-        const targetRef = ref(rtdb, `master/classSections/${key}/classTeacherId`);
-        await set(targetRef, teacherId);
+        try {
+            const [cId, sId] = key.split('_');
+            const targetRef = ref(rtdb, `master/classSections/${key}/classTeacherId`);
+
+            // 1. Get current teacher to clear their profile
+            const currentSnap = await get(targetRef);
+            const oldTeacherId = currentSnap.val();
+
+            // 2. Clear old teacher's profile if exists
+            if (oldTeacherId && oldTeacherId !== "NONE") {
+                const oldRef = doc(db, "teachers", oldTeacherId);
+                await updateDoc(oldRef, { classTeacherOf: null }).catch(() => { });
+            }
+
+            // 3. Update RTDB (Canonical)
+            await set(targetRef, teacherId === "NONE" ? null : teacherId);
+
+            // 4. Update new teacher's profile if provided
+            if (teacherId && teacherId !== "NONE") {
+                const newRef = doc(db, "teachers", teacherId);
+                await updateDoc(newRef, {
+                    classTeacherOf: {
+                        classId: cId,
+                        sectionId: sId || "A"
+                    }
+                }).catch(e => console.warn("Failed to sync Firestore profile:", e.message));
+            }
+        } catch (error) {
+            console.error("Assignment Sync Error:", error);
+            alert("Failed to sync assignment. Please try again.");
+        }
     };
 
     const getCombinationStatus = (cId: string, sId: string) => {

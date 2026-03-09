@@ -137,6 +137,7 @@ export function EditTeacherModal({ isOpen, onClose, teacher, onSuccess }: EditTe
 
             // 3. Update Firestore (Convenience Copy)
             const docRef = doc(db, "teachers", teacher.id);
+            const isAssigned = form.classTeacherClass && form.classTeacherClass !== "NONE";
             await updateDoc(docRef, {
                 name: form.name,
                 mobile: form.mobile,
@@ -144,7 +145,7 @@ export function EditTeacherModal({ isOpen, onClose, teacher, onSuccess }: EditTe
                 address: form.address,
                 qualifications: form.qualifications,
                 subjects: selectedSubjects,
-                classTeacherOf: (form.classTeacherClass && form.classTeacherClass !== "NONE") ? {
+                classTeacherOf: isAssigned ? {
                     classId: form.classTeacherClass,
                     sectionId: form.classTeacherSection || "A"
                 } : null,

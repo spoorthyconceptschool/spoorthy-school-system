@@ -78,12 +78,27 @@ export default function MarkAttendancePage() {
             }
         });
 
-        // Subject Teacher logic has been removed to restrict attendance strictly to Class Teachers ONLY.
+        // 2. Classes where I am Subject Teacher (Dynamic from RTDB)
+        if (subjectTeachers) {
+            Object.keys(subjectTeachers).forEach(key => {
+                const subjectsObj = subjectTeachers[key];
+                const teacherIds = Object.values(subjectsObj);
+                const isMatch = (tId && teacherIds.includes(tId)) || (tDocId && teacherIds.includes(tDocId));
+
+                if (isMatch) {
+                    const [cId, sId] = key.split('_');
+                    if (!set.has(key)) {
+                        set.set(key, { classId: cId, sectionId: sId, key, isClassTeacher: false });
+                    }
+                }
+            });
+        }
 
         return Array.from(set.values());
     };
 
-    if (loading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-accent" /></div>;
+    const { loading: masterLoading } = useMasterData();
+    if (loading || masterLoading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-accent" /></div>;
 
     const authorizedClasses = getAuthorizedClasses(teacher);
 

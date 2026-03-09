@@ -17,7 +17,7 @@ import { ManageRollNumbersModal } from "@/components/teacher/manage-roll-numbers
 export default function TeacherStudentsPage() {
     const { user } = useAuth();
     const router = useRouter();
-    const { classes, sections, classSections, subjectTeachers, selectedYear } = useMasterData();
+    const { classes, sections, classSections, subjectTeachers, selectedYear, loading: masterLoading } = useMasterData();
     const [teacher, setTeacher] = useState<any>(null);
     const [loadingTeacher, setLoadingTeacher] = useState(true);
     const [selectedClassKey, setSelectedClassKey] = useState("");
@@ -89,6 +89,8 @@ export default function TeacherStudentsPage() {
 
         return Array.from(set.values());
     };
+
+    if (loadingTeacher || masterLoading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-accent" /></div>;
 
     const authorizedClasses = useMemo(() => getAuthorizedClasses(teacher), [teacher, classSections, subjectTeachers]);
     const currentClassInfo = useMemo(() => authorizedClasses.find(c => c.key === selectedClassKey), [authorizedClasses, selectedClassKey]);

@@ -15,7 +15,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export default function TeacherDashboard() {
-    const { user } = useAuth();
+    const { user, userData } = useAuth();
     const [scheduleData, setScheduleData] = useState<any>(null);
     const [todaySlots, setTodaySlots] = useState<any[]>([]);
     const [notices, setNotices] = useState<any[]>([]);
@@ -25,7 +25,7 @@ export default function TeacherDashboard() {
     const [upcomingSubs, setUpcomingSubs] = useState<any[]>([]);
     const [teacherProfile, setTeacherProfile] = useState<any>(null);
     const [loading, setLoading] = useState(true);
-    const { classSections, classes, sections, classSubjects, subjects, homeworkSubjects } = useMasterData();
+    const { classSections, classes, sections, classSubjects, subjects, homeworkSubjects, loading: masterLoading } = useMasterData();
 
     useEffect(() => {
         if (user) {
@@ -136,6 +136,17 @@ export default function TeacherDashboard() {
 
     const managedClasses = getManagedClasses();
     // ----------------------------
+
+    if (loading || masterLoading) {
+        return (
+            <div className="min-h-[60vh] flex items-center justify-center">
+                <div className="flex flex-col items-center gap-4">
+                    <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
+                    <p className="text-muted-foreground animate-pulse text-sm uppercase tracking-widest font-bold">Synchronizing Classroom Data...</p>
+                </div>
+            </div>
+        );
+    }
 
     return (
         <div className="p-4 md:p-6 space-y-6 animate-in fade-in max-w-7xl mx-auto pb-16">
