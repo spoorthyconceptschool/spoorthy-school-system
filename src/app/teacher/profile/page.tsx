@@ -71,7 +71,7 @@ export default function TeacherProfilePage() {
     };
 
     return (
-        <div className="max-w-3xl mx-auto p-6 space-y-6 animate-in fade-in">
+        <div className="max-w-[1000px] mx-auto p-6 md:p-10 lg:p-12 space-y-6 animate-in fade-in">
             <div>
                 <Link
                     href="/teacher"

@@ -128,7 +128,7 @@ export default function MarkAttendancePage() {
     const currentSelection = authorizedClasses.find(c => c.key === selectedClassKey) || authorizedClasses[0];
 
     return (
-        <div className="p-4 md:p-8 space-y-8 max-w-6xl mx-auto animate-in fade-in pb-20">
+        <div className="p-6 md:p-10 lg:p-12 space-y-8 max-w-[1600px] mx-auto animate-in fade-in pb-20">
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/5 pb-8">
                 <div className="space-y-2">
                     <h1 className="text-3xl md:text-5xl font-display font-bold bg-gradient-to-r from-white to-white/40 bg-clip-text text-transparent italic leading-tight">

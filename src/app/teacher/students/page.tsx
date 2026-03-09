@@ -223,7 +223,7 @@ export default function TeacherStudentsPage() {
     const currentSectionName = sections[currentClassInfo?.sectionId || ""]?.name || "";
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-200 p-4 md:p-6 lg:p-8 max-w-[1600px] mx-auto pb-24">
+        <div className="space-y-6 animate-in fade-in duration-200 p-4 md:p-10 lg:p-12 max-w-[1600px] mx-auto pb-24">
 
             {/* 1. Header Section */}
             <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 pb-6">
@@ -463,7 +463,7 @@ export default function TeacherStudentsPage() {
             </div>
 
             {/* Modals */}
-            {isClassTeacher && (
+            {isClassTeacher && isManageRollsOpen && (
                 <ManageRollNumbersModal
                     classId={currentClassInfo?.classId || ""}
                     sectionId={currentClassInfo?.sectionId || ""}

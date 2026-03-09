@@ -175,7 +175,7 @@ export default function TeacherTimetablePage() {
     if (loading && !schedule) return <div className="p-10 flex justify-center bg-transparent"><Loader2 className="animate-spin text-emerald-500" /></div>;
 
     return (
-        <div className="space-y-6 max-w-full mx-auto p-4 md:p-6 animate-in fade-in">
+        <div className="space-y-6 max-w-[1600px] mx-auto p-6 md:p-10 lg:p-12 animate-in fade-in">
             <div>
                 <Link href="/teacher" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-white transition-colors mb-2">
                     <ArrowLeft className="w-4 h-4" /> Back to Dashboard

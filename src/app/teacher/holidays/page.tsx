@@ -29,7 +29,7 @@ export default function HolidaysPage() {
     if (loading) return <div className="flex justify-center p-20"><Loader2 className="w-8 h-8 animate-spin text-muted-foreground" /></div>;
 
     return (
-        <div className="max-w-4xl mx-auto p-6 space-y-6 animate-in fade-in">
+        <div className="max-w-[1600px] mx-auto p-6 md:p-10 lg:p-12 space-y-6 animate-in fade-in">
             <h1 className="text-3xl font-display font-bold">Holiday Calendar</h1>
 
             <div className="grid gap-4">

@@ -223,7 +223,7 @@ export default function TeacherDashboard() {
     }
 
     return (
-        <div className="space-y-6 animate-in fade-in w-full pb-16">
+        <div className="space-y-6 animate-in fade-in w-full pb-16 p-6 md:p-10 lg:p-12 max-w-[1600px] mx-auto">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="font-display text-3xl md:text-5xl font-bold tracking-tight">Teacher Dashboard</h1>
