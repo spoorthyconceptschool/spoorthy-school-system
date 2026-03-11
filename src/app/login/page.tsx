@@ -49,28 +49,36 @@ export default function LoginPage() {
             // --- REDIRECTION LOGIC ---
             const lowerId = schoolId.toLowerCase();
             const lowerEmail = email.toLowerCase();
-            let targetPath = "/student";
+            let targetPath = "/student"; // Default
 
             // 1. Initial heuristic check
             if (adminEmails.includes(lowerEmail) || lowerId.includes("admin")) {
                 targetPath = "/admin";
-            } else if (lowerId.startsWith("shst") || lowerId.startsWith("teacher")) {
-                targetPath = "/teacher";
             }
 
             // 2. Database verification (The Source of Truth)
             try {
-                const userSnapshot = await getDoc(doc(db, "users", (await import("@/lib/firebase")).auth.currentUser?.uid || ""));
-                if (userSnapshot.exists()) {
-                    const userData = userSnapshot.data();
-                    if (["ADMIN", "SUPER_ADMIN", "MANAGER"].includes(userData.role)) {
-                        targetPath = "/admin";
-                    } else if (userData.role === "TEACHER") {
-                        targetPath = "/teacher";
+                const { auth } = await import("@/lib/firebase");
+                const uid = auth.currentUser?.uid;
+                if (uid) {
+                    const userSnapshot = await getDoc(doc(db, "users", uid));
+                    if (userSnapshot.exists()) {
+                        const userData = userSnapshot.data();
+                        const role = userData.role?.toString().toUpperCase();
+
+                        if (["ADMIN", "SUPER_ADMIN", "MANAGER", "OWNER", "DEVELOPER"].includes(role)) {
+                            targetPath = "/admin";
+                        } else if (role === "TEACHER") {
+                            targetPath = "/teacher";
+                        } else if (role === "STUDENT") {
+                            targetPath = "/student";
+                        }
                     }
                 }
             } catch (dbErr) {
                 console.warn("[Login] DB Role check failed, using heuristic", dbErr);
+                // Fallback heuristic if DB fails
+                if (lowerId.startsWith("shst") || lowerId.startsWith("tch")) targetPath = "/teacher";
             }
 
             console.log("[Login] Final Target Path:", targetPath);

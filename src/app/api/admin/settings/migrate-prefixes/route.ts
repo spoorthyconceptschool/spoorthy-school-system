@@ -90,6 +90,21 @@ export async function POST(req: NextRequest) {
                     batch.delete(ledgerDoc.ref);
                 }
 
+                // F. Update search_index
+                const studentSearchRef = adminDb.collection("search_index").doc(oldId);
+                const studentSearchSnap = await studentSearchRef.get();
+                if (studentSearchSnap.exists) {
+                    const sData = studentSearchSnap.data();
+                    batch.delete(studentSearchRef);
+                    batch.set(adminDb.collection("search_index").doc(newId), {
+                        ...sData,
+                        id: newId,
+                        entityId: newId,
+                        keywords: (sData?.keywords || []).map((k: string) => k.replace(oldId.toLowerCase(), newId.toLowerCase())),
+                        url: `/admin/students/${newId}`
+                    });
+                }
+
                 await batch.commit();
                 stats.students++;
             } catch (err: any) {
