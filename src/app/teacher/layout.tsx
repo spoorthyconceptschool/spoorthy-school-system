@@ -27,7 +27,7 @@ const TEACHER_NAV = [
     { label: "My Schedule", icon: Clock, href: "/teacher/timetable" },
     { label: "Homework", icon: BookOpen, href: "/teacher/homework" },
     { label: "Notices", icon: Bell, href: "/teacher/notices" },
-    { label: "Leave Requests", icon: Calendar, href: "/teacher/leaves" },
+
     { label: "Groups", icon: Users, href: "/teacher/groups" },
     { label: "Holidays", icon: Calendar, href: "/teacher/holidays" },
     { label: "Profile", icon: User, href: "/teacher/profile" },

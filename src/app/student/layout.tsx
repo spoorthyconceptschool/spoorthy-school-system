@@ -24,7 +24,7 @@ const STUDENT_NAV = [
     { label: "Fee Payment", icon: Wallet, href: "/student/fees" },
     { label: "Homework", icon: BookOpen, href: "/student/homework" },
     { label: "Notices", icon: Bell, href: "/student/notices" },
-    { label: "Leaves", icon: FileText, href: "/student/leaves" },
+
     { label: "Attendance", icon: CalendarCheck, href: "/student/attendance" },
     { label: "Timetable", icon: Calendar, href: "/student/timetable" },
     { label: "Hall Tickets", icon: Ticket, href: "/student/exams" },

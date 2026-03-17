@@ -56,8 +56,22 @@ export default function StudentsPage() {
     const router = useRouter();
     const { user, role, isAdmin } = useAuth();
     const { villages: villagesData, classes: classesData, loading: masterLoading, selectedYear } = useMasterData();
-    const [students, setStudents] = useState<Student[]>([]);
-    const [localLoading, setLocalLoading] = useState(true);
+    const STUDENT_CACHE_KEY = `spoorthy_students_cache_${selectedYear}`;
+    const [students, setStudents] = useState<Student[]>(() => {
+        if (typeof window !== 'undefined' && selectedYear) {
+            const cached = localStorage.getItem(STUDENT_CACHE_KEY);
+            if (cached) {
+                try { return JSON.parse(cached); } catch (e) { return []; }
+            }
+        }
+        return [];
+    });
+    const [localLoading, setLocalLoading] = useState(() => {
+        if (typeof window !== 'undefined' && selectedYear) {
+            return !localStorage.getItem(STUDENT_CACHE_KEY);
+        }
+        return true;
+    });
     const [activeTab, setActiveTab] = useState<"directory" | "approvals">("directory");
 
     // Filter State
@@ -144,6 +158,9 @@ export default function StudentsPage() {
             })) as Student[];
             setStudents(list);
             setLocalLoading(false);
+            if (statusFilter === "ACTIVE" && classFilter === "all" && villageFilter === "all" && sectionFilter === "all" && !searchQuery) {
+                localStorage.setItem(STUDENT_CACHE_KEY, JSON.stringify(list.slice(0, 50))); // Cache first 50 for instant feel
+            }
         }, (error: any) => {
             console.error("Directory Stream Error:", error);
             setLocalLoading(false);

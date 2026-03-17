@@ -56,20 +56,41 @@ export default function AdminDashboard() {
     const { selectedYear, classes } = useMasterData();
     const router = useRouter();
 
+    const DASHBOARD_CACHE_KEY = `spoorthy_dashboard_cache_${selectedYear}`;
+    
     // Admin State
-    const [recentStudents, setRecentStudents] = useState<Student[]>([]);
+    const [recentStudents, setRecentStudents] = useState<Student[]>(() => {
+        if (typeof window !== 'undefined' && selectedYear) {
+            const cached = localStorage.getItem(`${DASHBOARD_CACHE_KEY}_students`);
+            if (cached) { try { return JSON.parse(cached); } catch (e) { return []; } }
+        }
+        return [];
+    });
+    
     const [pendingLeavesList, setPendingLeavesList] = useState<LeaveRequest[]>([]);
-    const [stats, setStats] = useState<DashboardStats>({
-        totalStudents: 0,
-        pendingFees: 0,
-        leaveRequests: 0,
-        totalLeaves: 0,
-        todayCollection: 0,
-        totalStaff: 0,
-        staffPresent: 0
+    
+    const [stats, setStats] = useState<DashboardStats>(() => {
+        if (typeof window !== 'undefined' && selectedYear) {
+            const cached = localStorage.getItem(`${DASHBOARD_CACHE_KEY}_stats`);
+            if (cached) { try { return JSON.parse(cached); } catch (e) { return { totalStudents: 0, pendingFees: 0, leaveRequests: 0, totalLeaves: 0, todayCollection: 0, totalStaff: 0, staffPresent: 0 }; } }
+        }
+        return {
+            totalStudents: 0,
+            pendingFees: 0,
+            leaveRequests: 0,
+            totalLeaves: 0,
+            todayCollection: 0,
+            totalStaff: 0,
+            staffPresent: 0
+        };
     });
 
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(() => {
+        if (typeof window !== 'undefined' && selectedYear) {
+            return !localStorage.getItem(`${DASHBOARD_CACHE_KEY}_stats`);
+        }
+        return true;
+    });
 
     useEffect(() => {
         if (!user) return;
@@ -85,6 +106,7 @@ export default function AdminDashboard() {
                         ...prev,
                         ...res.data
                     }));
+                    localStorage.setItem(`${DASHBOARD_CACHE_KEY}_stats`, JSON.stringify(res.data));
                 } else {
                     console.error("[AdminDashboard] Stats API error:", res.error);
                 }
@@ -128,6 +150,7 @@ export default function AdminDashboard() {
             const list = snapshot.docs.map(doc => ({ id: doc.id, schoolId: doc.id, ...doc.data() } as Student));
             console.log("[AdminDashboard] Recent students fetched:", list.length);
             setRecentStudents(list);
+            localStorage.setItem(`${DASHBOARD_CACHE_KEY}_students`, JSON.stringify(list));
         }, (err) => {
             console.error("[AdminDashboard] Students listener error:", err);
         });
