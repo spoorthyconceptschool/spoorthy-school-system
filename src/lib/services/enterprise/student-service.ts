@@ -31,19 +31,26 @@ export class EnterpriseStudentService {
             // Fetch Dynamic Prefix from settings
             const settingsRef = adminDb.collection("settings").doc("branding");
             const settingsSnap = await settingsRef.get();
-            const prefix = settingsSnap.data()?.studentIdPrefix || "SCS";
+            const brandingData = settingsSnap.data() || {};
+            const prefix = brandingData.studentIdPrefix || "SCS";
+            const startingNumber = brandingData.studentIdSuffix ? Number(brandingData.studentIdSuffix) : 1;
 
-            const counterId = `students_${yearPart}`;
+            const counterId = `students_global`;
             const counterRef = adminDb.collection("counters").doc(counterId);
 
             let newSchoolId = payload.admissionNumber;
 
             const studentRecord = await adminDb.runTransaction(async (transaction: FirebaseFirestore.Transaction) => {
                 const counterDoc = await transaction.get(counterRef as FirebaseFirestore.DocumentReference);
-                const nextIdNum = ((counterDoc.data() as any)?.current || 0) + 1;
+                let currentCount = (counterDoc.data() as any)?.current || 0;
+                
+                let nextIdNum = startingNumber;
+                if (currentCount >= startingNumber) {
+                    nextIdNum = currentCount + 1;
+                }
 
-                // New Format: SCS-2026-00001 (Configurable Prefix)
-                newSchoolId = `${prefix}-${yearPart}-${String(nextIdNum).padStart(5, "0")}`;
+                // New Format: SCS00001 (Configurable Prefix, Continuous Sequence)
+                newSchoolId = `${prefix}${String(nextIdNum).padStart(5, "0")}`;
 
                 const syntheticEmail = `${newSchoolId}@school.local`.toLowerCase();
 

@@ -34,34 +34,14 @@ export default function FeeDashboard() {
 
     const modules = [
         {
-            title: "Manage Fee Types",
-            description: "Configure standard academic fee payment and installment plans for all classes.",
+            title: "Manage All Fees",
+            description: "Configure standard academic terms, transport pricing, and assign specialized custom fees.",
             icon: Settings2,
-            href: "/admin/fees/config",
-            color: "text-blue-400",
-            borderColor: "border-blue-500/20",
-            bgColor: "bg-blue-500/5",
-            hoverBg: "hover:bg-blue-500/10"
-        },
-        {
-            title: "Custom Fee Payment",
-            description: "Assign special fees like Bus Fee, Uniform, or Contributions to specific groups.",
-            icon: Layers,
-            href: "/admin/fees/custom",
-            color: "text-purple-400",
-            borderColor: "border-purple-500/20",
-            bgColor: "bg-purple-500/5",
-            hoverBg: "hover:bg-purple-500/10"
-        },
-        {
-            title: "Fee Payment Structures",
-            description: "View master reports of fee allocations and billing details for all students.",
-            icon: Users,
-            href: "/admin/fees/structures",
-            color: "text-emerald-400",
-            borderColor: "border-emerald-500/20",
-            bgColor: "bg-emerald-500/5",
-            hoverBg: "hover:bg-emerald-500/10"
+            href: "/admin/fees/manage",
+            color: "text-accent",
+            borderColor: "border-accent/20",
+            bgColor: "bg-accent/5",
+            hoverBg: "hover:bg-accent/10"
         },
         {
             title: "Pending Dues",
@@ -163,7 +143,7 @@ export default function FeeDashboard() {
                         </p>
                     </div>
                     <Button asChild size="sm" className="bg-accent text-accent-foreground relative z-10 font-bold uppercase tracking-tighter w-full md:w-auto">
-                        <Link href="/admin/fees/config">
+                        <Link href="/admin/fees/manage">
                             <CalendarClock className="w-4 h-4 mr-2" /> Start Sync
                         </Link>
                     </Button>

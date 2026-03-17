@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, where, orderBy, getDocs, doc, getDoc, limit, startAfter } from "firebase/firestore";
+import { collection, query, where, orderBy, doc, getDoc, limit, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -17,6 +17,7 @@ import {
 import { Loader2, Check, X, RotateCcw, CalendarDays, BookOpen } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
 import { formatDateToDDMMYYYY } from "@/lib/date-utils";
+import { cn } from "@/lib/utils";
 
 export function LeavesManager() {
     const { user } = useAuth();
@@ -24,107 +25,55 @@ export function LeavesManager() {
     const [loading, setLoading] = useState(true);
     const [actioning, setActioning] = useState<string | null>(null);
 
-    // Impact View
-    const [selectedLeave, setSelectedLeave] = useState<any>(null);
+    // Impact Monitoring
     const [schedule, setSchedule] = useState<any>(null);
     const [loadingImpact, setLoadingImpact] = useState(false);
 
-    // Pagination State
-    const [pageTokens, setPageTokens] = useState<any[]>([]);
-    const [currentPage, setCurrentPage] = useState(0);
-    const PAGE_SIZE = 20;
+    useEffect(() => {
+        // Simple 50-item limit for instant response
+        const q = query(
+            collection(db, "leave_requests"),
+            orderBy("createdAt", "desc"),
+            limit(50)
+        );
 
-    const fetchPage = async (pageIndex: number, newTokens: any[] = pageTokens) => {
-        setLoading(true);
-        try {
-            let baseConstraints: any[] = [
-                orderBy("createdAt", "desc"),
-                limit(PAGE_SIZE + 1)
-            ];
-
-            if (pageIndex > 0 && newTokens[pageIndex - 1]) {
-                baseConstraints.push(startAfter(newTokens[pageIndex - 1]));
-            }
-
-            const pq = query(collection(db, "leave_requests"), ...baseConstraints);
-            const snapshot = await getDocs(pq);
-
-            const docs = snapshot.docs;
-            const hasMore = docs.length > PAGE_SIZE;
-            const displayDocs = hasMore ? docs.slice(0, PAGE_SIZE) : docs;
-
-            const loaded = displayDocs.map(doc => ({
+        const unsubscribe = onSnapshot(q, (snapshot) => {
+            const loaded = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
             }));
-
             setLeaves(loaded);
-
-            if (hasMore) {
-                const nextTokens = [...newTokens];
-                nextTokens[pageIndex] = displayDocs[displayDocs.length - 1];
-                setPageTokens(nextTokens);
-            }
-
-            setCurrentPage(pageIndex);
-        } catch (error) {
-            console.error("Leaves Pagination Error:", error);
-        } finally {
             setLoading(false);
-        }
-    };
+        }, (err) => {
+            console.error("Leaves Sync Error:", err);
+            setLoading(false);
+        });
 
-    useEffect(() => {
-        fetchPage(0, []);
+        return () => unsubscribe();
     }, []);
 
     const fetchImpact = async (leave: any) => {
-        setSelectedLeave(leave);
         setLoadingImpact(true);
-        setSchedule(null);
         try {
-            const yearId = "2025-2026";
-            const tQuery = query(collection(db, "teachers"), where("uid", "==", leave.teacherId), limit(1));
-            const tSnap = await getDocs(tQuery);
-
-            if (!tSnap.empty) {
-                const teacherData = tSnap.docs[0].data();
-                const teacherIdRes = teacherData.schoolId || teacherData.teacherId || teacherData.id || tSnap.docs[0].id;
-
-                const snap = await getDoc(doc(db, "teacher_schedules", `${yearId}_${teacherIdRes}`));
-                if (snap.exists()) {
-                    setSchedule(snap.data().schedule || {});
-                } else if (teacherData.schoolId) {
-                    // Fallback to Firestore Doc ID if schoolId lookup failed
-                    const fallbackSnap = await getDoc(doc(db, "teacher_schedules", `${yearId}_${tSnap.docs[0].id}`));
-                    if (fallbackSnap.exists()) {
-                        setSchedule(fallbackSnap.data().schedule || {});
-                    }
-                }
+            const teacherDoc = await getDoc(doc(db, "teachers", leave.teacherId));
+            if (teacherDoc.exists()) {
+                setSchedule(teacherDoc.data().timetable || {});
             }
         } catch (e) {
-            console.error("Impact Fetch Error", e);
+            console.error("Impact Check Error:", e);
         } finally {
             setLoadingImpact(false);
         }
     };
 
     const handleAction = async (leaveId: string, action: "APPROVE" | "REJECT" | "REVERT") => {
-        if (!user) {
-            alert("System is Verifying your identity... Please try again.");
-            return;
-        }
-
-        const confirmMsg = action === "REVERT"
-            ? "This will remove all coverage assignments for this leave. Move back to Pending?"
-            : `Are you sure you want to ${action.toLowerCase()} this leave?`;
-
-        if (!confirm(confirmMsg)) return;
+        if (!user) return;
+        if (!confirm(`Confirm ${action.toLowerCase()} this leave request?`)) return;
 
         setActioning(leaveId);
         try {
             const token = await user.getIdToken();
-            const res = await fetch("/api/admin/leaves/approve", {
+            const res = await fetch("/api/admin/leaves/action", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -133,66 +82,72 @@ export function LeavesManager() {
                 body: JSON.stringify({ leaveId, action })
             });
             const data = await res.json();
-            if (data.success) {
-                // Refresh current page
-                fetchPage(currentPage, pageTokens);
-            } else {
+            if (!data.success) {
                 alert("Error: " + data.error);
             }
-        } catch (e: any) { alert(e.message); }
-        finally { setActioning(null); }
+        } catch (e: any) {
+            alert(e.message);
+        } finally {
+            setActioning(null);
+        }
     };
 
     return (
-        <div className="space-y-3 md:space-y-6 max-w-none p-0 animate-in fade-in">
-            <div className="mobile-dense-table overflow-hidden">
+        <div className="space-y-6">
+            <div className="hidden md:block">
                 <DataTable
                     data={leaves}
                     isLoading={loading}
                     columns={[
                         {
                             key: "teacherName",
-                            header: "Staff",
+                            header: "Staff Member",
                             render: (leave: any) => (
-                                <div className="font-bold text-white truncate max-w-[60px] md:max-w-none text-[9px] md:text-sm">
-                                    {leave.teacherName}
+                                <div className="flex flex-col">
+                                    <span className="font-bold text-white text-xs">{leave.teacherName}</span>
+                                    <span className="text-[10px] font-mono text-white/40 uppercase tracking-tighter">{leave.teacherId}</span>
                                 </div>
                             )
                         },
                         {
                             key: "dates",
-                            header: "Term",
+                            header: "Duration",
                             render: (leave: any) => (
-                                <div className="text-white/70 leading-tight">
-                                    <div className="text-[8px] md:text-sm whitespace-nowrap">
-                                        {leave.fromDate === leave.toDate
-                                            ? formatDateToDDMMYYYY(leave.fromDate)
-                                            : `${formatDateToDDMMYYYY(leave.fromDate).split('/').slice(0, 2).join('/')}..`}
-                                    </div>
-                                    <Badge variant="outline" className="h-3 md:h-4 text-[7px] md:text-[10px] border-white/10 text-white/40 px-1 py-0 px-0.5">
-                                        {leave.type.slice(0, 4)}
+                                <div className="flex flex-col gap-0.5">
+                                    <span className="text-[10px] font-bold text-white/80">
+                                        {leave.fromDate === leave.toDate 
+                                            ? formatDateToDDMMYYYY(leave.fromDate) 
+                                            : `${formatDateToDDMMYYYY(leave.fromDate)} - ${formatDateToDDMMYYYY(leave.toDate)}`
+                                        }
+                                    </span>
+                                    <Badge variant="outline" className="w-fit h-4 text-[8px] uppercase font-black border-white/5 bg-white/5 text-muted-foreground px-1">
+                                        {leave.type}
                                     </Badge>
                                 </div>
                             )
                         },
                         {
                             key: "reason",
-                            header: "Cause",
+                            header: "Reason",
                             render: (leave: any) => (
-                                <div className="text-[8px] md:text-sm max-w-[50px] md:max-w-xs truncate text-white/50 italic" title={leave.reason}>
-                                    {leave.reason}
+                                <div className="text-xs text-white/50 italic max-w-[200px] truncate" title={leave.reason}>
+                                    "{leave.reason}"
                                 </div>
                             )
                         },
                         {
                             key: "status",
                             header: "Status",
+                            cellClassName: "text-center",
                             render: (leave: any) => (
-                                <div className="scale-[0.8] md:scale-100 origin-left">
-                                    {leave.status === "PENDING" && <Badge className="bg-yellow-500/10 text-yellow-500 border border-yellow-500/20 py-0 px-1 text-[8px] md:text-xs">Pend</Badge>}
-                                    {leave.status === "APPROVED" && <Badge className="bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 py-0 px-1 text-[8px] md:text-xs">Appr</Badge>}
-                                    {leave.status === "REJECTED" && <Badge className="bg-red-500/10 text-red-400 border border-red-500/20 py-0 px-1 text-[8px] md:text-xs">Rej</Badge>}
-                                </div>
+                                <Badge className={cn(
+                                    "text-[9px] font-black uppercase tracking-tighter py-0 h-5 border-none",
+                                    leave.status === "PENDING" ? "bg-amber-500/10 text-amber-500" :
+                                    leave.status === "APPROVED" ? "bg-emerald-500/10 text-emerald-400" :
+                                    "bg-red-500/10 text-red-400"
+                                )}>
+                                    {leave.status}
+                                </Badge>
                             )
                         }
                     ]}
@@ -200,22 +155,22 @@ export function LeavesManager() {
                         <div className="flex flex-col gap-1 p-1">
                             <Dialog>
                                 <DialogTrigger asChild>
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
-                                        className="w-full justify-start gap-2 h-8 hover:bg-zinc-800 text-white/70"
+                                    <Button 
+                                        size="sm" 
+                                        variant="ghost" 
+                                        className="w-full justify-start gap-2 h-8 text-[10px] uppercase font-black tracking-widest text-blue-400 hover:bg-blue-500/10"
                                         onClick={() => fetchImpact(leave)}
                                     >
-                                        <CalendarDays className="w-4 h-4" /> Impact Analysis
+                                        <BookOpen className="w-3.5 h-3.5" /> Check Impact
                                     </Button>
                                 </DialogTrigger>
-                                <DialogContent className="bg-[#0A192F] border-white/10 text-white max-w-md">
+                                <DialogContent className="bg-black/90 border-white/10 text-white backdrop-blur-2xl">
                                     <DialogHeader>
                                         <DialogTitle className="flex items-center gap-2">
-                                            <BookOpen className="w-5 h-5 text-accent" />
-                                            Classes Affected
+                                            <CalendarDays className="w-5 h-5 text-accent" />
+                                            Impact Analysis: {leave.teacherName}
                                         </DialogTitle>
-                                        <DialogDescription className="text-white/60">
+                                        <DialogDescription className="text-white/40">
                                             Teacher schedule for this leave period.
                                         </DialogDescription>
                                     </DialogHeader>
@@ -253,9 +208,9 @@ export function LeavesManager() {
 
                             {leave.status === "PENDING" ? (
                                 <>
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
+                                    <Button 
+                                        size="sm" 
+                                        variant="ghost" 
                                         className="w-full justify-start gap-2 h-8 hover:bg-emerald-500/10 text-emerald-400 font-bold"
                                         onClick={() => handleAction(leave.id, "APPROVE")}
                                         disabled={actioning === leave.id}
@@ -263,9 +218,9 @@ export function LeavesManager() {
                                         {actioning === leave.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
                                         Approve Leave
                                     </Button>
-                                    <Button
-                                        size="sm"
-                                        variant="ghost"
+                                    <Button 
+                                        size="sm" 
+                                        variant="ghost" 
                                         className="w-full justify-start gap-2 h-8 hover:bg-red-500/10 text-red-400 font-bold"
                                         onClick={() => handleAction(leave.id, "REJECT")}
                                         disabled={actioning === leave.id}
@@ -274,9 +229,9 @@ export function LeavesManager() {
                                     </Button>
                                 </>
                             ) : (
-                                <Button
-                                    size="sm"
-                                    variant="ghost"
+                                <Button 
+                                    size="sm" 
+                                    variant="ghost" 
                                     className="w-full justify-start gap-2 h-8 text-white/40 hover:text-white"
                                     onClick={() => handleAction(leave.id, "REVERT")}
                                     disabled={actioning === leave.id}
@@ -287,11 +242,7 @@ export function LeavesManager() {
                             )}
                         </div>
                     )}
-                    serverPagination={true}
-                    hasNextPage={pageTokens.length > currentPage}
-                    hasPrevPage={currentPage > 0}
-                    onNextPage={() => fetchPage(currentPage + 1)}
-                    onPrevPage={() => fetchPage(currentPage - 1)}
+                    serverPagination={false}
                 />
 
                 {leaves.length === 0 && !loading && (
@@ -299,6 +250,46 @@ export function LeavesManager() {
                         No leave requests found.
                     </div>
                 )}
+            </div>
+
+            {/* Mobile Cards (Native Feel) */}
+            <div className="md:hidden space-y-4">
+                {leaves.map(leave => (
+                    <div key={leave.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-4">
+                        <div className="flex justify-between items-start">
+                            <div>
+                                <h3 className="font-bold text-white leading-tight">{leave.teacherName}</h3>
+                                <p className="text-[10px] text-white/40 font-mono uppercase">{leave.teacherId}</p>
+                            </div>
+                            <Badge className={cn(
+                                "text-[10px] font-black uppercase tracking-tighter py-0 h-5 border-none",
+                                leave.status === "PENDING" ? "bg-amber-500/10 text-amber-500" :
+                                leave.status === "APPROVED" ? "bg-emerald-500/10 text-emerald-400" :
+                                "bg-red-500/10 text-red-400"
+                            )}>
+                                {leave.status}
+                            </Badge>
+                        </div>
+                        <div className="bg-black/20 p-3 rounded-xl border border-white/5 space-y-2">
+                             <div className="flex items-center gap-2 text-[10px] font-bold text-white/60">
+                                <CalendarDays className="w-3.5 h-3.5 text-accent" />
+                                {formatDateToDDMMYYYY(leave.fromDate)} - {formatDateToDDMMYYYY(leave.toDate)}
+                                <Badge variant="outline" className="ml-auto text-[8px] h-4 bg-white/5 border-none">{leave.type}</Badge>
+                             </div>
+                             <p className="text-xs italic text-white/40 italic">"{leave.reason}"</p>
+                        </div>
+                        <div className="flex gap-2">
+                            {leave.status === "PENDING" ? (
+                                <>
+                                    <Button className="flex-1 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border-none h-9 rounded-xl text-xs font-bold" onClick={() => handleAction(leave.id, "APPROVE")} disabled={actioning === leave.id}>Approve</Button>
+                                    <Button className="flex-1 bg-red-500/20 text-red-400 hover:bg-red-500/30 border-none h-9 rounded-xl text-xs font-bold" onClick={() => handleAction(leave.id, "REJECT")} disabled={actioning === leave.id}>Reject</Button>
+                                </>
+                            ) : (
+                                <Button className="w-full bg-white/5 text-white/40 hover:bg-white/10 border-none h-9 rounded-xl text-xs font-bold" onClick={() => handleAction(leave.id, "REVERT")} disabled={actioning === leave.id}>Revert to Pending</Button>
+                            )}
+                        </div>
+                    </div>
+                ))}
             </div>
         </div>
     );

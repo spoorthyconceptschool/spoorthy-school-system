@@ -38,6 +38,8 @@ interface MasterDataState {
         principalSignature: string;
         studentIdPrefix?: string;
         teacherIdPrefix?: string;
+        studentIdSuffix?: number;
+        teacherIdSuffix?: number;
     };
     /** Configured academic cycles and their timeline status. */
     academicYears: Record<string, { id: string, name: string, active: boolean, startDate: string, endDate: string }>;
@@ -76,7 +78,9 @@ const initialState: MasterDataState = {
         schoolLogo: "",
         principalSignature: "",
         studentIdPrefix: "SCS",
-        teacherIdPrefix: "SHST"
+        teacherIdPrefix: "SHST",
+        studentIdSuffix: 1,
+        teacherIdSuffix: 1
     },
     academicYears: {},
     systemConfig: {
@@ -127,31 +131,39 @@ const MASTER_CACHE_KEY = "spoorthy_master_cache";
  * UI components in sync with the school's master configuration.
  */
 export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
-    const [data, setData] = useState<Omit<MasterDataState, 'selectedYear' | 'setSelectedYear'>>(initialState);
-    const [selectedYear, setSelectedYear] = useState("2025-2026");
+    const [data, setData] = useState<Omit<MasterDataState, 'selectedYear' | 'setSelectedYear'>>(() => {
+        const base = { ...initialState };
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(MASTER_CACHE_KEY);
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    return {
+                        ...base,
+                        ...parsed,
+                        branding: { ...initialState.branding, ...(parsed.branding || {}) },
+                        systemConfig: { ...initialState.systemConfig, ...(parsed.systemConfig || {}) },
+                        loading: false
+                    };
+                } catch (e) {
+                    return base;
+                }
+            }
+        }
+        return base;
+    });
+
+    const [selectedYear, setSelectedYear] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return localStorage.getItem("spoorthy_academic_year") || "2025-2026";
+        }
+        return "2025-2026";
+    });
+
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
         setMounted(true);
-        // Hydrate from cache on mount (Client-side only)
-        const cached = localStorage.getItem(MASTER_CACHE_KEY);
-        if (cached) {
-            try {
-                const parsed = JSON.parse(cached);
-                setData(prev => ({
-                    ...prev,
-                    ...parsed,
-                    branding: { ...initialState.branding, ...(parsed.branding || {}) },
-                    systemConfig: { ...initialState.systemConfig, ...(parsed.systemConfig || {}) },
-                    loading: false
-                }));
-            } catch (e) {
-                console.warn("Master cache corrupted, resetting...");
-            }
-        }
-
-        const cachedYear = localStorage.getItem("spoorthy_academic_year");
-        if (cachedYear) setSelectedYear(cachedYear);
     }, []);
 
     useEffect(() => {
@@ -397,10 +409,7 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
         setSelectedYear: handleSetSelectedYear
     }), [data, selectedYear]);
 
-    if (!mounted) {
-        // Return a minimal consistent shell to avoid hydration errors
-        return <div className="min-h-screen bg-[#0A192F]" />;
-    }
+
 
     return (
         <MasterDataContext.Provider value={contextValue}>

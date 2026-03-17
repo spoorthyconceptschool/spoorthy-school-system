@@ -48,6 +48,7 @@ const NAV_ITEMS = [
     { label: "Fee Payment", icon: Banknote, href: "/admin/fees" },
     { label: "Payroll", icon: Wallet, href: "/admin/salary" },
     { type: "separator", label: "School Management" },
+    { label: "Leave Center", icon: Calendar, href: "/admin/leaves" },
     { label: "Schedules", icon: Clock, href: "/admin/timetable/manage" },
     { label: "Academics", icon: BookOpen, href: "/admin/homework" },
     { label: "Exams & Halls", icon: ClipboardCheck, href: "/admin/exams" },
@@ -97,7 +98,7 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
     const filteredNav = useMemo(() => {
         return NAV_ITEMS.filter(item => {
             const allowedPaths = (role === "MANAGER")
-                ? ["/admin", "/admin/students", "/admin/attendance", "/admin/fees", "/admin/exams", "/admin/faculty", "/admin/master-data", "/admin/timetable/manage"]
+                ? ["/admin", "/admin/students", "/admin/attendance", "/admin/fees", "/admin/exams", "/admin/faculty", "/admin/master-data", "/admin/timetable/manage", "/admin/leaves"]
                 : (role === "TIMETABLE_EDITOR")
                     ? ["/admin", "/admin/timetable/manage", "/admin/faculty", "/admin/master-data/subjects", "/admin/master-data/classes-sections"]
                     : null;
@@ -202,7 +203,7 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
                                         <span className={cn("truncate font-mono text-xs", isActive ? "font-bold" : "")}>
                                             {item.label}
                                         </span>
-                                        {item.label === "Staff Members" && pendingLeaves > 0 && (
+                                        {item.label === "Leave Center" && pendingLeaves > 0 && (
                                             <motion.span
                                                 initial={{ scale: 0.5, opacity: 0 }}
                                                 animate={{ scale: 1, opacity: 1 }}
@@ -215,7 +216,7 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
                                     </div>
                                 )}
 
-                                {collapsed && !mobile && item.label === "Staff Members" && pendingLeaves > 0 && (
+                                {collapsed && !mobile && item.label === "Leave Center" && pendingLeaves > 0 && (
                                     <div className="absolute top-1 right-1 w-2.5 h-2.5 bg-red-500 rounded-full border-2 border-[#0A192F] shadow-[0_0_8px_rgba(239,68,68,0.8)]">
                                         <div className="absolute inset-0 rounded-full bg-red-500 animate-ping opacity-40" />
                                     </div>

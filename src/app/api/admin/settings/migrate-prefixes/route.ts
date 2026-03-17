@@ -24,12 +24,18 @@ export async function POST(req: NextRequest) {
         const brandingSnap = await brandingRef.get();
         if (!brandingSnap.exists) throw new Error("Branding settings not found");
 
-        const { studentIdPrefix, teacherIdPrefix } = brandingSnap.data() || {};
+        const { studentIdPrefix, teacherIdPrefix, studentIdSuffix, teacherIdSuffix } = brandingSnap.data() || {};
         if (!studentIdPrefix || !teacherIdPrefix) throw new Error("Prefixes not configured");
+        
+        const startingStudentSequence = studentIdSuffix ? Number(studentIdSuffix) : 1;
+        const startingTeacherSequence = teacherIdSuffix ? Number(teacherIdSuffix) : 1;
 
-        console.log(`[Migration] Starting ID Migration to: Student=${studentIdPrefix}, Teacher=${teacherIdPrefix}`);
+        console.log(`[Migration] Starting ID Migration to: Student=${studentIdPrefix}[SEQ], Teacher=${teacherIdPrefix}[SEQ] starting from ${startingStudentSequence} and ${startingTeacherSequence}`);
 
         const stats = { students: 0, teachers: 0, auth: 0, errors: [] as string[] };
+        
+        let currentStudentSequence = startingStudentSequence;
+        let currentTeacherSequence = startingTeacherSequence;
 
         // --- MIGRATION: STUDENTS ---
         const studentsSnap = await adminDb.collection("students").get();
@@ -38,10 +44,14 @@ export async function POST(req: NextRequest) {
                 const data = studentDoc.data();
                 const oldId = studentDoc.id;
 
-                // Only migrate if prefix differs (assuming Prefix-Year-Seq format)
-                if (!oldId.includes("-")) continue;
-                const newId = `${studentIdPrefix}-${oldId.split("-").slice(1).join("-")}`;
-                if (oldId === newId) continue;
+                // For full reassignment, we ignore the old sequence and generate a new one
+                const numericSequence = String(currentStudentSequence).padStart(5, "0");
+
+                const newId = `${studentIdPrefix}${numericSequence}`;
+                if (oldId === newId) {
+                    currentStudentSequence++;
+                    continue;
+                }
 
                 const uid = data.uid;
                 const batch = adminDb.batch();
@@ -52,11 +62,7 @@ export async function POST(req: NextRequest) {
                     ...data,
                     schoolId: newId,
                     admissionNumber: data.admissionNumber === oldId ? newId : data.admissionNumber,
-                    keywords: (data.keywords || []).map((k: string) =>
-                        k.toLowerCase().startsWith(oldId.split("-")[0].toLowerCase())
-                            ? k.replace(new RegExp(`^${oldId.split("-")[0]}`, 'i'), studentIdPrefix)
-                            : k
-                    )
+                    keywords: (data.keywords || []).map((k: string) => k.replace(new RegExp(oldId.toLowerCase(), 'g'), newId.toLowerCase()))
                 };
                 batch.set(newStudentRef, updatedData);
                 batch.delete(studentDoc.ref);
@@ -72,8 +78,21 @@ export async function POST(req: NextRequest) {
 
                     // D. Update Auth Email (Atomic check not possible but failures handled)
                     const newEmail = `${newId.toLowerCase()}@school.local`;
-                    await adminAuth.updateUser(uid, { email: newEmail });
-                    stats.auth++;
+                    try {
+                        await adminAuth.updateUser(uid, { email: newEmail });
+                        stats.auth++;
+                    } catch (authErr: any) {
+                        if (authErr.code === 'auth/email-already-exists') {
+                            const zombie = await adminAuth.getUserByEmail(newEmail);
+                            if (zombie && zombie.uid !== uid) {
+                                await adminAuth.deleteUser(zombie.uid);
+                                await adminAuth.updateUser(uid, { email: newEmail });
+                                stats.auth++;
+                            }
+                        } else {
+                            throw authErr;
+                        }
+                    }
                 }
 
                 // E. Migrate Fee Ledgers
@@ -107,6 +126,7 @@ export async function POST(req: NextRequest) {
 
                 await batch.commit();
                 stats.students++;
+                currentStudentSequence++;
             } catch (err: any) {
                 console.error(`[Migration] Student ${studentDoc.id} failed:`, err.message);
                 stats.errors.push(`Student ${studentDoc.id}: ${err.message}`);
@@ -120,12 +140,14 @@ export async function POST(req: NextRequest) {
                 const data = teacherDoc.data();
                 const oldId = teacherDoc.id;
 
-                // Extract numeric part (Assuming prefix followed by digits)
-                const numericPart = oldId.match(/\d+$/)?.[0];
-                if (!numericPart) continue;
+                // For full reassignment, we ignore the old sequence and generate a new one
+                const numericPart = String(currentTeacherSequence).padStart(4, "0");
 
                 const newId = `${teacherIdPrefix}${numericPart}`;
-                if (oldId === newId) continue;
+                if (oldId === newId) {
+                    currentTeacherSequence++;
+                    continue;
+                }
 
                 const uid = data.uid;
                 const batch = adminDb.batch();
@@ -145,8 +167,22 @@ export async function POST(req: NextRequest) {
                     batch.delete(adminDb.collection("usersBySchoolId").doc(oldId));
                     batch.set(adminDb.collection("usersBySchoolId").doc(newId), { uid, role: "TEACHER" });
 
-                    await adminAuth.updateUser(uid, { email: `${newId.toLowerCase()}@school.local` });
-                    stats.auth++;
+                    const newEmail = `${newId.toLowerCase()}@school.local`;
+                    try {
+                        await adminAuth.updateUser(uid, { email: newEmail });
+                        stats.auth++;
+                    } catch (authErr: any) {
+                        if (authErr.code === 'auth/email-already-exists') {
+                            const zombie = await adminAuth.getUserByEmail(newEmail);
+                            if (zombie && zombie.uid !== uid) {
+                                await adminAuth.deleteUser(zombie.uid);
+                                await adminAuth.updateUser(uid, { email: newEmail });
+                                stats.auth++;
+                            }
+                        } else {
+                            throw authErr;
+                        }
+                    }
                 }
 
                 // C. Update search_index (if exists)
@@ -165,11 +201,20 @@ export async function POST(req: NextRequest) {
 
                 await batch.commit();
                 stats.teachers++;
+                currentTeacherSequence++;
             } catch (err: any) {
                 console.error(`[Migration] Teacher ${teacherDoc.id} failed:`, err.message);
                 stats.errors.push(`Teacher ${teacherDoc.id}: ${err.message}`);
             }
         }
+
+        // --- UPDATE COUNTERS ---
+        // After migration, we need to ensure the counters are updated to the latest sequence
+        // so that the next created student/teacher gets the right ID.
+        const countersBatch = adminDb.batch();
+        countersBatch.set(adminDb.collection("counters").doc("students_global"), { current: currentStudentSequence - 1 }, { merge: true });
+        countersBatch.set(adminDb.collection("counters").doc("teachers"), { count: currentTeacherSequence - 1 }, { merge: true });
+        await countersBatch.commit();
 
         return NextResponse.json({
             success: true,

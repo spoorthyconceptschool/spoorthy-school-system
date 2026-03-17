@@ -11,7 +11,7 @@ import { db } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
 
 export function BulkPrintTimetableModal() {
-    const { classes: classesData, sections: sectionsData, classSections, subjects: masterSubjects, branding } = useMasterData();
+    const { classes: classesData, sections: sectionsData, classSections, subjects: masterSubjects, branding, selectedYear } = useMasterData();
     const [open, setOpen] = useState(false);
     const [selectedIds, setSelectedIds] = useState<string[]>([]);
     const [loading, setLoading] = useState(false);
@@ -39,11 +39,17 @@ export function BulkPrintTimetableModal() {
         try {
             const printData = [];
 
-            // Get Day Template (Assuming same for all, fetched from global_settings)
+            const defaultTemplate = [
+                { id: 1, name: "Period 1", type: "CLASS", startTime: "09:00", endTime: "09:45", isLeisureAllowed: true },
+                { id: 2, name: "Period 2", type: "CLASS", startTime: "09:45", endTime: "10:30", isLeisureAllowed: true },
+                { id: 3, name: "Short Break", type: "BREAK", startTime: "10:30", endTime: "10:45", isLeisureAllowed: false },
+                { id: 4, name: "Period 3", type: "CLASS", startTime: "10:45", endTime: "11:30", isLeisureAllowed: true },
+            ];
+
             const settingsSnap = await getDoc(doc(db, "timetable_settings", "global_settings"));
             const dayTemplate = settingsSnap.exists() && settingsSnap.data().dayTemplates?.["MONDAY"]
                 ? settingsSnap.data().dayTemplates["MONDAY"].slots
-                : [];
+                : defaultTemplate;
 
             if (dayTemplate.length === 0) {
                 alert("Day structure template not found. Please configure the global structure first.");
@@ -55,10 +61,12 @@ export function BulkPrintTimetableModal() {
             const tSnap = await getDocs(query(collection(db, "teachers"), where("status", "==", "ACTIVE")));
             const allTeachers = tSnap.docs.map(d => ({ id: d.id, ...d.data() }));
 
+            const currentYear = selectedYear || "2026-2027";
+
             // Fetch selected timetables
             for (const id of selectedIds) {
                 const [cId, sId] = id.split('_');
-                const docRef = doc(db, "timetables", `2025-2026_${cId}_${sId}`);
+                const docRef = doc(db, "class_timetables", `${currentYear}_${cId}_${sId}`);
                 const docSnap = await getDoc(docRef);
 
                 if (docSnap.exists()) {

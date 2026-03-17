@@ -49,7 +49,7 @@ interface Student {
     transportRequired?: boolean;
 }
 
-import { StudentLeavesManager } from "@/components/admin/student-leaves-manager";
+
 import { StudentApprovalsManager } from "@/components/admin/student-approvals-manager";
 
 export default function StudentsPage() {
@@ -58,7 +58,7 @@ export default function StudentsPage() {
     const { villages: villagesData, classes: classesData, loading: masterLoading, selectedYear } = useMasterData();
     const [students, setStudents] = useState<Student[]>([]);
     const [localLoading, setLocalLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<"directory" | "leaves" | "approvals">("directory");
+    const [activeTab, setActiveTab] = useState<"directory" | "approvals">("directory");
 
     // Filter State
     const [searchQuery, setSearchQuery] = useState("");
@@ -188,17 +188,7 @@ export default function StudentsPage() {
                         >
                             Directory
                         </Button>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setActiveTab("leaves")}
-                            className={cn(
-                                "flex-1 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest h-8",
-                                activeTab === "leaves" ? "bg-white text-black hover:bg-white" : "text-white/40 hover:text-white"
-                            )}
-                        >
-                            Leaves
-                        </Button>
+
                         <Button
                             variant="ghost"
                             size="sm"
@@ -641,8 +631,6 @@ export default function StudentsPage() {
                         />
                     )}
                 </>
-            ) : activeTab === "leaves" ? (
-                <StudentLeavesManager />
             ) : (
                 <StudentApprovalsManager />
             )}

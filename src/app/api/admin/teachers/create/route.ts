@@ -21,14 +21,19 @@ export async function POST(req: Request) {
             // Fetch Dynamic Prefix from settings
             const settingsRef = adminDb.collection("settings").doc("branding");
             const settingsSnap = await t.get(settingsRef);
-            const prefix = settingsSnap.data()?.teacherIdPrefix || "SHST";
+            const brandingData = settingsSnap.data() || {};
+            const prefix = brandingData.teacherIdPrefix || "SHST";
+            const startingNumber = brandingData.teacherIdSuffix ? Number(brandingData.teacherIdSuffix) : 1;
 
             const counterRef = adminDb.collection("counters").doc("teachers");
             const counterSnap = await t.get(counterRef);
 
-            let newCount = 1;
-            if (counterSnap.exists) {
+            let newCount = startingNumber;
+            if (counterSnap.exists && counterSnap.data()?.count >= startingNumber) {
                 newCount = counterSnap.data()?.count + 1;
+            } else if (counterSnap.exists && counterSnap.data()?.count < startingNumber) {
+                // If counter exists but is less than starting number, we jump to starting number
+                newCount = startingNumber;
             }
 
             // Padded ID: SHST0005 (Configurable Prefix)

@@ -1,10 +1,10 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useSearchParams, useRouter } from "next/navigation";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { TeachersDirectory } from "@/components/admin/teachers-directory";
-import { LeavesManager } from "@/components/admin/leaves-manager";
+
 import { CoverageManager } from "@/components/admin/coverage-manager";
 import { AddTeacherModal } from "@/components/admin/add-teacher-modal";
 import { AddStaffModal } from "@/components/admin/add-staff-modal";
@@ -14,6 +14,7 @@ import { Button } from "@/components/ui/button";
 
 function FacultyManagementContent() {
     const searchParams = useSearchParams();
+    const router = useRouter();
     const [activeTab, setActiveTab] = useState(searchParams.get("tab") || "directory");
     const [directoryTab, setDirectoryTab] = useState("teachers"); // Track if we are on Teachers or Staff
 
@@ -52,7 +53,7 @@ function FacultyManagementContent() {
 
             <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
                 <div className="px-2 md:px-0 bg-black/20 p-1 rounded-2xl border border-white/5 backdrop-blur-md sticky top-0 z-10 mx-2 md:mx-0">
-                    <TabsList className="bg-transparent h-auto w-full grid grid-cols-3 gap-1">
+                    <TabsList className="bg-transparent h-auto w-full grid grid-cols-2 gap-1">
                         <TabsTrigger
                             value="directory"
                             className="data-[state=active]:bg-white data-[state=active]:text-black rounded-xl py-2 md:py-3 font-bold transition-all text-[10px] md:text-sm flex flex-col md:flex-row items-center gap-1 md:gap-2"
@@ -60,13 +61,7 @@ function FacultyManagementContent() {
                             <Users size={14} className="md:w-4 md:h-4" />
                             <span>Directory</span>
                         </TabsTrigger>
-                        <TabsTrigger
-                            value="leaves"
-                            className="data-[state=active]:bg-white data-[state=active]:text-black rounded-xl py-2 md:py-3 font-bold transition-all text-[10px] md:text-sm flex flex-col md:flex-row items-center gap-1 md:gap-2"
-                        >
-                            <Calendar size={14} className="md:w-4 md:h-4" />
-                            <span>Leaves</span>
-                        </TabsTrigger>
+
                         <TabsTrigger
                             value="coverage"
                             className="data-[state=active]:bg-white data-[state=active]:text-black rounded-xl py-2 md:py-3 font-bold transition-all text-[10px] md:text-sm flex flex-col md:flex-row items-center gap-1 md:gap-2"
@@ -85,9 +80,7 @@ function FacultyManagementContent() {
                         </div>
                     </TabsContent>
 
-                    <TabsContent value="leaves" className="outline-none m-0 px-2 md:px-0">
-                        <LeavesManager />
-                    </TabsContent>
+
 
                     <TabsContent value="coverage" className="outline-none m-0 px-2 md:px-0">
                         <CoverageManager />

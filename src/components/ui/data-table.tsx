@@ -57,13 +57,7 @@ export function DataTable<T>({
     const startIndex = (currentPage - 1) * pageSize;
     const paginatedData = serverPagination ? data : (Array.isArray(data) ? data.slice(startIndex, startIndex + pageSize) : []);
 
-    if (isLoading) {
-        return (
-            <div className="w-full h-48 flex items-center justify-center bg-white/5 rounded-xl animate-pulse">
-                <div className="h-4 w-4 bg-accent/50 rounded-full animate-ping" />
-            </div>
-        );
-    }
+    const isDataLoading = isLoading && paginatedData.length === 0;
 
     return (
         <div className={cn("w-full space-y-3", className)}>
@@ -86,7 +80,18 @@ export function DataTable<T>({
                         </TableRow>
                     </TableHeader>
                     <TableBody>
-                        {paginatedData.length === 0 ? (
+                        {isDataLoading ? (
+                            Array.from({ length: 5 }).map((_, i) => (
+                                <TableRow key={`skeleton-${i}`} className="border-white/5">
+                                    {columns.map((col) => (
+                                        <TableCell key={`skeleton-cell-${i}-${col.key}`} className="py-4 px-6 whitespace-nowrap">
+                                            <div className="h-4 bg-white/10 rounded-lg w-full animate-pulse" />
+                                        </TableCell>
+                                    ))}
+                                    {actions && <TableCell className="px-6"><div className="h-8 w-8 bg-white/5 rounded-lg ml-auto animate-pulse" /></TableCell>}
+                                </TableRow>
+                            ))
+                        ) : paginatedData.length === 0 ? (
                             <TableRow key="no-results">
                                 <TableCell colSpan={columns.length + (actions ? 1 : 0)} className="h-24 md:h-32 text-center text-muted-foreground border-white/10 whitespace-nowrap text-[10px] md:text-sm italic">
                                     No results found.

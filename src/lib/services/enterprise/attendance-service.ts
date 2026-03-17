@@ -1,5 +1,6 @@
 import { adminDb, Timestamp } from "@/lib/firebase-admin";
 import { AuditService } from "./audit-service";
+import { sendBulkPushNotifications } from "@/lib/notifications-server";
 
 /**
  * Enterprise Attendance Service
@@ -133,6 +134,23 @@ export class EnterpriseAttendanceService {
 
         await batch.commit();
 
+        // 4. Dispatch Push Notifications (Outside batch for performance)
+        try {
+            const uids = Object.keys(validStudentMap).map(sid => validStudentMap[sid]).filter(Boolean);
+            if (uids.length > 0) {
+                await sendBulkPushNotifications(
+                    uids,
+                    {
+                        title: "Attendance Updated",
+                        body: `Attendance for ${date} has been marked for your class.`
+                    },
+                    { type: "ATTENDANCE", date }
+                );
+            }
+        } catch (e) {
+            console.error("[Attendance Push] Failed to dispatch:", e);
+        }
+
         return { success: true, stats };
     }
 
@@ -236,6 +254,23 @@ export class EnterpriseAttendanceService {
 
         await batch.commit();
 
+        // 4. Dispatch Push Notifications for Teachers
+        try {
+            const uids = Object.values(validTeacherMap).filter(Boolean);
+            if (uids.length > 0) {
+                await sendBulkPushNotifications(
+                    uids,
+                    {
+                        title: "Staff Attendance Marked",
+                        body: `Your attendance for ${date} has been recorded.`
+                    },
+                    { type: "ATTENDANCE", date }
+                );
+            }
+        } catch (e) {
+            console.error("[Teacher Attendance Push] Failed to dispatch:", e);
+        }
+
         return { success: true, stats };
     }
 
@@ -335,6 +370,23 @@ export class EnterpriseAttendanceService {
         }
 
         await batch.commit();
+
+        // 4. Dispatch Push Notifications for Staff
+        try {
+            const uids = Object.values(validStaffMap).filter(Boolean);
+            if (uids.length > 0) {
+                await sendBulkPushNotifications(
+                    uids,
+                    {
+                        title: "Staff Attendance Marked",
+                        body: `Your attendance for ${date} has been recorded.`
+                    },
+                    { type: "ATTENDANCE", date }
+                );
+            }
+        } catch (e) {
+            console.error("[Staff Attendance Push] Failed to dispatch:", e);
+        }
 
         return { success: true, stats };
     }

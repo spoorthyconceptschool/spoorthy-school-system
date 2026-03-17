@@ -17,7 +17,7 @@ export async function POST(req: NextRequest) {
         }
 
         const body = await req.json();
-        const { schoolName, address, schoolLogo, principalSignature, studentIdPrefix, teacherIdPrefix } = body;
+        const { schoolName, address, schoolLogo, principalSignature, studentIdPrefix, teacherIdPrefix, studentIdSuffix, teacherIdSuffix } = body;
 
         // --- FOOTPRINT CLEANUP: IDENTIFY AND DELETE OLD ASSETS ---
         const existingRef = adminDb.collection("settings").doc("branding");
@@ -70,6 +70,8 @@ export async function POST(req: NextRequest) {
             principalSignature: principalSignature || "",
             studentIdPrefix: studentIdPrefix || "SCS",
             teacherIdPrefix: teacherIdPrefix || "SHST",
+            studentIdSuffix: studentIdSuffix ? Number(studentIdSuffix) : 1,
+            teacherIdSuffix: teacherIdSuffix ? Number(teacherIdSuffix) : 1,
             updatedAt: new Date().toISOString()
         };
 

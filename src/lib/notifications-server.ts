@@ -98,3 +98,64 @@ export async function notifyManagerActionServer(props: {
         await createServerNotification(props);
     }
 }
+
+/**
+ * Sends a push notification to multiple users simultaneously using FCM Multicast.
+ * Fetches FCM tokens from the 'users' collection for the provided UIDs.
+ * 
+ * @param uids - Array of User UIDs
+ * @param notification - Object containing title and body
+ * @param data - Optional data payload for deep linking
+ */
+export async function sendBulkPushNotifications(
+    uids: string[],
+    notification: { title: string; body: string },
+    data?: Record<string, string>
+) {
+    if (!uids.length) return { success: true, count: 0 };
+
+    try {
+        const { adminMessaging, adminDb } = require("./firebase-admin");
+        if (!adminMessaging) return { success: false, error: "Messaging not available" };
+
+        const allTokens: string[] = [];
+        
+        // Firestore 'in' query limit is 30 in newer versions, but we'll use chunks of 25 for safety
+        const chunkSize = 25;
+        for (let i = 0; i < uids.length; i += chunkSize) {
+            const chunk = uids.slice(i, i + chunkSize);
+            const userSnap = await adminDb.collection("users")
+                .where("__name__", "in", chunk)
+                .get();
+
+            userSnap.forEach((doc: any) => {
+                const tokens = doc.data()?.fcmTokens;
+                if (Array.isArray(tokens)) {
+                    allTokens.push(...tokens);
+                }
+            });
+        }
+
+        const uniqueTokens = [...new Set(allTokens)];
+        if (uniqueTokens.length === 0) return { success: true, count: 0 };
+
+        // FCM multicast limit is 500 tokens per call
+        let totalSent = 0;
+        for (let i = 0; i < uniqueTokens.length; i += 500) {
+            const tokenChunk = uniqueTokens.slice(i, i + 500);
+            const response = await adminMessaging.sendEachForMulticast({
+                tokens: tokenChunk,
+                notification,
+                data: data || {}
+            });
+            totalSent += response.successCount;
+        }
+
+        console.log(`[FCM Bulk] Sent ${totalSent} notifications for ${uids.length} users.`);
+        return { success: true, count: totalSent };
+
+    } catch (error) {
+        console.error("[FCM Bulk Error]", error);
+        return { success: false, error };
+    }
+}

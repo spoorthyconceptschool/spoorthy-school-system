@@ -15,7 +15,7 @@ import { useMasterData } from "@/context/MasterDataContext";
 import { toast } from "@/lib/toast-store";
 import { exportSingleStudentFee, printStudentFeeStructure } from "@/lib/export-utils";
 
-export function AddStudentModal({ onSuccess }: { onSuccess?: () => void }) {
+export function AddStudentModal({ onSuccess, children }: { onSuccess?: () => void, children?: React.ReactNode }) {
     const { user } = useAuth();
     const { villages: villagesData, classes: classesData, sections: sectionsData, classSections, branding, loading: masterDataLoading, selectedYear } = useMasterData();
     const [open, setOpen] = useState(false);
@@ -113,9 +113,11 @@ export function AddStudentModal({ onSuccess }: { onSuccess?: () => void }) {
             if (!val) setSuccessData(null);
         }}>
             <DialogTrigger asChild>
-                <Button className="gap-2 bg-accent text-accent-foreground">
-                    <Plus size={16} /> Add Student
-                </Button>
+                {children || (
+                    <Button className="gap-2 bg-accent text-accent-foreground hover:scale-100">
+                        <Plus size={16} /> Add Student
+                    </Button>
+                )}
             </DialogTrigger>
             <DialogContent className="sm:max-w-[500px] bg-black/95 border-white/10 text-white">
                 <DialogHeader>

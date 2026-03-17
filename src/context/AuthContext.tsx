@@ -42,21 +42,24 @@ const STORAGE_KEY = "spoorthy_user_cache";
  */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
-    const [userData, setUserData] = useState<any>(null);
+    const [userData, setUserData] = useState<any>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(STORAGE_KEY);
+            if (cached) {
+                try {
+                    return JSON.parse(cached);
+                } catch (e) {
+                    return null;
+                }
+            }
+        }
+        return null;
+    });
     const [loading, setLoading] = useState(true);
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
         setMounted(true);
-        // Hydrate from cache on mount
-        const cached = localStorage.getItem(STORAGE_KEY);
-        if (cached) {
-            try {
-                setUserData(JSON.parse(cached));
-            } catch (e) {
-                console.warn("Auth cache corrupted");
-            }
-        }
     }, []);
     const router = useRouter();
 
@@ -100,11 +103,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const signIn = async (email: string, pass: string) => {
         const result = await signInWithEmailAndPassword(auth, email, pass);
         if (result.user) {
+            setUser(result.user);
             const userDoc = await getDoc(doc(db, "users", result.user.uid));
             if (userDoc.exists()) {
                 const data = userDoc.data();
                 if (data.status !== "ACTIVE") {
                     await firebaseSignOut(auth);
+                    setUser(null);
                     throw new Error("Account is deactivated. Please contact administrator.");
                 }
                 const uData = { ...data, uid: result.user.uid };

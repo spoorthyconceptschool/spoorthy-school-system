@@ -21,6 +21,8 @@ export function BrandingSettingsV2() {
     const [signatureUrl, setSignatureUrl] = useState("");
     const [studentIdPrefix, setStudentIdPrefix] = useState("SCS");
     const [teacherIdPrefix, setTeacherIdPrefix] = useState("SHST");
+    const [studentIdSuffix, setStudentIdSuffix] = useState<number>(1);
+    const [teacherIdSuffix, setTeacherIdSuffix] = useState<number>(1);
     const [migrating, setMigrating] = useState(false);
     const [showMigrateConfirm, setShowMigrateConfirm] = useState(false);
 
@@ -39,7 +41,7 @@ export function BrandingSettingsV2() {
         // AND if the form hasn't been touched yet (all fields empty)
         // or if we explicitly want to refresh data
         const isFormPristine = !schoolName && !address && !logoUrl && !signatureUrl;
-        const isPrefixPristine = studentIdPrefix === "SCS" && teacherIdPrefix === "SHST";
+        const isPrefixPristine = studentIdPrefix === "SCS" && teacherIdPrefix === "SHST" && studentIdSuffix === 1 && teacherIdSuffix === 1;
 
         if (branding && (isFormPristine || !saving)) {
             // If the user hasn't typed anything yet, or we're not saving, sync from DB
@@ -53,6 +55,8 @@ export function BrandingSettingsV2() {
                 setSignatureUrl(branding.principalSignature || "");
                 setStudentIdPrefix(branding.studentIdPrefix || "SCS");
                 setTeacherIdPrefix(branding.teacherIdPrefix || "SHST");
+                setStudentIdSuffix(branding.studentIdSuffix || 1);
+                setTeacherIdSuffix(branding.teacherIdSuffix || 1);
             }
         }
     }, [branding, saving, schoolName, address, logoUrl, signatureUrl]);
@@ -159,7 +163,9 @@ export function BrandingSettingsV2() {
                     schoolLogo: logoUrl,
                     principalSignature: signatureUrl,
                     studentIdPrefix,
-                    teacherIdPrefix
+                    teacherIdPrefix,
+                    studentIdSuffix,
+                    teacherIdSuffix
                 })
             });
 
@@ -182,7 +188,9 @@ export function BrandingSettingsV2() {
         logoUrl !== (branding.schoolLogo || "") ||
         signatureUrl !== (branding.principalSignature || "") ||
         studentIdPrefix !== (branding.studentIdPrefix || "SCS") ||
-        teacherIdPrefix !== (branding.teacherIdPrefix || "SHST");
+        teacherIdPrefix !== (branding.teacherIdPrefix || "SHST") ||
+        studentIdSuffix !== (branding.studentIdSuffix || 1) ||
+        teacherIdSuffix !== (branding.teacherIdSuffix || 1);
 
     return (
         <Card className="bg-zinc-900/40 border-white/10 overflow-hidden shadow-2xl relative backdrop-blur-xl ring-1 ring-white/5">
@@ -249,6 +257,32 @@ export function BrandingSettingsV2() {
                             onChange={e => setTeacherIdPrefix(e.target.value.toUpperCase())}
                             className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700 font-mono"
                             placeholder="e.g. SHST"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                            Student ID Starting Number
+                        </Label>
+                        <Input
+                            type="number"
+                            min="1"
+                            value={studentIdSuffix}
+                            onChange={e => setStudentIdSuffix(parseInt(e.target.value) || 1)}
+                            className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700 font-mono"
+                            placeholder="e.g. 1000"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                            Teacher ID Starting Number
+                        </Label>
+                        <Input
+                            type="number"
+                            min="1"
+                            value={teacherIdSuffix}
+                            onChange={e => setTeacherIdSuffix(parseInt(e.target.value) || 1)}
+                            className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700 font-mono"
+                            placeholder="e.g. 100"
                         />
                     </div>
                 </div>

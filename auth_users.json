@@ -1,0 +1,28 @@
+[
+  {
+    "uid": "szFxo1AbbThGB6px6gMFxDG4orA2",
+    "email": "25r21a05e2@mlrit.ac.in",
+    "emailVerified": false,
+    "displayName": "25r21 Admin",
+    "disabled": false,
+    "metadata": {
+      "lastSignInTime": "Tue, 17 Mar 2026 14:18:51 GMT",
+      "creationTime": "Wed, 25 Feb 2026 03:09:47 GMT",
+      "lastRefreshTime": "Tue, 17 Mar 2026 14:18:51 GMT"
+    },
+    "passwordHash": "ldUyCfD7aYfk8ZzA7xppaSw5zQouOiZAK0iSUAs1WlGCgWEHp27eeypddXenL7hBh_7Bz8qZ34xFjHzFdBIQSg==",
+    "passwordSalt": "HvxofiUS7eGExw==",
+    "customClaims": {
+      "role": "SUPER_ADMIN"
+    },
+    "tokensValidAfterTime": "Wed, 25 Feb 2026 03:09:47 GMT",
+    "providerData": [
+      {
+        "uid": "25r21a05e2@mlrit.ac.in",
+        "displayName": "25r21 Admin",
+        "email": "25r21a05e2@mlrit.ac.in",
+        "providerId": "password"
+      }
+    ]
+  }
+]

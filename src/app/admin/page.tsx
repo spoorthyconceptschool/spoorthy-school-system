@@ -299,7 +299,7 @@ export default function AdminDashboard() {
                                             <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-500 font-bold text-xs capitalize">
                                                 {leave.teacherName?.charAt(0)}
                                             </div>
-                                            <div className="flex-1 min-w-0" onClick={() => router.push("/admin/faculty?tab=leaves")} style={{ cursor: 'pointer' }}>
+                                            <div className="flex-1 min-w-0" onClick={() => router.push("/admin/leaves?tab=staff")} style={{ cursor: 'pointer' }}>
                                                 <div className="text-[11px] font-bold text-white truncate">{leave.teacherName}</div>
                                                 <div className="text-[9px] text-muted-foreground">{leave.type}</div>
                                             </div>
@@ -376,7 +376,7 @@ export default function AdminDashboard() {
                         "transition-all duration-500 cursor-pointer",
                         stats.leaveRequests > 0 ? "border-rose-500/40 bg-rose-500/10 shadow-[0_0_20px_-5px_rgba(244,63,94,0.3)] animate-pulse-subtle" : "bg-zinc-500/5"
                     )}
-                    onClick={() => router.push("/admin/faculty?tab=leaves")}
+                    onClick={() => router.push("/admin/leaves?tab=staff")}
                 />
                 <KPICard
                     title="Collection"
@@ -397,7 +397,7 @@ export default function AdminDashboard() {
                                     <div className="w-1.5 h-1.5 rounded-full bg-rose-500 animate-pulse" />
                                     Urgent Action Required
                                 </h2>
-                                <Link href="/admin/faculty?tab=leaves" className="text-[9px] text-muted-foreground hover:text-white underline uppercase font-black tracking-widest">Process</Link>
+                                <Link href="/admin/leaves?tab=staff" className="text-[9px] text-muted-foreground hover:text-white underline uppercase font-black tracking-widest">Process</Link>
                             </div>
                             <div className="grid gap-2">
                                 {pendingLeavesList.map((leave: LeaveRequest) => (

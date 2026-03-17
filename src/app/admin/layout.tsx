@@ -32,36 +32,36 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const [showLoader, setShowLoader] = useState(true);
 
     useEffect(() => {
-        // Fallback: If still loading after 8s, stop showing the loader
-        // to prevent users from being stuck on a blank screen.
-        const timer = setTimeout(() => setShowLoader(false), 8000);
+        const timer = setTimeout(() => setShowLoader(false), 5000);
         return () => clearTimeout(timer);
     }, []);
 
-    // Show shell immediately if possibly logged in
-    const isAuthenticating = (loading || (user && !userData)) && showLoader;
-
-    if (isAuthenticating) {
-        return (
-            <div className="h-[100dvh] w-full flex items-center justify-center bg-[#0A192F]">
-                <Loader2 className="w-10 h-10 text-accent animate-spin" />
-            </div>
-        );
-    }
+    // Rocket Speed Logic: Show shell and children immediately if cached data exists
+    // We only show a loading state if we are truly unknown (no session at all)
+    const isAuthenticating = loading && !userData && showLoader;
 
     return (
         <div className="flex h-[100dvh] bg-gradient-to-br from-[#0A192F] via-[#112240] to-[#0A192F] text-foreground font-sans overflow-hidden">
-            {/* Desktop Sidebar - Hidden on mobile/tablet */}
+            {/* Desktop Sidebar - Persistent shell */}
             <div className="hidden lg:flex h-full shrink-0">
                 <Sidebar />
             </div>
 
-            {/* Main Application Shell */}
+            {/* Main Application Shell - Always stable */}
             <div className="flex-1 flex flex-col relative min-w-0 overflow-hidden">
                 <TopBar />
                 <main className="flex-1 py-4 md:py-6 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20 pb-20 lg:pb-6">
                     <div className="w-full space-y-4 md:space-y-6">
-                        {children}
+                        {isAuthenticating ? (
+                            <div className="h-full w-full flex flex-col items-center justify-center p-20">
+                                <Loader2 className="w-8 h-8 text-accent animate-spin mb-4 opacity-20" />
+                                <p className="text-[10px] font-mono uppercase tracking-[0.5em] text-white/10 animate-pulse italic">Synchronizing...</p>
+                            </div>
+                        ) : (
+                            <div className="animate-in fade-in zoom-in-95 duration-200">
+                                {children}
+                            </div>
+                        )}
                     </div>
                 </main>
                 <BottomNav />
