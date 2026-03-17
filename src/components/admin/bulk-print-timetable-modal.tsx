@@ -66,8 +66,19 @@ export function BulkPrintTimetableModal() {
             // Fetch selected timetables
             for (const id of selectedIds) {
                 const [cId, sId] = id.split('_');
-                const docRef = doc(db, "class_timetables", `${currentYear}_${cId}_${sId}`);
-                const docSnap = await getDoc(docRef);
+                const path = `${currentYear}_${cId}_${sId}`;
+                console.log(`[BulkPrint] Attempting to fetch: ${path}`);
+                
+                let docRef = doc(db, "class_timetables", path);
+                let docSnap = await getDoc(docRef);
+
+                // Fallback for legacy format if not found
+                if (!docSnap.exists()) {
+                   const legacyPath = `${currentYear}_class_${cId}_${sId}`;
+                   console.log(`[BulkPrint] Not found. Trying legacy: ${legacyPath}`);
+                   docRef = doc(db, "class_timetables", legacyPath);
+                   docSnap = await getDoc(docRef);
+                }
 
                 if (docSnap.exists()) {
                     const classInfo = classesData[cId];
@@ -78,6 +89,8 @@ export function BulkPrintTimetableModal() {
                         schedule: docSnap.data().schedule || {},
                         dayTemplate
                     });
+                } else {
+                    console.error(`[BulkPrint] Failed to find timetable for ${id} (tried ${path})`);
                 }
             }
 
@@ -158,7 +171,7 @@ export function BulkPrintTimetableModal() {
             if (cell.subjectId === "leisure") return `<td class="leisure">Leisure</td>`;
 
             const subject = subjectsList.find((s: any) => s.id === cell.subjectId);
-            const teacher = allTeachers.find((t: any) => (t.schoolId || t.id) === cell.teacherId);
+            const teacher = allTeachers.find((t: any) => t.id === cell.teacherId || t.schoolId === cell.teacherId);
 
             return `
                                                     <td>

@@ -280,7 +280,7 @@ export default function TimetableManagePage() {
             if (cell.subjectId === "leisure") return `<td class="leisure">Leisure</td>`;
 
             const subject = subjects.find(s => s.id === cell.subjectId);
-            const teacher = teachers.find(t => (t.schoolId || t.id) === cell.teacherId);
+            const teacher = teachers.find(t => t.id === cell.teacherId || t.schoolId === cell.teacherId);
 
             return `
                                             <td>
@@ -508,7 +508,7 @@ export default function TimetableManagePage() {
                                                                 return <td key={slot.id} className="p-2 md:p-4 bg-white/5 text-center text-[6px] md:text-[8px] font-black text-muted-foreground/20 tracking-[0.2em] md:tracking-[0.5em] diagonal-stripe italic">RECESS</td>
                                                             }
 
-                                                            const teacher = teachers.find(t => (t.schoolId || t.id) === cell.teacherId);
+                                                            const teacher = teachers.find(t => t.id === cell.teacherId || t.schoolId === cell.teacherId);
                                                             const isUnassigned = cell.teacherId === "UNASSIGNED" || (cell.subjectId && cell.subjectId !== "leisure" && !cell.teacherId);
 
                                                             return (
