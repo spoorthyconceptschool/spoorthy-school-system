@@ -65,8 +65,8 @@ export function BulkPrintTimetableModal() {
 
             // Fetch selected timetables
             for (const id of selectedIds) {
-                const [cId, sId] = id.split('_');
-                const path = `${currentYear}_${cId}_${sId}`;
+                // The id is already formatted as "classId_sectionId"
+                const path = `${currentYear}_${id}`;
                 console.log(`[BulkPrint] Attempting to fetch: ${path}`);
                 
                 let docRef = doc(db, "class_timetables", path);
@@ -74,15 +74,20 @@ export function BulkPrintTimetableModal() {
 
                 // Fallback for legacy format if not found
                 if (!docSnap.exists()) {
-                   const legacyPath = `${currentYear}_class_${cId}_${sId}`;
+                   const legacyPath = `${currentYear}_class_${id}`;
                    console.log(`[BulkPrint] Not found. Trying legacy: ${legacyPath}`);
                    docRef = doc(db, "class_timetables", legacyPath);
                    docSnap = await getDoc(docRef);
                 }
 
                 if (docSnap.exists()) {
-                    const classInfo = classesData[cId];
-                    const sectionInfo = sectionsData[sId];
+                    // Extract cId and sId for metadata if needed, but we can also get them from the doc if we added them
+                    const [cId, sId] = id.includes('_') ? [id.substring(0, id.lastIndexOf('_')), id.substring(id.lastIndexOf('_') + 1)] : [id, ''];
+                    
+                    // Actually, let's use the IDs stored in the document if they exist, or the ones from the split
+                    const data = docSnap.data();
+                    const classInfo = classesData[data.classId || id.split('_')[0]]; 
+                    const sectionInfo = sectionsData[data.sectionId || id.split('_')[1]];
                     printData.push({
                         className: classInfo?.name || "Unknown Class",
                         sectionName: sectionInfo?.name || "Unknown Section",
