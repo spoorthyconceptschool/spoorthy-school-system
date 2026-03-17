@@ -32,7 +32,9 @@ export default function TimetableManagePage() {
     const { user } = useAuth();
     const { classes: classesData, sections: sectionsData, subjects: masterSubjects, classSubjects, subjectTeachers, branding, selectedYear } = useMasterData();
     const [activeTab, setActiveTab] = useState("settings");
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
+    const [isPublishing, setIsPublishing] = useState(false);
+    const [isSavingSettings, setIsSavingSettings] = useState(false);
 
     // Convert master data objects to arrays
     const classes = Object.values(classesData).map((c: any) => ({ id: c.id, name: c.name, order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
@@ -109,11 +111,9 @@ export default function TimetableManagePage() {
                 ]);
             }
         } catch (error) { console.error(error); }
-        finally { setLoading(false); }
     };
 
     const fetchTimetable = async (classId: string, sectionId: string) => {
-        setLoading(true);
         try {
             const currentYear = selectedYear || "2026-2027";
             const ttRef = doc(db, "class_timetables", `${currentYear}_${classId}_${sectionId}`);
@@ -124,13 +124,12 @@ export default function TimetableManagePage() {
                 setTimetable({});
             }
         } catch (e) { console.error(e); }
-        finally { setLoading(false); }
     };
 
     // --- ACTIONS ---
 
     const saveSettings = async () => {
-        setLoading(true);
+        setIsSavingSettings(true);
         try {
             await setDoc(doc(db, "timetable_settings", "global_settings"), {
                 dayTemplates: {
@@ -145,7 +144,7 @@ export default function TimetableManagePage() {
             }, { merge: true });
             alert("Global Timetable Structure Saved");
         } catch (e) { alert("Error saving settings"); }
-        finally { setLoading(false); }
+        finally { setIsSavingSettings(false); }
     };
 
     const updateSlot = (index: number, field: string, value: any) => {
@@ -198,7 +197,7 @@ export default function TimetableManagePage() {
 
     const publishTimetable = async () => {
         if (!selectedClassId || !selectedSectionId || !user) return;
-        setLoading(true);
+        setIsPublishing(true);
         try {
             const token = await user.getIdToken();
             await fetch("/api/admin/timetable/publish", {
@@ -215,7 +214,7 @@ export default function TimetableManagePage() {
             });
             alert("Timetable Published Successfully!");
         } catch (e) { alert("Publish failed"); }
-        finally { setLoading(false); }
+        finally { setIsPublishing(false); }
     };
 
     const handlePrint = () => {
@@ -406,8 +405,9 @@ export default function TimetableManagePage() {
                                     <Button variant="outline" onClick={addSlot} className="h-10 md:h-12 border-dashed border-white/20 hover:bg-white/5 rounded-xl font-black uppercase tracking-widest text-[10px] md:text-xs">
                                         <Plus className="w-4 h-4 mr-2" /> Add Period / Break
                                     </Button>
-                                    <Button onClick={saveSettings} className="h-10 md:h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black uppercase tracking-widest text-[10px] md:text-xs shadow-lg shadow-emerald-900/20">
-                                        <Save className="w-4 h-4 mr-2" /> Save Global Configuration
+                                    <Button onClick={saveSettings} disabled={isSavingSettings} className="h-10 md:h-12 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl font-black uppercase tracking-widest text-[10px] md:text-xs shadow-lg shadow-emerald-900/20">
+                                        {isSavingSettings ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : <Save className="w-4 h-4 mr-2" />}
+                                        Save Global Configuration
                                     </Button>
                                 </div>
                             </div>
@@ -444,8 +444,8 @@ export default function TimetableManagePage() {
                             >
                                 <Printer className="mr-2 h-3 w-3" /> Print Timetable
                             </Button>
-                            <Button onClick={publishTimetable} disabled={!selectedClassId || !selectedSectionId || loading} className="w-full md:w-auto h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-blue-900/40">
-                                {loading ? <Loader2 className="animate-spin mr-2 w-3 h-3" /> : <Save className="mr-2 h-3 w-3" />}
+                            <Button onClick={publishTimetable} disabled={!selectedClassId || !selectedSectionId || isPublishing} className="w-full md:w-auto h-10 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black uppercase tracking-widest text-[10px] shadow-lg shadow-blue-900/40">
+                                {isPublishing ? <Loader2 className="animate-spin mr-2 w-3 h-3" /> : <Save className="mr-2 h-3 w-3" />}
                                 Publish Final Schedule
                             </Button>
                         </div>

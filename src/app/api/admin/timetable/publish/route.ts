@@ -15,13 +15,18 @@ export async function POST(req: NextRequest) {
         }
 
         // 1. Fetch Previous Class Timetable and Involved Teachers
-        const classRef = adminDb.collection("class_timetables").doc(`${yearId}_class_${classId}`);
-        const classRefShort = adminDb.collection("class_timetables").doc(`${yearId}_${classId}`);
+        const classRefLegacy = adminDb.collection("class_timetables").doc(`${yearId}_class_${classId}`);
+        const activeClassRef = adminDb.collection("class_timetables").doc(`${yearId}_${classId}`);
 
-        // Try both naming conventions just in case
-        const [oldDoc, oldDocShort] = await Promise.all([classRef.get(), classRefShort.get()]);
-        const activeClassRef = oldDocShort.exists ? classRefShort : classRef;
-        const oldSchedule = (oldDocShort.exists ? oldDocShort.data() : oldDoc.data())?.schedule || {};
+        // Try both naming conventions just in case migrating from old
+        const [oldDocLegacy, activeDoc] = await Promise.all([classRefLegacy.get(), activeClassRef.get()]);
+        
+        let oldSchedule: Record<string, any> = {};
+        if (activeDoc.exists) {
+            oldSchedule = activeDoc.data()?.schedule || {};
+        } else if (oldDocLegacy.exists) {
+            oldSchedule = oldDocLegacy.data()?.schedule || {};
+        }
 
         // 2. Identify all involved teachers (Old & New)
         const involvedTeachers = new Set<string>();
