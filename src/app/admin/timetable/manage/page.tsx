@@ -90,6 +90,35 @@ export default function TimetableManagePage() {
         }
     }, [selectedClassId, selectedSectionId]);
 
+    // AUTO-SYNC TEACHERS: If assignments exist in Master Data but missing in current builder state, fill them
+    useEffect(() => {
+        if (!selectedClassId || !selectedSectionId || Object.keys(timetable).length === 0) return;
+
+        const key = `${selectedClassId}_${selectedSectionId}`;
+        const assignments = subjectTeachers[key];
+        if (!assignments) return;
+
+        let hasUpdates = false;
+        const newTimetable = { ...timetable };
+
+        for (const day in newTimetable) {
+            for (const slotId in newTimetable[day]) {
+                const cell = newTimetable[day][slotId];
+                if (cell.subjectId && cell.subjectId !== "leisure" && (!cell.teacherId || cell.teacherId === "UNASSIGNED")) {
+                    const assignedTId = assignments[cell.subjectId];
+                    if (assignedTId && assignedTId !== cell.teacherId) {
+                        newTimetable[day][slotId] = { ...cell, teacherId: assignedTId };
+                        hasUpdates = true;
+                    }
+                }
+            }
+        }
+
+        if (hasUpdates) {
+            setTimetable(newTimetable);
+        }
+    }, [selectedClassId, selectedSectionId, subjectTeachers, timetable]);
+
     const fetchMasterData = async () => {
         try {
             const tSnap = await getDocs(query(collection(db, "teachers"), where("status", "==", "ACTIVE")));
