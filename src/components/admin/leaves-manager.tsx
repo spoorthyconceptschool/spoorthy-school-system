@@ -16,11 +16,13 @@ import {
 } from "@/components/ui/dialog";
 import { Loader2, Check, X, RotateCcw, CalendarDays, BookOpen } from "lucide-react";
 import { useAuth } from "@/context/AuthContext";
+import { useMasterData } from "@/context/MasterDataContext";
 import { formatDateToDDMMYYYY } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 
 export function LeavesManager() {
     const { user } = useAuth();
+    const { selectedYear } = useMasterData();
     const [leaves, setLeaves] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [actioning, setActioning] = useState<string | null>(null);
@@ -73,13 +75,17 @@ export function LeavesManager() {
         setActioning(leaveId);
         try {
             const token = await user.getIdToken();
-            const res = await fetch("/api/admin/leaves/action", {
+            const res = await fetch("/api/admin/leaves/approve", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${token}`
                 },
-                body: JSON.stringify({ leaveId, action })
+                body: JSON.stringify({ 
+                    leaveId, 
+                    action,
+                    yearId: selectedYear || "2025-2026"
+                })
             });
             const data = await res.json();
             if (!data.success) {
