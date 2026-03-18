@@ -10,7 +10,11 @@ export async function GET(req: NextRequest) {
         const token = authHeader.split("Bearer ")[1];
         const decodedToken = await adminAuth.verifyIdToken(token);
         const { uid, role = "STUDENT" } = decodedToken;
-        const yearId = "2025-2026"; // Hardcoded for MVP
+        
+        // Fetch current year from config instead of hardcoding
+        const configSnap = await adminDb.collection("config").doc("academic_years").get();
+        const config = configSnap.data();
+        const yearId = config?.currentYear || "2025-2026";
 
         let resultData: any = {};
 

@@ -27,6 +27,7 @@ const STUDENT_NAV = [
 
     { label: "Attendance", icon: CalendarCheck, href: "/student/attendance" },
     { label: "Timetable", icon: Calendar, href: "/student/timetable" },
+    { label: "Leave", icon: FileText, href: "/student/leaves" },
     { label: "Hall Tickets", icon: Ticket, href: "/student/exams" },
     { label: "Holidays", icon: Calendar, href: "/student/holidays" },
     { label: "Profile", icon: User, href: "/student/profile" },

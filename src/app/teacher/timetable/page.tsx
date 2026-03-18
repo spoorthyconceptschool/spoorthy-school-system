@@ -9,10 +9,14 @@ import { Loader2, Calendar, MapPin, ArrowLeft } from "lucide-react";
 import { collection, query, getDocs, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useMasterData } from "@/context/MasterDataContext";
+import { useRouter } from "next/navigation";
 
 export default function TeacherTimetablePage() {
     const { user } = useAuth();
-    const { subjects, selectedYear } = useMasterData();
+    const { teachers, subjects, branding, selectedYear } = useMasterData();
+    const router = useRouter();
+
+    const currentYear = selectedYear || "2025-2026";
     const [schedule, setSchedule] = useState<any>(null); // weeklySchedule
     const [substitutions, setSubstitutions] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);

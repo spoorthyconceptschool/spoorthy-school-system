@@ -19,6 +19,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { CheckCircle } from "lucide-react";
 import { NotificationCenter } from "@/components/NotificationCenter";
+import { UniversalSearch } from "@/components/admin/UniversalSearch";
 
 const TEACHER_NAV = [
     { label: "Dashboard", icon: LayoutDashboard, href: "/teacher", exact: true },
@@ -29,6 +30,7 @@ const TEACHER_NAV = [
     { label: "Notices", icon: Bell, href: "/teacher/notices" },
 
     { label: "Groups", icon: Users, href: "/teacher/groups" },
+    { label: "Leave", icon: MessageSquare, href: "/teacher/leaves" },
     { label: "Holidays", icon: Calendar, href: "/teacher/holidays" },
     { label: "Profile", icon: User, href: "/teacher/profile" },
 ];
@@ -191,6 +193,11 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
                             {branding?.schoolName || "Dashboard"}
                         </h2>
                     </div>
+
+                    <div className="flex-1 max-w-xs mx-4 hidden xs:block">
+                        <UniversalSearch />
+                    </div>
+
                     <div className="flex items-center gap-3">
                         <NotificationCenter role="TEACHER" />
                         <div className="w-8 h-8 rounded-full bg-[#10B981]/20 text-[#10B981] flex items-center justify-center font-bold text-xs border border-[#10B981]/30">
@@ -201,7 +208,14 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
 
                 {/* Desktop Header */}
                 <header className="hidden lg:flex h-16 border-b border-[#10B981]/10 items-center justify-between px-8 bg-[#0A192F]/50 backdrop-blur sticky top-0 z-40">
-                    <h2 className="font-semibold text-lg capitalize text-[#E6F1FF] tracking-wide">{pathname.split('/').pop()?.replace('-', ' ') || "Dashboard"}</h2>
+                    <div className="flex items-center gap-8 flex-1">
+                        <h2 className="font-semibold text-lg capitalize text-[#E6F1FF] tracking-wide shrink-0">
+                            {pathname.split('/').pop()?.replace('-', ' ') || "Dashboard"}
+                        </h2>
+                        <div className="max-w-md w-full">
+                            <UniversalSearch />
+                        </div>
+                    </div>
                     <div className="flex items-center gap-4">
                         <NotificationCenter role="TEACHER" />
                         <DropdownMenu>
