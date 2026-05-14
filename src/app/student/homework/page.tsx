@@ -20,9 +20,22 @@ import {
 export default function StudentHomeworkPage() {
     const { user } = useAuth();
     const { subjects, homeworkSubjects } = useMasterData();
-    const [homework, setHomework] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [studentProfile, setStudentProfile] = useState<any>(null);
+    const [homework, setHomework] = useState<any[]>(() => {
+        if (typeof window !== 'undefined') {
+            try { return JSON.parse(localStorage.getItem("student_hw_cache") || "[]"); } catch (e) { return []; }
+        }
+        return [];
+    });
+    const [loading, setLoading] = useState(() => {
+        if (typeof window !== 'undefined') return !localStorage.getItem("student_hw_cache");
+        return true;
+    });
+    const [studentProfile, setStudentProfile] = useState<any>(() => {
+        if (typeof window !== 'undefined') {
+            try { return JSON.parse(localStorage.getItem("student_profile_cache") || "null"); } catch (e) { return null; }
+        }
+        return null;
+    });
     const [useFallback, setUseFallback] = useState(false);
 
     useEffect(() => {
@@ -34,10 +47,14 @@ export default function StudentHomeworkPage() {
         const unsubDoc = onSnapshot(doc(db, "students", schoolIdFromEmail), (pSnap) => {
             if (pSnap.exists()) {
                 setStudentProfile(pSnap.data());
+                if (typeof window !== 'undefined') localStorage.setItem("student_profile_cache", JSON.stringify(pSnap.data()));
             } else if (user.uid) {
                 const q = query(collection(db, "students"), where("uid", "==", user.uid));
                 const unsubQuery = onSnapshot(q, (qSnap) => {
-                    if (!qSnap.empty) setStudentProfile(qSnap.docs[0].data());
+                    if (!qSnap.empty) {
+                        setStudentProfile(qSnap.docs[0].data());
+                        if (typeof window !== 'undefined') localStorage.setItem("student_profile_cache", JSON.stringify(qSnap.docs[0].data()));
+                    }
                 });
                 return () => unsubQuery();
             }
@@ -73,6 +90,7 @@ export default function StudentHomeworkPage() {
             }
 
             setHomework(filtered);
+            if (typeof window !== 'undefined') localStorage.setItem("student_hw_cache", JSON.stringify(filtered));
             setLoading(false);
         }, (err) => {
             if (!isMounted) return;

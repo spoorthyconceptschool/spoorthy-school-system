@@ -37,7 +37,7 @@ export class EnterpriseAttendanceService {
      * @returns A promise resolving to an object containing success status and statistics.
      * @throws Error if outside time window, section already marked, or database failure.
      */
-    static async markAttendance(date: string, classId: string, sectionId: string, records: Record<string, 'P' | 'A'>, markedBy: string) {
+    static async markAttendance(date: string, classId: string, sectionId: string, records: Record<string, 'P' | 'A'>, markedBy: string, schoolId: string) {
         // Enforce time window
         const now = new Date();
         const currentHour = now.getHours();
@@ -54,14 +54,13 @@ export class EnterpriseAttendanceService {
             adminDb.collection("students")
                 .where("classId", "==", classId)
                 .where("sectionId", "==", sectionId)
+                .where("schoolId", "==", schoolId)
                 .where("status", "==", "ACTIVE")
                 .get()
         ]);
 
-        // Enforce Read-Only After Marking Rule
-        if (existingSnap.exists) {
-            throw new Error("Business Rule Violation: Attendance for this class has already been submitted today.");
-        }
+        // Enforce Read-Only After Marking Rule -> OVERRIDDEN BY MASTER PROMPT (Allow UPSERTS)
+        const isModification = existingSnap.exists;
 
         // Validate and filter students (Ignore unknown persons)
         const validStudentMap: Record<string, string> = {};
@@ -90,6 +89,7 @@ export class EnterpriseAttendanceService {
             date,
             classId,
             sectionId,
+            schoolId,
             markedBy,
             records: validatedRecords,
             stats,
@@ -100,8 +100,8 @@ export class EnterpriseAttendanceService {
 
         const batch = adminDb.batch();
 
-        // 1. Save core attendance doc
-        batch.set(attRef, pureAttendanceData);
+        // 1. Save core attendance doc (UPSERT)
+        batch.set(attRef, pureAttendanceData, { merge: true });
 
         // 2. Append to immutable Audit Logs using centralized AuditService
         await AuditService.log({
@@ -126,6 +126,7 @@ export class EnterpriseAttendanceService {
                     type: "ATTENDANCE",
                     status: "UNREAD",
                     target: "student",
+                    schoolId,
                     createdAt: Timestamp.now(),
                     metadata: { date, status }
                 });
@@ -144,7 +145,7 @@ export class EnterpriseAttendanceService {
                         title: "Attendance Updated",
                         body: `Attendance for ${date} has been marked for your class.`
                     },
-                    { type: "ATTENDANCE", date }
+                    { type: "ATTENDANCE", date, url: "https://spoorthy-school-live-55917.web.app/student/attendance" }
                 );
             }
         } catch (e) {
@@ -167,7 +168,7 @@ export class EnterpriseAttendanceService {
      * @returns A promise resolving to success status and faculty attendance stats.
      * @throws Error if submitted outside of configured active school hours.
      */
-    static async markTeacherAttendance(date: string, records: Record<string, 'P' | 'A'>, markedBy: string) {
+    static async markTeacherAttendance(date: string, records: Record<string, 'P' | 'A'>, markedBy: string, schoolId: string) {
         // Enforce time window
         const now = new Date();
         const currentHour = now.getHours();
@@ -175,19 +176,18 @@ export class EnterpriseAttendanceService {
             throw new Error(`Business Rule Violation: Attendance can only be marked during school hours (${SCHOOL_TIME_WINDOW.startHour}:00 - ${SCHOOL_TIME_WINDOW.endHour}:00).`);
         }
 
-        const attId = `TEACHERS_${date}`;
+        const attId = `${schoolId}_TEACHERS_${date}`;
         const attRef = adminDb.collection("attendance_daily").doc(attId);
 
         const [existingSnap, teachersSnap] = await Promise.all([
             attRef.get(),
             adminDb.collection("teachers")
+                .where("schoolId", "==", schoolId)
                 .where("status", "==", "ACTIVE")
                 .get()
         ]);
 
-        if (existingSnap.exists) {
-            throw new Error("Business Rule Violation: Attendance is read-only after being marked and cannot be updated dynamically.");
-        }
+        const isModification = existingSnap.exists;
 
         const validTeacherMap: Record<string, string> = {};
         teachersSnap.docs.forEach((doc: any) => {
@@ -214,6 +214,7 @@ export class EnterpriseAttendanceService {
             id: attId,
             date,
             type: "TEACHERS",
+            schoolId,
             markedBy,
             records: validatedRecords,
             stats,
@@ -223,7 +224,7 @@ export class EnterpriseAttendanceService {
         };
 
         const batch = adminDb.batch();
-        batch.set(attRef, pureAttendanceData);
+        batch.set(attRef, pureAttendanceData, { merge: true });
 
         await AuditService.log({
             userId: markedBy,
@@ -246,6 +247,7 @@ export class EnterpriseAttendanceService {
                     type: "ATTENDANCE",
                     status: "UNREAD",
                     target: "teacher",
+                    schoolId,
                     createdAt: Timestamp.now(),
                     metadata: { date, status }
                 });
@@ -286,7 +288,7 @@ export class EnterpriseAttendanceService {
      * @param markedBy - The UID of the administrator submitting the attendance.
      * @returns A promise resolving to the final attendance statistics for the day.
      */
-    static async markStaffAttendance(date: string, records: Record<string, 'P' | 'A'>, markedBy: string) {
+    static async markStaffAttendance(date: string, records: Record<string, 'P' | 'A'>, markedBy: string, schoolId: string) {
         // Enforce time window
         const now = new Date();
         const currentHour = now.getHours();
@@ -294,17 +296,17 @@ export class EnterpriseAttendanceService {
             throw new Error(`Business Rule Violation: Attendance can only be marked during school hours (${SCHOOL_TIME_WINDOW.startHour}:00 - ${SCHOOL_TIME_WINDOW.endHour}:00).`);
         }
 
-        const attId = `STAFF_${date}`;
+        const attId = `${schoolId}_STAFF_${date}`;
         const attRef = adminDb.collection("attendance_daily").doc(attId);
 
         const [existingSnap, staffSnap] = await Promise.all([
             attRef.get(),
-            adminDb.collection("staff").get()
+            adminDb.collection("staff")
+                .where("schoolId", "==", schoolId)
+                .get()
         ]);
 
-        if (existingSnap.exists) {
-            throw new Error("Business Rule Violation: Attendance is read-only after being marked and cannot be updated dynamically.");
-        }
+        const isModification = existingSnap.exists;
 
         const validStaffMap: Record<string, string> = {};
         staffSnap.docs.forEach((doc: any) => {
@@ -331,6 +333,7 @@ export class EnterpriseAttendanceService {
             id: attId,
             date,
             type: "STAFF",
+            schoolId,
             markedBy,
             records: validatedRecords,
             stats,
@@ -340,7 +343,7 @@ export class EnterpriseAttendanceService {
         };
 
         const batch = adminDb.batch();
-        batch.set(attRef, pureAttendanceData);
+        batch.set(attRef, pureAttendanceData, { merge: true });
 
         await AuditService.log({
             userId: markedBy,
@@ -363,6 +366,7 @@ export class EnterpriseAttendanceService {
                     type: "ATTENDANCE",
                     status: "UNREAD",
                     target: "staff",
+                    schoolId,
                     createdAt: Timestamp.now(),
                     metadata: { date, status }
                 });

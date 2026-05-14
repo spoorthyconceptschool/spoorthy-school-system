@@ -65,15 +65,29 @@ export default function RootLayout({
           dangerouslySetInnerHTML={{
             __html: `
               window.addEventListener('error', (e) => {
-                if (e.message && (e.message.includes('ChunkLoadError') || e.message.includes('Loading chunk'))) {
-                  console.warn('Caught ChunkLoadError, reloading page...', e);
-                  window.location.reload();
+                const isNetwork = e.target && (e.target.tagName === 'SCRIPT' || e.target.tagName === 'LINK');
+                const isChunk = e.message && (e.message.includes('ChunkLoadError') || e.message.includes('Loading chunk'));
+                if (isNetwork || isChunk) {
+                  if (!sessionStorage.getItem('app_reloaded')) {
+                    sessionStorage.setItem('app_reloaded', 'true');
+                    console.warn('Caught PWA Asset desync, unregistering Service Workers and healing DOM...');
+                    if ('serviceWorker' in navigator) {
+                      navigator.serviceWorker.getRegistrations().then((regs) => {
+                        for (let reg of regs) { reg.unregister(); }
+                        window.location.reload(true);
+                      });
+                    } else {
+                      window.location.reload(true);
+                    }
+                  }
                 }
               }, true);
               window.addEventListener('unhandledrejection', (e) => {
                 if (e.reason && (e.reason.name === 'ChunkLoadError' || (e.reason.message && e.reason.message.includes('Loading chunk')))) {
-                  console.warn('Caught unhandled ChunkLoadError rejection, reloading page...', e);
-                  window.location.reload();
+                  if (!sessionStorage.getItem('app_reloaded')) {
+                    sessionStorage.setItem('app_reloaded', 'true');
+                    window.location.reload(true);
+                  }
                 }
               });
             `,

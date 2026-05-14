@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Bell } from "lucide-react";
 import { collection, query, where, onSnapshot, orderBy, limit, doc, updateDoc, getDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -30,6 +31,29 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
     const { user } = useAuth();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
+    const [optimisticReads, setOptimisticReads] = useState<Set<string>>(() => {
+        if (typeof window !== 'undefined') {
+            try {
+                const stored = localStorage.getItem(`read_notifs_${user?.uid}`);
+                return stored ? new Set(JSON.parse(stored)) : new Set();
+            } catch (e) {
+                return new Set();
+            }
+        }
+        return new Set();
+    });
+
+    // Rehydrate local reads once the user identity is confirmed
+    useEffect(() => {
+        if (typeof window !== 'undefined' && user?.uid) {
+            try {
+                const stored = localStorage.getItem(`read_notifs_${user.uid}`);
+                if (stored) {
+                    setOptimisticReads(new Set(JSON.parse(stored)));
+                }
+            } catch (e) {}
+        }
+    }, [user?.uid]);
 
     useEffect(() => {
         if (!user) return;
@@ -169,15 +193,51 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
     }, [user, role]);
 
     useEffect(() => {
-        setUnreadCount(notifications.filter(n => n.status === "UNREAD").length);
-    }, [notifications]);
+        setUnreadCount(notifications.filter(n => (!optimisticReads.has(n.id) && n.status === "UNREAD")).length);
+    }, [notifications, optimisticReads]);
 
-    const markAsRead = async (id: string) => {
+    const markAsRead = async (n: Notification) => {
+        if (n.status === "READ" || optimisticReads.has(n.id)) return;
+
+        setOptimisticReads(prev => {
+            const next = new Set(prev).add(n.id);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(`read_notifs_${user?.uid}`, JSON.stringify(Array.from(next).slice(-500)));
+            }
+            return next;
+        });
+
+        // Optimistic UI Update: instantly strip the unread bolding
+        setNotifications(prev => prev.map(item => item.id === n.id ? { ...item, status: "READ" } : item));
+        
         try {
-            await updateDoc(doc(db, "notifications", id), { status: "READ" });
+            await updateDoc(doc(db, "notifications", n.id), { status: "READ" });
         } catch (e) {
-            console.error("Error marking notification as read:", e);
+            // Silently fail if they don't have permission (e.g. global notice)
         }
+    };
+
+    const markAllAsRead = (e: React.MouseEvent) => {
+        e.preventDefault();
+        e.stopPropagation();
+        
+        setOptimisticReads(prev => {
+            const next = new Set(prev);
+            notifications.forEach(n => next.add(n.id));
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(`read_notifs_${user?.uid}`, JSON.stringify(Array.from(next).slice(-500)));
+            }
+            return next;
+        });
+
+        setNotifications(prev => prev.map(item => ({ ...item, status: "READ" })));
+
+        // Attempt global mark for permitted users
+        notifications.forEach(n => {
+            if (n.status === "UNREAD" && !optimisticReads.has(n.id)) {
+                updateDoc(doc(db, "notifications", n.id), { status: "READ" }).catch(()=>null);
+            }
+        });
     };
 
     return (
@@ -195,7 +255,21 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
             <DropdownMenuContent align="end" className="w-80 bg-[#112240] border-[#64FFDA]/20 text-[#E6F1FF] backdrop-blur-xl p-0 shadow-2xl rounded-xl">
                 <DropdownMenuLabel className="p-4 flex justify-between items-center border-b border-[#64FFDA]/10">
                     <span className="font-bold">Notifications</span>
-                    {unreadCount > 0 && <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-[#64FFDA]/10 text-[#64FFDA]">{unreadCount} New</span>}
+                    <div className="flex items-center gap-2">
+                        {unreadCount > 0 && (
+                            <>
+                                <button 
+                                    onClick={markAllAsRead}
+                                    className="text-[10px] uppercase font-bold text-[#64FFDA] hover:underline"
+                                >
+                                    Mark All Read
+                                </button>
+                                <span className="px-2 py-0.5 rounded-md text-xs font-semibold bg-[#64FFDA]/10 text-[#64FFDA]">
+                                    {unreadCount} New
+                                </span>
+                            </>
+                        )}
+                    </div>
                 </DropdownMenuLabel>
                 <div className="max-h-[400px] overflow-y-auto">
                     {notifications.length === 0 ? (
@@ -206,15 +280,18 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
                         notifications.map((n) => (
                             <DropdownMenuItem
                                 key={n.id}
-                                onClick={() => markAsRead(n.id)}
+                                onClick={(e) => {
+                                    e.preventDefault();
+                                    markAsRead(n);
+                                }}
                                 className={cn(
                                     "flex flex-col items-start gap-1 p-4 cursor-pointer focus:bg-[#3B82F6]/5",
-                                    n.status === "UNREAD" ? "bg-[#3B82F6]/5 border-l-2 border-[#3B82F6]" : "opacity-70"
+                                    (optimisticReads.has(n.id) || n.status === "READ") ? "opacity-70" : "bg-[#3B82F6]/5 border-l-2 border-[#3B82F6]"
                                 )}
                             >
                                 <div className="font-bold text-sm flex justify-between w-full">
                                     <span>{n.title}</span>
-                                    {n.status === "UNREAD" && <div className="w-2 h-2 rounded-full bg-[#3B82F6]" />}
+                                    {(!optimisticReads.has(n.id) && n.status === "UNREAD") && <div className="w-2 h-2 rounded-full bg-[#3B82F6]" />}
                                 </div>
                                 <p className="text-xs text-muted-foreground line-clamp-2">{n.message}</p>
                                 <span className="text-[10px] text-muted-foreground/50 mt-1">

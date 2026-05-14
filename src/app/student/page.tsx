@@ -14,10 +14,25 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { useRouter } from "next/navigation";
 
 export default function StudentDashboard() {
-    const { user } = useAuth();
-    const [isLoading, setIsLoading] = useState(true);
-    const [profile, setProfile] = useState<any>(null);
-    const [ledger, setLedger] = useState<any>(null);
+    const { user, userData } = useAuth();
+    const [isLoading, setIsLoading] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return !localStorage.getItem("student_ledger_cache");
+        }
+        return true;
+    });
+    const [profile, setProfile] = useState<any>(() => {
+        if (typeof window !== 'undefined') {
+            try { return JSON.parse(localStorage.getItem("student_profile_cache") || "null"); } catch (e) { return null; }
+        }
+        return null;
+    });
+    const [ledger, setLedger] = useState<any>(() => {
+        if (typeof window !== 'undefined') {
+            try { return JSON.parse(localStorage.getItem("student_ledger_cache") || "null"); } catch (e) { return null; }
+        }
+        return null;
+    });
     const [config, setConfig] = useState<{ keyId: string } | null>(null);
     const [paymentStatus, setPaymentStatus] = useState<"pending" | "paid">("pending");
 
@@ -25,7 +40,12 @@ export default function StudentDashboard() {
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
     const [paymentAmounts, setPaymentAmounts] = useState<{ [key: string]: string }>({});
     const [useHomeworkFallback, setUseHomeworkFallback] = useState(false);
-    const [recentHomework, setRecentHomework] = useState<any[]>([]);
+    const [recentHomework, setRecentHomework] = useState<any[]>(() => {
+        if (typeof window !== 'undefined') {
+            try { return JSON.parse(localStorage.getItem("student_recent_hw_cache") || "[]"); } catch (e) { return []; }
+        }
+        return [];
+    });
     const router = useRouter();
 
     useEffect(() => {
@@ -50,6 +70,7 @@ export default function StudentDashboard() {
 
         const processProfileSnap = (pData: any, docId: string) => {
             setProfile(pData);
+            if (typeof window !== 'undefined') localStorage.setItem("student_profile_cache", JSON.stringify(pData));
             const sId = pData.schoolId || docId;
 
             if (sId) {
@@ -58,6 +79,7 @@ export default function StudentDashboard() {
                     if (lSnap.exists()) {
                         const lData = lSnap.data();
                         setLedger(lData);
+                        if (typeof window !== 'undefined') localStorage.setItem("student_ledger_cache", JSON.stringify(lData));
                         setPaymentStatus(lData.status === "PAID" ? "paid" : "pending");
 
                         const initialSelected = new Set<string>();
@@ -86,7 +108,9 @@ export default function StudentDashboard() {
                     setIsLoading(false);
                 });
             } else {
-                setIsLoading(false);
+                if (!localStorage.getItem("student_ledger_cache")) {
+                    setIsLoading(false);
+                }
             }
         };
 
@@ -96,7 +120,11 @@ export default function StudentDashboard() {
                 processProfileSnap(pSnap.data(), pSnap.id);
             } else {
                 // Secondary Fallback: UID Query
-                const qProfile = query(collection(db, "students"), where("uid", "==", user.uid));
+                const qProfile = query(
+                    collection(db, "students"), 
+                    where("uid", "==", user.uid),
+                    where("schoolId", "==", userData?.schoolId || "global")
+                );
                 onSnapshot(qProfile, (qSnap) => {
                     if (!qSnap.empty) {
                         processProfileSnap(qSnap.docs[0].data(), qSnap.docs[0].id);
@@ -139,8 +167,19 @@ export default function StudentDashboard() {
         console.log("[Dashboard] Listening for homework targeting:", { classId: profile.classId, sectionId: profile.sectionId });
 
         const hQ = useHomeworkFallback
-            ? query(collection(db, "homework"), where("classId", "==", profile.classId), limit(10))
-            : query(collection(db, "homework"), where("classId", "==", profile.classId), orderBy("createdAt", "desc"), limit(10));
+            ? query(
+                collection(db, "homework"), 
+                where("classId", "==", profile.classId),
+                where("schoolId", "==", userData?.schoolId || profile.schoolId || "global"),
+                limit(10)
+            )
+            : query(
+                collection(db, "homework"), 
+                where("classId", "==", profile.classId), 
+                where("schoolId", "==", userData?.schoolId || profile.schoolId || "global"),
+                orderBy("createdAt", "desc"), 
+                limit(10)
+            );
 
         const unsubscribe = onSnapshot(hQ, (snapshot) => {
             if (!isMounted) return;
@@ -156,7 +195,9 @@ export default function StudentDashboard() {
             }
 
             console.log("[Dashboard] Homework received/filtered:", filtered.length);
-            setRecentHomework(filtered.slice(0, 3));
+            const top3 = filtered.slice(0, 3);
+            setRecentHomework(top3);
+            if (typeof window !== 'undefined') localStorage.setItem("student_recent_hw_cache", JSON.stringify(top3));
         }, (err) => {
             if (!isMounted) return;
             if (err.message.includes('index') && !useHomeworkFallback) {
@@ -266,7 +307,7 @@ export default function StudentDashboard() {
         rzp.open();
     };
 
-    const termFees = ledger?.items?.filter((i: any) => i.type === "TERM" && (i.amount - (i.paidAmount || 0)) >= 0) || [];
+    const termFees = ledger?.items?.filter((i: any) => i.type !== "CUSTOM" && (i.amount - (i.paidAmount || 0)) >= 0) || [];
     const customFees = ledger?.items?.filter((i: any) => i.type === "CUSTOM" && (i.amount - (i.paidAmount || 0)) >= 0) || [];
     const reductions = ledger?.items?.filter((i: any) => (i.amount - (i.paidAmount || 0)) < 0) || [];
 

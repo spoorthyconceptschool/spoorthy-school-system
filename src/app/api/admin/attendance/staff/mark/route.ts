@@ -22,7 +22,8 @@ export async function POST(req: NextRequest) {
             const result = await EnterpriseAttendanceService.markStaffAttendance(
                 date,
                 records,
-                user.uid
+                user.uid,
+                user.schoolId || "global"
             );
 
             return NextResponse.json({

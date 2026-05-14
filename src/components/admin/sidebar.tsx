@@ -25,7 +25,8 @@ import {
     ShieldAlert,
     UserCheck,
     ClipboardCheck,
-    Trash2
+    Trash2,
+    CalendarOff
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -57,6 +58,7 @@ const NAV_ITEMS = [
     { type: "separator", label: "System Administration" },
     { label: "Settings", icon: Settings, href: "/admin/settings" },
     { label: "Notices", icon: Bell, href: "/admin/notices" },
+    { label: "Holidays", icon: CalendarOff, href: "/admin/holidays" },
     { label: "Content", icon: FileText, href: "/admin/cms" },
     { label: "Purge Data", icon: Trash2, href: "/admin/purge-data" },
 ];
@@ -69,10 +71,13 @@ interface SidebarProps {
 export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
     const pathname = usePathname();
     const [collapsed, setCollapsed] = useState(false);
-    const { user, role, signOut } = useAuth();
+    const { user, userData, role, signOut } = useAuth();
     const { branding } = useMasterData();
     const [imageError, setImageError] = useState(false);
-    const [pendingLeaves, setPendingLeaves] = useState(0);
+    const [pendingStaffLeaves, setPendingStaffLeaves] = useState(0);
+    const [pendingStudentLeaves, setPendingStudentLeaves] = useState(0);
+    
+    const pendingLeaves = pendingStaffLeaves + pendingStudentLeaves;
 
     // Reset image error when branding changes
     useEffect(() => {
@@ -82,23 +87,32 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
     useEffect(() => {
         if (!user) return;
 
-        // Listen for Pending Leaves
-        const leavesQ = query(
-            collection(db, "leave_requests"),
-            where("status", "==", "PENDING")
+        // Listen for Pending Leaves (Staff)
+        const staffLeavesQ = query(
+            collection(db, "leave_requests"), 
+            where("status", "==", "PENDING"),
+            where("schoolId", "==", userData?.schoolId || "global")
         );
+        const unsubStaffLeaves = onSnapshot(staffLeavesQ, (snap) => setPendingStaffLeaves(snap.size));
 
-        const unsubLeaves = onSnapshot(leavesQ, (snap) => {
-            setPendingLeaves(snap.size);
-        });
+        // Listen for Pending Leaves (Students)
+        const studentLeavesQ = query(
+            collection(db, "student_leaves"), 
+            where("status", "==", "PENDING"),
+            where("schoolId", "==", userData?.schoolId || "global")
+        );
+        const unsubStudentLeaves = onSnapshot(studentLeavesQ, (snap) => setPendingStudentLeaves(snap.size));
 
-        return () => unsubLeaves();
-    }, [user]);
+        return () => {
+            unsubStaffLeaves();
+            unsubStudentLeaves();
+        };
+    }, [user, userData?.schoolId]);
 
     const filteredNav = useMemo(() => {
         return NAV_ITEMS.filter(item => {
             const allowedPaths = (role === "MANAGER")
-                ? ["/admin", "/admin/students", "/admin/attendance", "/admin/fees", "/admin/exams", "/admin/faculty", "/admin/master-data", "/admin/timetable/manage", "/admin/leaves"]
+                ? ["/admin", "/admin/students", "/admin/attendance", "/admin/fees", "/admin/exams", "/admin/faculty", "/admin/master-data", "/admin/timetable/manage", "/admin/leaves", "/admin/holidays"]
                 : (role === "TIMETABLE_EDITOR")
                     ? ["/admin", "/admin/timetable/manage", "/admin/faculty", "/admin/master-data/subjects", "/admin/master-data/classes-sections"]
                     : null;

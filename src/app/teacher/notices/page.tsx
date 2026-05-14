@@ -14,7 +14,7 @@ import { db } from "@/lib/firebase";
 import Link from "next/link";
 
 export default function NoticesPage() {
-    const { user } = useAuth();
+    const { user, userData } = useAuth();
     const [sentNotices, setSentNotices] = useState<any[]>([]);
     const [receivedNotices, setReceivedNotices] = useState<any[]>([]);
     const [classes, setClasses] = useState<string[]>([]);
@@ -39,8 +39,17 @@ export default function NoticesPage() {
         let isMounted = true;
 
         const qSent = useSentFallback
-            ? query(collection(db, "notices"), where("senderId", "==", user.uid))
-            : query(collection(db, "notices"), where("senderId", "==", user.uid), orderBy("createdAt", "desc"));
+            ? query(
+                collection(db, "notices"), 
+                where("senderId", "==", user.uid),
+                where("schoolId", "==", userData?.schoolId || "global")
+            )
+            : query(
+                collection(db, "notices"), 
+                where("senderId", "==", user.uid), 
+                where("schoolId", "==", userData?.schoolId || "global"),
+                orderBy("createdAt", "desc")
+            );
 
         const unsubSent = onSnapshot(qSent, (snap) => {
             if (!isMounted) return;
@@ -70,8 +79,17 @@ export default function NoticesPage() {
         let isMounted = true;
 
         const qInbox = useInboxFallback
-            ? query(collection(db, "notices"), where("target", "in", ["ALL", "TEACHERS"]))
-            : query(collection(db, "notices"), where("target", "in", ["ALL", "TEACHERS"]), orderBy("createdAt", "desc"));
+            ? query(
+                collection(db, "notices"), 
+                where("target", "in", ["ALL", "TEACHERS"]),
+                where("schoolId", "in", [userData?.schoolId || "global", "global"])
+            )
+            : query(
+                collection(db, "notices"), 
+                where("target", "in", ["ALL", "TEACHERS"]), 
+                where("schoolId", "in", [userData?.schoolId || "global", "global"]),
+                orderBy("createdAt", "desc")
+            );
 
         const unsubInbox = onSnapshot(qInbox, (snap) => {
             if (!isMounted) return;

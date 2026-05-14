@@ -13,12 +13,14 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
     const router = useRouter();
 
     useEffect(() => {
-        if (!loading && !user) {
+        if (loading && !userData) return;
+        
+        if (!loading && !user && !userData) {
             router.push("/login?redirect=" + encodeURIComponent(window.location.pathname));
             return;
         }
 
-        if (loading || !userData) return;
+        if (!userData) return;
 
         // Verify Role - Instant check from context
         const r = userData.role;

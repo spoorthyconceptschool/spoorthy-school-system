@@ -27,6 +27,14 @@ export async function POST(req: NextRequest) {
         // relying on frontend to only show valid options. 
         // (Production should validate).
 
+        // Fetch Teacher Profile for schoolId
+        const teacherDoc = await adminDb.collection("teachers").where("uid", "==", decodedToken.uid).limit(1).get();
+        if (teacherDoc.empty) {
+            return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
+        }
+        const teacherData = teacherDoc.docs[0].data();
+        const schoolId = teacherData.schoolId || "global";
+
         const expiryDate = new Date();
         expiryDate.setDate(expiryDate.getDate() + 3); // 3 Days Expiry
 
@@ -36,9 +44,10 @@ export async function POST(req: NextRequest) {
             title,
             content,
             senderId: decodedToken.uid,
-            senderName: decodedToken.name || "Teacher",
+            senderName: teacherData.name || decodedToken.name || "Teacher",
             senderRole: "TEACHER",
-            target: targetClassId, // Store as string for direct student query match
+            target: targetClassId,
+            schoolId,
             expiresAt: expiryDate,
             createdAt: FieldValue.serverTimestamp()
         });
@@ -49,6 +58,7 @@ export async function POST(req: NextRequest) {
             message: content.substring(0, 100),
             type: "NOTICE",
             target: `class_${targetClassId}`,
+            schoolId,
             status: "UNREAD",
             createdAt: FieldValue.serverTimestamp()
         });

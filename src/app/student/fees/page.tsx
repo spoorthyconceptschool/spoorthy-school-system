@@ -12,9 +12,22 @@ import { printPaymentReceipt } from "@/lib/export-utils";
 
 export default function StudentFeesPage() {
     const { user } = useAuth();
-    const [ledger, setLedger] = useState<any>(null);
-    const [transactions, setTransactions] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [ledger, setLedger] = useState<any>(() => {
+        if (typeof window !== 'undefined') {
+            try { return JSON.parse(localStorage.getItem("student_ledger_cache") || "null"); } catch (e) { return null; }
+        }
+        return null;
+    });
+    const [transactions, setTransactions] = useState<any[]>(() => {
+        if (typeof window !== 'undefined') {
+            try { return JSON.parse(localStorage.getItem("student_tx_cache") || "[]"); } catch (e) { return []; }
+        }
+        return [];
+    });
+    const [loading, setLoading] = useState(() => {
+        if (typeof window !== 'undefined') return !localStorage.getItem("student_ledger_cache");
+        return true;
+    });
     const [paying, setPaying] = useState(false);
     const [studentId, setStudentId] = useState<string | null>(null);
     const [studentData, setStudentData] = useState<any>(null);
@@ -35,7 +48,10 @@ export default function StudentFeesPage() {
             if (unsubLedger) unsubLedger();
             const yearId = student.academicYear || "2025-2026";
             unsubLedger = onSnapshot(doc(db, "student_fee_ledgers", `${sId}_${yearId}`), (lSnap) => {
-                if (lSnap.exists()) setLedger(lSnap.data());
+                if (lSnap.exists()) {
+                    setLedger(lSnap.data());
+                    if (typeof window !== 'undefined') localStorage.setItem("student_ledger_cache", JSON.stringify(lSnap.data()));
+                }
                 setLoading(false);
             }, (err) => {
                 console.warn("[Fees] Ledger sync error:", err.message);
@@ -44,9 +60,11 @@ export default function StudentFeesPage() {
 
             // 2. Listen to Payments
             if (unsubPayments) unsubPayments();
-            const pxQ = query(collection(db, "payments"), where("studentId", "==", sId), orderBy("date", "desc"), limit(20));
+            const pxQ = query(collection(db, "payments"), where("studentId", "==", sId), orderBy("createdAt", "desc"), limit(20));
             unsubPayments = onSnapshot(pxQ, (pxSnap) => {
-                setTransactions(pxSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+                const list = pxSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                setTransactions(list);
+                if (typeof window !== 'undefined') localStorage.setItem("student_tx_cache", JSON.stringify(list));
             }, (err) => {
                 console.warn("Payments sync error (index?):", err);
                 // Fallback query without orderBy if index is missing
@@ -54,6 +72,7 @@ export default function StudentFeesPage() {
                 onSnapshot(pxQ2, (pxSnap2) => {
                     const sorted = pxSnap2.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => (b.date?.seconds || 0) - (a.date?.seconds || 0));
                     setTransactions(sorted);
+                    if (typeof window !== 'undefined') localStorage.setItem("student_tx_cache", JSON.stringify(sorted));
                 });
             });
         };

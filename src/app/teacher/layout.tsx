@@ -49,8 +49,9 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
     }, [branding?.schoolLogo]);
 
     useEffect(() => {
-        if (loading) return;
-        if (!user) {
+        if (loading && !userData) return;
+        
+        if (!loading && !user && !userData) {
             router.push("/login");
             return;
         }
@@ -76,7 +77,7 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
 
     }, [user, userData, loading, pathname, router]);
 
-    const isAuthenticating = loading || (user && !userData);
+    const isAuthenticating = loading && !userData;
 
     if (isAuthenticating) {
         return <div className="h-screen w-full flex items-center justify-center bg-[#0A192F] text-[#10B981]"><Loader2 className="animate-spin" /></div>;

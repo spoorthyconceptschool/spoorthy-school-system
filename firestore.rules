@@ -14,10 +14,27 @@ service cloud.firestore {
            : null);
       return role;
     }
+
+    function getSchoolId() {
+      let uDoc = /databases/$(database)/documents/users/$(request.auth.uid);
+      let sDoc = /databases/$(database)/documents/students/$(request.auth.uid);
+      let prefix = request.auth.token.email != null ? request.auth.token.email.split('@')[0].upper() : '@@NONE@@';
+      let sPrefixDoc = /databases/$(database)/documents/students/$(prefix);
+      
+      return request.auth.token.schoolId != null ? request.auth.token.schoolId : 
+             (exists(uDoc) ? get(uDoc).data.schoolId :
+             (exists(sDoc) ? get(sDoc).data.schoolId :
+             (exists(sPrefixDoc) ? get(sPrefixDoc).data.schoolId : 'global')));
+    }
     
+    function isSuperAdmin() {
+      let r = getRole();
+      return isSignedIn() && (r == 'SUPER_ADMIN' || r == 'super_admin');
+    }
+
     function isAdmin() {
       let r = getRole();
-      return isSignedIn() && (r == 'ADMIN' || r == 'SUPER_ADMIN' || r == 'admin' || r == 'super_admin');
+      return isSignedIn() && (r == 'ADMIN' || r == 'admin' || isSuperAdmin());
     }
 
     function isManager() {
@@ -30,31 +47,42 @@ service cloud.firestore {
       return isSignedIn() && (r == 'TEACHER' || r == 'teacher');
     }
 
+    function isSameSchool(data) {
+       // Super Admins bypass tenant checks. If missing schoolId, we assume it's global config.
+       return isSuperAdmin() || 
+              !("schoolId" in data) || 
+              (data.schoolId == null) || 
+              (data.schoolId == getSchoolId());
+    }
+
     // --- COLLECTION RULES ---
 
     // Admin-only collections (Audit, Analytics)
-    match /audit_logs/{log} { allow read, write: if isManager(); }
-    match /analytics/{doc} { allow read, write: if isManager(); }
+    match /audit_logs/{log} { allow read, write: if isManager() && isSameSchool(resource.data); }
+    match /analytics/{doc} { allow read, write: if isManager() && isSameSchool(resource.data); }
     
-    // Core Config (Academic years needed for Landing Page/Context)
-    match /config/academic_years { allow read: if true; allow write: if isAdmin(); }
-    match /config/{doc} { allow read: if isSignedIn(); allow write: if isAdmin(); }
-    
-    match /settings/{doc} { allow read: if isSignedIn(); allow write: if isAdmin(); }
+    // Core Config
+    match /config/academic_years { allow read: if true; allow write: if isSuperAdmin(); }
+    match /config/{doc} { allow read: if isSignedIn(); allow write: if isSuperAdmin(); }
+    match /settings/{doc} { allow read: if isSignedIn() && isSameSchool(resource.data); allow write: if isAdmin() && isSameSchool(resource.data); }
 
     // Master Data (Public Read allowed for landing page/admissions)
-    match /master_classes/{doc} { allow read: if true; allow write: if isAdmin(); }
-    match /master_sections/{doc} { allow read: if true; allow write: if isAdmin(); }
-    match /master_villages/{doc} { allow read: if true; allow write: if isAdmin(); }
-    match /master_subjects/{doc} { allow read: if true; allow write: if isAdmin(); }
-    match /master_staff_roles/{doc} { allow read: if true; allow write: if isAdmin(); }
-    match /master_class_sections/{doc} { allow read: if true; allow write: if isAdmin(); }
+    match /master_classes/{doc} { allow read: if true; allow write: if isSuperAdmin(); }
+    match /master_sections/{doc} { allow read: if true; allow write: if isSuperAdmin(); }
+    match /master_villages/{doc} { allow read: if true; allow write: if isSuperAdmin(); }
+    match /master_subjects/{doc} { allow read: if true; allow write: if isSuperAdmin(); }
+    match /master_staff_roles/{doc} { allow read: if true; allow write: if isSuperAdmin(); }
+    match /master_class_sections/{doc} { allow read: if true; allow write: if isSuperAdmin(); }
 
     // Users Collection
     match /users/{userId} {
-      allow read: if isSignedIn() && (request.auth.uid == userId || isManager());
-      allow update: if isSignedIn() && (request.auth.uid == userId || isManager());
-      allow create, delete: if isAdmin();
+      allow read: if isSignedIn() && (request.auth.uid == userId || (isManager() && isSameSchool(resource.data)));
+      allow update: if isSignedIn() && (request.auth.uid == userId || (isManager() && isSameSchool(resource.data)));
+      allow create, delete: if isAdmin() && (isSuperAdmin() || request.resource.data.schoolId == getSchoolId());
+    }
+
+    match /user_sessions/{userId} {
+      allow read, write: if isSignedIn() && (request.auth.uid == userId || isManager());
     }
 
     // Students & Teachers
@@ -62,145 +90,145 @@ service cloud.firestore {
       allow read: if isSignedIn() && (
         request.auth.uid == studentId || 
         request.auth.uid == resource.data.uid || 
-        request.auth.email.split('@')[0].upper() == studentId ||
-        isManager() || 
-        isTeacher()
+        (request.auth.token.email != null && request.auth.token.email.split('@')[0].upper() == studentId) ||
+        (isSameSchool(resource.data) && (isManager() || isTeacher()))
       );
-      allow write: if isManager();
+      allow write: if isManager() && (isSuperAdmin() || request.resource.data.schoolId == getSchoolId());
     }
     
     match /teachers/{teacherId} {
-      allow read: if isSignedIn();
-      allow write: if isManager();
+      allow read: if isSignedIn() && (
+        request.auth.uid == teacherId || 
+        isSameSchool(resource.data)
+      );
+      allow write: if isManager() && (isSuperAdmin() || request.resource.data.schoolId == getSchoolId());
     }
 
     match /student_change_requests/{id} {
-      allow create: if isTeacher() && request.resource.data.teacherId == request.auth.uid;
-      allow read: if isManager() || (isSignedIn() && resource.data.teacherId == request.auth.uid);
-      allow update, delete: if isManager();
+      allow create: if isTeacher() && request.resource.data.teacherId == request.auth.uid && request.resource.data.schoolId == getSchoolId();
+      allow read: if isSameSchool(resource.data) && (isManager() || (isSignedIn() && resource.data.teacherId == request.auth.uid));
+      allow update, delete: if isManager() && isSameSchool(resource.data);
     }
 
     // Academic & Operations
     match /exam_results/{id} {
-      allow read: if isSignedIn() && (request.auth.uid == resource.data.studentId || isManager() || isTeacher());
-      allow write: if isManager(); // Forced via backend
+      allow read: if isSignedIn() && (
+        request.auth.uid == resource.data.studentId || 
+        (request.auth.token.email != null && request.auth.token.email.split('@')[0].upper() == resource.data.studentId) ||
+        (isSameSchool(resource.data) && (isManager() || isTeacher()))
+      );
+      allow write: if isManager() && isSameSchool(resource.data);
     }
 
     match /homework/{id} {
-      allow read: if isSignedIn();
-      allow write: if isManager() || isTeacher();
+      allow read: if isSignedIn() && isSameSchool(resource.data);
+      allow write: if (isManager() || isTeacher()) && (isSuperAdmin() || request.resource.data.schoolId == getSchoolId());
     }
     
     match /attendance/{id} {
-      allow read: if isSignedIn() && (isManager() || isTeacher() || getRole() == 'STUDENT' || getRole() == 'student');
-      allow write: if isManager(); // Forced via backend to validate time windows and read-only
+      allow read: if isSignedIn() && isSameSchool(resource.data);
+      allow write: if isManager() && isSameSchool(resource.data);
+    }
+    
+    match /attendance_daily/{id} {
+      allow read: if isSignedIn() && isSameSchool(resource.data);
+      allow write: if isManager() && isSameSchool(resource.data);
     }
     
     match /student_fee_ledgers/{id} { 
       allow read: if isSignedIn() && (
-        isManager() || 
         request.auth.uid == resource.data.uid || 
         request.auth.uid == resource.data.studentId ||
-        request.auth.email.split('@')[0].upper() == resource.data.studentId
+        (request.auth.token.email != null && request.auth.token.email.split('@')[0].upper() == resource.data.studentId) ||
+        (isSameSchool(resource.data) && isManager())
       ); 
-      allow write: if isManager(); 
+      allow write: if isManager() && isSameSchool(resource.data); 
     }
 
     match /payments/{id} { 
       allow read: if isSignedIn() && (
-        isManager() || 
         request.auth.uid == resource.data.uid || 
         request.auth.uid == resource.data.studentId ||
-        request.auth.email.split('@')[0].upper() == resource.data.studentId
+        (request.auth.token.email != null && request.auth.token.email.split('@')[0].upper() == resource.data.studentId) ||
+        (isSameSchool(resource.data) && isManager())
       ); 
-      allow write: if isManager(); 
+      allow write: if isManager() && isSameSchool(resource.data); 
     }
+    
     match /invoices/{id} { 
       allow read: if isSignedIn() && (
-        isManager() || 
         request.auth.uid == resource.data.uid || 
         request.auth.uid == resource.data.studentId ||
-        request.auth.email.split('@')[0].upper() == resource.data.studentId
+        (request.auth.token.email != null && request.auth.token.email.split('@')[0].upper() == resource.data.studentId) ||
+        (isSameSchool(resource.data) && isManager())
       ); 
-      allow write: if isManager(); 
+      allow write: if isManager() && isSameSchool(resource.data); 
     }
 
     // Communication & Notices
     match /notices/{id} {
-      allow read: if isSignedIn();
-      allow write: if isManager() || isTeacher();
+      allow read: if isSignedIn() && isSameSchool(resource.data);
+      allow write: if (isManager() || isTeacher()) && (isSuperAdmin() || request.resource.data.schoolId == getSchoolId());
     }
 
     match /notifications/{id} {
       allow read: if isSignedIn() && (
-        resource.data.target == 'ALL' || 
-        resource.data.target == 'ALL_STUDENTS' || 
         resource.data.userId == request.auth.uid ||
-        // Allow if userId matches the ID of a student doc owned by this user
-        (
-           exists(/databases/$(database)/documents/students/$(resource.data.userId)) &&
-           get(/databases/$(database)/documents/students/$(resource.data.userId)).data.uid == request.auth.uid
-        ) ||
-        isManager()
+        (isSameSchool(resource.data) && (
+          resource.data.target == 'ALL' || 
+          resource.data.target == 'ALL_STUDENTS' || 
+          resource.data.target == 'ALL_FACULTY' || 
+          resource.data.target == 'ALL_ADMINS' || 
+          (resource.data.target.matches('^class_.*')) ||
+          isManager()
+        ))
       );
-      allow write: if isManager();
+      allow write: if isManager() && isSameSchool(resource.data);
     }
 
     // Leave Management
     match /student_leaves/{id} {
       allow read: if isSignedIn() && (
         resource.data.uid == request.auth.uid || 
-        isManager() || 
-        isTeacher()
+        (isSameSchool(resource.data) && (isManager() || isTeacher()))
       );
-      allow create: if isSignedIn() && (getRole() == 'STUDENT' || getRole() == 'student');
-      allow update, delete: if isManager();
+      allow create: if isSignedIn() && request.resource.data.schoolId == getSchoolId();
+      allow update, delete: if isManager() && isSameSchool(resource.data);
     }
 
     match /leave_requests/{id} {
       allow read: if isSignedIn() && (
         resource.data.teacherId == request.auth.uid || 
-        isManager()
+        (isSameSchool(resource.data) && isManager())
       );
-      allow create: if isTeacher() && request.resource.data.teacherId == request.auth.uid;
-      allow update, delete: if isManager();
+      allow create: if isTeacher() && request.resource.data.teacherId == request.auth.uid && request.resource.data.schoolId == getSchoolId();
+      allow update, delete: if isManager() && isSameSchool(resource.data);
     }
 
-    // Search Index
+    // Miscellaneous
     match /search_index/{id} {
-      allow read: if isSignedIn();
-      allow write: if isAdmin();
+      allow read: if isSignedIn() && isSameSchool(resource.data);
+      allow write: if isSuperAdmin();
     }
 
-    // Timetable & Coverage
     match /coverage_tasks/{id} {
-      allow read: if isManager() || isTeacher();
-      allow write: if isManager();
+      allow read: if isSameSchool(resource.data) && (isManager() || isTeacher());
+      allow write: if isManager() && isSameSchool(resource.data);
     }
 
     match /substitutions/{id} {
-      allow read: if isManager() || isTeacher();
-      allow write: if isManager();
-    }
-
-    // Global Catch-all (Default to Admin only for safety)
-    match /exams/{id} {
-      allow read: if isSignedIn();
-      allow write: if isManager();
+      allow read: if isSameSchool(resource.data) && (isManager() || isTeacher());
+      allow write: if isManager() && isSameSchool(resource.data);
     }
 
     match /exam_syllabus/{id} {
-      allow read: if isSignedIn();
-      allow write: if isTeacher() || isManager();
+      allow read: if isSignedIn() && isSameSchool(resource.data);
+      allow write: if isSameSchool(resource.data) && (isTeacher() || isManager());
     }
 
-    match /exam_results/{id} {
-      allow read: if isSignedIn();
-      allow write: if isTeacher() || isManager();
-    }
-
+    // Complete Catch-all safeguard
     match /{document=**} {
-      allow read, write: if isAdmin();
+      allow read, write: if isSuperAdmin();
     }
   }
 }

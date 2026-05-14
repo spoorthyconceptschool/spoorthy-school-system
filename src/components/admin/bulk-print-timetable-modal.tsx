@@ -120,28 +120,154 @@ export function BulkPrintTimetableModal() {
         if (!printWindow) return;
 
         const html = `
+            <!DOCTYPE html>
             <html>
                 <head>
                     <title>Bulk Timetable Print</title>
                     <style>
-                        body { font-family: sans-serif; color: #333; margin: 0; padding: 0; }
-                        .page { padding: 40px; page-break-after: always; min-height: 100vh; display: flex; flex-direction: column; }
-                        .header { text-align: center; margin-bottom: 30px; }
-                        .header img { height: 60px; margin-bottom: 10px; }
-                        .header h1 { margin: 0; color: #1a365d; font-size: 24px; text-transform: uppercase; }
-                        .header p { margin: 5px 0; color: #718096; font-size: 14px; text-transform: uppercase; font-weight: bold; }
-                        table { width: 100%; border-collapse: collapse; margin-top: 20px; table-layout: fixed; }
-                        th, td { border: 1px solid #e2e8f0; padding: 8px; text-align: center; font-size: 10px; height: 50px; word-wrap: break-word; }
-                        th { background-color: #f8fafc; color: #4a5568; font-weight: bold; text-transform: uppercase; letter-spacing: 0.05em; font-size: 9px; height: auto; }
-                        .day-col { background-color: #f8fafc; font-weight: bold; width: 60px; text-transform: uppercase; }
-                        .period-info { font-size: 8px; color: #a0aec0; margin-bottom: 2px; }
-                        .subject { font-weight: bold; color: #2d3748; display: block; margin-bottom: 1px; }
-                        .teacher { font-size: 8px; color: #718096; line-height: 1.1; }
-                        .break { background-color: #f1f5f9; color: #94a3b8; font-weight: bold; font-style: italic; letter-spacing: 0.2em; }
-                        .leisure { color: #cbd5e0; font-style: italic; }
+                        @import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;700;900&display=swap');
+                        * { box-sizing: border-box; }
+                        body { 
+                            font-family: 'Inter', -apple-system, sans-serif; 
+                            background: white; 
+                            color: #0f172a; /* slate-900 */
+                            margin: 0; 
+                            padding: 0; 
+                        }
+                        .page { 
+                            padding: 40px; 
+                            page-break-after: always; 
+                            min-height: 100vh; 
+                            display: flex; 
+                            flex-direction: column; 
+                            margin: 0 auto;
+                            max-width: 1200px;
+                        }
+                        /* Header */
+                        .header { 
+                            display: flex;
+                            align-items: flex-end;
+                            justify-content: space-between;
+                            border-bottom: 2px solid #0f172a;
+                            padding-bottom: 2rem;
+                            margin-bottom: 3rem;
+                        }
+                        .header-left { display: flex; align-items: flex-end; gap: 20px; }
+                        .logo { height: 60px; object-fit: contain; }
+                        .title-block h1 { 
+                            margin: 0 0 8px 0; 
+                            font-size: 32px; 
+                            font-weight: 900; 
+                            text-transform: uppercase; 
+                            letter-spacing: -0.02em; 
+                            color: #0f172a; 
+                        }
+                        .title-block p { 
+                            margin: 0; 
+                            font-size: 14px; 
+                            font-weight: 700; 
+                            letter-spacing: 0.1em; 
+                            text-transform: uppercase; 
+                            color: #64748b; /* slate-500 */
+                        }
+                        .header-right { text-align: right; }
+                        .header-right p.label {
+                            margin: 0 0 4px 0;
+                            font-size: 10px;
+                            font-weight: 900;
+                            letter-spacing: 0.1em;
+                            text-transform: uppercase;
+                            color: #94a3b8; /* slate-400 */
+                        }
+                        .header-right p.date {
+                            margin: 0;
+                            font-size: 14px;
+                            font-weight: 500;
+                            color: #1e293b; /* slate-800 */
+                        }
+                        /* Table */
+                        table { 
+                            width: 100%; 
+                            border-collapse: collapse; 
+                            border-top: 2px solid #0f172a;
+                            border-bottom: 2px solid #0f172a;
+                        }
+                        th, td { 
+                            padding: 16px; 
+                            text-align: center; 
+                            vertical-align: middle;
+                        }
+                        th { 
+                            background-color: #f8fafc; /* slate-50 */
+                            border-bottom: 2px solid #0f172a; 
+                            font-size: 11px;
+                            font-weight: 900;
+                            text-transform: uppercase;
+                            letter-spacing: 0.1em;
+                            color: #0f172a;
+                        }
+                        tr:not(:last-child) td {
+                            border-bottom: 1px solid #e2e8f0; /* divide-y slate-200 */
+                        }
+                        td.day-col {
+                            text-align: left;
+                            font-weight: 700;
+                            text-transform: uppercase;
+                            letter-spacing: 0.1em;
+                            color: #0f172a;
+                            width: 100px;
+                        }
+                        td.border-l { border-left: 1px solid #f1f5f9; /* slate-100 */ }
+                        td.break { 
+                            background-color: #f8fafc; 
+                            border-left: 1px solid #e2e8f0; 
+                        }
+                        td.break span {
+                            font-size: 9px;
+                            font-weight: 900;
+                            text-transform: uppercase;
+                            letter-spacing: 0.2em;
+                            color: #94a3b8;
+                        }
+                        .subject-block {
+                            display: flex;
+                            flex-direction: column;
+                            align-items: center;
+                            justify-content: center;
+                            gap: 4px;
+                        }
+                        .subject { 
+                            font-size: 11px;
+                            font-weight: 700;
+                            text-transform: uppercase;
+                            letter-spacing: 0.05em;
+                            color: #0f172a; 
+                        }
+                        .teacher { 
+                            font-size: 9px;
+                            font-weight: 500;
+                            text-transform: uppercase;
+                            letter-spacing: 0.05em;
+                            color: #64748b; 
+                        }
+                        .leisure .subject { color: #94a3b8; }
+                        .empty { color: #e2e8f0; font-weight: 300; }
+                        /* Footer */
+                        .footer {
+                            margin-top: 64px;
+                            text-align: center;
+                        }
+                        .footer p {
+                            margin: 0;
+                            font-size: 10px;
+                            font-weight: 700;
+                            text-transform: uppercase;
+                            letter-spacing: 0.1em;
+                            color: #94a3b8;
+                        }
                         @media print {
-                            .page { padding: 0; }
-                            @page { margin: 1cm; orientation: landscape; }
+                            .page { padding: 0; max-width: 100%; }
+                            @page { margin: 1cm; size: landscape; }
                         }
                     </style>
                 </head>
@@ -149,19 +275,24 @@ export function BulkPrintTimetableModal() {
                     ${data.map(item => `
                         <div class="page">
                             <div class="header">
-                                ${branding.schoolLogo ? `<img src="${branding.schoolLogo}" />` : ''}
-                                <h1>${branding.schoolName || 'SPOORTHY CONCEPT SCHOOL'}</h1>
-                                <p>Academic Timetable: ${item.className} - ${item.sectionName}</p>
+                                <div class="header-left">
+                                    ${branding.schoolLogo ? `<img src="${branding.schoolLogo}" class="logo" />` : ''}
+                                    <div class="title-block">
+                                        <h1>${branding.schoolName || 'SPOORTHY CONCEPT SCHOOL'}</h1>
+                                        <p>MASTER TIMETABLE &bull; ${item.className} ${item.sectionName ? ' - ' + item.sectionName : ''}</p>
+                                    </div>
+                                </div>
+                                <div class="header-right">
+                                    <p class="label">Generated</p>
+                                    <p class="date">${new Date().toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                                </div>
                             </div>
                             <table>
                                 <thead>
                                     <tr>
-                                        <th class="day-col">Day</th>
+                                        <th style="text-align: left;">Day</th>
                                         ${item.dayTemplate.map((slot: any) => `
-                                            <th>
-                                                <div class="period-info">${slot.startTime} - ${slot.endTime}</div>
-                                                <div>${slot.name}</div>
-                                            </th>
+                                            <th>Period ${slot.id}</th>
                                         `).join('')}
                                     </tr>
                                 </thead>
@@ -170,25 +301,30 @@ export function BulkPrintTimetableModal() {
                                         <tr>
                                             <td class="day-col">${day.substring(0, 3)}</td>
                                             ${item.dayTemplate.map((slot: any) => {
-            if (slot.type === "BREAK") return `<td class="break">BREAK</td>`;
-            const cell = item.schedule[day]?.[slot.id] || {};
-            if (!cell.subjectId) return `<td>-</td>`;
-            if (cell.subjectId === "leisure") return `<td class="leisure">Leisure</td>`;
-
-            const subject = subjectsList.find((s: any) => s.id === cell.subjectId);
-            const teacher = allTeachers.find((t: any) => t.id === cell.teacherId || t.schoolId === cell.teacherId);
-
-            return `
-                                                    <td>
-                                                        <span class="subject">${subject?.name || 'Subject'}</span>
-                                                        <span class="teacher">${teacher?.name || ''}</span>
+                                                if (slot.type === "BREAK") return `<td class="break"><span>BREAK</span></td>`;
+                                                const cell = item.schedule[day]?.[slot.id] || {};
+                                                if (!cell.subjectId) return `<td class="border-l"><span class="empty">-</span></td>`;
+                                                if (cell.subjectId === "leisure") return `<td class="border-l leisure"><div class="subject-block"><span class="subject">Leisure</span></div></td>`;
+                                    
+                                                const subject = subjectsList.find((s: any) => s.id === cell.subjectId);
+                                                const teacher = allTeachers.find((t: any) => t.id === cell.teacherId || t.schoolId === cell.teacherId);
+                                    
+                                                return `
+                                                    <td class="border-l">
+                                                        <div class="subject-block">
+                                                            <span class="subject">${subject?.name || cell.subjectId}</span>
+                                                            <span class="teacher">${teacher?.name || ''}</span>
+                                                        </div>
                                                     </td>
                                                 `;
-        }).join('')}
+                                            }).join('')}
                                         </tr>
                                     `).join('')}
                                 </tbody>
                             </table>
+                            <div class="footer">
+                                <p>Official Document &bull; ${branding.schoolName || 'Spoorthy Concept School'}</p>
+                            </div>
                         </div>
                     `).join('')}
                     <script>window.onload = () => { window.print(); window.close(); };</script>

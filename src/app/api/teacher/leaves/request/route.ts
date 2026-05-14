@@ -38,18 +38,12 @@ export async function POST(req: NextRequest) {
         await leaveRef.set(leaveData);
 
         // Notify Admins
-        await adminDb.collection("notifications").add({
+        const { createServerNotification } = await import("@/lib/notifications-server");
+        await createServerNotification({
             title: "New Teacher Leave Request",
             message: `${decodedToken.name || "Teacher"} requested leave: ${reason || "No reason provided"}`,
             type: "LEAVE_REQUEST",
-            status: "UNREAD",
             target: "admin",
-            createdAt: FieldValue.serverTimestamp(),
-            metadata: {
-                teacherId: decodedToken.uid,
-                leaveId: leaveRef.id,
-                type: "TEACHER"
-            }
         });
 
         return NextResponse.json({ success: true, message: "Leave Requested" });

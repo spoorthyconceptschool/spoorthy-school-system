@@ -164,9 +164,13 @@ export default function TeacherAttendanceManager({
     const handleSubmit = async () => {
         setSubmitting(true);
         try {
+            const token = await user?.getIdToken(true);
             const res = await fetch("/api/admin/attendance/teachers/mark", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
                 body: JSON.stringify({
                     date,
                     records: attendance,

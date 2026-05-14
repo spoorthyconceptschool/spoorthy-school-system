@@ -32,7 +32,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
         name: schoolName,
         short_name: shortName,
         description: `Management System for ${schoolName}`,
-        start_url: '/',
+        start_url: '/dashboard',
         display: 'standalone',
         background_color: '#0A0A0B',
         categories: ['education', 'productivity', 'utilities'],

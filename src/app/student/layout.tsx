@@ -34,7 +34,7 @@ const STUDENT_NAV = [
 ];
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
-    const { user, loading, signOut } = useAuth();
+    const { user, userData, loading, signOut } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
     const [checking, setChecking] = useState(true);
@@ -47,13 +47,16 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         setImageError(false);
     }, [branding?.schoolLogo]);
 
-    // 1. Fetch User Status ONCE when user logs in
+    // 1. Fetch User Status ONCE when user logs in (Optimistic rendering)
     useEffect(() => {
-        if (loading) return;
-        if (!user) {
+        if (loading && !userData) return;
+        
+        if (!loading && !user && !userData) {
             router.push("/login");
             return;
         }
+
+        if (!user) return;
 
         const fetchUserStatus = async () => {
             try {
@@ -81,7 +84,8 @@ export default function StudentLayout({ children }: { children: React.ReactNode 
         }
     }, [pathname, mustChangePassword, router]);
 
-    if (loading || checking) {
+    // Only block the UI completely if we have NO cached data and are waiting for the network
+    if ((loading && !userData)) {
         return <div className="h-screen w-full flex items-center justify-center bg-[#0A192F] text-[#64FFDA]"><Loader2 className="animate-spin" /></div>;
     }
 

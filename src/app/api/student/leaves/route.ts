@@ -49,18 +49,13 @@ export async function POST(req: NextRequest) {
         });
 
         // Notify Admins
-        await adminDb.collection("notifications").add({
+        const { createServerNotification } = await import("@/lib/notifications-server");
+        await createServerNotification({
             title: "New Student Leave Request",
             message: `${studentName} (${schoolId}) requested leave: ${reason}`,
             type: "LEAVE_REQUEST",
-            status: "UNREAD",
             target: "admin",
-            createdAt: FieldValue.serverTimestamp(),
-            metadata: {
-                studentId: schoolId,
-                leaveId: leaveRef.id,
-                type: "STUDENT"
-            }
+            // We can't pass arbitrary metadata gracefully to createServerNotification typed props, but the deep link handles routing!
         });
 
         // MANDATORY: Notify Class Teacher
@@ -75,19 +70,12 @@ export async function POST(req: NextRequest) {
                 const teacherUid = teacherUserSnap.data()?.uid;
 
                 if (teacherUid) {
-                    await adminDb.collection("notifications").add({
+                    await createServerNotification({
                         title: "Leave Request: My Student",
                         message: `${studentName} from your class requested leave: ${reason}`,
                         type: "LEAVE_REQUEST",
-                        status: "UNREAD",
                         target: "user",
-                        uid: teacherUid,
-                        createdAt: FieldValue.serverTimestamp(),
-                        metadata: {
-                            studentId: schoolId,
-                            leaveId: leaveRef.id,
-                            type: "STUDENT"
-                        }
+                        userId: teacherUid
                     });
                 }
             }

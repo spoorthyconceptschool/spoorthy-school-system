@@ -46,9 +46,14 @@ export async function POST(req: NextRequest) {
         // Quick lookups from Firestore/RTDB would be slow here. 
         // Better: We assume the target IDs are what we filter by.
 
+        // Fetch Admin Profile for schoolId
+        const adminDoc = await adminDb.collection("users").doc(decodedToken.uid).get();
+        const schoolId = adminDoc.data()?.schoolId || "global";
+
         const hwId = adminDb.collection("homework").doc().id;
         await adminDb.collection("homework").doc(hwId).set({
             id: hwId,
+            schoolId,
             yearId,
             classId, // Targeted Class ID
             sectionId, // Targeted Section ID
@@ -69,6 +74,7 @@ export async function POST(req: NextRequest) {
         await adminDb.collection("audit_logs").add({
             action: "ADMIN_CREATE_HOMEWORK",
             actorUid: decodedToken.uid,
+            schoolId,
             details: { classId, title },
             timestamp: FieldValue.serverTimestamp()
         });
@@ -78,6 +84,7 @@ export async function POST(req: NextRequest) {
             // A. Fetch Target Students
             let studentQuery = adminDb.collection("students")
                 .where("classId", "==", classId)
+                .where("schoolId", "==", schoolId)
                 .where("status", "==", "ACTIVE");
 
             if (sectionId !== "ALL" && sectionId !== "GENERAL") {
@@ -119,11 +126,19 @@ export async function POST(req: NextRequest) {
                             title: `New Homework: ${title}`,
                             body: description.length > 50 ? description.substring(0, 50) + "..." : description,
                         },
+                        webpush: {
+                            fcmOptions: {
+                                link: "https://spoorthy-school-live-55917.web.app/student/homework"
+                            },
+                            notification: {
+                                icon: "https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Flogo.png?alt=media"
+                            }
+                        },
                         data: {
                             type: "HOMEWORK",
                             homeworkId: hwId,
                             subjectId: subjectId,
-                            click_action: "/student/homework"
+                            click_action: "https://spoorthy-school-live-55917.web.app/student/homework"
                         },
                         tokens: uniqueTokens
                     };

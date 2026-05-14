@@ -70,7 +70,7 @@ export function LeavesManager() {
 
     const handleAction = async (leaveId: string, action: "APPROVE" | "REJECT" | "REVERT") => {
         if (!user) return;
-        if (!confirm(`Confirm ${action.toLowerCase()} this leave request?`)) return;
+
 
         setActioning(leaveId);
         try {
@@ -111,7 +111,6 @@ export function LeavesManager() {
                             render: (leave: any) => (
                                 <div className="flex flex-col">
                                     <span className="font-bold text-white text-xs">{leave.teacherName}</span>
-                                    <span className="text-[10px] font-mono text-white/40 uppercase tracking-tighter">{leave.teacherId}</span>
                                 </div>
                             )
                         },
@@ -265,7 +264,6 @@ export function LeavesManager() {
                         <div className="flex justify-between items-start">
                             <div>
                                 <h3 className="font-bold text-white leading-tight">{leave.teacherName}</h3>
-                                <p className="text-[10px] text-white/40 font-mono uppercase">{leave.teacherId}</p>
                             </div>
                             <Badge className={cn(
                                 "text-[10px] font-black uppercase tracking-tighter py-0 h-5 border-none",

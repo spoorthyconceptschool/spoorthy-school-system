@@ -229,9 +229,7 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
                     // siteContent/branding is now the absolute source.
 
                     setData(prev => {
-                        const nextState = { ...prev, ...updates };
-                        if (JSON.stringify(prev) === JSON.stringify(nextState)) return prev;
-                        return nextState;
+                        return { ...prev, ...updates };
                     });
                 }, (error) => {
                     console.warn("RTDB Permission (master):", error.message);
@@ -355,13 +353,15 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
             }
         }, (error) => {
             console.warn("Firestore Permission/Error (config/system):", error.message);
+            // Even if config fails, we shouldn't block the app forever.
+            setData(prev => ({ ...prev, loading: false }));
         });
 
         return () => unsub();
     }, []);
 
     // 4. Authenticated Real-time Sync for Core Directories
-    const { role, user } = useAuth();
+    const { role, user, userData } = useAuth();
     useEffect(() => {
         if (!user) return;
 
@@ -372,21 +372,29 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
         if (!isAdmin && !isTeacher) return;
 
         // Sync Teachers (Active only for speed)
-        const teachersQ = query(collection(db, "teachers"), where("status", "==", "ACTIVE"));
+        const teachersQ = query(
+            collection(db, "teachers"), 
+            where("status", "==", "ACTIVE"),
+            where("schoolId", "==", userData?.schoolId || "global")
+        );
         const teachersUnsub = onSnapshot(teachersQ, (snap) => {
             const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setData(prev => ({ ...prev, teachers: list }));
         }, (err) => console.warn("[MasterData] Teachers Sync Error:", err.message));
 
         // Sync Staff (Active only)
-        const staffQ = query(collection(db, "staff"), where("status", "==", "ACTIVE"));
+        const staffQ = query(
+            collection(db, "staff"), 
+            where("status", "==", "ACTIVE"),
+            where("schoolId", "==", userData?.schoolId || "global")
+        );
         const staffUnsub = onSnapshot(staffQ, (snap) => {
             const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setData(prev => ({ ...prev, staff: list }));
         }, (err) => console.warn("[MasterData] Staff Sync Error:", err.message));
 
         // Sync Groups (House system)
-        const groupsUnsub = onSnapshot(collection(db, "groups"), (snap) => {
+        const groupsUnsub = onSnapshot(query(collection(db, "groups"), where("schoolId", "==", userData?.schoolId || "global")), (snap) => {
             const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setData(prev => ({ ...prev, groups: list }));
         }, (err) => console.warn("[MasterData] Groups Sync Error:", err.message));

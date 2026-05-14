@@ -49,7 +49,7 @@ export function StudentLeavesManager() {
             if (!reason) return;
         }
 
-        if (!confirm(`Confirm ${action.toLowerCase()} this leave request?`)) return;
+
 
         setActioning(leaveId);
         try {

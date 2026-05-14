@@ -53,13 +53,21 @@ export async function POST(req: NextRequest) {
             }
             // --- END VALIDATION ---
 
+            // Resolve schoolId for the actor
+            let actorSchoolId = "global";
+            const userSnap = await adminDb.collection("users").doc(user.uid).get();
+            if (userSnap.exists) {
+                actorSchoolId = userSnap.data()?.schoolId || "global";
+            }
+
             // Route all logic to our enterprise service
             const result = await EnterpriseAttendanceService.markAttendance(
                 date,
                 classId,
                 sectionId,
                 records,
-                user.uid
+                user.uid,
+                actorSchoolId
             );
 
             return NextResponse.json({

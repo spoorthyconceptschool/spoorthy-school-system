@@ -98,7 +98,12 @@ export default function AdminDashboard() {
         const fetchEnterpriseStats = async () => {
             try {
                 const currentYear = selectedYear || "2026-2027";
-                const req = await fetch(`/api/admin/dashboard/stats?year=${encodeURIComponent(currentYear)}`);
+                const token = await user.getIdToken();
+                const req = await fetch(`/api/admin/dashboard/stats?year=${encodeURIComponent(currentYear)}`, {
+                    headers: {
+                        'Authorization': `Bearer ${token}`
+                    }
+                });
                 const res = await req.json();
                 console.log("[AdminDashboard] Stats API response:", res);
                 if (res.success) {
@@ -118,6 +123,10 @@ export default function AdminDashboard() {
         };
 
         fetchEnterpriseStats();
+        
+        // Auto-refresh mechanism (30 seconds)
+        const interval = setInterval(fetchEnterpriseStats, 30000);
+        return () => clearInterval(interval);
     }, [user, selectedYear]);
 
     // We maintain simple non-aggregated paginated sub-lists if needed,

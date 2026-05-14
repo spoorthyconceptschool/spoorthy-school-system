@@ -212,37 +212,61 @@ export default function LeaveManagementPage() {
                             </CardTitle></CardHeader>
                             <CardContent className="p-0">
                                 {loading ? <div className="p-10 flex justify-center"><Loader2 className="animate-spin" /></div> : (
-                                    <div className="overflow-x-auto">
-                                        <table className="w-full text-left">
-                                            <thead className="bg-white/5 text-[10px] text-muted-foreground uppercase font-medium">
-                                                <tr>
-                                                    <th className="p-4">Dates</th>
-                                                    <th className="p-4">Type</th>
-                                                    <th className="p-4">Reason</th>
-                                                    <th className="p-4 text-right">Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody className="divide-y divide-white/5">
-                                                {leaves.map((leave: any) => (
-                                                    <tr key={leave.id} className="hover:bg-white/5 transition-colors">
-                                                        <td className="p-4 text-xs font-medium">
-                                                            {leave.fromDate === leave.toDate ? formatDateToDDMMYYYY(leave.fromDate) : `${formatDateToDDMMYYYY(leave.fromDate)} to ${formatDateToDDMMYYYY(leave.toDate)}`}
-                                                        </td>
-                                                        <td className="p-4"><Badge variant="outline" className="text-[10px]">{leave.type}</Badge></td>
-                                                        <td className="p-4 text-xs text-muted-foreground max-w-xs truncate" title={leave.reason}>{leave.reason}</td>
-                                                        <td className="p-4 text-right">
-                                                            {leave.status === "PENDING" && <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/10">Pending</Badge>}
-                                                            {leave.status === "APPROVED" && <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/10">Approved</Badge>}
-                                                            {leave.status === "REJECTED" && <Badge className="bg-red-500/20 text-red-500 border-red-500/10">Rejected</Badge>}
-                                                        </td>
+                                    <>
+                                        <div className="hidden md:block overflow-x-auto">
+                                            <table className="w-full text-left">
+                                                <thead className="bg-white/5 text-[10px] text-muted-foreground uppercase font-medium">
+                                                    <tr>
+                                                        <th className="p-4">Dates</th>
+                                                        <th className="p-4">Type</th>
+                                                        <th className="p-4">Reason</th>
+                                                        <th className="p-4 text-right">Status</th>
                                                     </tr>
-                                                ))}
-                                                {leaves.length === 0 && (
-                                                    <tr><td colSpan={4} className="p-10 text-center text-muted-foreground italic">No leave history.</td></tr>
-                                                )}
-                                            </tbody>
-                                        </table>
-                                    </div>
+                                                </thead>
+                                                <tbody className="divide-y divide-white/5">
+                                                    {leaves.map((leave: any) => (
+                                                        <tr key={leave.id} className="hover:bg-white/5 transition-colors">
+                                                            <td className="p-4 text-xs font-medium">
+                                                                {leave.fromDate === leave.toDate ? formatDateToDDMMYYYY(leave.fromDate) : `${formatDateToDDMMYYYY(leave.fromDate)} to ${formatDateToDDMMYYYY(leave.toDate)}`}
+                                                            </td>
+                                                            <td className="p-4"><Badge variant="outline" className="text-[10px]">{leave.type}</Badge></td>
+                                                            <td className="p-4 text-xs text-muted-foreground max-w-xs truncate" title={leave.reason}>{leave.reason}</td>
+                                                            <td className="p-4 text-right">
+                                                                {leave.status === "PENDING" && <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/10">Pending</Badge>}
+                                                                {leave.status === "APPROVED" && <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/10">Approved</Badge>}
+                                                                {leave.status === "REJECTED" && <Badge className="bg-red-500/20 text-red-500 border-red-500/10">Rejected</Badge>}
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                                    {leaves.length === 0 && (
+                                                        <tr><td colSpan={4} className="p-10 text-center text-muted-foreground italic">No leave history.</td></tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <div className="md:hidden space-y-4 p-4">
+                                            {leaves.map((leave: any) => (
+                                                <div key={leave.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-4">
+                                                    <div className="flex justify-between items-start">
+                                                        <div className="text-sm font-bold text-white flex gap-2 items-center">
+                                                            <History className="w-4 h-4 text-emerald-400" />
+                                                            {leave.fromDate === leave.toDate ? formatDateToDDMMYYYY(leave.fromDate) : `${formatDateToDDMMYYYY(leave.fromDate)} to ${formatDateToDDMMYYYY(leave.toDate)}`}
+                                                        </div>
+                                                        {leave.status === "PENDING" && <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/10 text-[10px]">Pending</Badge>}
+                                                        {leave.status === "APPROVED" && <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/10 text-[10px]">Approved</Badge>}
+                                                        {leave.status === "REJECTED" && <Badge className="bg-red-500/20 text-red-500 border-red-500/10 text-[10px]">Rejected</Badge>}
+                                                    </div>
+                                                    <div className="bg-black/20 p-3 rounded-xl border border-white/5 space-y-2">
+                                                        <Badge variant="outline" className="text-[10px] bg-white/5 border-none">{leave.type}</Badge>
+                                                        <p className="text-xs text-white/60 italic">"{leave.reason}"</p>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                            {leaves.length === 0 && (
+                                                <div className="text-center text-muted-foreground italic py-4">No leave history.</div>
+                                            )}
+                                        </div>
+                                    </>
                                 )}
                             </CardContent>
                         </Card>
@@ -269,68 +293,107 @@ export default function LeaveManagementPage() {
                             {studentLoading ? (
                                 <div className="p-10 flex justify-center"><Loader2 className="animate-spin" /></div>
                             ) : (
-                                <div className="overflow-x-auto">
-                                    <table className="w-full text-left">
-                                        <thead className="bg-white/5 text-[10px] text-muted-foreground uppercase font-medium">
-                                            <tr>
-                                                <th className="p-4">Student</th>
-                                                <th className="p-4">Dates</th>
-                                                <th className="p-4">Reason</th>
-                                                <th className="p-4">Status</th>
-                                                <th className="p-4 text-right">Actions</th>
-                                            </tr>
-                                        </thead>
-                                        <tbody className="divide-y divide-white/5">
-                                            {studentLeaves.map((l: any) => (
-                                                <tr key={l.id} className="hover:bg-white/5 transition-colors">
-                                                    <td className="p-4">
-                                                        <div className="font-bold text-xs">{l.studentName}</div>
-                                                        <div className="text-[10px] text-muted-foreground">{l.studentId}</div>
-                                                    </td>
-                                                    <td className="p-4 text-xs">
-                                                        <div>{l.fromDate === l.toDate ? formatDateToDDMMYYYY(l.fromDate) : `${formatDateToDDMMYYYY(l.fromDate)} to ${formatDateToDDMMYYYY(l.toDate)}`}</div>
-                                                    </td>
-                                                    <td className="p-4 text-xs text-muted-foreground max-w-sm">
-                                                        <Badge variant="outline" className="mr-2 mb-1 text-[9px]">{l.type}</Badge>
-                                                        <p className="line-clamp-1" title={l.reason}>{l.reason}</p>
-                                                    </td>
-                                                    <td className="p-4">
-                                                        {l.status === "PENDING" && <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/10">Pending</Badge>}
-                                                        {l.status === "APPROVED" && <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/10">Approved</Badge>}
-                                                        {l.status === "REJECTED" && <Badge className="bg-red-500/20 text-red-500 border-red-500/10">Rejected</Badge>}
-                                                    </td>
-                                                    <td className="p-4 text-right">
-                                                        {l.status === "PENDING" && (
-                                                            <div className="flex justify-end gap-2">
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="ghost"
-                                                                    className="h-8 w-8 p-0 hover:bg-emerald-500/20 hover:text-emerald-500"
-                                                                    onClick={() => handleAction(l.id, "APPROVED")}
-                                                                    disabled={actioning === l.id}
-                                                                >
-                                                                    {actioning === l.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
-                                                                </Button>
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="ghost"
-                                                                    className="h-8 w-8 p-0 hover:bg-red-500/20 hover:text-red-500"
-                                                                    onClick={() => handleAction(l.id, "REJECTED")}
-                                                                    disabled={actioning === l.id}
-                                                                >
-                                                                    <X className="w-4 h-4" />
-                                                                </Button>
-                                                            </div>
-                                                        )}
-                                                    </td>
+                                <>
+                                    <div className="hidden md:block overflow-x-auto">
+                                        <table className="w-full text-left">
+                                            <thead className="bg-white/5 text-[10px] text-muted-foreground uppercase font-medium">
+                                                <tr>
+                                                    <th className="p-4">Student</th>
+                                                    <th className="p-4">Dates</th>
+                                                    <th className="p-4">Reason</th>
+                                                    <th className="p-4">Status</th>
+                                                    <th className="p-4 text-right">Actions</th>
                                                 </tr>
-                                            ))}
-                                            {studentLeaves.length === 0 && (
-                                                <tr><td colSpan={5} className="p-10 text-center text-muted-foreground italic text-xs">No student leave requests found for your class.</td></tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </div>
+                                            </thead>
+                                            <tbody className="divide-y divide-white/5">
+                                                {studentLeaves.map((l: any) => (
+                                                    <tr key={l.id} className="hover:bg-white/5 transition-colors">
+                                                        <td className="p-4">
+                                                            <div className="font-bold text-xs">{l.studentName}</div>
+                                                            <div className="text-[10px] text-muted-foreground">{l.studentId}</div>
+                                                        </td>
+                                                        <td className="p-4 text-xs">
+                                                            <div>{l.fromDate === l.toDate ? formatDateToDDMMYYYY(l.fromDate) : `${formatDateToDDMMYYYY(l.fromDate)} to ${formatDateToDDMMYYYY(l.toDate)}`}</div>
+                                                        </td>
+                                                        <td className="p-4 text-xs text-muted-foreground max-w-sm">
+                                                            <Badge variant="outline" className="mr-2 mb-1 text-[9px]">{l.type}</Badge>
+                                                            <p className="line-clamp-1" title={l.reason}>{l.reason}</p>
+                                                        </td>
+                                                        <td className="p-4">
+                                                            {l.status === "PENDING" && <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/10">Pending</Badge>}
+                                                            {l.status === "APPROVED" && <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/10">Approved</Badge>}
+                                                            {l.status === "REJECTED" && <Badge className="bg-red-500/20 text-red-500 border-red-500/10">Rejected</Badge>}
+                                                        </td>
+                                                        <td className="p-4 text-right">
+                                                            {l.status === "PENDING" && (
+                                                                <div className="flex justify-end gap-2">
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="ghost"
+                                                                        className="h-8 w-8 p-0 hover:bg-emerald-500/20 hover:text-emerald-500"
+                                                                        onClick={() => handleAction(l.id, "APPROVED")}
+                                                                        disabled={actioning === l.id}
+                                                                    >
+                                                                        {actioning === l.id ? <Loader2 className="w-4 h-4 animate-spin" /> : <Check className="w-4 h-4" />}
+                                                                    </Button>
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant="ghost"
+                                                                        className="h-8 w-8 p-0 hover:bg-red-500/20 hover:text-red-500"
+                                                                        onClick={() => handleAction(l.id, "REJECTED")}
+                                                                        disabled={actioning === l.id}
+                                                                    >
+                                                                        <X className="w-4 h-4" />
+                                                                    </Button>
+                                                                </div>
+                                                            )}
+                                                        </td>
+                                                    </tr>
+                                                ))}
+                                                {studentLeaves.length === 0 && (
+                                                    <tr><td colSpan={5} className="p-10 text-center text-muted-foreground italic text-xs">No student leave requests found for your class.</td></tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                    <div className="md:hidden space-y-4 p-4">
+                                        {studentLeaves.map((l: any) => (
+                                            <div key={l.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-4">
+                                                <div className="flex justify-between items-start">
+                                                    <div>
+                                                        <div className="font-bold text-white text-sm">{l.studentName}</div>
+                                                        <div className="text-[10px] text-white/50">{l.studentId}</div>
+                                                    </div>
+                                                    {l.status === "PENDING" && <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/10 text-[10px]">Pending</Badge>}
+                                                    {l.status === "APPROVED" && <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/10 text-[10px]">Approved</Badge>}
+                                                    {l.status === "REJECTED" && <Badge className="bg-red-500/20 text-red-500 border-red-500/10 text-[10px]">Rejected</Badge>}
+                                                </div>
+                                                <div className="bg-black/20 p-3 rounded-xl border border-white/5 space-y-2">
+                                                    <div className="flex items-center gap-2 text-[10px] font-bold text-white/60">
+                                                        <History className="w-3.5 h-3.5 text-blue-400" />
+                                                        {l.fromDate === l.toDate ? formatDateToDDMMYYYY(l.fromDate) : `${formatDateToDDMMYYYY(l.fromDate)} - ${formatDateToDDMMYYYY(l.toDate)}`}
+                                                        <Badge variant="outline" className="ml-auto text-[8px] h-4 bg-white/5 border-none">{l.type}</Badge>
+                                                    </div>
+                                                    <p className="text-xs text-white/60 italic">"{l.reason}"</p>
+                                                </div>
+                                                {l.status === "PENDING" && (
+                                                    <div className="flex gap-2 isolate mt-2">
+                                                        <Button className="flex-1 bg-emerald-500/20 text-emerald-400 hover:bg-emerald-500/30 border-none h-9 rounded-xl text-xs font-bold" onClick={() => handleAction(l.id, "APPROVED")} disabled={actioning === l.id}>
+                                                            {actioning === l.id ? <Loader2 className="w-4 h-4 animate-spin mr-1" /> : <Check className="w-4 h-4 mr-1" />}
+                                                            Approve
+                                                        </Button>
+                                                        <Button className="flex-1 bg-red-500/20 text-red-400 hover:bg-red-500/30 border-none h-9 rounded-xl text-xs font-bold" onClick={() => handleAction(l.id, "REJECTED")} disabled={actioning === l.id}>
+                                                            <X className="w-4 h-4 mr-1" /> Reject
+                                                        </Button>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ))}
+                                        {studentLeaves.length === 0 && (
+                                            <div className="text-center text-muted-foreground italic text-xs py-4">No student leave requests found for your class.</div>
+                                        )}
+                                    </div>
+                                </>
                             )}
                         </CardContent>
                     </Card>

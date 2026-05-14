@@ -20,11 +20,13 @@ export default function TeacherDashboard() {
     const [todaySlots, setTodaySlots] = useState<any[]>([]);
     const [notices, setNotices] = useState<any[]>([]);
     const [substitutionsToday, setSubstitutionsToday] = useState<any[]>([]);
-    const [leaves, setLeaves] = useState<any[]>([]);
-    const [holidays, setHolidays] = useState<any[]>([]);
     const [upcomingSubs, setUpcomingSubs] = useState<any[]>([]);
-    const [teacherProfile, setTeacherProfile] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+    
+    // Optimistic Cache Hooks
+    const [teacherProfile, setTeacherProfile] = useState<any>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_profile_cache") || "null") : null);
+    const [leaves, setLeaves] = useState<any[]>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_leaves_cache") || "[]") : []);
+    const [holidays, setHolidays] = useState<any[]>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_holidays_cache") || "[]") : []);
+    const [loading, setLoading] = useState(() => typeof window !== 'undefined' ? !localStorage.getItem("teacher_profile_cache") : true);
     const { classSections, classes, sections, classSubjects, subjects, homeworkSubjects, selectedYear, loading: masterLoading } = useMasterData();
 
     useEffect(() => {
@@ -45,35 +47,57 @@ export default function TeacherDashboard() {
             // Parallel Execution (Removed timetable API fetch to avoid duplicate data)
             const [teacherSnapBySchoolId, leaveSnap] = await Promise.all([
                 userData?.schoolId ? getDocs(query(collection(db, "teachers"), where("schoolId", "==", userData.schoolId), limit(1))) : Promise.resolve({ empty: true, docs: [] }),
-                getDocs(query(collection(db, "leave_requests"), where("teacherId", "==", user.uid), orderBy("createdAt", "desc"), limit(2))).catch(e => { console.warn("[Dashboard] Leaves fetch error:", e.message); return { docs: [] }; })
+                getDocs(query(
+                    collection(db, "leave_requests"), 
+                    where("teacherId", "==", user.uid),
+                    where("schoolId", "==", userData?.schoolId || "global"),
+                    orderBy("createdAt", "desc"), 
+                    limit(2)
+                )).catch(e => { console.warn("[Dashboard] Leaves fetch error:", e.message); return { docs: [] }; }),
             ]);
 
             let finalTeacherSnap = teacherSnapBySchoolId;
             // Fallback for extremely old records without schoolId matched
             if (finalTeacherSnap.empty && user.uid) {
-                finalTeacherSnap = await getDocs(query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1)));
+                finalTeacherSnap = await getDocs(query(
+                    collection(db, "teachers"), 
+                    where("uid", "==", user.uid),
+                    where("schoolId", "==", userData?.schoolId || "global"),
+                    limit(1)
+                ));
             }
 
             // 0. Process Teacher Profile
             if (!finalTeacherSnap.empty && finalTeacherSnap.docs) {
                 const tData = finalTeacherSnap.docs[0].data();
-                setTeacherProfile({ id: finalTeacherSnap.docs[0].id, ...tData });
+                const profileObj = { id: finalTeacherSnap.docs[0].id, ...tData };
+                setTeacherProfile(profileObj);
+                if (typeof window !== 'undefined') localStorage.setItem("teacher_profile_cache", JSON.stringify(profileObj));
             }
 
             // 2. Process Leaves
             // @ts-ignore - catch block handles real errors, this is safe fallback
             if (leaveSnap.docs) {
                 // @ts-ignore
-                setLeaves(leaveSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+                const leavesList = leaveSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                setLeaves(leavesList);
+                if (typeof window !== 'undefined') localStorage.setItem("teacher_leaves_cache", JSON.stringify(leavesList));
             }
 
             // 3. Process Holidays
-            const hQuery = query(collection(db, "notices"), where("type", "==", "HOLIDAY"), limit(3));
+            const hQuery = query(
+                collection(db, "notices"), 
+                where("type", "==", "HOLIDAY"), 
+                where("schoolId", "in", [userData?.schoolId || "global", "global"]),
+                limit(3)
+            );
             const hSnap = await getDocs(hQuery).catch(e => ({ docs: [] }));
             // @ts-ignore
             if (hSnap.docs) {
                 // @ts-ignore
-                setHolidays(hSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+                const hList = hSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                setHolidays(hList);
+                if (typeof window !== 'undefined') localStorage.setItem("teacher_holidays_cache", JSON.stringify(hList));
             }
             setNotices([]);
 
@@ -141,9 +165,22 @@ export default function TeacherDashboard() {
         const possibleIds = [teacherProfile.id, teacherProfile.schoolId, teacherProfile.teacherId].filter(Boolean);
         if (possibleIds.length === 0) return;
 
-        const ttQuery = query(collection(db, "timetable_entries"), where("teacherId", "in", possibleIds));
-        const subQuery1 = query(collection(db, "substitutions"), where("originalTeacherId", "in", possibleIds));
-        const subQuery2 = query(collection(db, "substitutions"), where("substituteTeacherId", "in", possibleIds));
+        const ttQuery = query(
+            collection(db, "timetable_entries"), 
+            where("teacherId", "in", possibleIds),
+            where("academicYear", "==", currentYear),
+            where("schoolId", "==", userData?.schoolId || "global")
+        );
+        const subQuery1 = query(
+            collection(db, "substitutions"), 
+            where("originalTeacherId", "in", possibleIds),
+            where("schoolId", "==", userData?.schoolId || "global")
+        );
+        const subQuery2 = query(
+            collection(db, "substitutions"), 
+            where("substituteTeacherId", "in", possibleIds),
+            where("schoolId", "==", userData?.schoolId || "global")
+        );
 
         let lastEntries = [] as any[];
         let lastOrig = [] as any[];
@@ -211,7 +248,9 @@ export default function TeacherDashboard() {
         return () => { unsubTT(); unsubSub1(); unsubSub2(); };
     }, [teacherProfile, selectedYear]);
 
-    if (loading || masterLoading) {
+    // Removed full-screen loader to enable zero-latency optimistic rendering! 
+    // The UI will gracefully skip master data names if they arrive 50ms late.
+    if ((loading && !teacherProfile) && masterLoading) {
         return (
             <div className="min-h-[60vh] flex items-center justify-center">
                 <div className="flex flex-col items-center gap-4">

@@ -17,33 +17,44 @@ export async function createServerNotification(props: {
         });
 
         // FCM Push
-        if (props.userId) {
+        if (props.userId || props.target === "admin" || props.target === "ALL_ADMINS") {
             try {
-                // 1. Get User Logic (Direct UID or Student/Teacher ID lookup)
-                let uid = props.userId;
+                // 1. Get User Logic
                 let tokens: string[] = [];
 
-                // Check if userId is a UID (simple check: length usually 28 for firebase auth)
-                // Or fetch from 'users' collection directly.
-                const userSnap = await adminDb.collection("users").doc(uid).get();
+                if (props.userId) {
+                    let uid = props.userId;
+                        // Check if userId is a UID (simple check: length usually 28 for firebase auth)
+                    // Or fetch from 'users' collection directly.
+                    const userSnap = await adminDb.collection("users").doc(uid).get();
 
-                if (userSnap.exists) {
-                    tokens = userSnap.data()?.fcmTokens || [];
-                } else {
-                    // Fallback: If userId is School ID (e.g. ST123), find the linked UID
-                    // Try student collection
-                    const sSnap = await adminDb.collection("students").doc(uid).get();
-                    if (sSnap.exists() && sSnap.data()?.uid) {
-                        const linkedUser = await adminDb.collection("users").doc(sSnap.data()?.uid).get();
-                        tokens = linkedUser.data()?.fcmTokens || [];
+                    if (userSnap.exists) {
+                        tokens = userSnap.data()?.fcmTokens || [];
                     } else {
-                        // Try teacher collection
-                        const tSnap = await adminDb.collection("teachers").doc(uid).get();
-                        if (tSnap.exists() && tSnap.data()?.uid) {
-                            const linkedUser = await adminDb.collection("users").doc(tSnap.data()?.uid).get();
+                        // Fallback: If userId is School ID (e.g. ST123), find the linked UID
+                        // Try student collection
+                        const sSnap = await adminDb.collection("students").doc(uid).get();
+                        if (sSnap.exists && sSnap.data()?.uid) {
+                            const linkedUser = await adminDb.collection("users").doc(sSnap.data()?.uid).get();
                             tokens = linkedUser.data()?.fcmTokens || [];
+                        } else {
+                            // Try teacher collection
+                            const tSnap = await adminDb.collection("teachers").doc(uid).get();
+                            if (tSnap.exists && tSnap.data()?.uid) {
+                                const linkedUser = await adminDb.collection("users").doc(tSnap.data()?.uid).get();
+                                tokens = linkedUser.data()?.fcmTokens || [];
+                            }
                         }
                     }
+                } else if (props.target === "admin" || props.target === "ALL_ADMINS") {
+                    // Fetch all tokens for users with ADMIN or SUPER_ADMIN or MANAGER roles
+                    const adminSnaps = await adminDb.collection("users").where("role", "in", ["ADMIN", "SUPER_ADMIN", "MANAGER"]).get();
+                    adminSnaps.forEach((doc: any) => {
+                        const fTokens = doc.data()?.fcmTokens;
+                        if (Array.isArray(fTokens)) {
+                            tokens.push(...fTokens);
+                        }
+                    });
                 }
 
                 if (tokens.length > 0) {
@@ -52,15 +63,33 @@ export async function createServerNotification(props: {
 
                     if (adminMessaging) {
                         // adminMessaging is a Proxy, so we just call methods on it.
+                        
+                        // Determine Deep Link URL (Must be Absolute for PWA strict routing)
+                        const baseUrl = "https://spoorthy-school-live-55917.web.app";
+                        let linkUrl = `${baseUrl}/notifications`;
+                        if (props.type === "HOMEWORK") linkUrl = `${baseUrl}/student/homework`;
+                        else if (props.type === "FEE") linkUrl = `${baseUrl}/student/fees`;
+                        else if (props.type === "NOTICE") linkUrl = `${baseUrl}/notifications`;
+                        else if (props.type === "LEAVE_REQUEST") linkUrl = props.target === "admin" || props.target === "ALL_ADMINS" ? `${baseUrl}/admin/leaves` : `${baseUrl}/teacher/leaves`;
+                        else if (props.type === "LEAVE_APPROVED") linkUrl = `${baseUrl}/student/leaves`;
+
                         await adminMessaging.sendEachForMulticast({
                             tokens: [...new Set(tokens)], // Ensure unique
                             notification: {
                                 title: props.title,
                                 body: props.message,
                             },
+                            webpush: {
+                                fcmOptions: {
+                                    link: linkUrl
+                                },
+                                notification: {
+                                    icon: "https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Flogo.png?alt=media"
+                                }
+                            },
                             data: {
                                 type: props.type,
-                                url: "/notifications" // Deep link if needed
+                                url: linkUrl // Deep link if needed
                             }
                         });
                         console.log(`[FCM] Sent to ${tokens.length} devices for user ${props.userId}`);
@@ -146,6 +175,14 @@ export async function sendBulkPushNotifications(
             const response = await adminMessaging.sendEachForMulticast({
                 tokens: tokenChunk,
                 notification,
+                webpush: {
+                    fcmOptions: {
+                        link: data?.url || data?.click_action || "/notifications"
+                    },
+                    notification: {
+                        icon: "https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Flogo.png?alt=media"
+                    }
+                },
                 data: data || {}
             });
             totalSent += response.successCount;

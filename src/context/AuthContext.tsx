@@ -8,38 +8,27 @@ import {
     User
 } from "firebase/auth";
 import { auth, db } from "@/lib/firebase";
-import { doc, getDoc } from "firebase/firestore";
-import { useRouter } from "next/navigation";
+import { doc, getDoc, setDoc, onSnapshot, query, collection, where } from "firebase/firestore";
+import { useRouter, usePathname } from "next/navigation";
 
 /**
  * Defines the shape of the global authentication state and available actions.
  */
 interface AuthContextType {
-    /** The raw Firebase Auth User object. */
     user: User | null;
-    /** Extended user profile attributes from the 'users' Firestore collection. */
     userData: any | null;
-    /** Computed permission role (e.g., 'ADMIN', 'STUDENT'). */
     role: string;
-    /** Whether the user has any administrative role. */
     isAdmin: boolean;
-    /** Global authentication loading state. */
     loading: boolean;
-    /** Function to execute email/password sign-in. */
     signIn: (email: string, pass: string) => Promise<void>;
-    /** Function to sign out and clear local caches. */
     signOut: () => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType>({ isAdmin: false } as AuthContextType);
 
 const STORAGE_KEY = "spoorthy_user_cache";
+const SESSION_KEY = "local_session_id";
 
-/**
- * Global authentication provider that handles session persistence and role hydration.
- * This component monitors the Firebase Auth state and synchronizes it with 
- * the school's internal user directory automatically.
- */
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
     const [userData, setUserData] = useState<any>(() => {
@@ -55,41 +44,93 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
         return null;
     });
+    // System starts in a guarded loading state until Firebase physically confirms presence
     const [loading, setLoading] = useState(true);
     const [mounted, setMounted] = useState(false);
+    const router = useRouter();
+    const pathname = usePathname();
+    const [pendingStudentLeaves, setPendingStudentLeaves] = useState(0);
 
     useEffect(() => {
         setMounted(true);
-    }, []);
-    const router = useRouter();
 
+        const syncLogout = (e: StorageEvent) => {
+            if (e.key === "spoorthy_logout_sync") {
+                console.warn("[Auth] Cross-tab logout detected.");
+                firebaseSignOut(auth);
+                setUser(null);
+                setUserData(null);
+                router.push("/login?error=session_expired");
+            }
+        };
+        window.addEventListener("storage", syncLogout);
+        return () => window.removeEventListener("storage", syncLogout);
+    }, [router]);
+
+    // 1. Identity Monitor (Firebase Auth)
     useEffect(() => {
         const unsubscribe = onAuthStateChanged(auth, async (authUser) => {
             if (authUser) {
                 try {
+                    console.log("[Auth] Observer: User detected:", authUser.email);
+                    
+                    // --- STRICT BOOT-TIME SESSION GATE ---
+                    // If the app was closed during an override, the snapshot listener hasn't fired yet.
+                    // We MUST verify the session identity synchronously before allowing hydration.
+                    if (pathname !== "/login") {
+                        const sessionDoc = await getDoc(doc(db, "user_sessions", authUser.uid));
+                        if (sessionDoc.exists()) {
+                            const dbSessionId = sessionDoc.data().currentSessionId;
+                            const localSessionId = localStorage.getItem(SESSION_KEY);
+                            
+                            // If DB has a session and it does NOT match our local memory, EVICT immediately.
+                            // CRITICAL: We only evict if we HAVE a localSessionId but it's different.
+                            // If we don't have one, we let it pass and the monitor (Effect #2) will handle registration.
+                            if (dbSessionId && localSessionId && dbSessionId !== localSessionId) {
+                                console.error("[Auth] BOOT GATE: Stale session detected. Evicting.");
+                                await firebaseSignOut(auth);
+                                localStorage.removeItem(STORAGE_KEY);
+                                localStorage.removeItem(SESSION_KEY);
+                                setUser(null);
+                                setUserData(null);
+                                setLoading(false);
+                                router.push("/login?error=session_expired");
+                                return; // Halt execution, do not hydrate user!
+                            }
+                        }
+                    }
+                    // -------------------------------------
+
+                    await authUser.getIdToken(true);
+                    
+                    let dataToStore = null;
                     const userDoc = await getDoc(doc(db, "users", authUser.uid));
                     if (userDoc.exists()) {
                         const data = userDoc.data();
                         if (data.status !== "ACTIVE") {
+                            console.warn("[Auth] Account DEACTIVATED. Forced logout.");
                             await firebaseSignOut(auth);
-                            setUser(null);
-                            setUserData(null);
-                            localStorage.removeItem(STORAGE_KEY);
-                            router.push("/login?error=account_deactivated");
-                        } else {
-                            const uData = { ...data, uid: authUser.uid };
-                            setUser(authUser);
-                            setUserData(uData);
-                            localStorage.setItem(STORAGE_KEY, JSON.stringify(uData));
+                            return;
                         }
+                        dataToStore = { ...data, uid: authUser.uid };
                     } else {
-                        // User exists in Auth but not in Firestore users collection
-                        setUser(authUser);
+                        const studentDoc = await getDoc(doc(db, "students", authUser.uid));
+                        if (studentDoc.exists()) {
+                            const data = studentDoc.data();
+                            dataToStore = { ...data, uid: authUser.uid, role: "STUDENT" };
+                        }
                     }
+
+                    if (dataToStore) {
+                        setUserData(dataToStore);
+                        localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToStore));
+                    }
+                    setUser(authUser);
                 } catch (err: any) {
-                    console.warn("[Auth] Context user data fetch failed:", err.message);
+                    console.warn("[Auth] Identity fetch failed:", err.message);
                 }
             } else {
+                console.log("[Auth] Observer: No user.");
                 setUser(null);
                 setUserData(null);
                 localStorage.removeItem(STORAGE_KEY);
@@ -98,24 +139,105 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         });
 
         return () => unsubscribe();
-    }, []);
+    }, [router]);
+
+    // 2. Single-Device Session Monitor (Firestore Snapshot)
+    // Runs whenever 'user' identity changes.
+    useEffect(() => {
+        if (!user || pathname === "/login") return;
+
+        console.log("[Auth] Monitoring session for UID:", user.uid);
+        const unsub = onSnapshot(doc(db, "user_sessions", user.uid), (snap) => {
+            if (snap.exists()) {
+                const dbSessionId = snap.data().currentSessionId;
+                const localSessionId = localStorage.getItem(SESSION_KEY);
+                
+                console.log(`[Auth] Session sync check - User: ${user.email} - DB: ${dbSessionId} - Local: ${localSessionId}`);
+                
+                // CRITICAL FIX: By removing `&& localSessionId` from the condition, we ensure that
+                // if a device auto-hydrates an OLD session (where localSessionId is null), it will 
+                // still correctly register as a mismatch `(dbSessionId !== null)` and execute the 
+                // emergency logout when the user logs in on a new device.
+                if (dbSessionId && dbSessionId !== localSessionId) {
+                    console.error("[Auth] SESSION OVERRIDE DETECTED. Executing emergency logout.");
+                    firebaseSignOut(auth);
+                    localStorage.removeItem(STORAGE_KEY);
+                    localStorage.removeItem(SESSION_KEY);
+                    setUser(null);
+                    setUserData(null);
+                    router.push("/login?error=session_expired");
+                    setTimeout(() => { alert("Your session has expired because your account was logged in from another device."); }, 100);
+                }
+            }
+        }, (err) => {
+            console.error("[Auth] Session monitor error:", err);
+        });
+
+        return () => unsub();
+    }, [user?.uid, pathname, router]);
+
+    // 3. Smart Redirect Logic
+    useEffect(() => {
+        if (!loading && user && pathname === "/login") {
+            console.log("[Auth] Logged-in user at /login, forwarding to dashboard.");
+            router.replace("/dashboard");
+        }
+    }, [user, loading, pathname, router]);
+
+    const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'SUPERADMIN', 'OWNER', 'DEVELOPER', 'MANAGER'].includes(String(userData?.role || "").toUpperCase());
+
+    // 4. Listen for Pending Leaves (Admins)
+    useEffect(() => {
+        if (isAdmin) {
+            const studentLeavesQ = query(
+                collection(db, "student_leaves"), 
+                where("status", "==", "PENDING"),
+                where("schoolId", "==", userData?.schoolId || "global")
+            );
+            const unsubStudentLeaves = onSnapshot(studentLeavesQ, (snap) => setPendingStudentLeaves(snap.size));
+            return () => unsubStudentLeaves();
+        }
+    }, [isAdmin]);
 
     const signIn = async (email: string, pass: string) => {
         const result = await signInWithEmailAndPassword(auth, email, pass);
         if (result.user) {
-            setUser(result.user);
+            // 1. Establish session identity FIRST (Before UI re-renders or listeners fire)
+            const newSessionId = crypto.randomUUID();
+            localStorage.setItem(SESSION_KEY, newSessionId);
+            
+            await setDoc(doc(db, "user_sessions", result.user.uid), {
+                currentSessionId: newSessionId,
+                lastActive: new Date().toISOString()
+            }, { merge: true });
+
+            // 2. Refresh token and data
+            await result.user.getIdToken(true);
+            
+            let dataToStore = null;
             const userDoc = await getDoc(doc(db, "users", result.user.uid));
             if (userDoc.exists()) {
                 const data = userDoc.data();
                 if (data.status !== "ACTIVE") {
                     await firebaseSignOut(auth);
-                    setUser(null);
                     throw new Error("Account is deactivated. Please contact administrator.");
                 }
-                const uData = { ...data, uid: result.user.uid };
-                setUserData(uData);
-                localStorage.setItem(STORAGE_KEY, JSON.stringify(uData));
+                dataToStore = { ...data, uid: result.user.uid };
+            } else {
+                const studentDoc = await getDoc(doc(db, "students", result.user.uid));
+                if (studentDoc.exists()) {
+                    const data = studentDoc.data();
+                    dataToStore = { ...data, uid: result.user.uid, role: "STUDENT" };
+                }
             }
+            
+            if (dataToStore) {
+                setUserData(dataToStore);
+                localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToStore));
+            }
+
+            // 3. Finally set user state (triggers redirection and monitor mounting)
+            setUser(result.user);
         }
     };
 
@@ -123,24 +245,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         await firebaseSignOut(auth);
         setUserData(null);
         localStorage.removeItem(STORAGE_KEY);
+        localStorage.removeItem(SESSION_KEY);
+        localStorage.setItem("spoorthy_logout_sync", Date.now().toString());
         router.push("/login");
     };
 
+    // Hydration blocker
     if (!mounted) {
         return <div className="min-h-screen bg-[#0A192F]" />;
     }
 
-    const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'SUPERADMIN', 'OWNER', 'DEVELOPER', 'MANAGER'].includes(String(userData?.role || "").toUpperCase());
-
     return (
         <AuthContext.Provider value={{ user, userData, role: userData?.role || "", isAdmin, loading, signIn, signOut }}>
             {children}
+            <div className="hidden">{pendingStudentLeaves}</div>
         </AuthContext.Provider>
     );
 }
 
-/**
- * Convenience hook to access the current authenticated user and their permissions.
- * @returns The global Authentication context state.
- */
 export const useAuth = () => useContext(AuthContext);

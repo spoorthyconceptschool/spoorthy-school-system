@@ -16,11 +16,31 @@ const messaging = firebase.messaging();
 
 messaging.onBackgroundMessage((payload) => {
     console.log('[firebase-messaging-sw.js] Received background message ', payload);
-    const notificationTitle = payload.notification.title;
-    const notificationOptions = {
-        body: payload.notification.body,
-        icon: 'https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Flogo.png?alt=media'
-    };
+    // Firebase automatically displays a notification if payload.notification is present
+    // AND webpush data.link isn't being caught correctly natively by some browsers.
+});
 
-    self.registration.showNotification(notificationTitle, notificationOptions);
+self.addEventListener("notificationclick", (event) => {
+    event.notification.close();
+
+    // The payload data might be in event.notification.data.url OR event.notification.data.FCM_MSG...
+    // But since we use webpush.fcmOptions.link on the server, the link is usually event.notification.data?.url
+    // Or we extract it directly from the payload.
+    const urlToOpen = event.notification.data?.url || event.notification.data?.link || event.action || "/";
+
+    event.waitUntil(
+        clients.matchAll({ type: "window", includeUncontrolled: true }).then((windowClients) => {
+            // Check if there is already a window/tab open with the target URL
+            for (let i = 0; i < windowClients.length; i++) {
+                const client = windowClients[i];
+                if (client.url === urlToOpen && 'focus' in client) {
+                    return client.focus();
+                }
+            }
+            // If not, open a new window
+            if (clients.openWindow) {
+                return clients.openWindow(urlToOpen);
+            }
+        })
+    );
 });

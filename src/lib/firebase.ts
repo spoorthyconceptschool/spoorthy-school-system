@@ -1,5 +1,5 @@
 import { initializeApp, getApps, getApp, FirebaseApp } from "firebase/app";
-import { getAuth } from "firebase/auth";
+import { getAuth, setPersistence, browserLocalPersistence } from "firebase/auth";
 import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager, getFirestore, Firestore } from "firebase/firestore";
 import { getFunctions } from "firebase/functions";
 import { getStorage } from "firebase/storage";
@@ -47,6 +47,11 @@ if (typeof window !== "undefined") {
 }
 
 const auth = getAuth(app);
+if (typeof window !== "undefined") {
+    // Mandate persistent storage to survive PWA closed state
+    setPersistence(auth, browserLocalPersistence).catch(console.error);
+}
+
 const functions = getFunctions(app);
 const storage = getStorage(app);
 const rtdb = getDatabase(app);

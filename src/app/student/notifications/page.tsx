@@ -21,6 +21,29 @@ export default function StudentNotificationsPage() {
     const { user } = useAuth();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(true);
+    const [optimisticReads, setOptimisticReads] = useState<Set<string>>(() => {
+        if (typeof window !== 'undefined') {
+            try {
+                const stored = localStorage.getItem(`read_notifs_${user?.uid}`);
+                return stored ? new Set(JSON.parse(stored)) : new Set();
+            } catch (e) {
+                return new Set();
+            }
+        }
+        return new Set();
+    });
+
+    // Rehydrate local reads once the user identity is confirmed
+    useEffect(() => {
+        if (typeof window !== 'undefined' && user?.uid) {
+            try {
+                const stored = localStorage.getItem(`read_notifs_${user.uid}`);
+                if (stored) {
+                    setOptimisticReads(new Set(JSON.parse(stored)));
+                }
+            } catch (e) {}
+        }
+    }, [user?.uid]);
 
     useEffect(() => {
         if (!user?.email) return;
@@ -72,6 +95,15 @@ export default function StudentNotificationsPage() {
         });
         unsubscribes.push(unsubProfile);
 
+        // 3. Global Broadcast Notifications
+        const qGlobal = query(collection(db, "notifications"), where("target", "in", ["ALL", "ALL_STUDENTS"]), limit(50));
+        const unsubGlobal = onSnapshot(qGlobal, (snap) => {
+            if (!isMounted) return;
+            const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification));
+            updateNotifications(list);
+        });
+        unsubscribes.push(unsubGlobal);
+
         // Helper to merge lists safely
         const updateNotifications = (newList: Notification[]) => {
             if (!isMounted) return;
@@ -94,15 +126,34 @@ export default function StudentNotificationsPage() {
     }, [user]);
 
     const markAsRead = async (id: string, status: string) => {
-        // Prevent unnecessary writes
-        if (status === "READ") return;
+        if (status === "READ" || optimisticReads.has(id)) return;
+
+        setOptimisticReads(prev => {
+            const next = new Set(prev).add(id);
+            if (typeof window !== 'undefined') localStorage.setItem(`read_notifs_${user?.uid}`, JSON.stringify(Array.from(next).slice(-500)));
+            return next;
+        });
 
         try {
-            console.log("Marking as read:", id);
             await updateDoc(doc(db, "notifications", id), { status: "READ" });
         } catch (e) {
-            console.error("Error marking read:", e);
+            // Silently fail if no write permission
         }
+    };
+
+    const markAllAsRead = () => {
+        setOptimisticReads(prev => {
+            const next = new Set(prev);
+            notifications.forEach(n => next.add(n.id));
+            if (typeof window !== 'undefined') localStorage.setItem(`read_notifs_${user?.uid}`, JSON.stringify(Array.from(next).slice(-500)));
+            return next;
+        });
+
+        notifications.forEach(n => {
+            if (n.status === "UNREAD" && !optimisticReads.has(n.id)) {
+                updateDoc(doc(db, "notifications", n.id), { status: "READ" }).catch(()=>null);
+            }
+        });
     };
 
     const formatTimestamp = (timestamp: any) => {
@@ -119,14 +170,24 @@ export default function StudentNotificationsPage() {
 
     return (
         <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in pb-10">
-            <div className="flex items-center gap-3 mb-6 border-b border-[#64FFDA]/10 pb-4">
-                <div className="p-2 bg-[#64FFDA]/10 rounded-lg text-[#64FFDA]">
-                    <Bell size={24} />
+            <div className="flex items-center justify-between mb-6 border-b border-[#64FFDA]/10 pb-4">
+                <div className="flex items-center gap-3">
+                    <div className="p-2 bg-[#64FFDA]/10 rounded-lg text-[#64FFDA]">
+                        <Bell size={24} />
+                    </div>
+                    <div>
+                        <h1 className="text-3xl font-display font-bold text-white">Notifications</h1>
+                        <p className="text-muted-foreground">Updates on attendance, assignments, and system alerts.</p>
+                    </div>
                 </div>
-                <div>
-                    <h1 className="text-3xl font-display font-bold text-white">Notifications</h1>
-                    <p className="text-muted-foreground">Updates on attendance, assignments, and system alerts.</p>
-                </div>
+                {notifications.some(n => n.status === "UNREAD" && !optimisticReads.has(n.id)) && (
+                    <button 
+                        onClick={markAllAsRead}
+                        className="px-4 py-2 bg-[#64FFDA]/10 hover:bg-[#64FFDA]/20 text-[#64FFDA] rounded-lg text-sm font-bold transition-colors"
+                    >
+                        Mark All Read
+                    </button>
+                )}
             </div>
 
             <div className="space-y-4">
@@ -136,23 +197,25 @@ export default function StudentNotificationsPage() {
                         <p className="text-muted-foreground">No notifications yet.</p>
                     </div>
                 ) : (
-                    notifications.map(n => (
+                    notifications.map(n => {
+                        const isUnread = n.status === "UNREAD" && !optimisticReads.has(n.id);
+                        return (
                         <div
                             key={n.id}
                             onClick={() => markAsRead(n.id, n.status)}
                             className={cn(
                                 "bg-black/20 border border-white/10 rounded-lg transition-all hover:bg-white/5 cursor-pointer group relative overflow-hidden",
-                                n.status === "UNREAD" ? "border-l-4 border-l-[#3B82F6] bg-[#3B82F6]/5" : "opacity-80"
+                                isUnread ? "border-l-4 border-l-[#3B82F6] bg-[#3B82F6]/5" : "opacity-80"
                             )}
                         >
                             <div className="p-5 flex gap-4">
                                 <div className={cn(
                                     "mt-1 w-2 h-2 rounded-full flex-shrink-0",
-                                    n.status === "UNREAD" ? "bg-[#3B82F6]" : "bg-transparent"
+                                    isUnread ? "bg-[#3B82F6]" : "bg-transparent"
                                 )} />
                                 <div className="flex-1 space-y-1">
                                     <div className="flex justify-between items-start">
-                                        <h3 className={cn("font-bold text-lg", n.status === "UNREAD" ? "text-white" : "text-muted-foreground")}>
+                                        <h3 className={cn("font-bold text-lg", isUnread ? "text-white" : "text-muted-foreground")}>
                                             {n.title}
                                         </h3>
                                         <span suppressHydrationWarning className="text-xs text-muted-foreground whitespace-nowrap font-mono">
@@ -161,7 +224,7 @@ export default function StudentNotificationsPage() {
                                     </div>
                                     <p className="text-sm text-muted-foreground leading-relaxed">{n.message}</p>
 
-                                    {n.status === "READ" && (
+                                    {!isUnread && (
                                         <div className="flex items-center gap-1 text-[10px] text-green-500/50 mt-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                             <CheckCircle size={10} /> Read
                                         </div>
@@ -169,7 +232,8 @@ export default function StudentNotificationsPage() {
                                 </div>
                             </div>
                         </div>
-                    ))
+                        );
+                    })
                 )}
             </div>
         </div>

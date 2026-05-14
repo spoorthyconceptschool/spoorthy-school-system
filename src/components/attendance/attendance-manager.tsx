@@ -26,7 +26,7 @@ export default function AttendanceManager({
     sectionId: string;
     defaultDate?: string;
 }) {
-    const { user } = useAuth();
+    const { user, userData } = useAuth();
     const { classes, branding, students: globalStudents } = useMasterData();
 
     const [students, setStudents] = useState<any[]>([]);
@@ -42,6 +42,38 @@ export default function AttendanceManager({
 
     const date = defaultDate || new Date().toISOString().split('T')[0];
 
+    const [holidays, setHolidays] = useState<any[]>([]);
+    const [isHoliday, setIsHoliday] = useState(false);
+
+    useEffect(() => {
+        let isM = true;
+        const fetchH = async () => {
+            try {
+                const q = query(
+                    collection(db, "notices"), 
+                    where("type", "==", "HOLIDAY"),
+                    where("schoolId", "in", [userData?.schoolId || "global", "global"])
+                );
+                const snap = await getDocs(q);
+                if (isM) setHolidays(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+            } catch (e) {}
+        };
+        fetchH();
+        return () => { isM = false; };
+    }, []);
+
+    useEffect(() => {
+        const checkDate = new Date(`${date}T12:00:00`);
+        const isH = holidays.some(h => {
+             const start = h.startDate?.seconds ? new Date(h.startDate.seconds * 1000) : (h.date?.seconds ? new Date(h.date.seconds * 1000) : (h.createdAt?.seconds ? new Date(h.createdAt.seconds * 1000) : new Date()));
+             const end = h.endDate?.seconds ? new Date(h.endDate.seconds * 1000) : new Date(start.getTime());
+             start.setHours(0, 0, 0, 0);
+             end.setHours(23, 59, 59, 999);
+             return checkDate >= start && checkDate <= end;
+        });
+        setIsHoliday(isH);
+    }, [date, holidays]);
+
     const fetchStats = async () => {
         if (!classId || !sectionId) return;
         setLoading(true);
@@ -51,7 +83,8 @@ export default function AttendanceManager({
                 collection(db, "students"),
                 where("classId", "==", classId),
                 where("sectionId", "==", sectionId),
-                where("status", "==", "ACTIVE")
+                where("status", "==", "ACTIVE"),
+                where("schoolId", "==", userData?.schoolId || "global")
             );
             const sSnap = await getDocs(sQ);
             const sList = sSnap.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -208,7 +241,8 @@ export default function AttendanceManager({
                     collection(db, "students"),
                     where("classId", "==", classId),
                     where("sectionId", "==", sectionId),
-                    where("status", "==", "ACTIVE")
+                    where("status", "==", "ACTIVE"),
+                    where("schoolId", "==", userData?.schoolId || "global")
                 );
                 const sSnap = await getDocs(sQ);
                 const sList = sSnap.docs.map(d => ({ id: d.id, ...d.data() }))
@@ -225,7 +259,8 @@ export default function AttendanceManager({
                 const lQuery = query(
                     collection(db, "student_leaves"),
                     where("classId", "==", classId),
-                    where("status", "==", "APPROVED")
+                    where("status", "==", "APPROVED"),
+                    where("schoolId", "==", userData?.schoolId || "global")
                 );
 
                 const attId = `${date}_${classId}_${sectionId}`;
@@ -294,7 +329,7 @@ export default function AttendanceManager({
     const handleSubmit = async () => {
         setSubmitting(true);
         try {
-            const token = await user?.getIdToken();
+            const token = await user?.getIdToken(true);
             const res = await fetch("/api/attendance/mark", {
                 method: "POST",
                 headers: {
@@ -385,8 +420,18 @@ export default function AttendanceManager({
                 </Card>
             </div>
 
-            {/* List */}
-            <Card className="bg-black/20 border-white/10">
+            {isHoliday && !viewStats ? (
+                <div className="bg-amber-500/10 border border-amber-500/20 text-amber-500 p-10 rounded-3xl text-center space-y-4 max-w-lg mx-auto my-10 backdrop-blur-md shadow-2xl animate-in zoom-in duration-300">
+                    <div className="w-20 h-20 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-500/30">
+                        <CalendarDays className="w-10 h-10" />
+                    </div>
+                    <h3 className="text-3xl font-display font-bold">Holiday</h3>
+                    <p className="text-sm uppercase tracking-widest font-black opacity-60">Classes dismissed. Attendance locked.</p>
+                </div>
+            ) : (
+                <>
+                    {/* List */}
+                    <Card className="bg-black/20 border-white/10">
                 <div className="p-4 border-b border-white/10 flex flex-col md:flex-row justify-between gap-4 items-center">
                     <div className="flex bg-black/40 p-1 rounded-lg border border-white/10 items-center gap-2">
                         <Button
@@ -593,6 +638,8 @@ export default function AttendanceManager({
                         {alreadyMarked ? "Update Attendance" : "Submit Attendance"}
                     </Button>
                 </div>
+            )}
+            </>
             )}
         </div>
     );

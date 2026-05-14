@@ -76,7 +76,7 @@ export default function PaymentsPage() {
         try {
             console.log(`[PaymentsPage] Fetching payments page ${pageIndex}`);
             let baseConstraints: any[] = [
-                orderBy("date", "desc"),
+                orderBy("createdAt", "desc"),
                 limit(PAGE_SIZE + 1)
             ];
 

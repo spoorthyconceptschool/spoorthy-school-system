@@ -31,15 +31,14 @@ export async function POST(req: NextRequest) {
         if (teacherQuery.empty) return NextResponse.json({ error: "Teacher Profile Not Found" }, { status: 403 });
 
         const teacherData = teacherQuery.docs[0].data();
+        const schoolId = teacherData.schoolId || "global";
         const teacherId = teacherData.schoolId || teacherQuery.docs[0].id;
-
-        // Note: Deep validation against teaching_assignments skipped for now 
-        // as we rely on the teacher selecting from their assigned list in UI.
 
         // Create Homework
         const hwId = adminDb.collection("homework").doc().id;
         await adminDb.collection("homework").doc(hwId).set({
             id: hwId,
+            schoolId,
             yearId,
             classId,
             sectionId, // Targeted Section
@@ -53,7 +52,16 @@ export async function POST(req: NextRequest) {
             updatedAt: FieldValue.serverTimestamp()
         });
 
-        // TODO: Notification to Students of Class X
+        // Notify Students of the Class
+        await adminDb.collection("notifications").add({
+            target: `class_${classId}`,
+            title: "New Homework Assigned",
+            message: `${teacherData.name} assigned new homework for ${subjectId}: ${title}`,
+            type: "HOMEWORK",
+            schoolId,
+            status: "UNREAD",
+            createdAt: FieldValue.serverTimestamp()
+        });
 
         return NextResponse.json({ success: true, message: "Homework Posted" });
 

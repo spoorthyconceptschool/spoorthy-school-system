@@ -208,47 +208,70 @@ export default function StudentLeavesPage() {
                         {loading ? (
                             <div className="p-10 flex justify-center"><Loader2 className="animate-spin" /></div>
                         ) : (
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left">
-                                    <thead className="bg-white/5 text-[10px] text-muted-foreground uppercase font-medium">
-                                        <tr>
-                                            <th className="p-4">Dates</th>
-                                            <th className="p-4">Type</th>
-                                            <th className="p-4">Reason</th>
-                                            <th className="p-4 text-right">Status</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-white/5">
-                                        {leaves.map((l: any) => (
-                                            <tr key={l.id} className="hover:bg-white/5 transition-colors">
-                                                <td className="p-4 text-xs font-medium">
-                                                    <div className="flex items-center gap-2">
-                                                        <Calendar className="w-3 h-3 text-muted-foreground" />
-                                                        {l.fromDate === l.toDate
-                                                            ? formatDateToDDMMYYYY(l.fromDate)
-                                                            : `${formatDateToDDMMYYYY(l.fromDate)} - ${formatDateToDDMMYYYY(l.toDate)}`
-                                                        }
-                                                    </div>
-                                                </td>
-                                                <td className="p-4"><Badge variant="outline" className="text-[10px]">{l.type}</Badge></td>
-                                                <td className="p-4 text-xs text-muted-foreground" title={l.reason}>
-                                                    <p className="line-clamp-2 max-w-[200px]">{l.reason}</p>
-                                                </td>
-                                                <td className="p-4 text-right">
-                                                    {l.status === "PENDING" && <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/10">Pending</Badge>}
-                                                    {l.status === "APPROVED" && <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/10">Approved</Badge>}
-                                                    {l.status === "REJECTED" && <Badge className="bg-red-500/20 text-red-500 border-red-500/10">Rejected</Badge>}
-                                                </td>
+                            <>
+                                <div className="hidden md:block overflow-x-auto">
+                                    <table className="w-full text-left">
+                                        <thead className="bg-white/5 text-[10px] text-muted-foreground uppercase font-medium">
+                                            <tr>
+                                                <th className="p-4">Dates</th>
+                                                <th className="p-4">Type</th>
+                                                <th className="p-4">Reason</th>
+                                                <th className="p-4 text-right">Status</th>
                                             </tr>
-                                        ))}
-                                        {error ? (
-                                            <tr><td colSpan={4} className="p-12 text-center text-red-400 italic text-sm">{error}</td></tr>
-                                        ) : leaves.length === 0 ? (
-                                            <tr><td colSpan={4} className="p-12 text-center text-muted-foreground italic text-sm">No leave history found.</td></tr>
-                                        ) : null}
-                                    </tbody>
-                                </table>
-                            </div>
+                                        </thead>
+                                        <tbody className="divide-y divide-white/5">
+                                            {leaves.map((l: any) => (
+                                                <tr key={l.id} className="hover:bg-white/5 transition-colors">
+                                                    <td className="p-4 text-xs font-medium">
+                                                        <div className="flex items-center gap-2">
+                                                            <Calendar className="w-3 h-3 text-muted-foreground" />
+                                                            {l.fromDate === l.toDate
+                                                                ? formatDateToDDMMYYYY(l.fromDate)
+                                                                : `${formatDateToDDMMYYYY(l.fromDate)} - ${formatDateToDDMMYYYY(l.toDate)}`
+                                                            }
+                                                        </div>
+                                                    </td>
+                                                    <td className="p-4"><Badge variant="outline" className="text-[10px]">{l.type}</Badge></td>
+                                                    <td className="p-4 text-xs text-muted-foreground" title={l.reason}>
+                                                        <p className="line-clamp-2 max-w-[200px]">{l.reason}</p>
+                                                    </td>
+                                                    <td className="p-4 text-right">
+                                                        {l.status?.toUpperCase() === "PENDING" && <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/10">Pending</Badge>}
+                                                        {l.status?.toUpperCase() === "APPROVED" && <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/10">Approved</Badge>}
+                                                        {l.status?.toUpperCase() === "REJECTED" && <Badge className="bg-red-500/20 text-red-500 border-red-500/10">Rejected</Badge>}
+                                                    </td>
+                                                </tr>
+                                            ))}
+                                            {error ? (
+                                                <tr><td colSpan={4} className="p-12 text-center text-red-400 italic text-sm">{error}</td></tr>
+                                            ) : leaves.length === 0 ? (
+                                                <tr><td colSpan={4} className="p-12 text-center text-muted-foreground italic text-sm">No leave history found.</td></tr>
+                                            ) : null}
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div className="md:hidden space-y-4 p-4">
+                                    {leaves.map((l: any) => (
+                                        <div key={l.id} className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-4">
+                                            <div className="flex justify-between items-start">
+                                                <div className="flex items-center gap-2 text-sm font-bold text-white">
+                                                    <Calendar className="w-4 h-4 text-emerald-400" />
+                                                    {l.fromDate === l.toDate ? formatDateToDDMMYYYY(l.fromDate) : `${formatDateToDDMMYYYY(l.fromDate)} - ${formatDateToDDMMYYYY(l.toDate)}`}
+                                                </div>
+                                                {l.status?.toUpperCase() === "PENDING" && <Badge className="bg-yellow-500/20 text-yellow-500 border-yellow-500/10 text-[10px]">Pending</Badge>}
+                                                {l.status?.toUpperCase() === "APPROVED" && <Badge className="bg-emerald-500/20 text-emerald-500 border-emerald-500/10 text-[10px]">Approved</Badge>}
+                                                {l.status?.toUpperCase() === "REJECTED" && <Badge className="bg-red-500/20 text-red-500 border-red-500/10 text-[10px]">Rejected</Badge>}
+                                            </div>
+                                            <div className="bg-black/20 p-3 rounded-xl border border-white/5 space-y-2">
+                                                <Badge variant="outline" className="text-[10px] bg-white/5 border-none">{l.type}</Badge>
+                                                <p className="text-xs text-white/60 italic">"{l.reason}"</p>
+                                            </div>
+                                        </div>
+                                    ))}
+                                    {error && <div className="text-center text-red-400 italic text-sm py-4">{error}</div>}
+                                    {!error && leaves.length === 0 && <div className="text-center text-muted-foreground italic text-sm py-4">No leave history found.</div>}
+                                </div>
+                            </>
                         )}
                     </CardContent>
                 </Card>

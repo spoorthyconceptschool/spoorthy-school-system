@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { db } from "@/lib/firebase";
-import { doc, collection, query, where, onSnapshot } from "firebase/firestore";
+import { doc, collection, query, where, onSnapshot, getDocs } from "firebase/firestore";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loader2, Calendar as CalendarIcon, PieChart as PieChartIcon, ArrowLeft, ArrowRight, CheckCircle2, XCircle } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -11,13 +11,29 @@ import { startOfMonth, endOfMonth, eachDayOfInterval, format, isSameMonth, isSam
 import { motion } from "framer-motion";
 
 export default function StudentAttendancePage() {
-    const { user } = useAuth();
-    const [loading, setLoading] = useState(true);
+    const { user, userData } = useAuth();
+    const [loading, setLoading] = useState(() => {
+        if (typeof window !== 'undefined') return !localStorage.getItem("student_att_stats_cache");
+        return true;
+    });
     const [stats, setStats] = useState({ total: 0, present: 0, absent: 0, percentage: 0 });
-    const [attendanceMap, setAttendanceMap] = useState<Record<string, 'P' | 'A'>>({});
+    const [attendanceMap, setAttendanceMap] = useState<Record<string, 'P' | 'A'>>(() => {
+        if (typeof window !== 'undefined') {
+            try { return JSON.parse(localStorage.getItem("student_att_map_cache") || "{}"); } catch (e) { return {}; }
+        }
+        return {};
+    });
     const [currentMonth, setCurrentMonth] = useState(new Date());
+    const [holidays, setHolidays] = useState<any[]>([]);
 
     useEffect(() => {
+        if (typeof window !== 'undefined') {
+            const cachedStats = localStorage.getItem("student_att_stats_cache");
+            if (cachedStats) {
+                try { setStats(JSON.parse(cachedStats)); } catch (e) {}
+            }
+        }
+
         if (!user?.email) return;
 
         const schoolIdFromEmail = user.email.split('@')[0].toUpperCase();
@@ -36,9 +52,10 @@ export default function StudentAttendancePage() {
             if (unsubAtt) unsubAtt();
 
             const attQuery = query(
-                collection(db, "attendance"),
+                collection(db, "attendance_daily"),
                 where("classId", "==", classId),
-                where("sectionId", "==", sectionId)
+                where("sectionId", "==", sectionId),
+                where("schoolId", "==", userData?.schoolId || student.schoolId || "global")
             );
 
             unsubAtt = onSnapshot(attQuery, (attSnap) => {
@@ -58,13 +75,21 @@ export default function StudentAttendancePage() {
                     }
                 });
 
-                setAttendanceMap(map);
-                setStats({
+                const newStats = {
                     total,
                     present,
                     absent,
                     percentage: total > 0 ? Math.round((present / total) * 100) : 0
-                });
+                };
+                
+                setAttendanceMap(map);
+                setStats(newStats);
+                
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem("student_att_map_cache", JSON.stringify(map));
+                    localStorage.setItem("student_att_stats_cache", JSON.stringify(newStats));
+                }
+                
                 setLoading(false);
             }, (err) => {
                 console.error("Attendance sync error:", err);
@@ -94,11 +119,34 @@ export default function StudentAttendancePage() {
             setLoading(false);
         });
 
+        const fetchHolidays = async () => {
+            try {
+                const q = query(
+                    collection(db, "notices"), 
+                    where("type", "==", "HOLIDAY"),
+                    where("schoolId", "in", [userData?.schoolId || "global", "global"])
+                );
+                const snap = await getDocs(q);
+                setHolidays(snap.docs.map((doc: any) => ({ id: doc.id, ...doc.data() })));
+            } catch (e) {}
+        };
+        fetchHolidays();
+
         return () => {
             unsubProfile();
             if (unsubAtt) unsubAtt();
         };
     }, [user]);
+
+    const isDateHoliday = (date: Date) => {
+        return holidays.some(h => {
+            const start = h.startDate?.seconds ? new Date(h.startDate.seconds * 1000) : (h.date?.seconds ? new Date(h.date.seconds * 1000) : (h.createdAt?.seconds ? new Date(h.createdAt.seconds * 1000) : new Date()));
+            const end = h.endDate?.seconds ? new Date(h.endDate.seconds * 1000) : new Date(start.getTime());
+            start.setHours(0, 0, 0, 0);
+            end.setHours(23, 59, 59, 999);
+            return date >= start && date <= end;
+        });
+    };
 
     const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
     const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
@@ -209,13 +257,16 @@ export default function StudentAttendancePage() {
                                 const dateStr = format(date, 'yyyy-MM-dd');
                                 const status = attendanceMap[dateStr];
                                 const isToday = isSameDay(date, new Date());
+                                const isHoliday = isDateHoliday(date);
 
                                 return (
                                     <div
                                         key={dateStr}
                                         className={`
                                             aspect-square rounded-lg flex items-center justify-center text-sm font-bold relative group border transition-all
-                                            ${status === 'P'
+                                            ${isHoliday 
+                                                ? 'bg-amber-500/10 border-amber-500/30 text-amber-500 hover:bg-amber-500/20'
+                                                : status === 'P'
                                                 ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400 hover:bg-emerald-500/20'
                                                 : status === 'A'
                                                     ? 'bg-red-500/10 border-red-500/30 text-red-400 hover:bg-red-500/20'
@@ -225,9 +276,9 @@ export default function StudentAttendancePage() {
                                         `}
                                     >
                                         {format(date, 'd')}
-                                        {status && (
+                                        {(status || isHoliday) && (
                                             <div className="absolute inset-x-0 -bottom-8 bg-black/90 text-white text-[10px] py-1 px-2 rounded opacity-0 group-hover:opacity-100 transition-opacity z-10 pointer-events-none text-center border border-white/10">
-                                                {status === 'P' ? 'Present' : 'Absent'}
+                                                {isHoliday ? 'Holiday' : (status === 'P' ? 'Present' : 'Absent')}
                                             </div>
                                         )}
                                     </div>

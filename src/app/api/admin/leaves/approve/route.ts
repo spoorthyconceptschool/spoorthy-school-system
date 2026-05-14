@@ -301,31 +301,26 @@ export async function POST(req: NextRequest) {
                 batch.set(taskRef, { id: taskRef.id, ...task });
             });
 
-            // --- IMMEDIATE NOTIFICATIONS ---
-            const notifyRef = adminDb.collection("notifications");
+            await batch.commit();
 
+            // --- IMMEDIATE NOTIFICATIONS (Push Servers) ---
+            const { createServerNotification } = await import("@/lib/notifications-server");
+            
             // 1. Notify Original Teacher
-            batch.set(notifyRef.doc(), {
+            await createServerNotification({
                 userId: applicantUid,
                 type: "LEAVE_APPROVED",
                 title: "Leave Approved",
-                message: `Your leave request from ${fromDateStr} to ${toDateStr} has been approved.`,
-                status: "UNREAD",
-                createdAt: FieldValue.serverTimestamp()
+                message: `Your leave request from ${fromDateStr} to ${toDateStr} has been approved.`
             });
 
             // 2. Notify Admins (Broadcast)
-            batch.set(notifyRef.doc(), {
+            await createServerNotification({
                 type: "ADMIN_ACTION_REQUIRED",
                 target: "ALL_ADMINS",
                 title: "New Coverage Needed",
-                message: `${applicantName} is on leave. ${coverageTasks.length} classes need coverage resolution.`,
-                data: { leaveId, teacherName: applicantName },
-                status: "UNREAD",
-                createdAt: FieldValue.serverTimestamp()
+                message: `${applicantName} is on leave. ${coverageTasks.length} classes need coverage resolution.`
             });
-
-            await batch.commit();
 
             // 5. Auto-update Attendance Records (if already marked)
             try {

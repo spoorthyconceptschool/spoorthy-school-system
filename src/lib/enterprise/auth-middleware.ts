@@ -50,6 +50,10 @@ export async function authenticateRoute(
                 if (userDoc.exists) {
                     const data = userDoc.data();
                     roleStr = String(data?.role || "").toUpperCase();
+                    // Also resolve schoolId from Firestore if missing in token
+                    if (!decodedToken.schoolId) {
+                        (decodedToken as any).schoolId = data?.schoolId || "global";
+                    }
                 }
             } catch (err) {
                 console.warn("[Enterprise SecOps] Fallback role fetch failed:", err);
@@ -75,7 +79,7 @@ export async function authenticateRoute(
             uid: decodedToken.uid,
             email: decodedToken.email,
             role: normalizedRole as Role,
-            schoolId: decodedToken.schoolId || 'DEFAULT', // System default if not multi-tenant
+            schoolId: decodedToken.schoolId || 'global',
         };
 
         return { user: authUser };

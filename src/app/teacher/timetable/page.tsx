@@ -4,15 +4,16 @@ import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
 import Link from "next/link";
-import { Loader2, Calendar, MapPin, ArrowLeft } from "lucide-react";
+import { Loader2, Calendar, MapPin, ArrowLeft, Printer } from "lucide-react";
 import { collection, query, getDocs, where, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useMasterData } from "@/context/MasterDataContext";
 import { useRouter } from "next/navigation";
 
 export default function TeacherTimetablePage() {
-    const { user } = useAuth();
+    const { user, userData } = useAuth();
     const { teachers, subjects, branding, selectedYear } = useMasterData();
     const router = useRouter();
 
@@ -36,7 +37,11 @@ export default function TeacherTimetablePage() {
 
     const fetchTeacherProfile = async () => {
         if (!user?.uid) return;
-        const q = query(collection(db, "teachers"), where("uid", "==", user.uid));
+        const q = query(
+            collection(db, "teachers"), 
+            where("uid", "==", user.uid),
+            where("schoolId", "==", userData?.schoolId || "global")
+        );
         const snap = await getDocs(q);
         if (!snap.empty) {
             setTeacherProfile({ id: snap.docs[0].id, ...snap.docs[0].data() });
@@ -56,10 +61,19 @@ export default function TeacherTimetablePage() {
         const ttQuery = query(
             collection(db, "timetable_entries"),
             where("teacherId", "in", possibleIds),
-            where("academicYear", "==", currentYear)
+            where("academicYear", "==", currentYear),
+            where("schoolId", "==", userData?.schoolId || "global")
         );
-        const subQuery1 = query(collection(db, "substitutions"), where("originalTeacherId", "in", possibleIds));
-        const subQuery2 = query(collection(db, "substitutions"), where("substituteTeacherId", "in", possibleIds));
+        const subQuery1 = query(
+            collection(db, "substitutions"), 
+            where("originalTeacherId", "in", possibleIds),
+            where("schoolId", "==", userData?.schoolId || "global")
+        );
+        const subQuery2 = query(
+            collection(db, "substitutions"), 
+            where("substituteTeacherId", "in", possibleIds),
+            where("schoolId", "==", userData?.schoolId || "global")
+        );
 
         let lastEntries = [] as any[];
         let lastOrig = [] as any[];
@@ -106,7 +120,11 @@ export default function TeacherTimetablePage() {
 
     const fetchHolidays = async () => {
         try {
-            const hQuery = query(collection(db, "notices"), where("type", "==", "HOLIDAY"));
+            const hQuery = query(
+                collection(db, "notices"), 
+                where("type", "==", "HOLIDAY"),
+                where("schoolId", "in", [userData?.schoolId || "global", "global"])
+            );
             const hSnap = await getDocs(hQuery);
             setHolidays(hSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
         } catch (e) { console.warn("[Timetable] Holiday Fetch Error", e); }
@@ -114,7 +132,10 @@ export default function TeacherTimetablePage() {
 
     const fetchTeachers = async () => {
         try {
-            const q = query(collection(db, "teachers"));
+            const q = query(
+                collection(db, "teachers"),
+                where("schoolId", "==", userData?.schoolId || "global")
+            );
             const snap = await getDocs(q);
             const map: Record<string, string> = {};
             snap.docs.forEach(d => {
@@ -128,8 +149,8 @@ export default function TeacherTimetablePage() {
 
     const isDateHoliday = (date: Date) => {
         return holidays.some(h => {
-            const start = h.date?.seconds ? new Date(h.date.seconds * 1000) : (h.createdAt?.seconds ? new Date(h.createdAt.seconds * 1000) : new Date());
-            const end = h.expiresAt?.seconds ? new Date(h.expiresAt.seconds * 1000) : new Date();
+            const start = h.startDate?.seconds ? new Date(h.startDate.seconds * 1000) : (h.date?.seconds ? new Date(h.date.seconds * 1000) : (h.createdAt?.seconds ? new Date(h.createdAt.seconds * 1000) : new Date()));
+            const end = h.endDate?.seconds ? new Date(h.endDate.seconds * 1000) : new Date(start.getTime());
             start.setHours(0, 0, 0, 0);
             end.setHours(23, 59, 59, 999);
             return date >= start && date <= end;
@@ -180,12 +201,17 @@ export default function TeacherTimetablePage() {
 
     return (
         <div className="space-y-6 max-w-[1600px] mx-auto p-6 md:p-10 lg:p-12 animate-in fade-in">
-            <div>
-                <Link href="/teacher" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-white transition-colors mb-2">
-                    <ArrowLeft className="w-4 h-4" /> Back to Dashboard
-                </Link>
-                <h1 className="text-3xl font-display font-bold">My Schedule</h1>
-                <p className="text-muted-foreground">Teacher Portal</p>
+            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+                <div>
+                    <Link href="/teacher" className="flex items-center gap-2 text-sm text-muted-foreground hover:text-white transition-colors mb-2">
+                        <ArrowLeft className="w-4 h-4" /> Back to Dashboard
+                    </Link>
+                    <h1 className="text-3xl font-display font-bold">My Schedule</h1>
+                    <p className="text-muted-foreground">Teacher Portal</p>
+                </div>
+                <Button onClick={() => window.print()} variant="outline" className="gap-2 print:hidden bg-white/5 border-white/10 hover:bg-white/10 hover:text-white">
+                    <Printer className="w-4 h-4" /> Print Timetable
+                </Button>
             </div>
 
             {/* TODAY */}
@@ -243,7 +269,7 @@ export default function TeacherTimetablePage() {
             </Card>
 
             {/* WEEKLY */}
-            <Card className="bg-black/20 border-white/10">
+            <Card className="bg-black/20 border-white/10 print:hidden">
                 <CardHeader><CardTitle>Weekly Overview</CardTitle></CardHeader>
                 <CardContent>
                     <div className="overflow-x-auto">
@@ -315,6 +341,76 @@ export default function TeacherTimetablePage() {
                     </div>
                 </CardContent>
             </Card>
+
+            {/* PRINT-ONLY GENERIC MASTER SCHEDULE */}
+            <div className="hidden print:flex flex-col text-black bg-white min-h-screen">
+                <div className="w-full max-w-6xl mx-auto py-12">
+                    {/* Print Header */}
+                    <div className="flex items-end justify-between border-b-2 border-slate-900 pb-8 mb-12">
+                        <div>
+                            <h1 className="text-4xl font-black uppercase tracking-tight text-slate-900 mb-2">Master Timetable</h1>
+                            <p className="text-sm font-bold tracking-widest uppercase text-slate-500">
+                                {teacherProfile?.name || "Teacher portal"}
+                            </p>
+                        </div>
+                        <div className="text-right">
+                            <p className="text-[10px] font-black tracking-widest uppercase text-slate-400 mb-1">Generated</p>
+                            <p className="text-sm font-medium text-slate-800">{new Date().toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' })}</p>
+                        </div>
+                    </div>
+
+                    {/* Print Grid */}
+                    <table className="w-full border-collapse border-y-2 border-slate-900">
+                        <thead>
+                            <tr className="bg-slate-50">
+                                <th className="border-b-2 border-slate-900 p-4 font-black text-slate-900 uppercase tracking-widest text-[11px] text-left w-28">Day</th>
+                                {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
+                                    <th key={i} className="border-b-2 border-slate-900 p-4 font-black text-slate-900 uppercase tracking-widest text-[11px] text-center w-32">
+                                        Period {i}
+                                    </th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-200">
+                            {DAYS.map((day) => (
+                                <tr key={day} className="hover:bg-slate-50/50 transition-colors">
+                                    <td className="p-4 align-middle">
+                                        <span className="font-bold text-slate-900 uppercase tracking-widest">{day.substring(0, 3)}</span>
+                                    </td>
+                                    {[1, 2, 3, 4, 5, 6, 7, 8].map(i => {
+                                        const slot = schedule?.[day]?.[i];
+                                        if (!slot) return <td key={i} className="p-4 text-center align-middle border-l border-slate-100"><span className="text-slate-200 font-light">-</span></td>;
+                                        const classId = typeof slot === 'object' ? slot.classId : slot;
+                                        const subjectId = typeof slot === 'object' ? slot.subjectId : null;
+                                        
+                                        return (
+                                            <td key={i} className="p-4 text-center align-middle border-l border-slate-100">
+                                                <div className="flex flex-col items-center justify-center gap-1">
+                                                    <span className="font-bold uppercase text-[11px] tracking-wide text-slate-900">
+                                                        {classId}
+                                                    </span>
+                                                    {subjectId && (
+                                                        <span className="text-[9px] font-medium text-slate-500 uppercase tracking-wider">
+                                                            {subjects[subjectId]?.name || subjectId}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </td>
+                                        );
+                                    })}
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+
+                    {/* Print Footer */}
+                    <div className="mt-16 text-center">
+                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
+                            Official Document • Spoorthy Concept School
+                        </p>
+                    </div>
+                </div>
+            </div>
         </div>
     );
 }

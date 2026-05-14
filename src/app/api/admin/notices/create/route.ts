@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Insufficient Permissions" }, { status: 403 });
         }
 
-        const { title, content, type, target } = await req.json();
+        const { title, content, type, target, startDate, endDate } = await req.json();
 
         if (!title || !content) {
             return NextResponse.json({ error: "Missing fields" }, { status: 400 });
@@ -50,19 +50,28 @@ export async function POST(req: NextRequest) {
 
         const audience = target || (noticeType === "HOLIDAY" ? "ALL" : "ALL");
 
-        const noticeRef = adminDb.collection("notices").doc();
-        await noticeRef.set({
+        const actorSchoolId = userDoc.data()?.schoolId || "global";
+        
+        const noticePayload: any = {
             id: noticeRef.id,
             title,
             content,
             type: noticeType,
             target: audience,
+            schoolId: actorSchoolId,
             senderId: decodedToken.uid,
             senderName: actorName,
             senderRole: actorRole,
             createdAt: FieldValue.serverTimestamp(),
             expiresAt: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000)
-        });
+        };
+
+        if (noticeType === "HOLIDAY" && startDate && endDate) {
+            noticePayload.startDate = new Date(`${startDate}T00:00:00`);
+            noticePayload.endDate = new Date(`${endDate}T23:59:59`);
+        }
+
+        await noticeRef.set(noticePayload);
 
         // Broadcast to Notification Center
         const notifRef = adminDb.collection("notifications").doc();
@@ -80,6 +89,7 @@ export async function POST(req: NextRequest) {
             message: content.substring(0, 100) + (content.length > 100 ? "..." : ""),
             type: "NOTICE",
             target: broadcastTarget,
+            schoolId: actorSchoolId,
             status: "UNREAD",
             createdAt: FieldValue.serverTimestamp()
         });
@@ -95,6 +105,81 @@ export async function POST(req: NextRequest) {
                 actionByName: actorName
             });
         }
+
+        // --- FCM PUSH NOTIFICATION DISPATCHER ---
+        try {
+            // Already imported FieldValue at top, need adminMessaging
+            const { adminMessaging } = require("@/lib/firebase-admin");
+            let allTokens: string[] = [];
+
+            if (audience === "ALL") {
+                const usersSnap = await adminDb.collection("users").get();
+                usersSnap.forEach((d: any) => {
+                    const t = d.data().fcmTokens;
+                    if (Array.isArray(t)) allTokens.push(...t);
+                });
+            } else if (audience === "STUDENTS") {
+                const usersSnap = await adminDb.collection("users").where("role", "==", "STUDENT").get();
+                usersSnap.forEach((d: any) => {
+                    const t = d.data().fcmTokens;
+                    if (Array.isArray(t)) allTokens.push(...t);
+                });
+            } else if (audience === "TEACHERS") {
+                const usersSnap = await adminDb.collection("users").where("role", "in", ["TEACHER", "MANAGER", "ADMIN", "SUPER_ADMIN"]).get();
+                usersSnap.forEach((d: any) => {
+                    const t = d.data().fcmTokens;
+                    if (Array.isArray(t)) allTokens.push(...t);
+                });
+            } else {
+                // Class targeting (class_CLASSID)
+                const classId = audience.replace("class_", "");
+                const studSnap = await adminDb.collection("students").where("classId", "==", classId).get();
+                const uids = studSnap.docs.map((d: any) => d.data().uid).filter(Boolean);
+                
+                if (uids.length > 0) {
+                    const chunks = [];
+                    for (let i = 0; i < uids.length; i += 10) chunks.push(uids.slice(i, i + 10));
+                    for (const chunk of chunks) {
+                        const userSnap = await adminDb.collection("users").where(FieldValue.documentId(), "in", chunk).get();
+                        userSnap.forEach((d: any) => {
+                            const t = d.data().fcmTokens;
+                            if (Array.isArray(t)) allTokens.push(...t);
+                        });
+                    }
+                }
+            }
+
+            if (allTokens.length > 0) {
+                const uniqueTokens = [...new Set(allTokens)];
+                const message = {
+                    notification: {
+                        title: `New Notice: ${title}`,
+                        body: content.length > 50 ? content.substring(0, 50) + "..." : content,
+                    },
+                    webpush: {
+                        fcmOptions: {
+                            link: "https://spoorthy-school-live-55917.web.app/notifications"
+                        },
+                        notification: {
+                            icon: "https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Flogo.png?alt=media"
+                        }
+                    },
+                    data: {
+                        type: "NOTICE",
+                        click_action: "https://spoorthy-school-live-55917.web.app/notifications"
+                    },
+                    tokens: [] as string[]
+                };
+                
+                for (let i = 0; i < uniqueTokens.length; i += 500) {
+                    message.tokens = uniqueTokens.slice(i, i + 500);
+                    await adminMessaging.sendEachForMulticast(message);
+                }
+            }
+        } catch (pushErr) {
+            console.error("Notice Push Error:", pushErr);
+        }
+        // ----------------------------------------
 
         return NextResponse.json({ success: true, message: "Notice Published" });
 

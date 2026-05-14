@@ -16,7 +16,7 @@ import { toast } from "@/lib/toast-store";
 import { DataTable } from "@/components/ui/data-table";
 
 export default function AdminNoticesPage() {
-    const { user } = useAuth();
+    const { user, userData } = useAuth();
     const [notices, setNotices] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [submitting, setSubmitting] = useState(false);
@@ -27,12 +27,21 @@ export default function AdminNoticesPage() {
     const [content, setContent] = useState("");
     const [type, setType] = useState("REGULAR"); // REGULAR | HOLIDAY
     const [target, setTarget] = useState("ALL"); // ALL | TEACHERS | STUDENTS
+    const [startDate, setStartDate] = useState("");
+    const [endDate, setEndDate] = useState("");
 
     useEffect(() => {
         let isMounted = true;
         const q = useFallback
-            ? query(collection(db, "notices"))
-            : query(collection(db, "notices"), orderBy("createdAt", "desc"));
+            ? query(
+                collection(db, "notices"),
+                where("schoolId", "==", userData?.schoolId || "global")
+            )
+            : query(
+                collection(db, "notices"), 
+                where("schoolId", "==", userData?.schoolId || "global"),
+                orderBy("createdAt", "desc")
+            );
 
         const unsubscribe = onSnapshot(q, (snap) => {
             if (!isMounted) return;
@@ -64,13 +73,25 @@ export default function AdminNoticesPage() {
         setSubmitting(true);
         try {
             const token = await user?.getIdToken();
+            const payload: any = { title, content, type, target };
+
+            if (type === "HOLIDAY") {
+                if (!startDate || !endDate) {
+                    toast({ title: "Validation Error", description: "Select start and end dates.", type: "error" });
+                    setSubmitting(false);
+                    return;
+                }
+                payload.startDate = startDate;
+                payload.endDate = endDate;
+            }
+
             const res = await fetch("/api/admin/notices/create", {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${token}`
                 },
-                body: JSON.stringify({ title, content, type, target })
+                body: JSON.stringify(payload)
             });
 
             const data = await res.json();
@@ -82,6 +103,8 @@ export default function AdminNoticesPage() {
             setContent("");
             setType("REGULAR");
             setTarget("ALL");
+            setStartDate("");
+            setEndDate("");
         } catch (e: any) {
             toast({ title: "Failed", description: e.message || "Could not publish notice.", type: "error" });
         }
@@ -123,6 +146,19 @@ export default function AdminNoticesPage() {
                                     </SelectContent>
                                 </Select>
                             </div>
+
+                            {type === "HOLIDAY" && (
+                                <div className="grid grid-cols-2 gap-2">
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] md:text-xs font-black uppercase tracking-tighter text-muted-foreground">Start Date</label>
+                                        <Input type="date" required={type === "HOLIDAY"} value={startDate} onChange={e => setStartDate(e.target.value)} className="bg-white/5 border-white/10 h-8 md:h-10 text-xs text-white" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <label className="text-[10px] md:text-xs font-black uppercase tracking-tighter text-muted-foreground">End Date</label>
+                                        <Input type="date" required={type === "HOLIDAY"} value={endDate} onChange={e => setEndDate(e.target.value)} min={startDate} className="bg-white/5 border-white/10 h-8 md:h-10 text-xs text-white" />
+                                    </div>
+                                </div>
+                            )}
 
                             <div className="space-y-1.5">
                                 <label className="text-[10px] md:text-xs font-black uppercase tracking-tighter text-muted-foreground">Target Audience</label>
@@ -172,8 +208,17 @@ export default function AdminNoticesPage() {
                                     key: "type",
                                     header: "Type & Target",
                                     render: (n) => (
-                                        <div className="flex flex-wrap gap-1">
-                                            {n.type === "HOLIDAY" && <Badge className="text-[7px] md:text-[8px] bg-yellow-500/20 text-yellow-500 border-none px-1.5 py-0 h-4 uppercase font-black">Holiday</Badge>}
+                                        <div className="flex flex-wrap gap-1 items-center">
+                                            {n.type === "HOLIDAY" && (
+                                                <Badge className="text-[7px] md:text-[8px] bg-yellow-500/20 text-yellow-500 border-none px-1.5 py-0 h-4 uppercase font-black flex items-center gap-1">
+                                                    Holiday
+                                                    {n.startDate && (
+                                                        <span className="opacity-80 font-mono tracking-tighter">
+                                                            [{new Date(n.startDate?.seconds * 1000).toLocaleDateString()} {n.endDate && n.startDate.seconds !== n.endDate.seconds ? `- ${new Date(n.endDate?.seconds * 1000).toLocaleDateString()}` : ''}]
+                                                        </span>
+                                                    )}
+                                                </Badge>
+                                            )}
                                             <Badge variant="secondary" className="text-[7px] md:text-[8px] px-1.5 py-0 h-4 border-none bg-white/10 text-white/60 uppercase font-black">{n.target}</Badge>
                                         </div>
                                     )
