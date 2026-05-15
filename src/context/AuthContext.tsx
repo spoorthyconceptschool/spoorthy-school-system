@@ -86,7 +86,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     const userDoc = await getDoc(doc(db, "users", authUser.uid));
                     if (userDoc.exists()) {
                         const data = userDoc.data();
-                        if (data.status !== "ACTIVE") {
+                        if (data.status === "DEACTIVATED") {
                             console.warn("[Auth] Account DEACTIVATED. Forced logout.");
                             await firebaseSignOut(auth);
                             return;
@@ -122,23 +122,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [router]);
 
     // 2. Single-Device Session Monitor (Firestore Snapshot)
-    // Runs whenever 'user' identity changes.
     useEffect(() => {
         if (!user || pathname === "/login") return;
 
-        console.log("[Auth] Monitoring session for UID:", user.uid);
         const unsub = onSnapshot(doc(db, "user_sessions", user.uid), (snap) => {
             if (snap.exists()) {
                 const dbSessionId = snap.data().currentSessionId;
                 const localSessionId = localStorage.getItem(SESSION_KEY);
                 
-                console.log(`[Auth] Session sync check - User: ${user.email} - DB: ${dbSessionId} - Local: ${localSessionId}`);
-                
-                // CRITICAL FIX: By removing `&& localSessionId` from the condition, we ensure that
-                // if a device auto-hydrates an OLD session (where localSessionId is null), it will 
-                // still correctly register as a mismatch `(dbSessionId !== null)` and execute the 
-                // emergency logout when the user logs in on a new device.
-                if (dbSessionId && dbSessionId !== localSessionId) {
+                // Only enforce eviction if BOTH sessions exist but don't match.
+                // This prevents race conditions where local storage is temporarily empty during transitions.
+                if (dbSessionId && localSessionId && dbSessionId !== localSessionId) {
                     console.error("[Auth] SESSION OVERRIDE DETECTED. Executing emergency logout.");
                     firebaseSignOut(auth);
                     localStorage.removeItem(STORAGE_KEY);
@@ -146,11 +140,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setUser(null);
                     setUserData(null);
                     router.push("/login?error=session_expired");
-                    setTimeout(() => { alert("Your session has expired because your account was logged in from another device."); }, 100);
                 }
             }
-        }, (err) => {
-            console.error("[Auth] Session monitor error:", err);
         });
 
         return () => unsub();
@@ -203,7 +194,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const userDoc = await getDoc(doc(db, "users", result.user.uid));
             if (userDoc.exists()) {
                 const data = userDoc.data();
-                if (data.status !== "ACTIVE") {
+                if (data.status === "DEACTIVATED") {
                     await firebaseSignOut(auth);
                     throw new Error("Account is deactivated. Please contact administrator.");
                 }
