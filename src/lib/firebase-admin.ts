@@ -25,9 +25,9 @@ let _adminApp: any = null;
 let _initError: string | null = null;
 
 function getAdminApp(): App {
+    if (typeof window !== "undefined") throw new Error("Firebase Admin is not available on client-side");
+    
     const adminRoot = getAdminRoot();
-    if (!adminRoot) throw new Error("Firebase Admin is not available on client-side");
-
     if (_adminApp) return _adminApp;
 
     // Check if an app is already initialized with this name (usually [DEFAULT])
@@ -58,6 +58,35 @@ function getAdminApp(): App {
         return _adminApp;
     } catch (e: any) {
         _initError = e.message || String(e);
+        const isBuildPhase = process.env.NEXT_PHASE === "phase-production-build";
+        
+        if (isBuildPhase) {
+            console.warn(`[Firebase Admin] Using Build-Time Mock App due to: ${e.message}`);
+            // Return a dummy app that returns dummy services during static generation
+            const mockApp = {
+                firestore: () => ({ 
+                    collection: () => ({ 
+                        where: () => ({ limit: () => ({ get: () => Promise.resolve({ docs: [], size: 0 }) }) }),
+                        doc: () => ({ get: () => Promise.resolve({ exists: () => false }) }),
+                        get: () => Promise.resolve({ docs: [], size: 0 })
+                    }),
+                    settings: () => {}
+                }),
+                auth: () => ({}),
+                storage: () => ({ bucket: () => ({ file: () => ({ exists: () => [false] }) }) }),
+                database: () => ({ 
+                    ref: () => ({ 
+                        get: () => Promise.resolve({ exists: () => false, val: () => null }),
+                        on: () => {},
+                        once: () => Promise.resolve({ exists: () => false, val: () => null })
+                    }) 
+                }),
+                messaging: () => ({})
+            } as any;
+            _adminApp = mockApp;
+            return _adminApp;
+        }
+        
         console.error("[CRITICAL] Firebase Admin Init Error:", e);
         throw e;
     }
