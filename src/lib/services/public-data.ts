@@ -1,6 +1,14 @@
 import { adminRtdb } from "@/lib/firebase-admin";
 
 export async function getPublicHeroContent() {
+    if (process.env.NEXT_PHASE === "phase-production-build") {
+        return {
+            title: "Learn Today Lead Tommorrow",
+            subtitle: "Innovation meets tradition.",
+            videoUrl: "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/51d8a5ee-ebad-48e0-9617-b96d7911ac8b.mp4",
+            posterUrl: "https://firebasestorage.googleapis.com/v0/b/spoorthy-16292.firebasestorage.app/o/demo%2Fhero-poster.jpg?alt=media"
+        };
+    }
     try {
         const snap = await adminRtdb.ref('siteContent/home/hero').get();
         if (snap.exists()) {
@@ -19,6 +27,16 @@ export async function getPublicHeroContent() {
 }
 
 export async function getPublicSectionsContent() {
+    if (process.env.NEXT_PHASE === "phase-production-build") {
+        return {
+            facilities: [],
+            leadership: {},
+            whyUs: {},
+            gallery: [],
+            testimonials: [],
+            contact: {}
+        };
+    }
     try {
         const snap = await adminRtdb.ref('siteContent/home/sections').get();
         if (snap.exists()) {
@@ -64,6 +82,12 @@ export async function getPublicSectionsContent() {
 }
 
 export async function getPublicBranding() {
+    if (process.env.NEXT_PHASE === "phase-production-build") {
+        return {
+            schoolName: "Spoorthy Concept School",
+            schoolLogo: null
+        };
+    }
     try {
         const snap = await adminRtdb.ref('siteContent/branding').get();
         if (snap.exists()) {
