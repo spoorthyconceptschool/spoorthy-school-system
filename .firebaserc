@@ -1,5 +1,15 @@
 {
   "projects": {
     "default": "spoorthy-16292"
-  }
+  },
+  "targets": {
+    "spoorthy-16292": {
+      "hosting": {
+        "spoorthy-hosting-site": [
+          "spoorthyhighschool-11"
+        ]
+      }
+    }
+  },
+  "etags": {}
 }
