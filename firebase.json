@@ -1,6 +1,6 @@
 {
   "hosting": {
-    "site": "spoorthyhighschool-11",
+    "target": "spoorthy-hosting-site",
     "source": ".",
     "ignore": [
       "firebase.json",
