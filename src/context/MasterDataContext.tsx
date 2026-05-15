@@ -97,6 +97,10 @@ const initialState: MasterDataState = {
     },
     selectedYear: "2025-2026",
     setSelectedYear: () => { },
+    students: [],
+    teachers: [],
+    staff: [],
+    groups: [],
     feeConfig: { terms: [] },
     customFees: [],
     loading: true
@@ -408,10 +412,21 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
             setData(prev => ({ ...prev, groups: list }));
         }, (err) => console.warn("[MasterData] Groups Sync Error:", err.message));
 
+        // Sync Students (Active only)
+        let studentsBaseQ = query(collection(db, "students"), where("status", "==", "ACTIVE"));
+        if (userData?.schoolId && userData.schoolId !== "global") {
+            studentsBaseQ = query(studentsBaseQ, where("branchId", "==", userData.schoolId));
+        }
+        const studentsUnsub = onSnapshot(studentsBaseQ, (snap) => {
+            const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            setData(prev => ({ ...prev, students: list }));
+        }, (err) => console.warn("[MasterData] Students Sync Error:", err.message));
+
         return () => {
             teachersUnsub();
             staffUnsub();
             groupsUnsub();
+            studentsUnsub();
         };
     }, [user, role]);
 

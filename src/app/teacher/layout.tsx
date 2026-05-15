@@ -51,35 +51,47 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
     }, [branding?.schoolLogo]);
 
     useEffect(() => {
-        if (loading && !userData) return;
-        
-        if (!loading && !user && !userData) {
-            router.push("/login");
-            return;
-        }
+        // Block all routing decisions until the loading state is fully resolved
+        if (loading) return;
 
-        if (!userData) return;
+        // If data is fully loaded but no user exists, do nothing and let the fallback UI handle it
+        if (!user) return;
 
         // Verify Rule: Must Change Password and Role
-        const actualRole = userData.role || "";
+        if (userData && userData.role) {
+            const actualRole = userData.role || "";
 
-        if (["ADMIN", "SUPER_ADMIN", "MANAGER", "DEVELOPER", "OWNER"].includes(actualRole)) {
-            router.replace("/admin");
-            return;
-        }
-        if (actualRole === "STUDENT") {
-            router.replace("/student");
-            return;
-        }
+            if (["ADMIN", "SUPER_ADMIN", "MANAGER", "DEVELOPER", "OWNER"].includes(actualRole)) {
+                router.replace("/admin");
+                return;
+            }
+            if (actualRole === "STUDENT") {
+                router.replace("/student");
+                return;
+            }
 
-        if (userData.mustChangePassword && pathname !== "/teacher/change-password") {
-            router.push("/teacher/change-password");
-            return;
+            if (userData.mustChangePassword && pathname !== "/teacher/change-password") {
+                router.push("/teacher/change-password");
+                return;
+            }
         }
 
     }, [user, userData, loading, pathname, router]);
 
-    const isAuthenticating = loading && !userData;
+    // Hard fallback UI if user slips through somehow without data to stop loops dead in their tracks
+    if (!loading && (!user || !userData || !userData.role)) {
+        return (
+            <div className="h-screen w-full flex flex-col items-center justify-center bg-[#0A192F] text-white">
+                <p className="text-red-400 mb-4 text-xl font-bold uppercase tracking-widest">Session Invalid</p>
+                <p className="text-white/50 mb-8 max-w-sm text-center">Your authentication context is missing or invalid. Please sign in again.</p>
+                <a href="/login" className="bg-[#64FFDA] text-[#0A192F] px-6 py-2 rounded-lg font-bold hover:bg-[#64FFDA]/80 transition-colors">
+                    Return to Login
+                </a>
+            </div>
+        );
+    }
+
+    const isAuthenticating = loading;
 
     if (isAuthenticating) {
         return <div className="h-screen w-full flex items-center justify-center bg-[#0A192F] text-[#10B981]"><Loader2 className="animate-spin" /></div>;

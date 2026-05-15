@@ -140,8 +140,12 @@ export default function RootLayout({
             `,
           }}
         />
-        {children}
-        <SpeculativeLoader />
+        <AuthProvider>
+          <MasterDataProvider>
+            {children}
+            <SpeculativeLoader />
+          </MasterDataProvider>
+        </AuthProvider>
       </body>
     </html>
   );

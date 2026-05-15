@@ -71,7 +71,8 @@ export default function TeacherAttendanceManager({
             fetchStats();
         } else {
             setLoading(true);
-            const attId = `TEACHERS_${date}`;
+            const schoolId = user.schoolId || "global";
+            const attId = `${schoolId}_TEACHERS_${date}`;
             const unsub = onSnapshot(doc(db, "attendance_daily", attId), (snap) => {
                 if (snap.exists()) {
                     setAlreadyMarked(true);
@@ -91,14 +92,15 @@ export default function TeacherAttendanceManager({
             // Sync leaves
             const leavesQ = query(
                 collection(db, "leaves"),
-                where("status", "==", "APPROVED"),
-                where("startDate", "<=", date),
-                where("endDate", ">=", date)
+                where("status", "==", "APPROVED")
             );
             const leavesUnsub = onSnapshot(leavesQ, (snap) => {
                 const lMap: Record<string, boolean> = {};
                 snap.docs.forEach(d => {
-                    if (d.data().teacherId) lMap[d.data().teacherId] = true;
+                    const data = d.data();
+                    if (data.teacherId && data.startDate <= date && data.endDate >= date) {
+                        lMap[data.teacherId] = true;
+                    }
                 });
                 setLeavesMap(lMap);
             });
@@ -112,13 +114,14 @@ export default function TeacherAttendanceManager({
         try {
             const tList = teachers;
             const currentYear = new Date().getFullYear();
+            const schoolId = user?.schoolId || "global";
             let startKey, endKey;
             if (statsMonth === "ALL") {
-                startKey = `TEACHERS_${currentYear}-01-01`;
-                endKey = `TEACHERS_${currentYear}-12-31`;
+                startKey = `${schoolId}_TEACHERS_${currentYear}-01-01`;
+                endKey = `${schoolId}_TEACHERS_${currentYear}-12-31`;
             } else {
-                startKey = `TEACHERS_${currentYear}-${statsMonth}-01`;
-                endKey = `TEACHERS_${currentYear}-${statsMonth}-31`;
+                startKey = `${schoolId}_TEACHERS_${currentYear}-${statsMonth}-01`;
+                endKey = `${schoolId}_TEACHERS_${currentYear}-${statsMonth}-31`;
             }
             const q = query(collection(db, "attendance_daily"), where(documentId(), ">=", startKey), where(documentId(), "<=", endKey));
             const snap = await getDocs(q);

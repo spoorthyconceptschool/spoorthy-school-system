@@ -78,16 +78,21 @@ export default function AttendanceManager({
         if (!classId || !sectionId) return;
         setLoading(true);
         try {
-            // 1. Fetch Students for this class/section first
+            // 1. Fetch Students for this class/section locally, avoid complex index requirements
             const sQ = query(
                 collection(db, "students"),
                 where("classId", "==", classId),
-                where("sectionId", "==", sectionId),
-                where("status", "==", "ACTIVE"),
-                where("schoolId", "==", userData?.schoolId || "global")
+                where("sectionId", "==", sectionId)
             );
             const sSnap = await getDocs(sQ);
-            const sList = sSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+            
+            const schoolId = userData?.schoolId || "global";
+            const isGlobal = schoolId === "global";
+
+            const sList = sSnap.docs
+                .map(d => ({ id: d.id, ...d.data() }))
+                .filter((s: any) => s.status === "ACTIVE")
+                .filter((s: any) => isGlobal || s.schoolId === schoolId || !s.schoolId || s.branchId === schoolId)
                 .sort((a: any, b: any) => (a.rollNumber || 0) - (b.rollNumber || 0));
             setStudents(sList);
 
@@ -236,16 +241,21 @@ export default function AttendanceManager({
         const fetchData = async () => {
             setLoading(true);
             try {
-                // 1. Fetch Students for this class/section locally
+                // 1. Fetch Students for this class/section locally, avoid complex index requirements
                 const sQ = query(
                     collection(db, "students"),
                     where("classId", "==", classId),
-                    where("sectionId", "==", sectionId),
-                    where("status", "==", "ACTIVE"),
-                    where("schoolId", "==", userData?.schoolId || "global")
+                    where("sectionId", "==", sectionId)
                 );
                 const sSnap = await getDocs(sQ);
-                const sList = sSnap.docs.map(d => ({ id: d.id, ...d.data() }))
+
+                const schoolId = userData?.schoolId || "global";
+                const isGlobal = schoolId === "global";
+
+                const sList = sSnap.docs
+                    .map(d => ({ id: d.id, ...d.data() }))
+                    .filter((s: any) => s.status === "ACTIVE")
+                    .filter((s: any) => isGlobal || s.schoolId === schoolId || !s.schoolId || s.branchId === schoolId)
                     .sort((a: any, b: any) => (a.rollNumber || 0) - (b.rollNumber || 0));
 
                 if (isMounted) setStudents(sList);

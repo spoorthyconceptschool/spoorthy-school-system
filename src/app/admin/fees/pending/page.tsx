@@ -45,7 +45,13 @@ export default function FeePendingsPage() {
     const [selectedVillages, setSelectedVillages] = useState<string[]>([]);
     const [sending, setSending] = useState(false);
 
-    const { classes: classesData, villages: villagesData, branding, selectedYear } = useMasterData();
+    // Inline Fee Collection State
+    const [selectedLedger, setSelectedLedger] = useState<any>(null);
+    const [feeForm, setFeeForm] = useState({ amount: "", method: "cash", date: new Date().toISOString().split('T')[0], remarks: "" });
+    const [collectingFee, setCollectingFee] = useState(false);
+    const [receiptData, setReceiptData] = useState<any>(null);
+
+    const { classes: classesData, villages: villagesData, branding, selectedYear, feeConfig, customFees } = useMasterData();
     const classes = Object.values(classesData || {}).map((c: any) => ({ id: c.id, name: c.name, order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
     const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name || "Unknown Village" })).sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)));
 
@@ -104,6 +110,105 @@ export default function FeePendingsPage() {
     useEffect(() => {
         fetchPendings();
     }, [selectedYear]);
+
+    const handleCollectFee = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!selectedLedger || !user) return;
+        setCollectingFee(true);
+
+        try {
+            const amount = Number(feeForm.amount);
+            if (amount <= 0) throw new Error("Invalid Amount");
+
+            const now = new Date();
+            const timestampStr = `${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
+            const isManager = user?.email?.includes("manager") || false; // Quick heuristic or fallback to DB role
+            const managerRemark = isManager ? ` | Collected by manager: ${user?.displayName || "Manager"} at ${timestampStr}` : "";
+
+            const newPayment = {
+                studentId: selectedLedger.studentId,
+                studentName: selectedLedger.studentName,
+                amount,
+                method: feeForm.method,
+                date: new Date(feeForm.date), // Will be converted to Timestamp if necessary backend side, or just store string
+                status: "success",
+                remarks: (feeForm.remarks || "") + managerRemark,
+                academicYear: selectedYear || "2025-2026",
+                createdAt: new Date(),
+                verifiedBy: isManager ? `manager:${user?.displayName || 'Manager'}` : "admin"
+            };
+
+            const { writeBatch, doc, Timestamp, addDoc } = await import("firebase/firestore");
+            const batch = writeBatch(db);
+            const paymentRef = doc(collection(db, "payments"));
+            
+            // Adjust payment dates to FireStore Timestamps
+            const paymentDoc = {
+                ...newPayment,
+                date: Timestamp.fromDate(new Date(feeForm.date)),
+                createdAt: Timestamp.now()
+            };
+            batch.set(paymentRef, paymentDoc);
+
+            const newTotalPaid = (selectedLedger.totalPaid || 0) + amount;
+            const ledgerRef = doc(db, "student_fee_ledgers", selectedLedger.id);
+
+            let remainingAmount = amount;
+            const updatedItems = (selectedLedger.items || []).map((item: any) => {
+                if (remainingAmount <= 0) return item;
+                const itemTotal = Number(item.amount || 0);
+                const itemPaid = Number(item.paidAmount || 0);
+                const itemDue = itemTotal - itemPaid;
+                
+                if (itemDue > 0) {
+                    const payAmount = Math.min(itemDue, remainingAmount);
+                    remainingAmount -= payAmount;
+                    return { ...item, paidAmount: itemPaid + payAmount };
+                }
+                return item;
+            });
+
+            batch.set(ledgerRef, {
+                totalPaid: newTotalPaid,
+                items: updatedItems,
+                status: newTotalPaid >= selectedLedger.totalFee ? "PAID" : "PENDING",
+                updatedAt: new Date().toISOString()
+            }, { merge: true });
+
+            await batch.commit();
+
+            try {
+                await addDoc(collection(db, "notifications"), {
+                    target: "ALL_ADMINS",
+                    title: "Fee Collected",
+                    message: `Collected ₹${amount.toLocaleString()} from ${selectedLedger.studentName} via ${feeForm.method}.`,
+                    type: "FEE",
+                    status: "UNREAD",
+                    createdAt: Timestamp.now()
+                });
+            } catch (e) {}
+
+            const updatedLedgers = ledgers.map(l => {
+                if (l.id === selectedLedger.id) {
+                    const pend = (l.totalFee || 0) - newTotalPaid;
+                    return { ...l, totalPaid: newTotalPaid, pendingAmount: pend, items: updatedItems };
+                }
+                return l;
+            }).filter(l => l.pendingAmount > 0);
+
+            setLedgers(updatedLedgers);
+            setSelectedLedger(null);
+            setFeeForm({ amount: "", method: "cash", date: new Date().toISOString().split('T')[0], remarks: "" });
+            setReceiptData({ id: paymentRef.id, ...paymentDoc });
+            toast({ title: "Success", description: "Fee collected successfully.", type: "success" });
+            
+        } catch (e: any) {
+            console.error(e);
+            toast({ title: "Error", description: e.message, type: "error" });
+        } finally {
+            setCollectingFee(false);
+        }
+    };
 
     const filtered = ledgers.filter(l => {
         const matchesSearch = !search ||
@@ -465,7 +570,7 @@ export default function FeePendingsPage() {
                             variant="ghost"
                             onClick={(e) => {
                                 e.stopPropagation();
-                                router.push(`/admin/students/${l.studentDocId || l.id}`);
+                                setSelectedLedger(l);
                             }}
                             className="w-full justify-start gap-2 h-9 text-xs font-bold uppercase tracking-tighter text-red-400 hover:text-white hover:bg-red-500/20"
                         >
@@ -474,6 +579,130 @@ export default function FeePendingsPage() {
                     </div>
                 )}
             />
+
+            <Dialog open={!!selectedLedger} onOpenChange={(open) => !open && setSelectedLedger(null)}>
+                <DialogContent className="bg-[#0A192F] text-white border-white/10 sm:max-w-md">
+                    <DialogHeader>
+                        <DialogTitle>Collect Payment - {selectedLedger?.studentName}</DialogTitle>
+                    </DialogHeader>
+                    {selectedLedger && (
+                        <form onSubmit={handleCollectFee} className="space-y-4 pt-4">
+                            <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl flex items-center justify-between">
+                                <span className="text-emerald-400 font-bold text-sm">Total Due Balance:</span>
+                                <span className="text-emerald-400 font-black">₹{selectedLedger.pendingAmount.toLocaleString()}</span>
+                            </div>
+
+                            <div className="space-y-2">
+                                <Label className="flex items-center gap-1.5 text-red-500">Amount Received (₹) <span className="font-black text-lg">*</span></Label>
+                                <Input
+                                    required
+                                    min="1"
+                                    max={selectedLedger.pendingAmount}
+                                    type="number"
+                                    placeholder="Enter amount..."
+                                    className="bg-white/5 border-white/10 h-10"
+                                    value={feeForm.amount}
+                                    onChange={e => {
+                                        const val = Number(e.target.value);
+                                        if (val > selectedLedger.pendingAmount) {
+                                            setFeeForm({ ...feeForm, amount: selectedLedger.pendingAmount.toString() });
+                                        } else {
+                                            setFeeForm({ ...feeForm, amount: e.target.value });
+                                        }
+                                    }}
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div className="space-y-2">
+                                    <Label>Mode</Label>
+                                    <Select value={feeForm.method} onValueChange={v => setFeeForm({ ...feeForm, method: v })}>
+                                        <SelectTrigger className="bg-white/5 border-white/10 h-10"><SelectValue /></SelectTrigger>
+                                        <SelectContent className="bg-[#0A192F] border-white/10 text-white">
+                                            <SelectItem value="cash">Cash</SelectItem>
+                                            <SelectItem value="upi">UPI / GPay</SelectItem>
+                                            <SelectItem value="cheque">Cheque</SelectItem>
+                                            <SelectItem value="bank_transfer">Transfer</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Date</Label>
+                                    <Input type="date" required className="bg-white/5 border-white/10 h-10" value={feeForm.date} onChange={e => setFeeForm({ ...feeForm, date: e.target.value })} />
+                                </div>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Remarks</Label>
+                                <Input placeholder="Note..." className="bg-white/5 border-white/10 h-10" value={feeForm.remarks} onChange={e => setFeeForm({ ...feeForm, remarks: e.target.value })} />
+                            </div>
+                            <DialogFooter>
+                                <Button type="submit" disabled={collectingFee} className="w-full bg-emerald-600 hover:bg-emerald-700">
+                                    {collectingFee ? <Loader2 className="animate-spin" /> : "Confirm Payment"}
+                                </Button>
+                            </DialogFooter>
+                        </form>
+                    )}
+                </DialogContent>
+            </Dialog>
+
+            <Dialog open={!!receiptData} onOpenChange={(open) => !open && setReceiptData(null)}>
+                <DialogContent className="bg-[#0A192F] text-white border-white/10 sm:max-w-md print:bg-white print:text-black print:border-none print:shadow-none print:max-w-full">
+                    <DialogHeader className="print:hidden">
+                        <DialogTitle className="text-emerald-400 flex items-center gap-2">Payment Successful</DialogTitle>
+                    </DialogHeader>
+                    {receiptData && (
+                        <div className="space-y-6 pt-4 print:p-0">
+                            <div className="text-center space-y-2 border-b border-white/10 pb-6 print:border-black/10">
+                                {branding.schoolLogo && <img src={branding.schoolLogo} alt="School Logo" className="w-16 h-16 mx-auto object-contain hidden print:block mb-4" />}
+                                <h2 className="text-2xl font-bold font-display uppercase tracking-widest print:text-black">{branding.schoolName || "SPOORTHY CONCEPT SCHOOL"}</h2>
+                                <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold print:text-black/60">Fee Receipt</p>
+                            </div>
+                            
+                            <div className="grid grid-cols-2 gap-4 text-sm print:text-black">
+                                <div>
+                                    <p className="text-[10px] text-muted-foreground uppercase font-black print:text-black/60">Receipt No</p>
+                                    <p className="font-mono font-bold text-accent print:text-black">{receiptData.id?.slice(-8).toUpperCase() || "N/A"}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[10px] text-muted-foreground uppercase font-black print:text-black/60">Date</p>
+                                    <p className="font-mono font-bold print:text-black">{new Date(receiptData.createdAt?.seconds * 1000 || Date.now()).toLocaleString()}</p>
+                                </div>
+                                <div className="col-span-2 bg-white/5 p-4 rounded-xl print:bg-black/5">
+                                    <p className="text-[10px] text-muted-foreground uppercase font-black mb-1 print:text-black/60">Received From</p>
+                                    <p className="font-bold text-lg print:text-black">{receiptData.studentName}</p>
+                                    <p className="text-xs font-mono text-muted-foreground print:text-black/60">ID: {receiptData.studentId}</p>
+                                </div>
+                                <div className="col-span-2 flex justify-between items-center border-y border-white/10 py-4 print:border-black/10">
+                                    <p className="text-[10px] text-muted-foreground uppercase font-black print:text-black/60">Amount Received</p>
+                                    <p className="text-2xl font-black text-emerald-400 print:text-black">₹{Number(receiptData.amount).toLocaleString()}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[10px] text-muted-foreground uppercase font-black print:text-black/60">Payment Mode</p>
+                                    <p className="font-bold uppercase print:text-black">{receiptData.method}</p>
+                                </div>
+                                <div className="text-right">
+                                    <p className="text-[10px] text-muted-foreground uppercase font-black print:text-black/60">Cashier</p>
+                                    <p className="font-bold print:text-black">{receiptData.verifiedBy}</p>
+                                </div>
+                                {receiptData.remarks && (
+                                    <div className="col-span-2">
+                                        <p className="text-[10px] text-muted-foreground uppercase font-black print:text-black/60">Remarks</p>
+                                        <p className="text-xs italic text-white/70 print:text-black/80">{receiptData.remarks}</p>
+                                    </div>
+                                )}
+                            </div>
+
+                            <DialogFooter className="print:hidden sm:justify-between pt-4 border-t border-white/10">
+                                <Button variant="outline" onClick={() => setReceiptData(null)} className="bg-white/5 border-white/10 hover:bg-white/10">
+                                    Done
+                                </Button>
+                                <Button onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
+                                    <Printer className="w-4 h-4" /> Print Receipt
+                                </Button>
+                            </DialogFooter>
+                        </div>
+                    )}
+                </DialogContent>
+            </Dialog>
 
             <Dialog open={isWizardOpen} onOpenChange={setIsWizardOpen}>
                 <DialogContent className="max-w-2xl bg-[#0A192F] border-white/10 text-white shadow-2xl backdrop-blur-3xl rounded-3xl">

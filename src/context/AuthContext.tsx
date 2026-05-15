@@ -151,14 +151,37 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         if (isInitialized && !loading) {
             if (user && pathname === "/login") {
-                console.log("[Auth] Logged-in user at /login, forwarding to dashboard.");
-                router.replace("/admin");
+                console.log("[Auth] Logged-in user at /login. Checking profile data...");
+                
+                if (userData && userData.role) {
+                    const r = String(userData.role).toUpperCase();
+                    if (["ADMIN", "SUPER_ADMIN", "MANAGER", "DEVELOPER", "OWNER", "SUPERADMIN"].includes(r)) {
+                        router.replace("/admin");
+                    } else if (r === "TEACHER") {
+                        router.replace("/teacher");
+                    } else if (r === "STUDENT") {
+                        router.replace("/student");
+                    } else {
+                        console.warn("[Auth] Invalid role. Forcing logout to break loop.");
+                        firebaseSignOut(auth);
+                        setUserData(null);
+                        setUser(null);
+                    }
+                } else if (!userData) {
+                    // This is the critical loop breaker.
+                    // If a user exists in Auth but has no Firestore profile,
+                    // they will loop forever between /login and /admin. We MUST log them out.
+                    console.warn("[Auth] Authenticated user has no profile data. Forcing logout to break loop.");
+                    firebaseSignOut(auth);
+                    setUserData(null);
+                    setUser(null);
+                }
             } else if (!user && pathname !== "/login" && pathname !== "/" && !pathname.startsWith("/admissions")) {
                 console.log("[Auth] Public user at protected path, forcing login.");
                 router.replace("/login");
             }
         }
-    }, [user, loading, isInitialized, pathname, router]);
+    }, [user, userData, loading, isInitialized, pathname, router]);
 
     const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'SUPERADMIN', 'OWNER', 'DEVELOPER', 'MANAGER'].includes(String(userData?.role || "").toUpperCase());
 

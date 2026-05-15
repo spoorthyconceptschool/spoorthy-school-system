@@ -45,7 +45,8 @@ export function AddStaffModal({ isOpen, onClose, onSuccess, onOptimisticUpdate }
         roleId: "",
         name: "",
         mobile: "",
-        address: ""
+        address: "",
+        baseSalary: ""
     });
     const [submitting, setSubmitting] = useState(false);
     const [createdId, setCreatedId] = useState("");
@@ -53,7 +54,7 @@ export function AddStaffModal({ isOpen, onClose, onSuccess, onOptimisticUpdate }
     useEffect(() => {
         if (isOpen) {
             setCreatedId("");
-            setForm({ roleId: "", name: "", mobile: "", address: "" });
+            setForm({ roleId: "", name: "", mobile: "", address: "", baseSalary: "" });
             fetchRoles();
         }
     }, [isOpen]);
@@ -75,6 +76,15 @@ export function AddStaffModal({ isOpen, onClose, onSuccess, onOptimisticUpdate }
         }
     };
 
+    const handleRoleChange = (roleId: string) => {
+        const selected = roles.find(r => r.id === roleId);
+        setForm({
+            ...form,
+            roleId,
+            baseSalary: selected?.basicSalary ? String(selected.basicSalary) : ""
+        });
+    };
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSubmitting(true);
@@ -93,7 +103,7 @@ export function AddStaffModal({ isOpen, onClose, onSuccess, onOptimisticUpdate }
                 name: form.name.trim(),
                 mobile: form.mobile,
                 roleCode: selectedRole.code,
-                baseSalary: selectedRole.basicSalary || 0,
+                baseSalary: Number(form.baseSalary) || selectedRole.basicSalary || 0,
                 status: "ACTIVE",
                 isOptimistic: true
             };
@@ -101,14 +111,18 @@ export function AddStaffModal({ isOpen, onClose, onSuccess, onOptimisticUpdate }
         }
 
         try {
+            const token = await user?.getIdToken();
             const res = await fetch("/api/admin/staff/create", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
                 body: JSON.stringify({
                     roleId: form.roleId,
                     roleName: selectedRole.name,
                     roleCode: selectedRole.code,
-                    baseSalary: selectedRole.basicSalary,
+                    baseSalary: Number(form.baseSalary) || selectedRole.basicSalary || 0,
                     name: form.name,
                     mobile: form.mobile,
                     address: form.address
@@ -166,7 +180,7 @@ export function AddStaffModal({ isOpen, onClose, onSuccess, onOptimisticUpdate }
                             <Label>Job Role</Label>
                             <Select
                                 value={form.roleId}
-                                onValueChange={v => setForm({ ...form, roleId: v })}
+                                onValueChange={handleRoleChange}
                                 disabled={loadingRoles}
                             >
                                 <SelectTrigger className="bg-white/5 border-white/10">
@@ -219,13 +233,23 @@ export function AddStaffModal({ isOpen, onClose, onSuccess, onOptimisticUpdate }
                         </div>
 
                         {selectedRoleData && role !== "MANAGER" && (
-                            <div className="p-3 rounded bg-white/5 border border-white/10 text-sm flex justify-between">
-                                <span className="text-muted-foreground">Standard Basic Salary:</span>
-                                <span className="font-mono font-bold">₹{selectedRoleData.basicSalary?.toLocaleString()}</span>
+                            <div className="space-y-2 pt-2">
+                                <div className="flex justify-between items-center">
+                                    <Label className="text-amber-400">Custom Base Salary (₹)</Label>
+                                    <span className="text-[10px] text-muted-foreground">Standard: ₹{selectedRoleData.basicSalary?.toLocaleString()}</span>
+                                </div>
+                                <Input
+                                    required
+                                    type="number"
+                                    value={form.baseSalary}
+                                    onChange={e => setForm({ ...form, baseSalary: e.target.value })}
+                                    className="bg-amber-500/5 border-amber-500/20 text-amber-400 font-mono font-bold"
+                                    placeholder="e.g. 15000"
+                                />
                             </div>
                         )}
 
-                        <DialogFooter className="mt-4">
+                        <DialogFooter className="mt-6">
                             <Button type="submit" disabled={submitting || !form.roleId} className="w-full bg-white text-black hover:bg-zinc-200">
                                 {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Create Staff Record"}
                             </Button>

@@ -51,21 +51,32 @@ function StudentContent({ children }: { children: React.ReactNode }) {
 
     // 1. Fetch User Status ONCE when user logs in (Optimistic rendering)
     useEffect(() => {
-        if (loading && !userData) return;
-        
-        if (!loading && !user && !userData) {
-            router.push("/login");
-            return;
-        }
+        // Block all routing decisions until the loading state is fully resolved
+        if (loading) return;
 
+        // If data is fully loaded but no user exists, do nothing and let the fallback UI handle it
         if (!user) return;
+
+        // Verify Rule: Must Change Password and Role
+        if (userData && userData.role) {
+            const actualRole = userData.role || "";
+
+            if (["ADMIN", "SUPER_ADMIN", "MANAGER", "DEVELOPER", "OWNER"].includes(actualRole)) {
+                router.replace("/admin");
+                return;
+            }
+            if (actualRole === "TEACHER") {
+                router.replace("/teacher");
+                return;
+            }
+        }
 
         const fetchUserStatus = async () => {
             try {
                 const userDoc = await getDoc(doc(db, "users", user.uid));
                 if (userDoc.exists()) {
-                    const userData = userDoc.data();
-                    if (userData.mustChangePassword) {
+                    const data = userDoc.data();
+                    if (data.mustChangePassword) {
                         setMustChangePassword(true);
                     }
                 }
@@ -77,7 +88,7 @@ function StudentContent({ children }: { children: React.ReactNode }) {
         };
 
         fetchUserStatus();
-    }, [user, loading, router]); // Dependency on router for login redirect is fine
+    }, [user, userData, loading, router]); // Dependency on router for login redirect is fine
 
     // 2. Enforce Password Change on Navigation (Synchronous & Fast)
     useEffect(() => {
@@ -86,8 +97,22 @@ function StudentContent({ children }: { children: React.ReactNode }) {
         }
     }, [pathname, mustChangePassword, router]);
 
+    // Hard fallback UI if user slips through somehow without data to stop loops dead in their tracks
+    if (!loading && (!user || !userData || !userData.role)) {
+        return (
+            <div className="h-screen w-full flex flex-col items-center justify-center bg-[#0A192F] text-white">
+                <p className="text-red-400 mb-4 text-xl font-bold uppercase tracking-widest">Session Invalid</p>
+                <p className="text-white/50 mb-8 max-w-sm text-center">Your authentication context is missing or invalid. Please sign in again.</p>
+                <a href="/login" className="bg-[#64FFDA] text-[#0A192F] px-6 py-2 rounded-lg font-bold hover:bg-[#64FFDA]/80 transition-colors">
+                    Return to Login
+                </a>
+            </div>
+        );
+    }
+
     // Only block the UI completely if we have NO cached data and are waiting for the network
-    if ((loading && !userData)) {
+    const isAuthenticating = loading;
+    if (isAuthenticating) {
         return <div className="h-screen w-full flex items-center justify-center bg-[#0A192F] text-[#64FFDA]"><Loader2 className="animate-spin" /></div>;
     }
 
