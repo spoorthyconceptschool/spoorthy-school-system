@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -21,6 +21,17 @@ export default function LoginPage() {
     const [error, setError] = useState("");
     const { signIn } = useAuth();
     const router = useRouter();
+    // Use window.location.search directly to avoid Next.js Suspense bail-out during build
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get("error") === "session_expired") {
+                setError("Session override detected. You have been logged out because another device logged in.");
+            }
+        }
+    }, []);
+
+
 
     // Zero-Latency Speculative Prefetch
     useEffect(() => {
