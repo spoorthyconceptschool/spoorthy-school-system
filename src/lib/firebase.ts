@@ -4,6 +4,7 @@ import { initializeFirestore, persistentLocalCache, persistentMultipleTabManager
 import { getFunctions } from "firebase/functions";
 import { getStorage } from "firebase/storage";
 import { getDatabase } from "firebase/database";
+import { getAnalytics, Analytics } from "firebase/analytics";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
@@ -55,4 +56,9 @@ if (typeof window !== "undefined") {
     });
 }
 
-export { app, auth, db, functions, storage, rtdb, messaging };
+let analytics: Analytics | null = null;
+if (typeof window !== "undefined") {
+    analytics = getAnalytics(app);
+}
+
+export { app, auth, db, functions, storage, rtdb, messaging, analytics };
