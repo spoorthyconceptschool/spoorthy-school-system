@@ -48,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     // System starts in a guarded loading state until Firebase physically confirms presence
     const [loading, setLoading] = useState(true);
+    const [isInitialized, setIsInitialized] = useState(false);
     const [mounted, setMounted] = useState(false);
     const router = useRouter();
     const pathname = usePathname();
@@ -114,6 +115,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 localStorage.removeItem(STORAGE_KEY);
             }
             setLoading(false);
+            setIsInitialized(true);
         });
 
         return () => unsubscribe();
@@ -156,11 +158,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // 3. Smart Redirect Logic
     useEffect(() => {
-        if (!loading && user && pathname === "/login") {
-            console.log("[Auth] Logged-in user at /login, forwarding to dashboard.");
-            router.replace("/dashboard");
+        if (isInitialized && !loading) {
+            if (user && pathname === "/login") {
+                console.log("[Auth] Logged-in user at /login, forwarding to dashboard.");
+                router.replace("/admin");
+            } else if (!user && pathname !== "/login" && pathname !== "/" && !pathname.startsWith("/admissions")) {
+                console.log("[Auth] Public user at protected path, forcing login.");
+                router.replace("/login");
+            }
         }
-    }, [user, loading, pathname, router]);
+    }, [user, loading, isInitialized, pathname, router]);
 
     const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'SUPERADMIN', 'OWNER', 'DEVELOPER', 'MANAGER'].includes(String(userData?.role || "").toUpperCase());
 
