@@ -7,6 +7,8 @@ const nextConfig: NextConfig = {
   typescript: {
     ignoreBuildErrors: true,
   },
+  poweredByHeader: false,
+  compress: true,
   images: {
     formats: ['image/avif', 'image/webp'],
     minimumCacheTTL: 31536000, // 1 year
@@ -17,6 +19,12 @@ const nextConfig: NextConfig = {
       }
     ],
   },
+  experimental: {
+    ppr: 'incremental',
+    serverActions: {
+      bodySizeLimit: '2mb',
+    }
+  }
 };
 
 export default nextConfig;
