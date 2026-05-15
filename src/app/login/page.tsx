@@ -22,6 +22,15 @@ export default function LoginPage() {
     const { signIn } = useAuth();
     const router = useRouter();
 
+    // Zero-Latency Speculative Prefetch
+    useEffect(() => {
+        if (schoolId.length > 2) {
+            router.prefetch("/admin");
+            router.prefetch("/student");
+            router.prefetch("/teacher");
+        }
+    }, [schoolId, router]);
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsLoading(true);
@@ -47,42 +56,18 @@ export default function LoginPage() {
                 type: "success"
             });
 
-            // --- REDIRECTION LOGIC ---
+            // --- INSTANT REDIRECTION LOGIC (Heuristic First) ---
             const lowerId = schoolId.toLowerCase();
             const lowerEmail = email.toLowerCase();
-            let targetPath = "/student"; // Default
+            let targetPath = "/student";
 
-            // 1. Initial heuristic check
             if (adminEmails.includes(lowerEmail) || lowerId.includes("admin")) {
                 targetPath = "/admin";
+            } else if (lowerId.startsWith("shst") || lowerId.startsWith("tch")) {
+                targetPath = "/teacher";
             }
 
-            // 2. Database verification (The Source of Truth)
-            try {
-                const { auth } = await import("@/lib/firebase");
-                const uid = auth.currentUser?.uid;
-                if (uid) {
-                    const userSnapshot = await getDoc(doc(db, "users", uid));
-                    if (userSnapshot.exists()) {
-                        const userData = userSnapshot.data();
-                        const role = userData.role?.toString().toUpperCase();
-
-                        if (["ADMIN", "SUPER_ADMIN", "MANAGER", "OWNER", "DEVELOPER"].includes(role)) {
-                            targetPath = "/admin";
-                        } else if (role === "TEACHER") {
-                            targetPath = "/teacher";
-                        } else if (role === "STUDENT") {
-                            targetPath = "/student";
-                        }
-                    }
-                }
-            } catch (dbErr) {
-                console.warn("[Login] DB Role check failed, using heuristic", dbErr);
-                // Fallback heuristic if DB fails
-                if (lowerId.startsWith("shst") || lowerId.startsWith("tch")) targetPath = "/teacher";
-            }
-
-            console.log("[Login] Final Target Path:", targetPath);
+            console.log("[Login] Instant Redirect to:", targetPath);
             router.push(targetPath);
 
         } catch (err: any) {
@@ -115,7 +100,7 @@ export default function LoginPage() {
                             Portal Login
                         </CardTitle>
                         <CardDescription className="text-muted-foreground font-medium uppercase tracking-widest text-[10px]">
-                            Spoorthy Concept School System
+                            Spoorthy High School
                         </CardDescription>
                     </div>
                 </CardHeader>
@@ -181,7 +166,7 @@ export default function LoginPage() {
                             )}
                         </Button>
                         <p className="text-[9px] text-center text-muted-foreground font-bold uppercase tracking-widest">
-                            Secure Terminal Access • v1.2.0
+                            Secure Terminal Access • v1.3.0
                         </p>
                     </CardFooter>
                 </form>
