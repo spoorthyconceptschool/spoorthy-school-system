@@ -58,6 +58,14 @@ interface MasterDataState {
     teachers: any[];
     /** Cached set of active staff. */
     staff: any[];
+    /** Global fee terms and pricing configuration. */
+    feeConfig: {
+        terms: any[];
+        transportFees?: Record<string, number>;
+        academicYear?: string;
+    };
+    /** Registry of active custom fees (targeted by class/student). */
+    customFees: any[];
     /** Tracks the initial synchronization status with the RTDB. */
     loading: boolean;
 }
@@ -89,9 +97,8 @@ const initialState: MasterDataState = {
     },
     selectedYear: "2025-2026",
     setSelectedYear: () => { },
-    students: [],
-    teachers: [],
-    staff: [],
+    feeConfig: { terms: [] },
+    customFees: [],
     loading: true
 };
 
@@ -372,29 +379,31 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
         if (!isAdmin && !isTeacher) return;
 
         // Sync Teachers (Active only for speed)
-        const teachersQ = query(
-            collection(db, "teachers"), 
-            where("status", "==", "ACTIVE"),
-            where("schoolId", "==", userData?.schoolId || "global")
-        );
-        const teachersUnsub = onSnapshot(teachersQ, (snap) => {
+        let teachersBaseQ = query(collection(db, "teachers"), where("status", "==", "ACTIVE"));
+        if (userData?.schoolId && userData.schoolId !== "global") {
+            teachersBaseQ = query(teachersBaseQ, where("schoolId", "==", userData.schoolId));
+        }
+        const teachersUnsub = onSnapshot(teachersBaseQ, (snap) => {
             const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setData(prev => ({ ...prev, teachers: list }));
         }, (err) => console.warn("[MasterData] Teachers Sync Error:", err.message));
 
         // Sync Staff (Active only)
-        const staffQ = query(
-            collection(db, "staff"), 
-            where("status", "==", "ACTIVE"),
-            where("schoolId", "==", userData?.schoolId || "global")
-        );
-        const staffUnsub = onSnapshot(staffQ, (snap) => {
+        let staffBaseQ = query(collection(db, "staff"), where("status", "==", "ACTIVE"));
+        if (userData?.schoolId && userData.schoolId !== "global") {
+            staffBaseQ = query(staffBaseQ, where("schoolId", "==", userData.schoolId));
+        }
+        const staffUnsub = onSnapshot(staffBaseQ, (snap) => {
             const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setData(prev => ({ ...prev, staff: list }));
         }, (err) => console.warn("[MasterData] Staff Sync Error:", err.message));
 
         // Sync Groups (House system)
-        const groupsUnsub = onSnapshot(query(collection(db, "groups"), where("schoolId", "==", userData?.schoolId || "global")), (snap) => {
+        let groupsBaseQ = collection(db, "groups");
+        if (userData?.schoolId && userData.schoolId !== "global") {
+            groupsBaseQ = query(groupsBaseQ, where("schoolId", "==", userData.schoolId)) as any;
+        }
+        const groupsUnsub = onSnapshot(groupsBaseQ, (snap) => {
             const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setData(prev => ({ ...prev, groups: list }));
         }, (err) => console.warn("[MasterData] Groups Sync Error:", err.message));
@@ -403,6 +412,32 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
             teachersUnsub();
             staffUnsub();
             groupsUnsub();
+        };
+    }, [user, role]);
+
+    // 5. Fee Configuration & Custom Fees Sync
+    useEffect(() => {
+        if (!user) return;
+        const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'SUPERADMIN', 'OWNER', 'DEVELOPER', 'MANAGER'].includes(String(role || "").toUpperCase());
+        if (!isAdmin) return;
+
+        // Sync Global Fee Terms
+        const feeConfigUnsub = onSnapshot(doc(db, "config", "fees"), (snap) => {
+            if (snap.exists()) {
+                setData(prev => ({ ...prev, feeConfig: snap.data() as any }));
+            }
+        });
+
+        // Sync Custom Fees
+        const customFeesQ = query(collection(db, "custom_fees"), where("status", "==", "ACTIVE"));
+        const customFeesUnsub = onSnapshot(customFeesQ, (snap) => {
+            const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            setData(prev => ({ ...prev, customFees: list }));
+        });
+
+        return () => {
+            feeConfigUnsub();
+            customFeesUnsub();
         };
     }, [user, role]);
 

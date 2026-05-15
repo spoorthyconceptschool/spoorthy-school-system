@@ -15,8 +15,8 @@ import { useMasterData } from "@/context/MasterDataContext";
 import { toast } from "@/lib/toast-store";
 import { exportSingleStudentFee, printStudentFeeStructure } from "@/lib/export-utils";
 
-export function AddStudentModal({ onSuccess, children }: { onSuccess?: () => void, children?: React.ReactNode }) {
-    const { user } = useAuth();
+export function AddStudentModal({ onSuccess, onOptimisticUpdate, children }: { onSuccess?: () => void, onOptimisticUpdate?: (student: any) => void, children?: React.ReactNode }) {
+    const { user, callApi } = useAuth();
     const { villages: villagesData, classes: classesData, sections: sectionsData, classSections, branding, loading: masterDataLoading, selectedYear } = useMasterData();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -48,41 +48,65 @@ export function AddStudentModal({ onSuccess, children }: { onSuccess?: () => voi
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!user) return toast({ title: "Auth Required", description: "Please log in to confirm admission.", type: "error" });
         if (!formData.studentName || formData.studentName.length < 2) return toast({ title: "Name Required", type: "error" });
         if (!/^\d{10}$/.test(formData.parentPhone)) return toast({ title: "Invalid Mobile", type: "error" });
         if (!formData.villageId || !formData.classId) return toast({ title: "Missing Fields", type: "error" });
         if (formData.gender === "select") return toast({ title: "Gender Required", type: "error" });
 
         setLoading(true);
-        try {
-            const token = await user?.getIdToken();
-            const selectedVillage = villages.find(v => v.id === formData.villageId)?.name || "";
-            const selectedClass = classesList.find(c => c.id === formData.classId)?.name || "";
-            const selectedSection = availableSections.find(s => s.id === formData.sectionId)?.name || "";
+        
+        // 1. Immediately paint the success state (Sub-16ms transition)
+        const optimisticId = `temp-${Date.now()}`;
+        const selectedClass = classesList.find(c => c.id === formData.classId)?.name || "N/A";
+        const selectedVillage = villages.find(v => v.id === formData.villageId)?.name || "N/A";
 
-            const payload = {
-                studentName: formData.studentName.trim(),
-                parentName: formData.parentName.trim(),
-                parentMobile: formData.parentPhone,
-                villageId: formData.villageId,
-                villageName: selectedVillage,
-                classId: formData.classId,
-                className: selectedClass,
-                sectionId: formData.sectionId,
-                sectionName: selectedSection,
-                dateOfBirth: formData.dateOfBirth,
-                gender: formData.gender,
-                transportRequired: formData.transportRequired,
-                academicYear: selectedYear || "2026-2027"
-            };
+        setSuccessData({ 
+            schoolId: "GENERATING...", 
+            studentName: formData.studentName, 
+            className: selectedClass
+        });
 
-            console.log("Creating student with payload:", payload);
+        // 2. Trigger Optimistic Update in parent list
+        onOptimisticUpdate?.({
+            id: optimisticId,
+            schoolId: "PENDING...",
+            studentName: formData.studentName,
+            parentName: formData.parentName,
+            parentMobile: formData.parentPhone,
+            className: selectedClass,
+            villageName: selectedVillage,
+            status: "ACTIVE",
+            isOptimistic: true
+        });
 
-            const res = await fetch("/api/admin/students/create", {
-                method: "POST",
-                headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
-                body: JSON.stringify(payload)
-            });
+        // 2. Offload the network request to the next event loop to prevent UI blocking
+        const processAdmission = async () => {
+            try {
+                const selectedVillage = villages.find(v => v.id === formData.villageId)?.name || "";
+                const selectedClass = classesList.find(c => c.id === formData.classId)?.name || "";
+                const selectedSection = availableSections.find(s => s.id === formData.sectionId)?.name || "";
+
+                const payload = {
+                    studentName: formData.studentName.trim(),
+                    parentName: formData.parentName.trim(),
+                    parentMobile: formData.parentPhone,
+                    villageId: formData.villageId,
+                    villageName: selectedVillage,
+                    classId: formData.classId,
+                    className: selectedClass,
+                    sectionId: formData.sectionId,
+                    sectionName: selectedSection,
+                    dateOfBirth: formData.dateOfBirth,
+                    gender: formData.gender,
+                    transportRequired: formData.transportRequired,
+                    academicYear: selectedYear || "2026-2027"
+                };
+
+                const res = await callApi("/api/admin/students/create", {
+                    method: "POST",
+                    body: JSON.stringify(payload)
+                });
 
             let data;
             const resText = await res.text();
@@ -90,21 +114,42 @@ export function AddStudentModal({ onSuccess, children }: { onSuccess?: () => voi
                 data = JSON.parse(resText);
             } catch (pE) {
                 console.error("Failed to parse response as JSON:", resText);
-                throw new Error(`[HTTP ${res.status}] Server error. Body snippet: ${resText.substring(0, 200)}`);
+                throw new Error(`[HTTP ${res.status}] Server error.`);
             }
 
-            if (!res.ok) throw new Error(data.error || data.message || "Admission failed on server");
+            if (!res.ok) {
+                // If it fails, we must roll back the success state
+                setSuccessData(null);
+                if (res.status === 401) {
+                    const errorDetails = data;
+                    const hint = errorDetails.hint ? `\nHint: ${errorDetails.hint}` : "";
+                    throw new Error(`${errorDetails.error || "Unauthorized"}${hint}`);
+                }
+                throw new Error(data.error || data.message || "Admission failed on server");
+            }
 
-            toast({ title: "Admission Successful", type: "success" });
-            const finalSchoolId = data.data?.schoolId || data.schoolId;
-            setSuccessData({ schoolId: finalSchoolId, studentName: formData.studentName, className: selectedClass || "N/A" });
-            setFormData({ studentName: "", parentName: "", parentPhone: "", villageId: "", classId: "", sectionId: "", dateOfBirth: "", gender: "select", transportRequired: false });
-            onSuccess?.();
-        } catch (error: any) {
-            toast({ title: "Admission Failed", description: error.message, type: "error" });
-        } finally {
-            setLoading(false);
-        }
+                const finalSchoolId = data.data?.schoolId || data.schoolId;
+                
+                // RECONCILIATION: Update the optimistic state with final server data
+                setSuccessData({ 
+                    schoolId: finalSchoolId, 
+                    studentName: formData.studentName, 
+                    className: selectedClass || "N/A" 
+                });
+                
+                toast({ title: "Admission Successful", type: "success" });
+                setFormData({ studentName: "", parentName: "", parentPhone: "", villageId: "", classId: "", sectionId: "", dateOfBirth: "", gender: "select", transportRequired: false });
+                onSuccess?.();
+            } catch (error: any) {
+                setSuccessData(null);
+                toast({ title: "Admission Failed", description: error.message, type: "error" });
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        // Fire and forget the background process (it's non-blocking for the UI)
+        processAdmission();
     };
 
     return (
@@ -135,6 +180,7 @@ export function AddStudentModal({ onSuccess, children }: { onSuccess?: () => voi
                             <Button
                                 className="w-full bg-emerald-500 hover:bg-emerald-600 gap-2 font-bold h-12"
                                 onClick={async () => {
+                                    if (successData.schoolId === "PENDING...") return;
                                     setLoading(true);
                                     const q = query(collection(db, "student_fee_ledgers"), where("studentId", "==", successData.schoolId));
                                     const snap = await getDocs(q);
@@ -154,8 +200,17 @@ export function AddStudentModal({ onSuccess, children }: { onSuccess?: () => voi
                                     }
                                     setLoading(false);
                                 }}
+                                disabled={successData.schoolId === "PENDING..." || loading}
                             >
-                                <Printer size={18} /> Print / View Fee Structure
+                                {successData.schoolId === "PENDING..." ? (
+                                    <>
+                                        <Loader2 className="animate-spin" /> Generating ID...
+                                    </>
+                                ) : (
+                                    <>
+                                        <Printer size={18} /> Print / View Fee Structure
+                                    </>
+                                )}
                             </Button>
                         </div>
                         <Button variant="ghost" onClick={() => setOpen(false)}>Done</Button>
@@ -237,8 +292,8 @@ export function AddStudentModal({ onSuccess, children }: { onSuccess?: () => voi
                             <Label htmlFor="transport" className="cursor-pointer">Transport Required?</Label>
                         </div>
 
-                        <Button type="submit" disabled={loading} className="w-full bg-accent text-accent-foreground font-bold h-12">
-                            {loading ? <Loader2 className="animate-spin" /> : "Confirm Admission"}
+                        <Button type="submit" disabled={loading || !user} className="w-full bg-accent text-accent-foreground font-bold h-12">
+                            {loading ? <Loader2 className="animate-spin" /> : (!user ? "Confirming Auth..." : "Confirm Admission")}
                         </Button>
                     </form>
                 )}

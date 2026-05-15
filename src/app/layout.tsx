@@ -53,6 +53,8 @@ export const viewport = {
   viewportFit: 'cover',
 };
 
+import { SpeculativeLoader } from "@/components/speculative-loader";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -61,6 +63,59 @@ export default function RootLayout({
   return (
     <html lang="en" className={cn(inter.variable, outfit.variable, "dark")} suppressHydrationWarning>
       <body className={`font-body antialiased bg-background text-foreground overflow-x-hidden`} suppressHydrationWarning>
+        <div id="global-loader" className="fixed top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-accent via-emerald-400 to-accent z-[9999] transform -translate-x-full transition-transform duration-500 ease-out opacity-0" />
+        <script
+          dangerouslySetInnerHTML={{
+            __html: `
+              // Zero-Latency Navigation Listener
+              let progressTimer;
+              function startProgress() {
+                const loader = document.getElementById('global-loader');
+                if (!loader) return;
+                loader.style.opacity = '1';
+                loader.style.transform = 'translateX(-20%)';
+                
+                let progress = -20;
+                clearInterval(progressTimer);
+                progressTimer = setInterval(() => {
+                    progress += (Math.random() * 2);
+                    if (progress > -5) {
+                        loader.style.transform = 'translateX(' + progress + '%)';
+                    }
+                    if (progress > -2) clearInterval(progressTimer);
+                }, 100);
+              }
+
+              function stopProgress() {
+                const loader = document.getElementById('global-loader');
+                if (!loader) return;
+                clearInterval(progressTimer);
+                loader.style.transform = 'translateX(0%)';
+                setTimeout(() => {
+                    loader.style.opacity = '0';
+                    setTimeout(() => {
+                        loader.style.transform = 'translateX(-100%)';
+                    }, 300);
+                }, 200);
+              }
+
+              // Bind to all clicks that look like navigations
+              document.addEventListener('click', (e) => {
+                const link = e.target.closest('a');
+                if (link && link.href && !link.target && !link.href.includes('#')) {
+                    startProgress();
+                }
+              });
+
+              // Also bind to form submissions
+              document.addEventListener('submit', () => startProgress());
+              
+              // Stop on load/popstate
+              window.addEventListener('popstate', () => stopProgress());
+              window.addEventListener('load', () => stopProgress());
+            `,
+          }}
+        />
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -82,27 +137,11 @@ export default function RootLayout({
                   }
                 }
               }, true);
-              window.addEventListener('unhandledrejection', (e) => {
-                if (e.reason && (e.reason.name === 'ChunkLoadError' || (e.reason.message && e.reason.message.includes('Loading chunk')))) {
-                  if (!sessionStorage.getItem('app_reloaded')) {
-                    sessionStorage.setItem('app_reloaded', 'true');
-                    window.location.reload(true);
-                  }
-                }
-              });
             `,
           }}
         />
-        <AuthProvider>
-          <MasterDataProvider>
-            {children}
-            <NotificationManager />
-            <FCMTokenManager />
-            <InstallPrompt />
-            <LiveUpdatePrompt />
-          </MasterDataProvider>
-          <Toaster />
-        </AuthProvider>
+        {children}
+        <SpeculativeLoader />
       </body>
     </html>
   );

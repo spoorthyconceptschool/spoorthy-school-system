@@ -182,11 +182,11 @@ body {
   --font-body: 'Inter', 'system-ui', sans-serif;
 
   /* Core Theme Colors with Hex for maximum compatibility */
-  --color-background: #0A0A0B;
+  --color-background: #050505;
   --color-foreground: #FAFAFA;
-  --color-card: #111112;
+  --color-card: #0D0D0E;
   --color-card-foreground: #FAFAFA;
-  --color-popover: #111112;
+  --color-popover: #0D0D0E;
   --color-popover-foreground: #FAFAFA;
   --color-primary: #64FFDA;
   --color-primary-foreground: #0A0A0B;
@@ -240,6 +240,35 @@ body {
       transform: translateX(-50%);
     }
   }
+
+}
+
+/* Premium Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 6px;
+  height: 6px;
+}
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(100, 255, 218, 0.2);
+}
+
+/* Selection Color */
+::selection {
+  background: rgba(100, 255, 218, 0.2);
+  color: #64FFDA;
+}
+
+/* Smooth Transitions */
+* {
+  transition: background-color 0.3s ease, border-color 0.3s ease, opacity 0.3s ease;
 }
 
 @layer utilities {

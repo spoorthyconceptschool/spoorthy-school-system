@@ -6,8 +6,8 @@ import * as dotenv from 'dotenv';
 dotenv.config({ path: '.env.local' });
 
 const SERVICE_ACCOUNT = {
-    projectId: "spoorthy-high-school-new",
-    clientEmail: "firebase-adminsdk-fbsvc@spoorthy-high-school-new.iam.gserviceaccount.com",
+    projectId: "spoorthy-16292",
+    clientEmail: "firebase-adminsdk-fbsvc@spoorthy-16292.iam.gserviceaccount.com",
     privateKey: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : ""
 };
 

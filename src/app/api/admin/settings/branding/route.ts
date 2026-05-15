@@ -42,8 +42,8 @@ export async function POST(req: NextRequest) {
                 // Try to delete from several possible buckets just in case
                 const buckets = [
                     adminStorage.bucket(), // Default
-                    adminStorage.bucket("spoorthy-school-live-55917.firebasestorage.app"),
-                    adminStorage.bucket("spoorthy-school-live-55917.appspot.com")
+                    adminStorage.bucket("spoorthy-16292.firebasestorage.app"),
+                    adminStorage.bucket("spoorthy-16292.appspot.com")
                 ];
                 buckets.forEach(b => storageCleanupTasks.push(b.file(oldPath).delete().catch(() => { })));
             }
@@ -56,8 +56,8 @@ export async function POST(req: NextRequest) {
                 console.log(`[Branding] Nuking old signature footprint: ${oldPath}`);
                 const buckets = [
                     adminStorage.bucket(),
-                    adminStorage.bucket("spoorthy-school-live-55917.firebasestorage.app"),
-                    adminStorage.bucket("spoorthy-school-live-55917.appspot.com")
+                    adminStorage.bucket("spoorthy-16292.firebasestorage.app"),
+                    adminStorage.bucket("spoorthy-16292.appspot.com")
                 ];
                 buckets.forEach(b => storageCleanupTasks.push(b.file(oldPath).delete().catch(() => { })));
             }

@@ -8,29 +8,27 @@ import { ref, onValue } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
 
-export function Hero() {
-    const [content, setContent] = useState<any>({
+export function Hero({ initialContent }: { initialContent?: any }) {
+    const [content, setContent] = useState<any>(initialContent || {
         title: "Learn Today Lead Tommorrow",
         subtitle: "Innovation meets tradition.",
         videoUrl: "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/51d8a5ee-ebad-48e0-9617-b96d7911ac8b.mp4",
         mobileVideoUrl: null,
-        posterUrl: "https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Fhero-poster.jpg?alt=media"
+        posterUrl: "https://firebasestorage.googleapis.com/v0/b/spoorthy-16292.firebasestorage.app/o/demo%2Fhero-poster.jpg?alt=media"
     });
 
-    const [loading, setLoading] = useState(true);
     const [isMobile, setIsMobile] = useState(false);
-
-
 
     useEffect(() => {
         const unsub = onValue(ref(rtdb, 'siteContent/home/hero'), (snap) => {
             if (snap.exists()) {
-                setContent(snap.val());
+                const data = snap.val();
+                if (data && typeof data === 'object') {
+                    setContent((prev: any) => ({ ...prev, ...data }));
+                }
             }
-            setLoading(false);
         }, (error: any) => {
             console.warn("RTDB Permission (hero):", error.message);
-            setLoading(false);
         });
 
         // Detect mobile for video optimization

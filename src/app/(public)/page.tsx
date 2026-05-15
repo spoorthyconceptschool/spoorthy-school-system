@@ -1,24 +1,29 @@
 import { Hero } from "@/components/landing/Hero";
 import { ContactBand, Facilities, GalleryPreview, Leadership, Testimonials, WhyUs, Footer } from "@/components/landing/Sections";
-import ThreeBackground from "@/components/landing/ThreeBackground";
+import { getPublicHeroContent, getPublicSectionsContent } from "@/lib/services/public-data";
 
-export default function LandingPage() {
+// Zero-Latency Pillar: SSG
+export const revalidate = 3600; // Revalidate every hour
+
+export default async function LandingPage() {
+    const [heroContent, sectionsContent] = await Promise.all([
+        getPublicHeroContent(),
+        getPublicSectionsContent()
+    ]);
+
     return (
         <main className="bg-[#0a0a0a] min-h-screen text-foreground overflow-x-hidden selection:bg-accent selection:text-black">
-            <Hero />
+            <Hero initialContent={heroContent} />
 
             <div className="relative z-10">
-                <Facilities />
-                <Leadership />
-                <WhyUs />
-                <GalleryPreview />
-                <Testimonials />
-                <ContactBand />
+                <Facilities content={sectionsContent?.facilities} />
+                <Leadership content={sectionsContent?.leadership} />
+                <WhyUs content={sectionsContent?.whyUs} />
+                <GalleryPreview content={sectionsContent?.gallery} />
+                <Testimonials content={sectionsContent?.testimonials} />
+                <ContactBand content={sectionsContent?.contact} />
                 <Footer />
             </div>
-
-            {/* 3D Background Layer - Disabled for Performance */}
-            {/* <ThreeBackground /> */}
         </main>
     );
 }

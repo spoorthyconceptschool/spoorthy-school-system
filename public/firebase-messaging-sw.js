@@ -2,12 +2,12 @@ importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-app-compat.js')
 importScripts('https://www.gstatic.com/firebasejs/9.0.0/firebase-messaging-compat.js');
 
 const firebaseConfig = {
-    apiKey: "AIzaSyAOQJJH5sZDP_0SsNmcfHsE5__XwAOIPR0",
-    authDomain: "spoorthy-school-live-55917.firebaseapp.com",
-    projectId: "spoorthy-school-live-55917",
-    storageBucket: "spoorthy-school-live-55917.firebasestorage.app",
-    messagingSenderId: "740480088621",
-    appId: "1:740480088621:web:c5b98d739c1399feee96a4"
+    apiKey: "AIzaSyBzMWTDIaP9R7C1GGbNg613ZGV48T1fmeQ",
+    authDomain: "spoorthy-16292.firebaseapp.com",
+    projectId: "spoorthy-16292",
+    storageBucket: "spoorthy-16292.firebasestorage.app",
+    messagingSenderId: "248869775868",
+    appId: "1:248869775868:web:96492410eb8d69284aea79"
 };
 
 firebase.initializeApp(firebaseConfig);

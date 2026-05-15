@@ -35,7 +35,9 @@ const TEACHER_NAV = [
     { label: "Profile", icon: User, href: "/teacher/profile" },
 ];
 
-export default function TeacherLayout({ children }: { children: React.ReactNode }) {
+import { AuthenticatedProvider } from "@/components/providers/AuthenticatedProvider";
+
+function TeacherContent({ children }: { children: React.ReactNode }) {
     const { user, userData, loading, signOut } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
@@ -253,5 +255,13 @@ export default function TeacherLayout({ children }: { children: React.ReactNode 
                 </div>
             </main>
         </div>
+    );
+}
+
+export default function TeacherLayout({ children }: { children: React.ReactNode }) {
+    return (
+        <AuthenticatedProvider>
+            <TeacherContent>{children}</TeacherContent>
+        </AuthenticatedProvider>
     );
 }

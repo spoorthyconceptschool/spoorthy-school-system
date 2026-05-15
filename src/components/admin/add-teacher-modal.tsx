@@ -26,9 +26,10 @@ interface AddTeacherModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    onOptimisticUpdate?: (teacher: any) => void;
 }
 
-export function AddTeacherModal({ isOpen, onClose, onSuccess }: AddTeacherModalProps) {
+export function AddTeacherModal({ isOpen, onClose, onSuccess, onOptimisticUpdate }: AddTeacherModalProps) {
     const { user } = useAuth();
     const { subjects: masterSubjects } = useMasterData();
     const [subjects, setSubjects] = useState<any[]>([]);
@@ -58,6 +59,7 @@ export function AddTeacherModal({ isOpen, onClose, onSuccess }: AddTeacherModalP
     const [submitting, setSubmitting] = useState(false);
     const [result, setResult] = useState<{ teacherId: string, password: string } | null>(null);
 
+    // Only reset form when the modal is explicitly opened
     useEffect(() => {
         if (isOpen) {
             setResult(null);
@@ -73,14 +75,17 @@ export function AddTeacherModal({ isOpen, onClose, onSuccess }: AddTeacherModalP
                 classTeacherClass: "",
                 classTeacherSection: ""
             });
-
-            // Populate subjects from Master Data context
-            const activeSubjects = Object.values(masterSubjects || {})
-                .filter((s: any) => s.isActive !== false)
-                .sort((a: any, b: any) => String(a.name || "").localeCompare(String(b.name || "")));
-            setSubjects(activeSubjects);
         }
-    }, [isOpen, masterSubjects]);
+    }, [isOpen]);
+
+    // Separate effect for subjects population to avoid resetting result
+    useEffect(() => {
+        if (!masterSubjects) return;
+        const activeSubjects = Object.values(masterSubjects || {})
+            .filter((s: any) => s.isActive !== false)
+            .sort((a: any, b: any) => String(a.name || "").localeCompare(String(b.name || "")));
+        setSubjects(activeSubjects);
+    }, [masterSubjects]);
 
     const fetchSubjects = async () => {
         // No longer needed, using masterSubjects context
@@ -91,6 +96,21 @@ export function AddTeacherModal({ isOpen, onClose, onSuccess }: AddTeacherModalP
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setSubmitting(true);
+
+        // --- ZERO-LATENCY OPTIMISTIC PROJECTION ---
+        if (onOptimisticUpdate) {
+            const tempTeacher = {
+                id: `TEMP-${Date.now()}`,
+                schoolId: "PENDING...",
+                name: form.name.trim(),
+                mobile: form.mobile,
+                salary: Number(form.salary) || 0,
+                status: "ACTIVE",
+                subjects: [form.primarySubject, form.secondarySubject].filter(s => s && s !== "NONE"),
+                isOptimistic: true
+            };
+            onOptimisticUpdate(tempTeacher);
+        }
 
         try {
             const selectedSubjects = [];

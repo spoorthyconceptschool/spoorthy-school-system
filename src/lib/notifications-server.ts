@@ -65,7 +65,7 @@ export async function createServerNotification(props: {
                         // adminMessaging is a Proxy, so we just call methods on it.
                         
                         // Determine Deep Link URL (Must be Absolute for PWA strict routing)
-                        const baseUrl = "https://spoorthy-school-live-55917.web.app";
+                        const baseUrl = "https://spoorthy-16292.web.app";
                         let linkUrl = `${baseUrl}/notifications`;
                         if (props.type === "HOMEWORK") linkUrl = `${baseUrl}/student/homework`;
                         else if (props.type === "FEE") linkUrl = `${baseUrl}/student/fees`;
@@ -84,7 +84,7 @@ export async function createServerNotification(props: {
                                     link: linkUrl
                                 },
                                 notification: {
-                                    icon: "https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Flogo.png?alt=media"
+                                    icon: "https://firebasestorage.googleapis.com/v0/b/spoorthy-16292.firebasestorage.app/o/demo%2Flogo.png?alt=media"
                                 }
                             },
                             data: {
@@ -180,7 +180,7 @@ export async function sendBulkPushNotifications(
                         link: data?.url || data?.click_action || "/notifications"
                     },
                     notification: {
-                        icon: "https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Flogo.png?alt=media"
+                        icon: "https://firebasestorage.googleapis.com/v0/b/spoorthy-16292.firebasestorage.app/o/demo%2Flogo.png?alt=media"
                     }
                 },
                 data: data || {}

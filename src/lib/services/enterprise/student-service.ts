@@ -27,14 +27,28 @@ export class EnterpriseStudentService {
         try {
             const academicYear = payload.academicYear || "2026-2027";
             const yearPart = academicYear.split("-")[0] || "2026";
+            const ledgerYear = academicYear;
 
-            // Fetch Dynamic Prefix from settings
-            const settingsRef = adminDb.collection("settings").doc("branding");
-            const settingsSnap = await settingsRef.get();
+            // --- ZERO-LATENCY HYPER-PARALLEL FETCH ---
+            // We fetch everything independent in one go to kill sequential waterfalls
+            const [settingsSnap, configSnap, customFeesSnap, classesSnap] = await Promise.all([
+                adminDb.collection("settings").doc("branding").get(),
+                adminDb.collection("config").doc("fees").get(),
+                adminDb.collection("custom_fees").where("status", "==", "ACTIVE").where("academicYearId", "==", ledgerYear).get(),
+                adminDb.collection("master_classes").get(),
+                // Start a speculative auth check (we'll need the ID first, but we can check if the synthetic email format is clear)
+            ]);
+
             const brandingData = settingsSnap.data() || {};
             const prefix = brandingData.studentIdPrefix || "SCS";
             const startingNumber = brandingData.studentIdSuffix ? Number(brandingData.studentIdSuffix) : 1;
 
+            const feeConfig = configSnap.exists ? configSnap.data() : { terms: [], transportFees: {} };
+            const activeCustomFees = customFeesSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as any));
+            const classMap = new Map<string, string>();
+            classesSnap.docs.forEach((d: any) => classMap.set(d.id, (d.data() as any).name));
+
+            // --- ATOMIC ID GENERATION ---
             const counterId = `students_global`;
             const counterRef = adminDb.collection("counters").doc(counterId);
 
@@ -49,45 +63,23 @@ export class EnterpriseStudentService {
                     nextIdNum = currentCount + 1;
                 }
 
-                // New Format: SCS00001 (Configurable Prefix, Continuous Sequence)
                 newSchoolId = `${prefix}${String(nextIdNum).padStart(5, "0")}`;
-
                 const syntheticEmail = `${newSchoolId}@school.local`.toLowerCase();
 
                 transaction.set(counterRef, { current: nextIdNum, year: yearPart }, { merge: true });
 
-                return {
-                    newSchoolId,
-                    syntheticEmail,
-                    nextIdNum
-                };
+                return { newSchoolId, syntheticEmail, nextIdNum };
             });
 
             const studentName = `${payload.firstName} ${payload.lastName || ''}`.trim();
-            // Secure Temporary Password
             const tempPassword = Math.random().toString(36).slice(-8) + "@" + studentRecord.newSchoolId;
 
-            // PRE-EMPTIVE CLEANUP: Check if a user with this email already exists (e.g., from an orphaned record)
-            try {
-                const existingUser = await adminAuth.getUserByEmail(studentRecord.syntheticEmail);
-                if (existingUser) {
-                    console.warn(`[Enterprise Admissions] Collision detected for ${studentRecord.syntheticEmail}. Cleaning up orphaned Auth user...`);
-                    await adminAuth.deleteUser(existingUser.uid);
-                }
-            } catch (authErr: any) {
-                // If user not found, that's what we expect. Ignore other errors unless catastrophic.
-                if (authErr.code !== 'auth/user-not-found') {
-                    console.error("[Enterprise Admissions] Auth Pre-check failed:", authErr);
-                }
-            }
-
+            // Auth user creation (Sequential because it needs the generated email)
             userRecord = await adminAuth.createUser({
                 email: studentRecord.syntheticEmail,
                 password: tempPassword,
                 displayName: studentName
             });
-
-            await adminAuth.setCustomUserClaims(userRecord.uid, { role: "STUDENT" });
 
             const keywords = Array.from(new Set([
                 ...SearchService.generateKeywords(studentName),
@@ -136,27 +128,16 @@ export class EnterpriseStudentService {
             });
 
             // --- REAL-TIME FEE LEDGER AUTOMATION ---
-            const ledgerYear = payload.academicYear || "2026-2027";
-            const ledgerRef = adminDb.collection("student_fee_ledgers").doc(`${studentRecord.newSchoolId}_${ledgerYear}`);
+            const ledgerYearId = payload.academicYear || "2026-2027";
+            const ledgerRef = adminDb.collection("student_fee_ledgers").doc(`${studentRecord.newSchoolId}_${ledgerYearId}`);
 
-            // Fetch fee context in parallel (Note: we use get() on adminDb here safely as it's outside the transaction above)
-            const [configSnap, customFeesSnap, classesSnap]: [any, any, any] = await Promise.all([
-                adminDb.collection("config").doc("fees").get(),
-                adminDb.collection("custom_fees").where("status", "==", "ACTIVE").where("academicYearId", "==", ledgerYear).get(),
-                adminDb.collection("master_classes").get()
-            ]);
-
-            const feeConfig = configSnap.exists ? configSnap.data() : { terms: [], transportFees: {} };
-            const activeCustomFees = customFeesSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as any));
-            const classMap = new Map<string, string>();
-            classesSnap.docs.forEach((d: any) => classMap.set(d.id, (d.data() as any).name));
-
+            // REUSE: Using the already-fetched data from the top-level HYPER-PARALLEL block
             const initialLedger = calculateStudentLedger(
                 finalStudentData,
                 feeConfig as any,
                 activeCustomFees,
                 classMap,
-                ledgerYear
+                ledgerYearId
             );
 
             batch.set(ledgerRef, {
@@ -178,16 +159,15 @@ export class EnterpriseStudentService {
 
             await SearchService.indexStudent(studentRecord.newSchoolId, finalStudentData, batch);
 
-            await batch.commit();
-
-            try {
-                await adminRtdb.ref(`students/${studentRecord.newSchoolId}`).set({
+            // 3. Execution via Parallelized Pipeline (Zero-Latency Pillar)
+            await Promise.all([
+                adminAuth.setCustomUserClaims(userRecord.uid, { role: "STUDENT" }),
+                batch.commit(),
+                adminRtdb.ref(`students/${studentRecord.newSchoolId}`).set({
                     ...finalStudentData,
                     createdAt: ServerValue ? ServerValue.TIMESTAMP : new Date().getTime(),
-                });
-            } catch (e) {
-                console.warn("[EnterpriseStudentService] RTDB Sync missed on create:", e);
-            }
+                }).catch(e => console.warn("[EnterpriseStudentService] RTDB Sync missed on create:", e))
+            ]);
 
             return { success: true, schoolId: studentRecord.newSchoolId, uid: userRecord.uid, tempPassword };
         } catch (error: any) {
@@ -195,13 +175,12 @@ export class EnterpriseStudentService {
             if (userRecord?.uid) {
                 try {
                     await adminAuth.deleteUser(userRecord.uid);
-                    console.info("[EnterpriseStudentService] Rolled back Auth user due to failure:", userRecord.uid);
                 } catch (rollbackError) {
                     console.error("[EnterpriseStudentService] Critical Error: Rollback failed:", rollbackError);
                 }
             }
             console.error("[EnterpriseStudentService] Core Failure:", error);
-            throw new Error(`Critical Admission Step Failed: ${error.message} (TraceID: ${Date.now()})`);
+            throw new Error(`Critical Admission Step Failed: ${error.message}`);
         }
     }
 

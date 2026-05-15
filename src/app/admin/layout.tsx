@@ -8,7 +8,9 @@ import { Sidebar } from "@/components/admin/sidebar";
 import { TopBar } from "@/components/admin/topbar";
 import { BottomNav } from "@/components/layout/bottom-nav";
 
-export default function AdminLayout({ children }: { children: React.ReactNode }) {
+import { AuthenticatedProvider } from "@/components/providers/AuthenticatedProvider";
+
+function AdminContent({ children }: { children: React.ReactNode }) {
     const { user, userData, loading } = useAuth();
     const router = useRouter();
 
@@ -69,5 +71,13 @@ export default function AdminLayout({ children }: { children: React.ReactNode })
                 <BottomNav />
             </div>
         </div>
+    );
+}
+
+export default function AdminLayout({ children }: { children: React.ReactNode }) {
+    return (
+        <AuthenticatedProvider>
+            <AdminContent>{children}</AdminContent>
+        </AuthenticatedProvider>
     );
 }

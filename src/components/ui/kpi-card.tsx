@@ -3,7 +3,7 @@ import { ArrowUpRight, ArrowDownRight, Minus, LucideIcon } from "lucide-react";
 
 interface KPICardProps {
     title: string;
-    value: string | number;
+    value: React.ReactNode;
     icon?: any; // Allow LucideIcon or ReactNode
     trend?: number | string; // percentage or custom string
     trendLabel?: string;

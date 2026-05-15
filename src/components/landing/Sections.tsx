@@ -36,10 +36,11 @@ const SectionHeader = ({ title, subtitle, align = "left" }: { title: string, sub
 );
 
 // === FACILITIES / CAMPUS (Premium Motion Slideshow) ===
-export function Facilities() {
-    const [facilities, setFacilities] = useState<any[]>([]);
-    const [originalLen, setOriginalLen] = useState(0);
-    const [activeIndex, setActiveIndex] = useState(0);
+export function Facilities({ content }: { content?: any[] }) {
+    const initialList = Array.isArray(content) ? content : [];
+    const [facilities, setFacilities] = useState<any[]>(initialList);
+    const [originalLen, setOriginalLen] = useState(initialList.length);
+    const [activeIndex, setActiveIndex] = useState(initialList.length);
     const [isPaused, setIsPaused] = useState(false);
     const [isJumping, setIsJumping] = useState(false);
 
@@ -249,12 +250,20 @@ export function Facilities() {
 }
 
 // === LEADERSHIP (Stories Format) ===
-export function Leadership() {
+export function Leadership({ content }: { content?: any }) {
     const { branding } = useMasterData();
-    const [leaders, setLeaders] = useState<any>({
+    
+    // Ensure we have a valid object even if content is empty or null
+    const safeContent = content && typeof content === 'object' && Object.keys(content).length > 0 ? content : null;
+
+    const [leaders, setLeaders] = useState<any>(safeContent || {
         chairman: { name: "Mr. Spoorthy Reddy", title: "Chairman", photo: "https://images.unsplash.com/photo-1544717297-fa154da09f5b?q=80&w=2070&auto=format&fit=crop" },
         principal: { name: "Mrs. Lakshmi", title: "Principal", photo: "https://images.unsplash.com/photo-1580894732230-285b963a9483?q=80&w=2070&auto=format&fit=crop" }
     });
+
+    // Merge logic to ensure members exist
+    const chairman = leaders?.chairman || { name: "Chairman", title: "Leadership" };
+    const principal = leaders?.principal || { name: "Principal", title: "Leadership" };
 
     useEffect(() => {
         const unsub = onValue(ref(rtdb, 'siteContent/home/leadership'), (snap) => {
@@ -275,7 +284,7 @@ export function Leadership() {
                 <SectionHeader title="The Visionaries." subtitle="Leadership" align="center" />
 
                 <div className="grid grid-cols-2 gap-4 md:gap-12 mt-8 md:mt-16 max-w-6xl mx-auto">
-                    {[leaders.chairman, leaders.principal].map((leader, i) => (
+                    {[chairman, principal].map((leader, i) => (
                         <motion.div
                             key={i}
                             initial={{ opacity: 0, y: 30 }}
@@ -292,10 +301,10 @@ export function Leadership() {
                             >
                                 {/* Image Mask */}
                                 <div className="absolute inset-0">
-                                    {leader.photo && (leader.photo.startsWith('http') || leader.photo.startsWith('/')) ? (
+                                    {leader?.photo && (leader.photo.startsWith('http') || leader.photo.startsWith('/')) ? (
                                         <Image
                                             src={leader.photo}
-                                            alt={leader.name}
+                                            alt={leader.name || "Leader"}
                                             fill
                                             className="object-cover transition-all duration-[2s] group-hover:scale-105"
                                         />
@@ -385,13 +394,14 @@ export function WhyUs() {
 }
 
 // === GALLERY (Mosaic Grid) ===
-export function GalleryPreview() {
-    const [activities, setActivities] = useState<any[]>([
+export function GalleryPreview({ content }: { content?: any[] }) {
+    const initialActivities = Array.isArray(content) ? content : [
         { title: "Science Discovery", category: "Academics", src: "https://images.unsplash.com/photo-1532094349884-543bc11b234d?q=80&w=1600&auto=format&fit=crop" },
         { title: "Sports Tournament", category: "Athletics", src: "https://images.unsplash.com/photo-1526676037777-05a232554f77?q=80&w=1600&auto=format&fit=crop" },
         { title: "Cultural Festival", category: "Arts", src: "https://images.unsplash.com/photo-1514362545857-3bc16c4c7d1b?q=80&w=1600&auto=format&fit=crop" },
         { title: "Digital Literacy", category: "Tech", src: "https://images.unsplash.com/photo-1531482615713-2afd69097998?q=80&w=1600&auto=format&fit=crop" }
-    ]);
+    ];
+    const [activities, setActivities] = useState<any[]>(initialActivities);
 
     useEffect(() => {
         const unsub = onValue(ref(rtdb, 'siteContent/home/gallery'), (snap) => {
@@ -507,7 +517,7 @@ export function Testimonials() {
 }
 
 // === CTA BAND (Minimal & Bold) ===
-export function ContactBand() {
+export function ContactBand({ content }: { content?: any }) {
     return (
         <section id="contact" className="py-24 md:py-32 bg-accent text-black relative overflow-hidden flex flex-col items-center justify-center text-center">
             {/* Noise texture for depth */}
@@ -521,17 +531,17 @@ export function ContactBand() {
                     viewport={{ once: true }}
                     className="text-5xl md:text-9xl font-sans font-black tracking-tighter leading-[0.85]"
                 >
-                    START YOUR JOURNEY.
+                    {content?.title || "START YOUR JOURNEY."}
                 </motion.h2>
 
                 <p className="text-xl md:text-3xl font-medium max-w-2xl mx-auto opacity-80 leading-relaxed">
-                    Admissions for 2026-27 are closing soon. <br /> Be part of the legacy.
+                    {content?.subtitle || "Admissions for 2026-27 are closing soon. Be part of the legacy."}
                 </p>
 
                 <div className="pt-12">
                     <Link href="/admissions/apply">
                         <button className="px-16 py-8 rounded-full bg-black text-white font-bold text-lg md:text-2xl hover:bg-black/90 transition-all hover:scale-105 shadow-2xl">
-                            Apply for Admission
+                            {content?.ctaText || "Apply for Admission"}
                         </button>
                     </Link>
                 </div>

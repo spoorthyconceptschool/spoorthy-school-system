@@ -22,6 +22,8 @@ interface AuthContextType {
     loading: boolean;
     signIn: (email: string, pass: string) => Promise<void>;
     signOut: () => Promise<void>;
+    getFreshToken: (forceRefresh?: boolean) => Promise<string | null>;
+    callApi: (url: string, options?: RequestInit) => Promise<Response>;
 }
 
 const AuthContext = createContext<AuthContextType>({ isAdmin: false } as AuthContextType);
@@ -250,13 +252,85 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         router.push("/login");
     };
 
+    const [warmedToken, setWarmedToken] = useState<{ token: string; expiry: number } | null>(null);
+
+    // SPECULATIVE TOKEN WARMING (Zero-Latency Pillar)
+    // We keep the token fresh in the background so API calls are instantaneous
+    useEffect(() => {
+        if (!user) {
+            setWarmedToken(null);
+            return;
+        }
+
+        const warm = async () => {
+            try {
+                console.log("[Auth] Speculative Token Warming...");
+                const token = await user.getIdToken(true);
+                setWarmedToken({ token, expiry: Date.now() + (30 * 60 * 1000) });
+            } catch (e) {
+                console.warn("[Auth] Token warming failed:", e);
+            }
+        };
+
+        warm(); // Initial warm
+        const interval = setInterval(warm, 30 * 60 * 1000); // Refresh every 30 mins
+        return () => clearInterval(interval);
+    }, [user]);
+
+    const getFreshToken = async (forceRefresh = false) => {
+        if (!user) return null;
+        
+        // Use pre-warmed token if valid and not forcing
+        if (!forceRefresh && warmedToken && Date.now() < warmedToken.expiry) {
+            return warmedToken.token;
+        }
+
+        try {
+            const token = await user.getIdToken(forceRefresh);
+            setWarmedToken({ token, expiry: Date.now() + (30 * 60 * 1000) });
+            return token;
+        } catch (err) {
+            console.error("[Auth] Token refresh failed:", err);
+            return null;
+        }
+    };
+
+    /**
+     * SENIOR ARCHITECT PATTERN: Centralized Auth Interceptor
+     * Encapsulates JWT lifecycle, silent refresh, and idempotent retries.
+     */
+    const callApi = async (url: string, options: RequestInit = {}) => {
+        // 1. Ensure fresh token for the initial attempt
+        let token = await getFreshToken(false);
+        
+        const execute = async (authToken: string | null) => {
+            const headers = new Headers(options.headers || {});
+            if (authToken) headers.set("Authorization", `Bearer ${authToken}`);
+            
+            return await fetch(url, { ...options, headers });
+        };
+
+        let response = await execute(token);
+
+        // 2. Silent Refresh & Retry Logic (Handshake recovery)
+        if (response.status === 401) {
+            console.warn(`[Auth Interceptor] 401 detected for ${url}. Attempting silent refresh...`);
+            const refreshedToken = await getFreshToken(true);
+            if (refreshedToken) {
+                response = await execute(refreshedToken);
+            }
+        }
+
+        return response;
+    };
+
     // Hydration blocker
     if (!mounted) {
         return <div className="min-h-screen bg-[#0A192F]" />;
     }
 
     return (
-        <AuthContext.Provider value={{ user, userData, role: userData?.role || "", isAdmin, loading, signIn, signOut }}>
+        <AuthContext.Provider value={{ user, userData, role: userData?.role || "", isAdmin, loading, signIn, signOut, getFreshToken, callApi }}>
             {children}
             <div className="hidden">{pendingStudentLeaves}</div>
         </AuthContext.Provider>

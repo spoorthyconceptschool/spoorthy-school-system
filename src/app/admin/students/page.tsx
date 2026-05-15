@@ -226,7 +226,15 @@ export default function StudentsPage() {
                         {isAdmin && (
                             <>
                                 <StudentImportModal onSuccess={() => { window.location.reload(); }} />
-                                <AddStudentModal onSuccess={() => { }} />
+                                <AddStudentModal 
+                                    onSuccess={() => { }} 
+                                    onOptimisticUpdate={(newStudent) => {
+                                        setStudents(prev => {
+                                            if (prev.find(s => s.schoolId === newStudent.schoolId || s.id === newStudent.id)) return prev;
+                                            return [newStudent, ...prev];
+                                        });
+                                    }}
+                                />
                             </>
                         )}
                     </div>
@@ -235,7 +243,15 @@ export default function StudentsPage() {
                 {/* Mobile FAB */}
                 {activeTab === "directory" && isAdmin && (
                     <div className="fixed bottom-20 right-4 z-50 md:hidden">
-                        <AddStudentModal onSuccess={() => { }}>
+                        <AddStudentModal 
+                            onSuccess={() => { }}
+                            onOptimisticUpdate={(newStudent) => {
+                                setStudents(prev => {
+                                    if (prev.find(s => s.schoolId === newStudent.schoolId || s.id === newStudent.id)) return prev;
+                                    return [newStudent, ...prev];
+                                });
+                            }}
+                        >
                             <button className="w-14 h-14 rounded-full bg-accent text-black shadow-2xl shadow-accent/40 flex items-center justify-center">
                                 <Plus className="w-7 h-7" />
                             </button>

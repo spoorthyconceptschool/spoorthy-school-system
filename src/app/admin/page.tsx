@@ -14,11 +14,26 @@ import {
     Plus, Download, IndianRupee, Users, Database,
     Calendar, Clock, AlertTriangle, Layers, GraduationCap,
     BookOpen, Bell, Briefcase, FileText, ClipboardList,
-    TrendingUp, CheckCircle, ArrowRight, BarChart3
+    TrendingUp, CheckCircle, ArrowRight, BarChart3,
+    PieChart, Wallet, Bus, Home, Settings2, Filter, X
 } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AddStudentModal } from "@/components/admin/add-student-modal";
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+    DropdownMenuRadioGroup,
+    DropdownMenuRadioItem,
+    DropdownMenuSub,
+    DropdownMenuSubTrigger,
+    DropdownMenuPortal,
+    DropdownMenuSubContent
+} from "@/components/ui/dropdown-menu";
 
 interface Student {
     id: string;
@@ -49,16 +64,133 @@ interface DashboardStats {
     todayCollection: number;
     totalStaff: number;
     staffPresent: number;
+    presentStudents?: number;
+    presentTeachers?: number;
+    presentStaff?: number;
+    finance?: {
+        totalFee: number;
+        totalPaid: number;
+        hostelFee: number;
+        hostelPaid: number;
+        customFee: number;
+        customPaid: number;
+        transportFee: number;
+        transportPaid: number;
+        schoolFee: number;
+        schoolPaid: number;
+        terms: Record<string, { total: number; paid: number }>;
+    };
+}
+
+// --- MODULAR CARD FILTER COMPONENT ---
+function CardFilter({ 
+    villages, classes, sections, 
+    filterVillage, setFilterVillage,
+    filterClass, setFilterClass,
+    filterSection, setFilterSection,
+    size = "sm"
+}: any) {
+    const hasActive = filterVillage || filterClass || filterSection;
+    const iconSize = size === "xs" ? 12 : 14;
+
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button 
+                    variant="outline" 
+                    size="icon" 
+                    className={cn(
+                        "rounded-full border-white/10 bg-black/40 hover:bg-white/10 transition-all",
+                        size === "xs" ? "w-6 h-6" : "w-8 h-8",
+                        hasActive && "border-accent text-accent shadow-[0_0_10px_-2px_rgba(var(--accent-rgb),0.5)]"
+                    )}
+                >
+                    <Filter size={iconSize} />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent className="w-56 bg-zinc-950 border-white/10 backdrop-blur-xl" align="end">
+                <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest opacity-50">Filter Module</DropdownMenuLabel>
+                <DropdownMenuSeparator className="bg-white/5" />
+                
+                <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="text-xs font-bold text-white/80">
+                        <Home className="mr-2 h-3.5 w-3.5 opacity-50" />
+                        <span>Village</span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuPortal>
+                        <DropdownMenuSubContent className="bg-zinc-950 border-white/10 max-h-[300px] overflow-y-auto">
+                            <DropdownMenuRadioGroup value={filterVillage} onValueChange={setFilterVillage}>
+                                <DropdownMenuRadioItem value="" className="text-xs">All Villages</DropdownMenuRadioItem>
+                                {Object.values(villages || {}).sort((a:any, b:any) => a.name?.localeCompare(b.name)).map((v:any) => (
+                                    <DropdownMenuRadioItem key={v.id} value={v.id} className="text-xs">{v.name}</DropdownMenuRadioItem>
+                                ))}
+                            </DropdownMenuRadioGroup>
+                        </DropdownMenuSubContent>
+                    </DropdownMenuPortal>
+                </DropdownMenuSub>
+
+                <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="text-xs font-bold text-white/80">
+                        <GraduationCap className="mr-2 h-3.5 w-3.5 opacity-50" />
+                        <span>Class</span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuPortal>
+                        <DropdownMenuSubContent className="bg-zinc-950 border-white/10">
+                            <DropdownMenuRadioGroup value={filterClass} onValueChange={setFilterClass}>
+                                <DropdownMenuRadioItem value="" className="text-xs">All Classes</DropdownMenuRadioItem>
+                                {Object.values(classes || {}).sort((a:any, b:any) => (a.order || 0) - (b.order || 0)).map((c:any) => (
+                                    <DropdownMenuRadioItem key={c.id} value={c.id} className="text-xs">{c.name}</DropdownMenuRadioItem>
+                                ))}
+                            </DropdownMenuRadioGroup>
+                        </DropdownMenuSubContent>
+                    </DropdownMenuPortal>
+                </DropdownMenuSub>
+
+                <DropdownMenuSub>
+                    <DropdownMenuSubTrigger className="text-xs font-bold text-white/80">
+                        <Layers className="mr-2 h-3.5 w-3.5 opacity-50" />
+                        <span>Section</span>
+                    </DropdownMenuSubTrigger>
+                    <DropdownMenuPortal>
+                        <DropdownMenuSubContent className="bg-zinc-950 border-white/10">
+                            <DropdownMenuRadioGroup value={filterSection} onValueChange={setFilterSection}>
+                                <DropdownMenuRadioItem value="" className="text-xs">All Sections</DropdownMenuRadioItem>
+                                {Object.values(sections || {}).sort((a:any, b:any) => a.name?.localeCompare(b.name)).map((s:any) => (
+                                    <DropdownMenuRadioItem key={s.id} value={s.id} className="text-xs">{s.name}</DropdownMenuRadioItem>
+                                ))}
+                            </DropdownMenuRadioGroup>
+                        </DropdownMenuSubContent>
+                    </DropdownMenuPortal>
+                </DropdownMenuSub>
+
+                <DropdownMenuSeparator className="bg-white/5" />
+                <DropdownMenuItem 
+                    className="text-[10px] font-black uppercase tracking-widest text-rose-400 focus:text-rose-300"
+                    onClick={() => {
+                        setFilterVillage("");
+                        setFilterClass("");
+                        setFilterSection("");
+                    }}
+                >
+                    <X className="mr-2 h-3 w-3" />
+                    Reset Card
+                </DropdownMenuItem>
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
 }
 
 export default function AdminDashboard() {
     const { user, role: authRole } = useAuth();
-    const { selectedYear, classes } = useMasterData();
+    const { selectedYear, classes, sections, villages } = useMasterData();
     const router = useRouter();
 
     const DASHBOARD_CACHE_KEY = `spoorthy_dashboard_cache_${selectedYear}`;
     
-    // Admin State
+    const [filterClass, setFilterClass] = useState<string>("");
+    const [filterSection, setFilterSection] = useState<string>("");
+    const [filterVillage, setFilterVillage] = useState<string>("");
+
     const [recentStudents, setRecentStudents] = useState<Student[]>(() => {
         if (typeof window !== 'undefined' && selectedYear) {
             const cached = localStorage.getItem(`${DASHBOARD_CACHE_KEY}_students`);
@@ -99,71 +231,52 @@ export default function AdminDashboard() {
             try {
                 const currentYear = selectedYear || "2026-2027";
                 const token = await user.getIdToken();
-                const req = await fetch(`/api/admin/dashboard/stats?year=${encodeURIComponent(currentYear)}`, {
-                    headers: {
-                        'Authorization': `Bearer ${token}`
-                    }
+                
+                let url = `/api/admin/dashboard/stats?year=${encodeURIComponent(currentYear)}`;
+                if (filterClass) url += `&classId=${filterClass}`;
+                if (filterSection) url += `&section=${filterSection}`;
+                if (filterVillage) url += `&village=${filterVillage}`;
+
+                const req = await fetch(url, {
+                    headers: { 'Authorization': `Bearer ${token}` }
                 });
                 const res = await req.json();
-                console.log("[AdminDashboard] Stats API response:", res);
                 if (res.success) {
-                    setStats(prev => ({
-                        ...prev,
-                        ...res.data
-                    }));
-                    localStorage.setItem(`${DASHBOARD_CACHE_KEY}_stats`, JSON.stringify(res.data));
-                } else {
-                    console.error("[AdminDashboard] Stats API error:", res.error);
+                    setStats(prev => ({ ...prev, ...res.data }));
+                    if (!filterClass && !filterSection && !filterVillage) {
+                        localStorage.setItem(`${DASHBOARD_CACHE_KEY}_stats`, JSON.stringify(res.data));
+                    }
                 }
                 setLoading(false);
             } catch (e) {
-                console.error("[AdminDashboard] Fetch Enterprise Stats Error", e);
                 setLoading(false);
             }
         };
 
         fetchEnterpriseStats();
-        
-        // Auto-refresh mechanism (30 seconds)
         const interval = setInterval(fetchEnterpriseStats, 30000);
         return () => clearInterval(interval);
-    }, [user, selectedYear]);
+    }, [user, selectedYear, filterClass, filterSection, filterVillage]);
 
-    // We maintain simple non-aggregated paginated sub-lists if needed,
-    // like recent leaves.
     useEffect(() => {
         if (!user) return;
-
         const qLeaves = query(collection(db, "leave_requests"), where("status", "==", "PENDING"), limit(5));
         const unsubLeaves = onSnapshot(qLeaves, (snap) => {
             const leaves = snap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveRequest));
             leaves.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
             setPendingLeavesList(leaves);
         });
-
-        return () => {
-            unsubLeaves();
-        };
+        return () => unsubLeaves();
     }, [user, selectedYear]);
 
-    // Recent Students Listener (replaces applications — shows real enrolled students)
     useEffect(() => {
         if (!user || authRole === "TIMETABLE_EDITOR") return;
-
-        const studentsQ = query(
-            collection(db, "students"),
-            orderBy("createdAt", "desc"),
-            limit(10)
-        );
+        const studentsQ = query(collection(db, "students"), orderBy("createdAt", "desc"), limit(10));
         const unsubscribe = onSnapshot(studentsQ, (snapshot) => {
             const list = snapshot.docs.map(doc => ({ id: doc.id, schoolId: doc.id, ...doc.data() } as Student));
-            console.log("[AdminDashboard] Recent students fetched:", list.length);
             setRecentStudents(list);
             localStorage.setItem(`${DASHBOARD_CACHE_KEY}_students`, JSON.stringify(list));
-        }, (err) => {
-            console.error("[AdminDashboard] Students listener error:", err);
         });
-
         return () => unsubscribe();
     }, [user, authRole]);
 
@@ -200,7 +313,6 @@ export default function AdminDashboard() {
         }
     ];
 
-    // === MANAGER DASHBOARD VIEW ===
     if (authRole === "MANAGER") {
         return (
             <div className="space-y-6 md:space-y-10 animate-in fade-in slide-in-from-bottom-4 duration-200 pb-10">
@@ -235,7 +347,7 @@ export default function AdminDashboard() {
                     />
                     <KPICard
                         title="Outstanding Fee Payment"
-                        value={`₹${stats.pendingFees.toLocaleString()}`}
+                        value={`₹${((stats.finance?.totalFee || 0) - (stats.finance?.totalPaid || 0)).toLocaleString()}`}
                         icon={<Database className="w-4 h-4 text-rose-400" />}
                         trend="Fee Payment Recovery"
                         className="bg-rose-500/5 border-rose-500/10 cursor-pointer hover:bg-rose-500/10 transition-all"
@@ -260,14 +372,14 @@ export default function AdminDashboard() {
                 </div>
 
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 px-2 md:px-0">
-                    <div className="lg:col-span-2 space-y-6">
+                    <div className="lg:col-span-3 space-y-6">
                         <div className="p-8 rounded-3xl bg-gradient-to-br from-blue-600/20 to-indigo-600/5 border border-blue-500/20 backdrop-blur-xl group">
                             <div className="relative z-10 space-y-6">
                                 <h2 className="text-xl md:text-2xl font-display font-bold italic flex items-center gap-3">
                                     <Briefcase className="text-blue-400" />
                                     Department Overview
                                 </h2>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                     {[
                                         { label: "Staff Members", desc: "View staff profiles & leaves", href: "/admin/faculty", icon: Users },
                                         { label: "Master Data", desc: "Manage classes, subjects & villages", href: "/admin/master-data", icon: Database },
@@ -298,55 +410,16 @@ export default function AdminDashboard() {
                                     data={recentStudents.filter(s => s.classId && (classes as any)?.[s.classId]).slice(0, 3)}
                                     columns={columns}
                                     isLoading={false}
-                                    onRowClick={(s) => router.push(`/admin/students`)}
+                                    onRowClick={() => router.push(`/admin/students`)}
                                 />
                             </div>
                         </div>
-                    </div>
-
-                    <div className="space-y-6">
-                        <div className="p-6 rounded-3xl bg-black/40 border border-white/10 backdrop-blur-md space-y-4">
-                            <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400 flex items-center gap-2">
-                                <div className="w-1 h-3 bg-blue-500 rounded-full" />
-                                Quick Actions
-                            </h3>
-                            <div className="grid gap-3">
-                                <Button asChild variant="outline" className="w-full justify-start gap-3 h-12 border-white/5 bg-white/5 hover:bg-white/10 font-bold">
-                                    <Link href="/admin/attendance">
-                                        <Clock size={16} /> Mark Attendance
-                                    </Link>
-                                </Button>
-                            </div>
-                        </div>
-
-                        {pendingLeavesList.length > 0 && (
-                            <div className="p-6 rounded-3xl bg-amber-500/5 border border-amber-500/10 backdrop-blur-md space-y-4">
-                                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-amber-500 flex items-center gap-2">
-                                    <div className="w-1 h-3 bg-amber-500 rounded-full animate-pulse" />
-                                    Pending Absences
-                                </h3>
-                                <div className="space-y-2">
-                                    {pendingLeavesList.slice(0, 3).map((leave: LeaveRequest) => (
-                                        <div key={leave.id} className="p-3 rounded-xl bg-black/40 border border-white/5 flex items-center gap-3">
-                                            <div className="w-8 h-8 rounded-lg bg-amber-500/10 flex items-center justify-center text-amber-500 font-bold text-xs capitalize">
-                                                {leave.teacherName?.charAt(0)}
-                                            </div>
-                                            <div className="flex-1 min-w-0" onClick={() => router.push("/admin/leaves?tab=staff")} style={{ cursor: 'pointer' }}>
-                                                <div className="text-[11px] font-bold text-white truncate">{leave.teacherName}</div>
-                                                <div className="text-[9px] text-muted-foreground">{leave.type}</div>
-                                            </div>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
                     </div>
                 </div>
             </div>
         );
     }
 
-    // === TIMETABLE EDITOR VIEW ===
     if (authRole === "TIMETABLE_EDITOR") {
         return (
             <div className="space-y-8 animate-in fade-in duration-200">
@@ -364,7 +437,7 @@ export default function AdminDashboard() {
         );
     }
 
-    // === ADMIN VIEW ===
+    // Default Admin View
     return (
         <div className="space-y-6 md:space-y-8 animate-in fade-in duration-200 pb-10 w-full">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -387,17 +460,31 @@ export default function AdminDashboard() {
                     title="Total Students"
                     value={loading ? "..." : stats.totalStudents}
                     icon={<Users className="w-4 h-4 text-blue-400" />}
-                    trend="Live Snapshot"
+                    trend="Digital Registry"
                     className="bg-blue-500/5 border-blue-500/10 cursor-pointer"
                     onClick={() => router.push("/admin/students")}
                 />
                 <KPICard
-                    title="Active Grades"
-                    value={loading ? "..." : (stats as any).totalClasses || 0}
-                    icon={<Layers className="w-4 h-4 text-emerald-400" />}
-                    trend="Digital Registry"
-                    className="bg-emerald-500/5 border-emerald-500/10 cursor-pointer"
-                    onClick={() => router.push("/admin/master-data")}
+                    title="Present Today"
+                    value={
+                        <div className="flex flex-col gap-1 md:gap-2 mt-1 md:mt-2 w-full pr-2">
+                            <div className="flex justify-between items-center group/row">
+                                <span className="text-[10px] md:text-xs font-black text-muted-foreground uppercase tracking-widest italic group-hover/row:text-white transition-colors">Students</span>
+                                <span className="text-sm md:text-2xl font-black text-emerald-400 font-display italic leading-none">{stats.presentStudents || 0}</span>
+                            </div>
+                            <div className="flex justify-between items-center group/row border-t border-white/5 pt-1 md:pt-2">
+                                <span className="text-[10px] md:text-xs font-black text-muted-foreground uppercase tracking-widest italic group-hover/row:text-white transition-colors">Teachers</span>
+                                <span className="text-sm md:text-2xl font-black text-blue-400 font-display italic leading-none">{stats.presentTeachers || 0}</span>
+                            </div>
+                            <div className="flex justify-between items-center group/row border-t border-white/5 pt-1 md:pt-2">
+                                <span className="text-[10px] md:text-xs font-black text-muted-foreground uppercase tracking-widest italic group-hover/row:text-white transition-colors">Support</span>
+                                <span className="text-sm md:text-2xl font-black text-amber-400 font-display italic leading-none">{stats.presentStaff || 0}</span>
+                            </div>
+                        </div>
+                    }
+                    icon={<ClipboardList className="w-4 h-4 text-emerald-400" />}
+                    className="bg-emerald-500/5 border-emerald-500/10 col-span-1 md:row-span-1"
+                    onClick={() => router.push("/admin/attendance")}
                 />
                 <KPICard
                     title="Leave Requests"
@@ -411,17 +498,17 @@ export default function AdminDashboard() {
                     onClick={() => router.push("/admin/leaves?tab=staff")}
                 />
                 <KPICard
-                    title="Collection"
+                    title="Today's Collection"
                     value={`₹${stats.todayCollection}`}
                     icon={<IndianRupee className="w-4 h-4 text-emerald-400" />}
-                    trend="Today's Flow"
+                    trend="Financial Flow"
                     className="bg-emerald-500/5 border-emerald-500/10 cursor-pointer"
                     onClick={() => router.push("/admin/payments")}
                 />
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
-                <div className="lg:col-span-2 space-y-6">
+                <div className="lg:col-span-3 space-y-6">
                     {pendingLeavesList.length > 0 && (
                         <div className="space-y-3 animate-in slide-in-from-top-4 duration-700 bg-rose-500/5 rounded-2xl border border-rose-500/10 p-4 backdrop-blur-md">
                             <div className="flex items-center justify-between border-b border-rose-500/10 pb-2 mb-2">
@@ -445,54 +532,158 @@ export default function AdminDashboard() {
                             </div>
                         </div>
                     )}
+                    
+                    <div className="space-y-6">
+                        <div className="flex items-center justify-between px-1">
+                            <h2 className="text-xl md:text-2xl font-display font-bold italic flex items-center gap-2">
+                                <Wallet className="w-5 h-5 text-accent" />
+                                Financial Performance
+                            </h2>
+                            <div className="flex items-center gap-2">
+                                <Badge variant="outline" className="bg-emerald-500/10 text-emerald-400 border-emerald-500/20 text-[9px] uppercase font-black">Collection Active</Badge>
+                                {(filterClass || filterSection || filterVillage) && (
+                                    <Button 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        className="h-7 px-2 text-[9px] font-black uppercase text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 gap-1"
+                                        onClick={() => {
+                                            setFilterClass("");
+                                            setFilterSection("");
+                                            setFilterVillage("");
+                                        }}
+                                    >
+                                        Clear All Filters
+                                    </Button>
+                                )}
+                            </div>
+                        </div>
+
+                        <div className="space-y-6">
+                            {/* MASTER SUMMARY CARD */}
+                            <div className="p-8 rounded-[2rem] bg-gradient-to-br from-indigo-600/20 via-blue-600/10 to-transparent border border-indigo-500/20 relative overflow-hidden group/master">
+                                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full -mr-32 -mt-32 blur-3xl group-hover/master:bg-indigo-500/10 transition-all duration-1000" />
+                                <div className="absolute top-6 right-6 z-20">
+                                    <CardFilter 
+                                        villages={villages} classes={classes} sections={sections}
+                                        filterVillage={filterVillage} setFilterVillage={setFilterVillage}
+                                        filterClass={filterClass} setFilterClass={setFilterClass}
+                                        filterSection={filterSection} setFilterSection={setFilterSection}
+                                    />
+                                </div>
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
+                                    <div className="space-y-2">
+                                        <div className="flex items-center gap-2 text-indigo-400">
+                                            <div className="w-1.5 h-6 bg-indigo-500 rounded-full" />
+                                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Total Outstanding Revenue</span>
+                                        </div>
+                                        <h3 className="text-4xl md:text-6xl font-display font-bold text-white italic tracking-tighter">
+                                            ₹{((stats.finance?.totalFee || 0) - (stats.finance?.totalPaid || 0)).toLocaleString()}
+                                        </h3>
+                                        <p className="text-xs text-muted-foreground italic">Combined Pending: School + Hostel + Transport + Custom</p>
+                                    </div>
+                                    <div className="flex flex-col justify-end md:items-end gap-1">
+                                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Total Combined Target</p>
+                                        <p className="text-2xl md:text-3xl font-display font-bold text-indigo-300/80 italic">₹{(stats.finance?.totalFee || 0).toLocaleString()}</p>
+                                        <div className="w-full md:w-48 h-1 bg-white/5 rounded-full mt-2 overflow-hidden">
+                                            <div 
+                                                className="h-full bg-indigo-500 transition-all duration-1000" 
+                                                style={{ width: `${stats.finance?.totalFee ? (stats.finance.totalPaid / stats.finance.totalFee) * 100 : 0}%` }}
+                                            />
+                                        </div>
+                                        <p className="text-[10px] text-indigo-400/60 font-mono mt-1">
+                                            Collection Progress: {stats.finance?.totalFee ? Math.round((stats.finance.totalPaid / stats.finance.totalFee) * 100) : 0}%
+                                        </p>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+                                {[
+                                    { label: "School Fee", paid: stats.finance?.schoolPaid || 0, total: stats.finance?.schoolFee || 0, color: "#60a5fa", icon: GraduationCap },
+                                    { label: "Hostel Fee", paid: stats.finance?.hostelPaid || 0, total: stats.finance?.hostelFee || 0, color: "#10b981", icon: Home },
+                                    { label: "Transport", paid: stats.finance?.transportPaid || 0, total: stats.finance?.transportFee || 0, color: "#3b82f6", icon: Bus },
+                                    { label: "Custom Fee", paid: stats.finance?.customPaid || 0, total: stats.finance?.customFee || 0, color: "#f59e0b", icon: Settings2 }
+                                ].map((fee, idx) => (
+                                    <div key={idx} className="p-6 rounded-3xl bg-black/40 border border-white/5 flex flex-col items-center justify-center text-center gap-4 group/item hover:border-white/20 transition-all relative min-h-[260px]">
+                                        <div className="absolute top-4 right-4 z-20 opacity-0 group-hover/item:opacity-100 transition-opacity"><CardFilter villages={villages} classes={classes} sections={sections} filterVillage={filterVillage} setFilterVillage={setFilterVillage} filterClass={filterClass} setFilterClass={setFilterClass} filterSection={filterSection} setFilterSection={setFilterSection} size="xs" /></div>
+                                        
+                                        <div className="relative w-16 h-16 md:w-20 md:h-20">
+                                            <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                                                <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3" />
+                                                <circle cx="18" cy="18" r="16" fill="none" stroke={fee.color} strokeWidth="3" strokeDasharray={`${fee.total > 0 ? (fee.paid / fee.total) * 100 : 0} 100`} strokeDashoffset="0" className="transition-all duration-1000 ease-out" />
+                                            </svg>
+                                            <div className="absolute inset-0 flex items-center justify-center"><fee.icon className="w-6 h-6 text-white/20" /></div>
+                                        </div>
+                                        
+                                        <div className="w-full space-y-1">
+                                            <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{fee.label}</p>
+                                            <div className="flex flex-col gap-1">
+                                                <div className="flex justify-between items-center text-[10px] md:text-xs">
+                                                    <span className="text-emerald-400 font-bold">Paid:</span>
+                                                    <span className="text-white font-mono">₹{fee.paid.toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-[10px] md:text-xs">
+                                                    <span className="text-rose-400 font-bold">Pending:</span>
+                                                    <span className="text-white font-mono">₹{(fee.total - fee.paid).toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-[10px] md:text-xs border-t border-white/5 pt-1 mt-1">
+                                                    <span className="text-blue-400 font-bold">Total:</span>
+                                                    <span className="text-white font-mono">₹{fee.total.toLocaleString()}</span>
+                                                </div>
+                                            </div>
+                                            <div className="mt-2 text-[8px] font-black uppercase text-white/40 tracking-tighter pt-2 italic">
+                                                Progress: {fee.total > 0 ? Math.round((fee.paid / fee.total) * 100) : 0}%
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+
+                            <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
+                                {Object.entries(stats.finance?.terms || {}).sort().map(([name, data]) => (
+                                    <div key={name} className="p-4 rounded-2xl bg-blue-500/5 border border-blue-500/10 flex flex-col items-center text-center gap-3">
+                                        <div className="relative w-12 h-12">
+                                            <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                                                <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(59, 130, 246, 0.1)" strokeWidth="3" />
+                                                <circle cx="18" cy="18" r="16" fill="none" stroke="#60a5fa" strokeWidth="3" strokeDasharray={`${data.total > 0 ? (data.paid / data.total) * 100 : 0} 100`} strokeDashoffset="0" />
+                                            </svg>
+                                            <div className="absolute inset-0 flex items-center justify-center"><BookOpen className="w-4 h-4 text-blue-500/30" /></div>
+                                        </div>
+                                        <div className="w-full space-y-2">
+                                            <p className="text-[9px] font-black uppercase text-blue-400 tracking-widest">{name}</p>
+                                            <div className="flex flex-col gap-0.5">
+                                                <div className="flex justify-between text-[8px] md:text-[10px]">
+                                                    <span className="text-emerald-400/80">Paid:</span>
+                                                    <span className="text-white/60 font-mono">₹{data.paid.toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between text-[8px] md:text-[10px]">
+                                                    <span className="text-rose-400/80">Left:</span>
+                                                    <span className="text-white/60 font-mono">₹{(data.total - data.paid).toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between text-[8px] md:text-[10px] border-t border-white/5 pt-0.5">
+                                                    <span className="text-blue-400/80">Total:</span>
+                                                    <span className="text-white/60 font-mono">₹{data.total.toLocaleString()}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    </div>
 
                     <div className="space-y-4">
                         <div className="flex items-center justify-between px-1">
                             <h2 className="text-xl md:text-2xl font-display font-bold italic">Latest Registrations</h2>
                             <Link href="/admin/students" className="text-[10px] font-black uppercase tracking-widest text-accent hover:underline">Full Database</Link>
                         </div>
-
-                        {recentStudents.filter(s => s.classId && (classes as any)?.[s.classId]).length > 0 ? (
-                            <div className="rounded-2xl border border-white/10 bg-black/40 shadow-2xl backdrop-blur-md overflow-hidden mobile-dense-table">
-                                <DataTable
-                                    data={recentStudents.filter(s => s.classId && (classes as any)?.[s.classId]).slice(0, 5)}
-                                    columns={columns}
-                                    isLoading={false}
-                                    onRowClick={() => router.push("/admin/students")}
-                                />
-                            </div>
-                        ) : (
-                            <div className="p-12 border border-dashed border-white/10 rounded-2xl bg-white/5 text-center text-muted-foreground italic text-sm">
-                                {loading ? "Syncing data matrix..." : "No recent activity found."}
-                            </div>
-                        )}
-                    </div>
-                </div>
-
-                <div className="space-y-6">
-                    <div className="p-6 rounded-3xl bg-black/40 border border-white/10 backdrop-blur-md relative overflow-hidden group">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-accent/10 transition-all duration-1000" />
-                        <h3 className="text-[10px] font-black uppercase tracking-[0.2em] mb-6 text-accent/60 flex items-center gap-2">
-                            <div className="w-1 h-4 bg-accent rounded-full" />
-                            Terminal Links
-                        </h3>
-                        <div className="space-y-3 relative z-10">
-                            {[
-                                { href: "/admin/payments", icon: IndianRupee, text: "Record Payment", color: "text-emerald-400" },
-                                { href: "/admin/notices", icon: AlertTriangle, text: "Post Notice", color: "text-amber-400" },
-                                { href: "/admin/timetable/manage", icon: Clock, text: "Edit Schedule", color: "text-blue-400" }
-                            ].map((btn, i) => (
-                                <Button
-                                    key={i}
-                                    className="w-full justify-start gap-4 bg-white/5 hover:bg-white/10 border border-white/5 h-14 md:h-16 text-sm md:text-base font-bold rounded-2xl transition-all text-white"
-                                    onClick={() => router.push(btn.href)}
-                                >
-                                    <div className={cn("p-2 rounded-xl bg-black/40 border border-white/5", btn.color)}>
-                                        <btn.icon size={18} />
-                                    </div>
-                                    {btn.text}
-                                </Button>
-                            ))}
+                        <div className="rounded-2xl border border-white/10 bg-black/40 backdrop-blur-md overflow-hidden">
+                            <DataTable
+                                data={recentStudents.filter(s => s.classId && (classes as any)?.[s.classId]).slice(0, 5)}
+                                columns={columns}
+                                isLoading={false}
+                                onRowClick={() => router.push("/admin/students")}
+                            />
                         </div>
                     </div>
                 </div>

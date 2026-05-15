@@ -145,7 +145,7 @@ export class EnterpriseAttendanceService {
                         title: "Attendance Updated",
                         body: `Attendance for ${date} has been marked for your class.`
                     },
-                    { type: "ATTENDANCE", date, url: "https://spoorthy-school-live-55917.web.app/student/attendance" }
+                    { type: "ATTENDANCE", date, url: "https://spoorthy-16292.web.app/student/attendance" }
                 );
             }
         } catch (e) {

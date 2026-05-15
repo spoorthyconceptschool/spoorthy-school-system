@@ -158,15 +158,15 @@ export async function POST(req: NextRequest) {
                     },
                     webpush: {
                         fcmOptions: {
-                            link: "https://spoorthy-school-live-55917.web.app/notifications"
+                            link: "https://spoorthy-16292.web.app/notifications"
                         },
                         notification: {
-                            icon: "https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Flogo.png?alt=media"
+                            icon: "https://firebasestorage.googleapis.com/v0/b/spoorthy-16292.firebasestorage.app/o/demo%2Flogo.png?alt=media"
                         }
                     },
                     data: {
                         type: "NOTICE",
-                        click_action: "https://spoorthy-school-live-55917.web.app/notifications"
+                        click_action: "https://spoorthy-16292.web.app/notifications"
                     },
                     tokens: [] as string[]
                 };

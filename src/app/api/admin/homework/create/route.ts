@@ -128,17 +128,17 @@ export async function POST(req: NextRequest) {
                         },
                         webpush: {
                             fcmOptions: {
-                                link: "https://spoorthy-school-live-55917.web.app/student/homework"
+                                link: "https://spoorthy-16292.web.app/student/homework"
                             },
                             notification: {
-                                icon: "https://firebasestorage.googleapis.com/v0/b/spoorthy-school-live-55917.firebasestorage.app/o/demo%2Flogo.png?alt=media"
+                                icon: "https://firebasestorage.googleapis.com/v0/b/spoorthy-16292.firebasestorage.app/o/demo%2Flogo.png?alt=media"
                             }
                         },
                         data: {
                             type: "HOMEWORK",
                             homeworkId: hwId,
                             subjectId: subjectId,
-                            click_action: "https://spoorthy-school-live-55917.web.app/student/homework"
+                            click_action: "https://spoorthy-16292.web.app/student/homework"
                         },
                         tokens: uniqueTokens
                     };

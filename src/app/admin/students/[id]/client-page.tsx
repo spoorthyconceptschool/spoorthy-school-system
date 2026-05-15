@@ -147,7 +147,7 @@ export default function StudentDetailsPage() {
     const [editForm, setEditForm] = useState<Partial<Student>>({});
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
 
-    const { villages: villagesData, classes: classesData, sections: sectionsData, classSections, branding, selectedYear } = useMasterData();
+    const { villages: villagesData, classes: classesData, sections: sectionsData, classSections, branding, selectedYear, feeConfig, customFees } = useMasterData();
 
     // Derived Master Data
     const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name || "Unknown Village" })).sort((a, b) => String(a.name).localeCompare(String(b.name)));
@@ -182,9 +182,14 @@ export default function StudentDetailsPage() {
             setLoading(true);
 
             try {
-                // 1. Fetch Student Profile
+                // 2. Parallel Fetch: Student Profile & Payments
                 const studentRef = doc(db, "students", studentId);
-                const studentSnap = await getDoc(studentRef);
+                const pQ = query(collection(db, "payments"), where("studentId", "==", studentId)); // Note: Usually schoolId is studentId docId
+
+                const [studentSnap, pSnap] = await Promise.all([
+                    getDoc(studentRef),
+                    getDocs(pQ)
+                ]);
 
                 if (!studentSnap.exists()) {
                     alert("Student Not Found");
@@ -193,46 +198,19 @@ export default function StudentDetailsPage() {
                 }
 
                 const sData = { id: studentSnap.id, ...studentSnap.data() } as Student;
-
-                // 1.1 Fetch Linked UID (Critical for Password Reset)
-                if (!sData.uid) {
-                    try {
-                        const mappingRef = doc(db, "usersBySchoolId", sData.schoolId);
-                        const mappingSnap = await getDoc(mappingRef);
-                        if (mappingSnap.exists()) {
-                            sData.uid = mappingSnap.data().uid;
-                        }
-                    } catch (e) {
-                        console.warn("UID Lookup Failed", e);
-                    }
-                }
+                const loadedPayments = pSnap.docs.map(d => ({ id: d.id, ...d.data() } as Payment));
 
                 setStudent(sData);
                 setEditForm(sData);
+                setPayments(loadedPayments.sort((a, b) => safeDateParse(b.date) - safeDateParse(a.date)));
 
-                // 2. Fetch Payments
-                const pQ = query(collection(db, "payments"), where("studentId", "==", sData.schoolId));
-                const pSnap = await getDocs(pQ);
-                const loadedPayments = pSnap.docs.map(d => ({ id: d.id, ...d.data() } as Payment));
-                // Client-side sort
-                setPayments(loadedPayments.sort((a, b) => {
-                    return safeDateParse(b.date) - safeDateParse(a.date);
-                }));
-
-                // 3. Auto-Sync Fee Ledger (Real-time synchronization)
+                // 3. Auto-Sync Fee Ledger (Uses Centralized Config)
                 const currentYearId = selectedYear || "2025-2026";
                 const ledgerRef = doc(db, "student_fee_ledgers", `${sData.schoolId}_${currentYearId}`);
                 const ledgerSnap = await getDoc(ledgerRef);
 
                 try {
-                    // Fetch Global Fee Config
-                    const feeConfigSnap = await getDoc(doc(db, "config", "fees"));
-                    const feeTerms = ((feeConfigSnap.data()?.terms as any[]) || []).filter((t: any) => t.isActive);
-
-                    // Fetch Custom Fees (Targeted)
-                    const customFeesQ = query(collection(db, "custom_fees"), where("status", "==", "ACTIVE"));
-                    const customFeesSnap = await getDocs(customFeesQ);
-
+                    const feeTerms = (feeConfig.terms || []).filter((t: any) => t.isActive);
                     const targetClassName = sData.className || "Class 1";
                     const newItems: FeeLedgerItem[] = [];
 
@@ -241,10 +219,9 @@ export default function StudentDetailsPage() {
                         if (amount > 0) newItems.push({ id: `TERM_${term.id}`, type: "TERM", name: term.name, dueDate: term.dueDate, amount: Number(amount), paidAmount: 0, status: "PENDING" });
                     });
 
-                    customFeesSnap.docs.forEach(cDoc => {
-                        const cf = cDoc.data();
+                    customFees.forEach(cf => {
                         if (cf.targetType === "CLASS" && cf.targetIds?.includes(sData.classId)) {
-                            newItems.push({ id: `CUSTOM_${cDoc.id}`, type: "CUSTOM", name: cf.name, dueDate: cf.dueDate, amount: Number(cf.amount), paidAmount: 0, status: "PENDING" });
+                            newItems.push({ id: `CUSTOM_${cf.id}`, type: "CUSTOM", name: cf.name, dueDate: cf.dueDate, amount: Number(cf.amount), paidAmount: 0, status: "PENDING" });
                         }
                     });
 

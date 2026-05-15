@@ -22,27 +22,19 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 let db: Firestore;
 
-// Robust Firestore Initialization with Persistence
+// Robust Firestore Initialization with Persistence (Zero-Latency Pillar)
 if (typeof window !== "undefined") {
     try {
-        // In Next.js dev mode, HMR causes this to re-run.
-        // We only want to initialize persistence once.
-        db = getFirestore(app); // Check if it exists or create basic
-
-        // Unfortunately firebase v9+ doesn't have an easy "is persistence enabled" check,
-        // but it will throw if we try to initialize it twice.
-        // The safest robust way in NextJS is to just let getFirestore handle it,
-        // or strictly call initializeFirestore ONCE before getFirestore is ever called.
-        // Given HMR, we will just use getFirestore and NOT try to force persistence manually
-        // if it causes lease errors. If persistence is critical, it should be wrapped in a singleton check.
-
-        // This simple getFirestore(app) will resolve the "Failed to obtain primary lease" error.
+        db = initializeFirestore(app, {
+            localCache: persistentLocalCache({
+                tabManager: persistentMultipleTabManager()
+            })
+        });
     } catch (e: any) {
+        // Fallback if already initialized (common in HMR)
         db = getFirestore(app);
-        console.warn("Firestore init warning:", e.message);
     }
 } else {
-    // Server-side
     db = getFirestore(app);
 }
 

@@ -80,10 +80,13 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
     }, [activeTab, onTabChange]);
 
     const {
-        teachers,
-        staff,
+        teachers: masterTeachers,
+        staff: masterStaff,
         loading
     } = useMasterData();
+
+    const [optimisticTeachers, setOptimisticTeachers] = useState<any[]>([]);
+    const [optimisticStaff, setOptimisticStaff] = useState<any[]>([]);
 
     // Modals
     const [showTeacherModal, setShowTeacherModal] = useState(false);
@@ -123,24 +126,48 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
     /**
      * Array of teachers dynamically filtered by the search query spanning
      * fields like name, ID, or mobile digits.
+     * Incorporates optimistic updates with deduplication.
      */
-    const filteredTeachers = (teachers || []).filter((t: any) =>
-        t.name?.toLowerCase().includes(search.toLowerCase()) ||
-        t.schoolId?.toLowerCase().includes(search.toLowerCase()) ||
-        t.mobile?.includes(search)
-    );
+    const filteredTeachers = (() => {
+        // Merge master teachers with optimistic ones
+        const merged = [...optimisticTeachers, ...(masterTeachers || [])];
+        
+        // Deduplicate by mobile (primary key for optimistic match)
+        const uniqueMap = new Map();
+        merged.forEach(t => {
+            const key = t.mobile;
+            if (!uniqueMap.has(key) || !t.isOptimistic) {
+                uniqueMap.set(key, t);
+            }
+        });
+
+        return Array.from(uniqueMap.values()).filter((t: any) =>
+            t.name?.toLowerCase().includes(search.toLowerCase()) ||
+            t.schoolId?.toLowerCase().includes(search.toLowerCase()) ||
+            t.mobile?.includes(search)
+        );
+    })();
 
     /**
      * Array of generic staff members filtered interactively by both
      * text query fields and their exact role assignment code.
      */
-    const filteredStaff = (staff || []).filter((s: any) => {
-        const matchesSearch = s.name?.toLowerCase().includes(search.toLowerCase()) ||
-            s.schoolId?.toLowerCase().includes(search.toLowerCase()) ||
-            s.mobile?.includes(search);
-        const matchesRole = roleFilter === "ALL" || s.roleCode === roleFilter;
-        return matchesSearch && matchesRole;
-    });
+    const filteredStaff = (() => {
+        const merged = [...optimisticStaff, ...(masterStaff || [])];
+        const uniqueMap = new Map();
+        merged.forEach(s => {
+            const key = s.mobile;
+            if (!uniqueMap.has(key) || !s.isOptimistic) uniqueMap.set(key, s);
+        });
+
+        return Array.from(uniqueMap.values()).filter((s: any) => {
+            const matchesSearch = s.name?.toLowerCase().includes(search.toLowerCase()) ||
+                s.schoolId?.toLowerCase().includes(search.toLowerCase()) ||
+                s.mobile?.includes(search);
+            const matchesRole = roleFilter === "ALL" || s.roleCode === roleFilter;
+            return matchesSearch && matchesRole;
+        });
+    })();
 
 
     return (
@@ -152,7 +179,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                         <h1 className="text-2xl md:text-5xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic leading-tight">
                             Faculty Registry
                         </h1>
-                        <p className="text-muted-foreground text-[10px] md:text-lg tracking-tight uppercase font-black opacity-90">Managing <span className="text-white">{teachers.length + staff.length} professional staff</span> members</p>
+                        <p className="text-muted-foreground text-[10px] md:text-lg tracking-tight uppercase font-black opacity-90">Managing <span className="text-white">{masterTeachers.length + masterStaff.length} professional staff</span> members</p>
                     </div>
 
                     <div className="flex items-center gap-2">
@@ -448,8 +475,18 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                 </TabsContent>
             </Tabs>
 
-            <AddTeacherModal isOpen={showTeacherModal} onClose={() => setShowTeacherModal(false)} onSuccess={() => { /* Real-time update */ }} />
-            <AddStaffModal isOpen={showStaffModal} onClose={() => setShowStaffModal(false)} onSuccess={() => { /* Real-time update */ }} />
+            <AddTeacherModal 
+                isOpen={showTeacherModal} 
+                onClose={() => setShowTeacherModal(false)} 
+                onSuccess={() => { /* Real-time update */ }} 
+                onOptimisticUpdate={(t) => setOptimisticTeachers(prev => [t, ...prev])}
+            />
+            <AddStaffModal 
+                isOpen={showStaffModal} 
+                onClose={() => setShowStaffModal(false)} 
+                onSuccess={() => { /* Real-time update */ }} 
+                onOptimisticUpdate={(s) => setOptimisticStaff(prev => [s, ...prev])}
+            />
 
             <AdminChangePasswordModal
                 isOpen={isResetModalOpen}

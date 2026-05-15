@@ -83,10 +83,20 @@ export async function authenticateRoute(
         };
 
         return { user: authUser };
-    } catch (error) {
+    } catch (error: any) {
         console.error("[Enterprise SecOps] Authentication Error:", error);
+        
+        // SENIOR ARCHITECT DIAGNOSTIC: Surface specific failure reasons in DEV/LOCAL to resolve clock-skew or project mismatches
+        const isDev = process.env.NODE_ENV === 'development' || req.nextUrl.hostname === 'localhost';
+        const diagnosticMessage = isDev ? `Unauthorized: ${error.message || 'Invalid token'}` : 'Unauthorized: Invalid token';
+        
         return {
-            errorResponse: NextResponse.json({ error: 'Unauthorized: Invalid token' }, { status: 401 })
+            errorResponse: NextResponse.json({ 
+                error: diagnosticMessage,
+                timestamp: new Date().toISOString(),
+                code: error.code || 'auth/unknown',
+                hint: error.message?.includes('future') ? 'Check your system clock sync.' : 'Ensure Firebase Project ID matches.'
+            }, { status: 401 })
         };
     }
 }

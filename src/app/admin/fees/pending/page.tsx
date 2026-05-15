@@ -20,8 +20,17 @@ import { useRouter } from "next/navigation";
 import { FeeSlipGenerator } from "@/components/admin/fee-slip-generator";
 
 export default function FeePendingsPage() {
-    const [ledgers, setLedgers] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const PENDING_CACHE_KEY = "spoorthy_pending_ledgers";
+    const [ledgers, setLedgers] = useState<any[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(PENDING_CACHE_KEY);
+            if (cached) {
+                try { return JSON.parse(cached); } catch (e) { return []; }
+            }
+        }
+        return [];
+    });
+    const [loading, setLoading] = useState(ledgers.length === 0);
     const [search, setSearch] = useState("");
     const [classFilter, setClassFilter] = useState("all");
     const [villageFilter, setVillageFilter] = useState("all");
@@ -82,6 +91,9 @@ export default function FeePendingsPage() {
             }).sort((a, b) => b.pendingAmount - a.pendingAmount);
 
             setLedgers(joined);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(PENDING_CACHE_KEY, JSON.stringify(joined));
+            }
         } catch (e) {
             console.error("Fetch Pendings Error:", e);
         } finally {

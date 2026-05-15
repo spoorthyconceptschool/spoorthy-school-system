@@ -23,9 +23,10 @@ interface AddStaffModalProps {
     isOpen: boolean;
     onClose: () => void;
     onSuccess: () => void;
+    onOptimisticUpdate?: (staff: any) => void;
 }
 
-export function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffModalProps) {
+export function AddStaffModal({ isOpen, onClose, onSuccess, onOptimisticUpdate }: AddStaffModalProps) {
     const { user } = useAuth();
     const [roles, setRoles] = useState<any[]>([]);
     const [loadingRoles, setLoadingRoles] = useState(false);
@@ -78,10 +79,28 @@ export function AddStaffModal({ isOpen, onClose, onSuccess }: AddStaffModalProps
         e.preventDefault();
         setSubmitting(true);
 
-        try {
-            const selectedRole = roles.find(r => r.id === form.roleId);
-            if (!selectedRole) throw new Error("Invalid Role");
+        const selectedRole = roles.find(r => r.id === form.roleId);
+        if (!selectedRole) {
+            setSubmitting(false);
+            return;
+        }
 
+        // --- ZERO-LATENCY OPTIMISTIC PROJECTION ---
+        if (onOptimisticUpdate) {
+            const tempStaff = {
+                id: `TEMP-${Date.now()}`,
+                schoolId: "PENDING...",
+                name: form.name.trim(),
+                mobile: form.mobile,
+                roleCode: selectedRole.code,
+                baseSalary: selectedRole.basicSalary || 0,
+                status: "ACTIVE",
+                isOptimistic: true
+            };
+            onOptimisticUpdate(tempStaff);
+        }
+
+        try {
             const res = await fetch("/api/admin/staff/create", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },

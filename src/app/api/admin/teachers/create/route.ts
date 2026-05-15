@@ -16,9 +16,8 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Invalid Data: Name and 10-digit mobile required." }, { status: 400 });
         }
 
-        // 2. Transaction for Atomic ID Generation
+        // 2. Atomic ID Generation & Core Writes
         const result = await adminDb.runTransaction(async (t: any) => {
-            // Fetch Dynamic Prefix from settings
             const settingsRef = adminDb.collection("settings").doc("branding");
             const settingsSnap = await t.get(settingsRef);
             const brandingData = settingsSnap.data() || {};
@@ -31,50 +30,28 @@ export async function POST(req: Request) {
             let newCount = startingNumber;
             if (counterSnap.exists && counterSnap.data()?.count >= startingNumber) {
                 newCount = counterSnap.data()?.count + 1;
-            } else if (counterSnap.exists && counterSnap.data()?.count < startingNumber) {
-                // If counter exists but is less than starting number, we jump to starting number
-                newCount = startingNumber;
             }
 
-            // Padded ID: SHST0005 (Configurable Prefix)
             const paddedId = String(newCount).padStart(4, "0");
             const teacherId = `${prefix}${paddedId}`;
-
-            // 3. Create Firebase Auth User
-            // Email: SHST0005@school.local
-            // Pass: Mobile Number
-            // Email: SHST0005@school.local
-            // Pass: Mobile Number
-            // Ensure email is lowercase to avoid Auth case-sensitivity issues
             const email = `${teacherId}@school.local`.toLowerCase();
-            const password = mobile;
 
-            let uid;
-            try {
-                const userRecord = await adminAuth.createUser({
-                    email,
-                    password,
-                    displayName: name,
-                    phoneNumber: `+91${mobile}`, // Enforce +91 for uniqueness if needed, or skip phone field in Auth if dupes worry
-                });
-                uid = userRecord.uid;
-                await adminAuth.setCustomUserClaims(uid, { role: "TEACHER" });
-            } catch (authError: any) {
-                if (authError.code === 'auth/email-already-exists') {
-                    // This is catastropic for our counter logic, strictly shouldn't happen if counter is atomic.
-                    throw new Error("Critical: Teacher ID collision in Auth.");
-                }
-                throw authError;
-            }
+            // 3. Auth Creation (Must be in transaction to prevent ID reuse if auth fails, 
+            // but we can't truly put it in a Firestore transaction. 
+            // However, we'll keep it here as the 'point of no return')
+            const userRecord = await adminAuth.createUser({
+                email,
+                password: mobile,
+                displayName: name,
+                phoneNumber: `+91${mobile}`,
+            });
+            const uid = userRecord.uid;
+            await adminAuth.setCustomUserClaims(uid, { role: "TEACHER" });
 
-            // 4. Firestore Writes
-
-            // Increment Counter
+            // 4. Atomic Firestore Writes
             t.set(counterRef, { count: newCount }, { merge: true });
-
-            // Create Teacher Profile
-            const teacherRef = adminDb.collection("teachers").doc(teacherId); // Doc ID = SHSTxxxx
-            t.set(teacherRef, {
+            
+            t.set(adminDb.collection("teachers").doc(teacherId), {
                 schoolId: teacherId,
                 uid,
                 name,
@@ -84,103 +61,86 @@ export async function POST(req: Request) {
                 salary: Number(salary) || 0,
                 qualifications,
                 status: "ACTIVE",
-                subjects: subjects || [], // Array of subject names or IDs
-                classTeacherOf: classTeacherOf || null, // { className, sectionName }
+                subjects: subjects || [],
+                classTeacherOf: classTeacherOf || null,
                 createdAt: Timestamp.now(),
-                recoveryPassword: mobile // Shadow Password for Admin Visibility
+                recoveryPassword: mobile
             });
 
-            // Role Mapping for Login
-            const userRef = adminDb.collection("users").doc(uid);
-            t.set(userRef, {
+            t.set(adminDb.collection("users").doc(uid), {
                 schoolId: teacherId,
                 role: "TEACHER",
                 status: "ACTIVE",
-                mustChangePassword: true, // Force change on first login
+                mustChangePassword: true,
                 createdAt: Timestamp.now(),
-                recoveryPassword: mobile // Shadow Password
+                recoveryPassword: mobile
             });
 
-            // Map by School ID (Optional, since doc ID IS school ID, but useful for lookups)
-            const mapRef = adminDb.collection("usersBySchoolId").doc(teacherId);
-            t.set(mapRef, {
-                uid,
-                role: "TEACHER"
-            });
-
-            // Audit Log
-            const auditRef = adminDb.collection("audit_logs").doc();
-            t.set(auditRef, {
-                action: "CREATE_TEACHER",
-                targetId: teacherId,
-                details: { name, mobile },
-                timestamp: Timestamp.now()
-            });
-
-            // G. Search Indexing
-            const searchKeywords = new Set<string>();
-            const addKeywords = (text: string) => {
-                if (!text) return;
-                const normalized = text.toLowerCase().trim();
-                searchKeywords.add(normalized);
-                const tokens = normalized.split(/\s+/);
-                tokens.forEach(t => searchKeywords.add(t));
-                tokens.forEach(token => {
-                    for (let i = 2; i <= token.length; i++) {
-                        searchKeywords.add(token.substring(0, i));
-                    }
-                });
-            };
-            addKeywords(name);
-            addKeywords(teacherId);
-            addKeywords(mobile);
-            addKeywords("Teacher");
-
-            const searchRef = adminDb.collection("search_index").doc(teacherId);
-            t.set(searchRef, {
-                id: teacherId,
-                entityId: teacherId,
-                type: "teacher",
-                title: name,
-                subtitle: `Teacher - ${mobile}`,
-                url: `/admin/teachers`, // Assuming no dedicated page per teacher yet, or update later
-                keywords: Array.from(searchKeywords),
-                updatedAt: Timestamp.now()
-            });
-
-            // H. Sync with RTDB if Class Teacher assignment is provided
-            if (classTeacherOf && classTeacherOf.classId && classTeacherOf.sectionId) {
-                const { adminRtdb } = require("@/lib/firebase-admin");
-                const csKey = `${classTeacherOf.classId}_${classTeacherOf.sectionId}`;
-                const csRef = adminRtdb.ref(`master/classSections/${csKey}`);
-
-                // We use set/update to ensure this teacher is now the class teacher in the canonical mapping
-                // Note: RTDB operations are not part of Firestore transaction, but we handle it at the end of logic
-                // for structural consistency.
-                await csRef.update({
-                    classId: classTeacherOf.classId,
-                    sectionId: classTeacherOf.sectionId,
-                    classTeacherId: teacherId,
-                    active: true
-                });
-            }
+            t.set(adminDb.collection("usersBySchoolId").doc(teacherId), { uid, role: "TEACHER" });
 
             return { teacherId, uid };
-        }); // End Transaction
+        });
 
-        // Notification (After Transaction)
-        try {
-            const { sendServerNotification } = await import("@/lib/server-notifications");
-            await sendServerNotification({
-                target: "ALL_ADMINS",
-                title: "New Teacher Onboarded",
-                message: `${name} has been added as a Teacher. ID: ${result.teacherId}`,
-                type: "INFO",
-                actionBy: "SYSTEM"
+        // --- ASYNCHRONOUS SIDE EFFECTS (OUTSIDE TRANSACTION) ---
+        const backgroundTasks = [];
+
+        // 1. Search Indexing
+        const searchKeywords = new Set<string>();
+        const addKeywords = (text: string) => {
+            if (!text) return;
+            const normalized = text.toLowerCase().trim();
+            searchKeywords.add(normalized);
+            normalized.split(/\s+/).forEach(token => {
+                searchKeywords.add(token);
+                for (let i = 2; i <= token.length; i++) searchKeywords.add(token.substring(0, i));
             });
-        } catch (noteError) {
-            console.error("Failed to send notification:", noteError);
+        };
+        addKeywords(name);
+        addKeywords(result.teacherId);
+        addKeywords(mobile);
+
+        backgroundTasks.push(adminDb.collection("search_index").doc(result.teacherId).set({
+            id: result.teacherId,
+            entityId: result.teacherId,
+            type: "teacher",
+            title: name,
+            subtitle: `Teacher - ${mobile}`,
+            url: `/admin/teachers`,
+            keywords: Array.from(searchKeywords),
+            updatedAt: Timestamp.now()
+        }));
+
+        // 2. RTDB Sync
+        if (classTeacherOf?.classId && classTeacherOf?.sectionId) {
+            const { adminRtdb } = require("@/lib/firebase-admin");
+            const csKey = `${classTeacherOf.classId}_${classTeacherOf.sectionId}`;
+            backgroundTasks.push(adminRtdb.ref(`master/classSections/${csKey}`).update({
+                classId: classTeacherOf.classId,
+                sectionId: classTeacherOf.sectionId,
+                classTeacherId: result.teacherId,
+                active: true
+            }));
         }
+
+        // 3. Notifications
+        backgroundTasks.push((async () => {
+            try {
+                const { sendServerNotification } = await import("@/lib/server-notifications");
+                await sendServerNotification({
+                    target: "ALL_ADMINS",
+                    title: "New Teacher Onboarded",
+                    message: `${name} has been added. ID: ${result.teacherId}`,
+                    type: "INFO",
+                    actionBy: "SYSTEM"
+                });
+            } catch (e) {}
+        })());
+
+        // We don't await backgroundTasks to keep response time ultra-low
+        // but we'll trigger them now. 
+        Promise.all(backgroundTasks).catch(e => console.error("Post-Teacher-Creation Task Error:", e));
+
+        return NextResponse.json({ success: true, ...result });
 
         return NextResponse.json({ success: true, ...result });
 
