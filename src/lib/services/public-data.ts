@@ -97,7 +97,7 @@ export async function getPublicBranding() {
         console.error("Error fetching public branding:", e);
     }
     return {
-        schoolName: "Spoorthy Concept School",
+        schoolName: "Spoorthy High School",
         schoolLogo: null
     };
 }
