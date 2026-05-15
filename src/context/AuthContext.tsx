@@ -121,31 +121,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         return () => unsubscribe();
     }, [router]);
 
-    // 2. Single-Device Session Monitor (Firestore Snapshot)
-    useEffect(() => {
-        if (!user || pathname === "/login") return;
+    // 2. Single-Device Session Monitor (DISABLED to allow multi-device usage)
+    // Removed to prevent emergency logout when switching between mobile and laptop.
 
-        const unsub = onSnapshot(doc(db, "user_sessions", user.uid), (snap) => {
-            if (snap.exists()) {
-                const dbSessionId = snap.data().currentSessionId;
-                const localSessionId = localStorage.getItem(SESSION_KEY);
-                
-                // Only enforce eviction if BOTH sessions exist but don't match.
-                // This prevents race conditions where local storage is temporarily empty during transitions.
-                if (dbSessionId && localSessionId && dbSessionId !== localSessionId) {
-                    console.error("[Auth] SESSION OVERRIDE DETECTED. Executing emergency logout.");
-                    firebaseSignOut(auth);
-                    localStorage.removeItem(STORAGE_KEY);
-                    localStorage.removeItem(SESSION_KEY);
-                    setUser(null);
-                    setUserData(null);
-                    router.push("/login?error=session_expired");
-                }
-            }
-        });
-
-        return () => unsub();
-    }, [user?.uid, pathname, router]);
 
     // 3. Smart Redirect Logic
     useEffect(() => {
