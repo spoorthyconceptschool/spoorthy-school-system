@@ -50,3 +50,12 @@ next-env.d.ts
 # local dev scripts
 *.cjs
 src/lib/service-account.json
+
+# Security & Credentials
+firebase-credentials.json
+test-token.json
+fix-iam.js
+scratch/
+test-token.json
+*.json.token
+.gemini/
