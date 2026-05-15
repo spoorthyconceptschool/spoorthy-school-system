@@ -20,7 +20,7 @@ const nextConfig: NextConfig = {
     ],
   },
   experimental: {
-    ppr: 'incremental',
+    optimizePackageImports: ["lucide-react"],
     serverActions: {
       bodySizeLimit: '2mb',
     }
