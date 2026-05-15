@@ -33,11 +33,6 @@ export function AdminChangePasswordModal({ isOpen, onClose, user, onSuccess }: A
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
 
-        if (!user.uid) {
-            toast({ title: "Error", description: "User has no linked account.", type: "error" });
-            return;
-        }
-
         setLoading(true);
 
         try {

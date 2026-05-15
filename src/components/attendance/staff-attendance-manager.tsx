@@ -58,7 +58,8 @@ export default function StaffAttendanceManager({
             fetchStats();
         } else {
             setLoading(true);
-            const attId = `STAFF_${date}`;
+            const schoolId = user.schoolId || "global";
+            const attId = `${schoolId}_STAFF_${date}`;
             const unsub = onSnapshot(doc(db, "attendance_daily", attId), (snap) => {
                 if (snap.exists()) {
                     setAlreadyMarked(true);
@@ -83,13 +84,14 @@ export default function StaffAttendanceManager({
         try {
             const sList = staff;
             const currentYear = new Date().getFullYear();
+            const schoolId = user?.schoolId || "global";
             let startKey, endKey;
             if (statsMonth === "ALL") {
-                startKey = `STAFF_${currentYear}-01-01`;
-                endKey = `STAFF_${currentYear}-12-31`;
+                startKey = `${schoolId}_STAFF_${currentYear}-01-01`;
+                endKey = `${schoolId}_STAFF_${currentYear}-12-31`;
             } else {
-                startKey = `STAFF_${currentYear}-${statsMonth}-01`;
-                endKey = `STAFF_${currentYear}-${statsMonth}-31`;
+                startKey = `${schoolId}_STAFF_${currentYear}-${statsMonth}-01`;
+                endKey = `${schoolId}_STAFF_${currentYear}-${statsMonth}-31`;
             }
             const q = query(collection(db, "attendance_daily"), where(documentId(), ">=", startKey), where(documentId(), "<=", endKey));
             const snap = await getDocs(q);

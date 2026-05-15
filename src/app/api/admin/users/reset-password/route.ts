@@ -24,14 +24,20 @@ export async function POST(req: NextRequest) {
         // 2. Parse Body
         const { targetUid, newPassword, schoolId, role } = await req.json();
 
-        if (!targetUid || !newPassword || newPassword.length < 6) {
-            return NextResponse.json({ error: "Invalid parameters" }, { status: 400 });
+        if (!newPassword || newPassword.length < 6) {
+            return NextResponse.json({ error: "Invalid password parameters" }, { status: 400 });
         }
 
-        // 3. Update Firebase Auth Password
-        await adminAuth.updateUser(targetUid, {
-            password: newPassword
-        });
+        // 3. Update Firebase Auth Password if UID exists
+        if (targetUid) {
+            try {
+                await adminAuth.updateUser(targetUid, {
+                    password: newPassword
+                });
+            } catch (authErr) {
+                console.warn("Auth user not found or error:", authErr);
+            }
+        }
 
         // 4. Update Shadow Password in Firestore
         // We update users/{uid} AND the role-specific collection (students/teachers)
@@ -45,7 +51,9 @@ export async function POST(req: NextRequest) {
         // Batch writes for atomicity
         const batch = adminDb.batch();
 
-        batch.set(adminDb.collection("users").doc(targetUid), updateData, { merge: true });
+        if (targetUid) {
+            batch.set(adminDb.collection("users").doc(targetUid), updateData, { merge: true });
+        }
 
         if (role === "STUDENT" && schoolId) {
             batch.set(adminDb.collection("students").doc(schoolId), { recoveryPassword: newPassword }, { merge: true });
@@ -60,7 +68,7 @@ export async function POST(req: NextRequest) {
         batch.set(logRef, {
             action: "ADMIN_PASSWORD_RESET",
             actorUid: decodedToken.uid,
-            targetUid,
+            targetUid: targetUid || "NO_UID",
             targetSchoolId: schoolId || "N/A",
             timestamp: new Date().toISOString()
         });
@@ -68,7 +76,13 @@ export async function POST(req: NextRequest) {
         await batch.commit();
 
         // 5. Revoke Refresh Tokens (Force logout on next refresh)
-        await adminAuth.revokeRefreshTokens(targetUid);
+        if (targetUid) {
+            try {
+                await adminAuth.revokeRefreshTokens(targetUid);
+            } catch (authErr) {
+                console.warn("Could not revoke tokens:", authErr);
+            }
+        }
 
         return NextResponse.json({ success: true, message: "Password updated successfully" });
 

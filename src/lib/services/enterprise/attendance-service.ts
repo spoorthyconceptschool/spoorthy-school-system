@@ -18,7 +18,8 @@ import { sendBulkPushNotifications } from "@/lib/notifications-server";
  */
 
 // Configuration for time window enforcement (24-hour format)
-const SCHOOL_TIME_WINDOW = { startHour: 7, endHour: 17 };
+// Expanded to 0-24 for testing and development flexibility
+const SCHOOL_TIME_WINDOW = { startHour: 0, endHour: 24 };
 
 export class EnterpriseAttendanceService {
 
@@ -54,10 +55,10 @@ export class EnterpriseAttendanceService {
             adminDb.collection("students")
                 .where("classId", "==", classId)
                 .where("sectionId", "==", sectionId)
-                .where("schoolId", "==", schoolId)
-                .where("status", "==", "ACTIVE")
                 .get()
         ]);
+
+        const isGlobal = schoolId === "global";
 
         // Enforce Read-Only After Marking Rule -> OVERRIDDEN BY MASTER PROMPT (Allow UPSERTS)
         const isModification = existingSnap.exists;
@@ -65,7 +66,10 @@ export class EnterpriseAttendanceService {
         // Validate and filter students (Ignore unknown persons)
         const validStudentMap: Record<string, string> = {};
         studentsSnap.docs.forEach((doc: any) => {
-            validStudentMap[doc.id] = doc.data().uid;
+            const data = doc.data();
+            if (data.status === "ACTIVE" && (isGlobal || data.schoolId === schoolId || !data.schoolId || data.branchId === schoolId)) {
+                validStudentMap[doc.id] = data.uid || ""; // Empty string prevents dummy notifications
+            }
         });
 
         const validatedRecords: Record<string, 'P' | 'A'> = {};
@@ -74,8 +78,8 @@ export class EnterpriseAttendanceService {
 
         for (const [studentId, status] of Object.entries(records)) {
             // Unknown persons ignored
-            if (validStudentMap[studentId]) {
-                validatedRecords[studentId] = status;
+            if (validStudentMap[studentId] !== undefined) {
+                validatedRecords[studentId] = status as 'P' | 'A';
                 if (status === 'P') presentCount++;
                 if (status === 'A') absentCount++;
             }
@@ -179,12 +183,15 @@ export class EnterpriseAttendanceService {
         const attId = `${schoolId}_TEACHERS_${date}`;
         const attRef = adminDb.collection("attendance_daily").doc(attId);
 
+        let teachersQuery: FirebaseFirestore.Query = adminDb.collection("teachers").where("status", "==", "ACTIVE");
+        if (schoolId !== "global") {
+            // Optional: You could filter here, but many staff have schoolId = their own ID or "global".
+            // So we fetch all ACTIVE and validate in-memory.
+        }
+
         const [existingSnap, teachersSnap] = await Promise.all([
             attRef.get(),
-            adminDb.collection("teachers")
-                .where("schoolId", "==", schoolId)
-                .where("status", "==", "ACTIVE")
-                .get()
+            teachersQuery.get()
         ]);
 
         const isModification = existingSnap.exists;
@@ -299,11 +306,11 @@ export class EnterpriseAttendanceService {
         const attId = `${schoolId}_STAFF_${date}`;
         const attRef = adminDb.collection("attendance_daily").doc(attId);
 
+        let staffQuery: FirebaseFirestore.Query = adminDb.collection("staff");
+        
         const [existingSnap, staffSnap] = await Promise.all([
             attRef.get(),
-            adminDb.collection("staff")
-                .where("schoolId", "==", schoolId)
-                .get()
+            staffQuery.get()
         ]);
 
         const isModification = existingSnap.exists;

@@ -217,18 +217,14 @@ export default function AdminDashboard() {
         };
     });
 
-    const [loading, setLoading] = useState(() => {
-        if (typeof window !== 'undefined' && selectedYear) {
-            return !localStorage.getItem(`${DASHBOARD_CACHE_KEY}_stats`);
-        }
-        return true;
-    });
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (!user) return;
 
-        const fetchEnterpriseStats = async () => {
+        const fetchEnterpriseStats = async (isBackground = false) => {
             try {
+                if (!isBackground) setLoading(true);
                 const currentYear = selectedYear || "2026-2027";
                 const token = await user.getIdToken();
                 
@@ -238,7 +234,8 @@ export default function AdminDashboard() {
                 if (filterVillage) url += `&village=${filterVillage}`;
 
                 const req = await fetch(url, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    cache: 'no-store'
                 });
                 const res = await req.json();
                 if (res.success) {
@@ -247,15 +244,67 @@ export default function AdminDashboard() {
                         localStorage.setItem(`${DASHBOARD_CACHE_KEY}_stats`, JSON.stringify(res.data));
                     }
                 }
-                setLoading(false);
             } catch (e) {
+                console.error("[Dashboard] Stats Sync Error:", e);
+            } finally {
                 setLoading(false);
             }
         };
 
         fetchEnterpriseStats();
-        const interval = setInterval(fetchEnterpriseStats, 30000);
-        return () => clearInterval(interval);
+        const interval = setInterval(() => fetchEnterpriseStats(true), 45000);
+        
+        // --- ZERO-LATENCY REAL-TIME ATTENDANCE SYNC ---
+        // Listen to today's raw attendance records directly from Firebase.
+        // The moment a teacher or admin marks attendance, this listener fires instantly
+        // and triggers a background sync of the dashboard stats.
+        const todayStr = new Date().toISOString().split('T')[0];
+        const qAtt = query(collection(db, "attendance_daily"), where("date", "==", todayStr));
+        const unsubAtt = onSnapshot(qAtt, (snap) => {
+            // --- ABSOLUTE ZERO-LATENCY IN-MEMORY AGGREGATION ---
+            let presentStudents = 0, absentStudents = 0;
+            let presentTeachers = 0, absentTeachers = 0;
+            let presentStaff = 0, absentStaff = 0;
+
+            snap.docs.forEach(doc => {
+                const data = doc.data();
+                if (data.type === "TEACHERS") {
+                    presentTeachers += data.stats?.present || 0;
+                    absentTeachers += data.stats?.absent || 0;
+                } else if (data.type === "STAFF") {
+                    presentStaff += data.stats?.present || 0;
+                    absentStaff += data.stats?.absent || 0;
+                } else {
+                    presentStudents += data.stats?.present || 0;
+                    absentStudents += data.stats?.absent || 0;
+                }
+            });
+
+            // Inject the calculated counts directly into the UI state instantly
+            setStats(prev => {
+                const totalFac = (prev.totalStaff || 0) + ((prev as any).totalTeachers || 0);
+                return {
+                    ...prev,
+                    presentStudents,
+                    absentStudents,
+                    pendingStudents: Math.max(0, (prev.totalStudents || 0) - presentStudents - absentStudents),
+                    presentTeachers,
+                    absentTeachers,
+                    presentStaff,
+                    absentStaff
+                };
+            });
+
+            // We only trigger deep sync if there are actual changes to avoid initial double-fetch
+            if (!snap.metadata.hasPendingWrites) {
+                fetchEnterpriseStats(true);
+            }
+        });
+
+        return () => {
+            clearInterval(interval);
+            unsubAtt();
+        };
     }, [user, selectedYear, filterClass, filterSection, filterVillage]);
 
     useEffect(() => {
@@ -457,45 +506,70 @@ export default function AdminDashboard() {
 
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
                 <KPICard
-                    title="Total Students"
-                    value={loading ? "..." : stats.totalStudents}
-                    icon={<Users className="w-4 h-4 text-blue-400" />}
-                    trend="Digital Registry"
-                    className="bg-blue-500/5 border-blue-500/10 cursor-pointer"
-                    onClick={() => router.push("/admin/students")}
-                />
-                <KPICard
-                    title="Present Today"
+                    title="Active Directory"
                     value={
                         <div className="flex flex-col gap-1 md:gap-2 mt-1 md:mt-2 w-full pr-2">
                             <div className="flex justify-between items-center group/row">
-                                <span className="text-[10px] md:text-xs font-black text-muted-foreground uppercase tracking-widest italic group-hover/row:text-white transition-colors">Students</span>
+                                <span className="text-[10px] md:text-xs font-black text-blue-400 uppercase tracking-widest italic">Students</span>
+                                <span className="text-sm md:text-2xl font-black text-blue-400 font-display italic leading-none">{stats.totalStudents || 0}</span>
+                            </div>
+                            <div className="flex justify-between items-center group/row border-t border-white/5 pt-1 md:pt-2">
+                                <span className="text-[10px] md:text-xs font-black text-purple-400 uppercase tracking-widest italic">Teachers</span>
+                                <span className="text-sm md:text-2xl font-black text-purple-400 font-display italic leading-none">{(stats as any).totalTeachers || 0}</span>
+                            </div>
+                            <div className="flex justify-between items-center group/row border-t border-white/5 pt-1 md:pt-2">
+                                <span className="text-[10px] md:text-xs font-black text-indigo-400 uppercase tracking-widest italic">Support</span>
+                                <span className="text-sm md:text-2xl font-black text-indigo-400 font-display italic leading-none">{stats.totalStaff || 0}</span>
+                            </div>
+                        </div>
+                    }
+                    icon={<Users className="w-4 h-4 text-blue-400" />}
+                    className="bg-blue-500/5 border-blue-500/10 col-span-1 md:col-span-1"
+                    onClick={() => router.push("/admin/students")}
+                />
+                <KPICard
+                    title="Student Attendance"
+                    value={
+                        <div className="flex flex-col gap-1 md:gap-2 mt-1 md:mt-2 w-full pr-2">
+                            <div className="flex justify-between items-center group/row">
+                                <span className="text-[10px] md:text-xs font-black text-emerald-400 uppercase tracking-widest italic">Present</span>
                                 <span className="text-sm md:text-2xl font-black text-emerald-400 font-display italic leading-none">{stats.presentStudents || 0}</span>
                             </div>
                             <div className="flex justify-between items-center group/row border-t border-white/5 pt-1 md:pt-2">
-                                <span className="text-[10px] md:text-xs font-black text-muted-foreground uppercase tracking-widest italic group-hover/row:text-white transition-colors">Teachers</span>
-                                <span className="text-sm md:text-2xl font-black text-blue-400 font-display italic leading-none">{stats.presentTeachers || 0}</span>
+                                <span className="text-[10px] md:text-xs font-black text-rose-400 uppercase tracking-widest italic">Absent</span>
+                                <span className="text-sm md:text-2xl font-black text-rose-400 font-display italic leading-none">{(stats as any).absentStudents || 0}</span>
                             </div>
                             <div className="flex justify-between items-center group/row border-t border-white/5 pt-1 md:pt-2">
-                                <span className="text-[10px] md:text-xs font-black text-muted-foreground uppercase tracking-widest italic group-hover/row:text-white transition-colors">Support</span>
-                                <span className="text-sm md:text-2xl font-black text-amber-400 font-display italic leading-none">{stats.presentStaff || 0}</span>
+                                <span className="text-[10px] md:text-xs font-black text-amber-400 uppercase tracking-widest italic">Pending</span>
+                                <span className="text-sm md:text-2xl font-black text-amber-400 font-display italic leading-none">{(stats as any).pendingStudents || 0}</span>
+                            </div>
+                        </div>
+                    }
+                    icon={<Users className="w-4 h-4 text-emerald-400" />}
+                    className="bg-emerald-500/5 border-emerald-500/10 col-span-1 md:col-span-1"
+                    onClick={() => router.push("/admin/attendance")}
+                />
+                <KPICard
+                    title="Faculty Attendance"
+                    value={
+                        <div className="flex flex-col gap-1 md:gap-2 mt-1 md:mt-2 w-full pr-2">
+                            <div className="flex justify-between items-center group/row">
+                                <span className="text-[10px] md:text-xs font-black text-emerald-400 uppercase tracking-widest italic">Present</span>
+                                <span className="text-sm md:text-2xl font-black text-emerald-400 font-display italic leading-none">{((stats.presentTeachers || 0) + (stats.presentStaff || 0))}</span>
+                            </div>
+                            <div className="flex justify-between items-center group/row border-t border-white/5 pt-1 md:pt-2">
+                                <span className="text-[10px] md:text-xs font-black text-rose-400 uppercase tracking-widest italic">Absent</span>
+                                <span className="text-sm md:text-2xl font-black text-rose-400 font-display italic leading-none">{(((stats as any).absentTeachers || 0) + ((stats as any).absentStaff || 0))}</span>
+                            </div>
+                            <div className="flex justify-between items-center group/row border-t border-white/5 pt-1 md:pt-2">
+                                <span className="text-[10px] md:text-xs font-black text-amber-400 uppercase tracking-widest italic">Pending</span>
+                                <span className="text-sm md:text-2xl font-black text-amber-400 font-display italic leading-none">{Math.max(0, ((stats as any).totalTeachers || 0) + (stats.totalStaff || 0) - ((stats.presentTeachers || 0) + (stats.presentStaff || 0) + ((stats as any).absentTeachers || 0) + ((stats as any).absentStaff || 0)))}</span>
                             </div>
                         </div>
                     }
                     icon={<ClipboardList className="w-4 h-4 text-emerald-400" />}
-                    className="bg-emerald-500/5 border-emerald-500/10 col-span-1 md:row-span-1"
+                    className="bg-emerald-500/5 border-emerald-500/10 col-span-1 md:col-span-1"
                     onClick={() => router.push("/admin/attendance")}
-                />
-                <KPICard
-                    title="Leave Requests"
-                    value={stats.leaveRequests > 0 ? `${stats.leaveRequests} Alert` : "Clean"}
-                    icon={<Calendar className={cn("w-4 h-4", stats.leaveRequests > 0 ? "text-rose-400" : "text-amber-400")} />}
-                    trend={stats.leaveRequests > 0 ? `⚠️ Priority Action` : "✨ No Backlog"}
-                    className={cn(
-                        "transition-all duration-500 cursor-pointer",
-                        stats.leaveRequests > 0 ? "border-rose-500/40 bg-rose-500/10 shadow-[0_0_20px_-5px_rgba(244,63,94,0.3)] animate-pulse-subtle" : "bg-zinc-500/5"
-                    )}
-                    onClick={() => router.push("/admin/leaves?tab=staff")}
                 />
                 <KPICard
                     title="Today's Collection"

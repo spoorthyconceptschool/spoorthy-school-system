@@ -32,13 +32,22 @@ export default function AdminHolidaysPage() {
 
         const q = query(
             collection(db, "notices"),
-            where("type", "==", "HOLIDAY"),
-            where("schoolId", "==", userData?.schoolId || "global"),
-            orderBy("startDate", "desc")
+            where("type", "==", "HOLIDAY")
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const hols = snapshot.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+            const schoolId = userData?.schoolId || "global";
+            const isGlobal = schoolId === "global";
+            
+            const hols = snapshot.docs
+                .map(doc => ({ id: doc.id, ...doc.data() }))
+                .filter((doc: any) => isGlobal || doc.schoolId === schoolId)
+                .sort((a: any, b: any) => {
+                    const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
+                    const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
+                    return dateB - dateA; // descending
+                });
+                
             setHolidays(hols);
             setLoading(false);
         }, (error) => {

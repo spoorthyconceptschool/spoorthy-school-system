@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { useParams, useRouter } from "next/navigation";
+import { useParams, useRouter, useSearchParams } from "next/navigation";
 import { doc, getDoc, collection, query, where, getDocs, deleteDoc, updateDoc, addDoc, Timestamp, orderBy, setDoc, onSnapshot, limit, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { motion } from "framer-motion";
@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { ArrowLeft, Edit, Trash2, Save, X, Loader2, CreditCard, ShieldAlert, History, Settings2, Lock, RefreshCw, Download, Printer, FileText } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Save, X, Loader2, CreditCard, ShieldAlert, History, Settings2, Lock, RefreshCw, Download, Printer, FileText, CheckCircle2 } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
@@ -112,6 +112,7 @@ interface FeeLedger {
 export default function StudentDetailsPage() {
     const params = useParams();
     const router = useRouter();
+    const searchParams = useSearchParams();
     const studentId = params.id as string;
 
     // Core Data
@@ -155,8 +156,15 @@ export default function StudentDetailsPage() {
     const sections = Object.values(sectionsData || {}).map((s: any) => ({ id: s.id, name: s.name || "Unknown Section" })).sort((a, b) => String(a.name).localeCompare(String(b.name)));
 
     // Fee Collection State
-    const [isFeeModalOpen, setIsFeeModalOpen] = useState(false);
+    const [isFeeModalOpen, setIsFeeModalOpen] = useState(() => searchParams.get('action') === 'collect_fee');
     const [isAdjustModalOpen, setIsAdjustModalOpen] = useState(false);
+    const [receiptData, setReceiptData] = useState<any>(null);
+
+    useEffect(() => {
+        if (searchParams.get('action') === 'collect_fee') {
+            setIsFeeModalOpen(true);
+        }
+    }, [searchParams]);
 
     const [feeForm, setFeeForm] = useState({
         amount: "",
@@ -382,13 +390,31 @@ export default function StudentDetailsPage() {
             const paymentRef = doc(collection(db, "payments"));
             batch.set(paymentRef, newPayment);
 
-            // === Critical Update: Update Student Ledger ===
+            // === Critical Update: Update Student Ledger & Distribute Across Items ===
             const newTotalPaid = totalPaid + amount;
             const currentYearId = selectedYear || "2025-2026";
             const ledgerRef = doc(db, "student_fee_ledgers", `${student.schoolId}_${currentYearId}`);
 
+            let remainingAmount = amount;
+            const updatedItems = (ledger?.items || []).map((item: any) => {
+                if (remainingAmount <= 0) return item;
+                
+                // Calculate due for this specific item. If it's a "distributedDue" item we use its raw amounts.
+                const itemTotal = Number(item.amount || 0);
+                const itemPaid = Number(item.paidAmount || 0);
+                const itemDue = itemTotal - itemPaid;
+                
+                if (itemDue > 0) {
+                    const payAmount = Math.min(itemDue, remainingAmount);
+                    remainingAmount -= payAmount;
+                    return { ...item, paidAmount: itemPaid + payAmount };
+                }
+                return item;
+            });
+
             batch.set(ledgerRef, {
                 totalPaid: newTotalPaid,
+                items: updatedItems,
                 status: newTotalPaid >= totalFee ? "PAID" : "PENDING",
                 updatedAt: new Date().toISOString()
             }, { merge: true });
@@ -397,7 +423,10 @@ export default function StudentDetailsPage() {
             const ref = paymentRef;
 
             setPayments([{ id: ref.id, ...newPayment } as unknown as Payment, ...payments]);
-            setLedger(prev => prev ? { ...prev, totalPaid: newTotalPaid, status: newTotalPaid >= totalFee ? "PAID" : "PENDING" } : null);
+            setLedger(prev => prev ? { ...prev, totalPaid: newTotalPaid, items: updatedItems, status: newTotalPaid >= totalFee ? "PAID" : "PENDING" } : null);
+
+            // Store receipt data to trigger print flow
+            setReceiptData({ id: ref.id, ...newPayment });
 
             // === Notifications ===
             // 2. Notify Admins & Effective User (if Manager)
@@ -711,6 +740,66 @@ export default function StudentDetailsPage() {
                             </Dialog>
                         )}
 
+                        <Dialog open={!!receiptData} onOpenChange={(open) => !open && setReceiptData(null)}>
+                            <DialogContent className="bg-[#0A192F] text-white border-white/10 sm:max-w-md print:bg-white print:text-black print:border-none print:shadow-none print:max-w-full">
+                                <DialogHeader className="print:hidden">
+                                    <DialogTitle className="text-emerald-400 flex items-center gap-2"><CheckCircle2 className="w-5 h-5" /> Payment Successful</DialogTitle>
+                                </DialogHeader>
+                                {receiptData && (
+                                    <div className="space-y-6 pt-4 print:p-0">
+                                        <div className="text-center space-y-2 border-b border-white/10 pb-6 print:border-black/10">
+                                            {branding.schoolLogo && <img src={branding.schoolLogo} alt="School Logo" className="w-16 h-16 mx-auto object-contain hidden print:block mb-4" />}
+                                            <h2 className="text-2xl font-bold font-display uppercase tracking-widest print:text-black">{branding.schoolName || "SPOORTHY CONCEPT SCHOOL"}</h2>
+                                            <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold print:text-black/60">Fee Receipt</p>
+                                        </div>
+                                        
+                                        <div className="grid grid-cols-2 gap-4 text-sm print:text-black">
+                                            <div>
+                                                <p className="text-[10px] text-muted-foreground uppercase font-black print:text-black/60">Receipt No</p>
+                                                <p className="font-mono font-bold text-accent print:text-black">{receiptData.id?.slice(-8).toUpperCase() || "N/A"}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-[10px] text-muted-foreground uppercase font-black print:text-black/60">Date</p>
+                                                <p className="font-mono font-bold print:text-black">{new Date(receiptData.createdAt?.seconds * 1000 || Date.now()).toLocaleString()}</p>
+                                            </div>
+                                            <div className="col-span-2 bg-white/5 p-4 rounded-xl print:bg-black/5">
+                                                <p className="text-[10px] text-muted-foreground uppercase font-black mb-1 print:text-black/60">Received From</p>
+                                                <p className="font-bold text-lg print:text-black">{receiptData.studentName}</p>
+                                                <p className="text-xs font-mono text-muted-foreground print:text-black/60">ID: {receiptData.studentId}</p>
+                                            </div>
+                                            <div className="col-span-2 flex justify-between items-center border-y border-white/10 py-4 print:border-black/10">
+                                                <p className="text-[10px] text-muted-foreground uppercase font-black print:text-black/60">Amount Received</p>
+                                                <p className="text-2xl font-black text-emerald-400 print:text-black">₹{Number(receiptData.amount).toLocaleString()}</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-[10px] text-muted-foreground uppercase font-black print:text-black/60">Payment Mode</p>
+                                                <p className="font-bold uppercase print:text-black">{receiptData.method}</p>
+                                            </div>
+                                            <div className="text-right">
+                                                <p className="text-[10px] text-muted-foreground uppercase font-black print:text-black/60">Cashier</p>
+                                                <p className="font-bold print:text-black">{receiptData.verifiedBy}</p>
+                                            </div>
+                                            {receiptData.remarks && (
+                                                <div className="col-span-2">
+                                                    <p className="text-[10px] text-muted-foreground uppercase font-black print:text-black/60">Remarks</p>
+                                                    <p className="text-xs italic text-white/70 print:text-black/80">{receiptData.remarks}</p>
+                                                </div>
+                                            )}
+                                        </div>
+
+                                        <DialogFooter className="print:hidden sm:justify-between pt-4 border-t border-white/10">
+                                            <Button variant="outline" onClick={() => setReceiptData(null)} className="bg-white/5 border-white/10 hover:bg-white/10">
+                                                Done
+                                            </Button>
+                                            <Button onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
+                                                <Printer className="w-4 h-4" /> Print Receipt
+                                            </Button>
+                                        </DialogFooter>
+                                    </div>
+                                )}
+                            </DialogContent>
+                        </Dialog>
+
                         {isEditing ? (
                             <div className="flex items-center gap-1.5 md:gap-2">
                                 <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)} className="h-8 text-[10px] md:text-xs">Cancel</Button>
@@ -719,17 +808,17 @@ export default function StudentDetailsPage() {
                         ) : (
                             canEdit && (
                                 <div className="flex items-center gap-1.5 md:gap-2">
-                                    <Button variant="outline" size="sm" onClick={() => window.print()} className="h-8 md:h-9 border-white/10 bg-white/5 text-[9px] md:text-sm px-1.5 md:px-4">
+                                    <Button type="button" variant="outline" size="sm" onClick={() => window.print()} className="h-8 md:h-9 border-white/10 bg-white/5 text-[9px] md:text-sm px-1.5 md:px-4">
                                         <FileText className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> <span className="hidden sm:inline">Print Profile</span>
                                     </Button>
-                                    <Button variant="outline" size="sm" onClick={() => setIsResetModalOpen(true)} className="h-8 md:h-9 border-white/10 bg-white/5 text-[9px] md:text-sm px-1.5 md:px-4">
+                                    <Button type="button" variant="outline" size="sm" onClick={() => setIsResetModalOpen(true)} className="h-8 md:h-9 border-white/10 bg-white/5 text-[9px] md:text-sm px-1.5 md:px-4">
                                         <Lock className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> <span className="hidden sm:inline">Reset</span>
                                     </Button>
-                                    <Button variant="outline" size="sm" onClick={() => setIsEditing(true)} className="h-8 md:h-9 border-white/10 bg-white/5 text-[9px] md:text-sm px-1.5 md:px-4">
+                                    <Button type="button" variant="outline" size="sm" onClick={() => setIsEditing(true)} className="h-8 md:h-9 border-white/10 bg-white/5 text-[9px] md:text-sm px-1.5 md:px-4">
                                         <Edit className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> Edit
                                     </Button>
                                     {isAdmin && (
-                                        <Button variant="destructive" size="sm" onClick={() => setIsDeleteModalOpen(true)} className="h-8 md:h-9 bg-red-500/10 border-red-500/20 text-red-500 hover:bg-red-500/20 px-1.5 md:px-3">
+                                        <Button type="button" variant="destructive" size="sm" onClick={() => setIsDeleteModalOpen(true)} className="h-8 md:h-9 bg-red-500/10 border-red-500/20 text-red-500 hover:bg-red-500/20 px-1.5 md:px-3">
                                             <ShieldAlert className="w-3 h-3 md:w-3.5 md:h-3.5" />
                                         </Button>
                                     )}

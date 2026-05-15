@@ -48,6 +48,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     });
     // System starts in a guarded loading state until Firebase physically confirms presence
     const [loading, setLoading] = useState(true);
+    const [isInitialized, setIsInitialized] = useState(false);
     const [mounted, setMounted] = useState(false);
     const router = useRouter();
     const pathname = usePathname();
@@ -76,40 +77,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 try {
                     console.log("[Auth] Observer: User detected:", authUser.email);
                     
-                    // --- STRICT BOOT-TIME SESSION GATE ---
-                    // If the app was closed during an override, the snapshot listener hasn't fired yet.
-                    // We MUST verify the session identity synchronously before allowing hydration.
-                    if (pathname !== "/login") {
-                        const sessionDoc = await getDoc(doc(db, "user_sessions", authUser.uid));
-                        if (sessionDoc.exists()) {
-                            const dbSessionId = sessionDoc.data().currentSessionId;
-                            const localSessionId = localStorage.getItem(SESSION_KEY);
-                            
-                            // If DB has a session and it does NOT match our local memory, EVICT immediately.
-                            // CRITICAL: We only evict if we HAVE a localSessionId but it's different.
-                            // If we don't have one, we let it pass and the monitor (Effect #2) will handle registration.
-                            if (dbSessionId && localSessionId && dbSessionId !== localSessionId) {
-                                console.error("[Auth] BOOT GATE: Stale session detected. Evicting.");
-                                await firebaseSignOut(auth);
-                                localStorage.removeItem(STORAGE_KEY);
-                                localStorage.removeItem(SESSION_KEY);
-                                setUser(null);
-                                setUserData(null);
-                                setLoading(false);
-                                router.push("/login?error=session_expired");
-                                return; // Halt execution, do not hydrate user!
-                            }
-                        }
-                    }
-                    // -------------------------------------
-
-                    await authUser.getIdToken(true);
+                    // --- ZERO-LATENCY BOOT GATE ---
+                    // Trust local session for initial hydration to achieve zero latency.
+                    // The background monitor (Effect #2) will handle eviction if needed.
+                    await authUser.getIdToken(false);
                     
                     let dataToStore = null;
                     const userDoc = await getDoc(doc(db, "users", authUser.uid));
                     if (userDoc.exists()) {
                         const data = userDoc.data();
-                        if (data.status !== "ACTIVE") {
+                        if (data.status === "DEACTIVATED") {
                             console.warn("[Auth] Account DEACTIVATED. Forced logout.");
                             await firebaseSignOut(auth);
                             return;
@@ -138,29 +115,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 localStorage.removeItem(STORAGE_KEY);
             }
             setLoading(false);
+            setIsInitialized(true);
         });
 
         return () => unsubscribe();
     }, [router]);
 
     // 2. Single-Device Session Monitor (Firestore Snapshot)
-    // Runs whenever 'user' identity changes.
     useEffect(() => {
         if (!user || pathname === "/login") return;
 
-        console.log("[Auth] Monitoring session for UID:", user.uid);
         const unsub = onSnapshot(doc(db, "user_sessions", user.uid), (snap) => {
             if (snap.exists()) {
                 const dbSessionId = snap.data().currentSessionId;
                 const localSessionId = localStorage.getItem(SESSION_KEY);
                 
-                console.log(`[Auth] Session sync check - User: ${user.email} - DB: ${dbSessionId} - Local: ${localSessionId}`);
-                
-                // CRITICAL FIX: By removing `&& localSessionId` from the condition, we ensure that
-                // if a device auto-hydrates an OLD session (where localSessionId is null), it will 
-                // still correctly register as a mismatch `(dbSessionId !== null)` and execute the 
-                // emergency logout when the user logs in on a new device.
-                if (dbSessionId && dbSessionId !== localSessionId) {
+                // Only enforce eviction if BOTH sessions exist but don't match.
+                // This prevents race conditions where local storage is temporarily empty during transitions.
+                if (dbSessionId && localSessionId && dbSessionId !== localSessionId) {
                     console.error("[Auth] SESSION OVERRIDE DETECTED. Executing emergency logout.");
                     firebaseSignOut(auth);
                     localStorage.removeItem(STORAGE_KEY);
@@ -168,11 +140,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setUser(null);
                     setUserData(null);
                     router.push("/login?error=session_expired");
-                    setTimeout(() => { alert("Your session has expired because your account was logged in from another device."); }, 100);
                 }
             }
-        }, (err) => {
-            console.error("[Auth] Session monitor error:", err);
         });
 
         return () => unsub();
@@ -180,11 +149,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // 3. Smart Redirect Logic
     useEffect(() => {
-        if (!loading && user && pathname === "/login") {
-            console.log("[Auth] Logged-in user at /login, forwarding to dashboard.");
-            router.replace("/dashboard");
+        if (isInitialized && !loading) {
+            if (user && pathname === "/login") {
+                console.log("[Auth] Logged-in user at /login. Checking profile data...");
+                
+                if (userData && userData.role) {
+                    const r = String(userData.role).toUpperCase();
+                    if (["ADMIN", "SUPER_ADMIN", "MANAGER", "DEVELOPER", "OWNER", "SUPERADMIN"].includes(r)) {
+                        router.replace("/admin");
+                    } else if (r === "TEACHER") {
+                        router.replace("/teacher");
+                    } else if (r === "STUDENT") {
+                        router.replace("/student");
+                    } else {
+                        console.warn("[Auth] Invalid role. Forcing logout to break loop.");
+                        firebaseSignOut(auth);
+                        setUserData(null);
+                        setUser(null);
+                    }
+                } else if (!userData) {
+                    // This is the critical loop breaker.
+                    // If a user exists in Auth but has no Firestore profile,
+                    // they will loop forever between /login and /admin. We MUST log them out.
+                    console.warn("[Auth] Authenticated user has no profile data. Forcing logout to break loop.");
+                    firebaseSignOut(auth);
+                    setUserData(null);
+                    setUser(null);
+                }
+            } else if (!user && pathname !== "/login" && pathname !== "/" && !pathname.startsWith("/admissions")) {
+                console.log("[Auth] Public user at protected path, forcing login.");
+                router.replace("/login");
+            }
         }
-    }, [user, loading, pathname, router]);
+    }, [user, userData, loading, isInitialized, pathname, router]);
 
     const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'SUPERADMIN', 'OWNER', 'DEVELOPER', 'MANAGER'].includes(String(userData?.role || "").toUpperCase());
 
@@ -220,7 +217,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const userDoc = await getDoc(doc(db, "users", result.user.uid));
             if (userDoc.exists()) {
                 const data = userDoc.data();
-                if (data.status !== "ACTIVE") {
+                if (data.status === "DEACTIVATED") {
                     await firebaseSignOut(auth);
                     throw new Error("Account is deactivated. Please contact administrator.");
                 }

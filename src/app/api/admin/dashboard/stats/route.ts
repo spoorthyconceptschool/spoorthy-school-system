@@ -33,19 +33,22 @@ export async function GET(req: NextRequest) {
         const isGlobal = schoolId === "global";
 
         let studentsBaseQ = adminDb.collection("students").where("status", "==", "ACTIVE");
-        let staffBaseQ = adminDb.collection("users").where("role", "==", "TEACHER").where("status", "==", "ACTIVE");
+        let teachersBaseQ = adminDb.collection("teachers").where("status", "==", "ACTIVE");
+        let staffBaseQ = adminDb.collection("staff").where("status", "==", "ACTIVE");
         
-        const [studentsSnap, staffSnap, classesSnap, leavesSnap] = await Promise.all([
+        const [studentsSnap, teachersSnap, staffSnap, classesSnap, leavesSnap] = await Promise.all([
             studentsBaseQ.get(), // Get full snapshot for memory filtering if needed
+            teachersBaseQ.get(),
             staffBaseQ.get(),
             adminDb.collection("master_classes").get(),
             adminDb.collection("leave_requests").where("status", "==", "PENDING").get()
         ]);
 
         // --- IN-MEMORY FILTERING TO AVOID COMPOSITE INDEXES ---
-        const filteredStudents = isGlobal ? studentsSnap.docs : studentsSnap.docs.filter(d => d.data().branchId === schoolId);
-        const filteredStaff = isGlobal ? staffSnap.docs : staffSnap.docs.filter(d => d.data().schoolId === schoolId);
-        const filteredLeaves = isGlobal ? leavesSnap.docs : leavesSnap.docs.filter(d => d.data().schoolId === schoolId);
+        const filteredStudents = isGlobal ? studentsSnap.docs : studentsSnap.docs.filter(d => d.data().branchId === schoolId || !d.data().branchId);
+        const filteredTeachers = isGlobal ? teachersSnap.docs : teachersSnap.docs.filter(d => d.data().schoolId === schoolId || !d.data().schoolId);
+        const filteredStaff = isGlobal ? staffSnap.docs : staffSnap.docs.filter(d => d.data().schoolId === schoolId || !d.data().schoolId);
+        const filteredLeaves = isGlobal ? leavesSnap.docs : leavesSnap.docs.filter(d => d.data().schoolId === schoolId || !d.data().schoolId);
 
         const totalClasses = classesSnap.size;
 
@@ -66,7 +69,7 @@ export async function GET(req: NextRequest) {
         let exactTodayCollection = 0;
         paymentsSnap.forEach((doc: any) => {
             const data = doc.data();
-            const matchesSchool = isGlobal || data.schoolId === schoolId;
+            const matchesSchool = isGlobal || data.branchId === schoolId || !data.branchId;
             if (matchesSchool && (data.status === "success" || data.status === "SUCCESS" || !data.status)) {
                 exactTodayCollection += Number(data.amount || 0);
             }
@@ -81,20 +84,28 @@ export async function GET(req: NextRequest) {
         let presentStudents = 0;
         let presentTeachers = 0;
         let presentStaff = 0;
+        
+        let absentStudents = 0;
+        let absentTeachers = 0;
+        let absentStaff = 0;
 
         attendanceSnap.forEach(doc => {
             const data = doc.data();
-            const matchesSchool = isGlobal || data.schoolId === schoolId;
+            const matchesSchool = isGlobal || data.branchId === schoolId || !data.branchId;
             if (!matchesSchool) return;
 
             const pCount = data.stats?.present || 0;
+            const aCount = data.stats?.absent || 0;
             
             if (data.type === "TEACHERS") {
                 presentTeachers += pCount;
+                absentTeachers += aCount;
             } else if (data.type === "STAFF") {
                 presentStaff += pCount;
+                absentStaff += aCount;
             } else {
                 presentStudents += pCount;
+                absentStudents += aCount;
             }
         });
 
@@ -138,7 +149,7 @@ export async function GET(req: NextRequest) {
 
         ledgersSnap.forEach(doc => {
             const data = doc.data();
-            const matchesSchool = isGlobal || data.branchId === schoolId || data.schoolId === schoolId;
+            const matchesSchool = isGlobal || data.branchId === schoolId || !data.branchId;
             if (!matchesSchool) return;
 
             // Apply Filter Intersection
@@ -176,6 +187,7 @@ export async function GET(req: NextRequest) {
 
         const preComputedStats = {
             totalStudents: filteredStudents.length,
+            totalTeachers: filteredTeachers.length,
             totalStaff: filteredStaff.length,
             totalClasses: totalClasses,
             pendingFees: systemStats?.totalPendingFees || 0,
@@ -184,6 +196,10 @@ export async function GET(req: NextRequest) {
             presentStudents,
             presentTeachers,
             presentStaff,
+            absentStudents,
+            absentTeachers,
+            absentStaff,
+            pendingStudents: filteredStudents.length - (presentStudents + absentStudents),
             finance
         };
 

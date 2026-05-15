@@ -1,5 +1,6 @@
 "use client";
 
+import { useRouter } from "next/navigation";
 import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
@@ -12,7 +13,8 @@ import {
     Database,
     Binary,
     Globe2,
-    CheckCircle2
+    CheckCircle2,
+    Users2
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { ClassesSectionsManager } from "@/components/admin/master-data/ClassesSectionsManager";
@@ -21,6 +23,7 @@ import { VillagesManager } from "@/components/admin/master-data/VillagesManager"
 import { useMasterData } from "@/context/MasterDataContext";
 
 export default function MasterDataPage() {
+    const router = useRouter();
     const [view, setView] = useState<"dashboard" | "classes" | "subjects" | "villages">("dashboard");
     const { classes, subjects, villages, loading } = useMasterData();
 
@@ -62,6 +65,18 @@ export default function MasterDataPage() {
             bgColor: "bg-emerald-500/5",
             hoverBg: "hover:bg-emerald-500/10",
             stat: `${villageCount} Active Zones`
+        },
+        {
+            id: "staff-roles",
+            title: "Staff Roles",
+            description: "Define employee job titles, standard basic salaries, and login access controls.",
+            icon: Users2,
+            color: "text-amber-400",
+            borderColor: "border-amber-500/20",
+            bgColor: "bg-amber-500/5",
+            hoverBg: "hover:bg-amber-500/10",
+            stat: `Manage Roles`,
+            isRoute: true
         }
     ];
 
@@ -139,11 +154,11 @@ export default function MasterDataPage() {
             </div>
 
             {/* Main Action Grid */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 md:gap-6">
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 md:gap-6">
                 {modules.map((module) => (
                     <div
                         key={module.id}
-                        onClick={() => setView(module.id as any)}
+                        onClick={() => module.isRoute ? router.push(`/admin/master-data/${module.id}`) : setView(module.id as any)}
                         className="group"
                     >
                         <Card className={cn(
@@ -169,7 +184,7 @@ export default function MasterDataPage() {
                                     </p>
                                     <div className="inline-block px-3 py-1 rounded-full bg-black/40 border border-white/5 mt-2">
                                         <span className={cn("text-[10px] font-black uppercase tracking-widest", module.color)}>
-                                            {loading ? "Loading..." : module.stat}
+                                            {loading && !module.isRoute ? "Loading..." : module.stat}
                                         </span>
                                     </div>
                                 </div>

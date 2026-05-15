@@ -190,8 +190,11 @@ export default function StudentsPage() {
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between pt-2 md:pt-4 gap-4 md:gap-6 px-1 md:px-0">
                 <div className="space-y-0.5 md:space-y-1">
-                    <h1 className="text-2xl md:text-5xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic leading-tight">
+                    <h1 className="text-2xl md:text-5xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic leading-tight flex items-center gap-3">
                         Student Center
+                        <span className="text-sm md:text-lg bg-accent/20 text-accent px-3 py-1 rounded-full not-italic tracking-normal font-medium">
+                            {students.length} Total
+                        </span>
                     </h1>
                     <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 w-full mt-2">
                         <Button
