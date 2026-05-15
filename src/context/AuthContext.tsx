@@ -76,34 +76,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 try {
                     console.log("[Auth] Observer: User detected:", authUser.email);
                     
-                    // --- STRICT BOOT-TIME SESSION GATE ---
-                    // If the app was closed during an override, the snapshot listener hasn't fired yet.
-                    // We MUST verify the session identity synchronously before allowing hydration.
-                    if (pathname !== "/login") {
-                        const sessionDoc = await getDoc(doc(db, "user_sessions", authUser.uid));
-                        if (sessionDoc.exists()) {
-                            const dbSessionId = sessionDoc.data().currentSessionId;
-                            const localSessionId = localStorage.getItem(SESSION_KEY);
-                            
-                            // If DB has a session and it does NOT match our local memory, EVICT immediately.
-                            // CRITICAL: We only evict if we HAVE a localSessionId but it's different.
-                            // If we don't have one, we let it pass and the monitor (Effect #2) will handle registration.
-                            if (dbSessionId && localSessionId && dbSessionId !== localSessionId) {
-                                console.error("[Auth] BOOT GATE: Stale session detected. Evicting.");
-                                await firebaseSignOut(auth);
-                                localStorage.removeItem(STORAGE_KEY);
-                                localStorage.removeItem(SESSION_KEY);
-                                setUser(null);
-                                setUserData(null);
-                                setLoading(false);
-                                router.push("/login?error=session_expired");
-                                return; // Halt execution, do not hydrate user!
-                            }
-                        }
-                    }
-                    // -------------------------------------
-
-                    await authUser.getIdToken(true);
+                    // --- ZERO-LATENCY BOOT GATE ---
+                    // Trust local session for initial hydration to achieve zero latency.
+                    // The background monitor (Effect #2) will handle eviction if needed.
+                    await authUser.getIdToken(false);
                     
                     let dataToStore = null;
                     const userDoc = await getDoc(doc(db, "users", authUser.uid));

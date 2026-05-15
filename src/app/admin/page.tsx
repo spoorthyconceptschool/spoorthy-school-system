@@ -219,7 +219,9 @@ export default function AdminDashboard() {
 
     const [loading, setLoading] = useState(() => {
         if (typeof window !== 'undefined' && selectedYear) {
-            return !localStorage.getItem(`${DASHBOARD_CACHE_KEY}_stats`);
+            const hasStats = localStorage.getItem(`${DASHBOARD_CACHE_KEY}_stats`);
+            const hasStudents = localStorage.getItem(`${DASHBOARD_CACHE_KEY}_students`);
+            return !(hasStats && hasStudents);
         }
         return true;
     });
@@ -227,8 +229,9 @@ export default function AdminDashboard() {
     useEffect(() => {
         if (!user) return;
 
-        const fetchEnterpriseStats = async () => {
+        const fetchEnterpriseStats = async (isBackground = false) => {
             try {
+                if (!isBackground) setLoading(true);
                 const currentYear = selectedYear || "2026-2027";
                 const token = await user.getIdToken();
                 
@@ -238,7 +241,8 @@ export default function AdminDashboard() {
                 if (filterVillage) url += `&village=${filterVillage}`;
 
                 const req = await fetch(url, {
-                    headers: { 'Authorization': `Bearer ${token}` }
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    cache: 'no-store'
                 });
                 const res = await req.json();
                 if (res.success) {
@@ -247,14 +251,15 @@ export default function AdminDashboard() {
                         localStorage.setItem(`${DASHBOARD_CACHE_KEY}_stats`, JSON.stringify(res.data));
                     }
                 }
-                setLoading(false);
             } catch (e) {
+                console.error("[Dashboard] Stats Sync Error:", e);
+            } finally {
                 setLoading(false);
             }
         };
 
         fetchEnterpriseStats();
-        const interval = setInterval(fetchEnterpriseStats, 30000);
+        const interval = setInterval(() => fetchEnterpriseStats(true), 45000);
         return () => clearInterval(interval);
     }, [user, selectedYear, filterClass, filterSection, filterVillage]);
 
