@@ -17,6 +17,11 @@ function AdminContent({ children }: { children: React.ReactNode }) {
     const [showLoader, setShowLoader] = useState(true);
 
     useEffect(() => {
+        const timer = setTimeout(() => setShowLoader(false), 5000);
+        return () => clearTimeout(timer);
+    }, []);
+
+    useEffect(() => {
         // Block all routing decisions until the loading state is fully resolved
         if (loading) return;
 
@@ -35,11 +40,6 @@ function AdminContent({ children }: { children: React.ReactNode }) {
             }
         }
     }, [user, userData, loading, router]);
-
-    useEffect(() => {
-        const timer = setTimeout(() => setShowLoader(false), 5000);
-        return () => clearTimeout(timer);
-    }, []);
 
     // Hard fallback UI if user slips through somehow without data to stop loops dead in their tracks
     if (!loading && (!user || !userData || !userData.role)) {

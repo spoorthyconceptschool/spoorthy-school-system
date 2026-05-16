@@ -187,37 +187,40 @@ export default function AdminDashboard() {
 
     const DASHBOARD_CACHE_KEY = `spoorthy_dashboard_cache_${selectedYear}`;
     
+    const [mounted, setMounted] = useState(false);
+    useEffect(() => { setMounted(true); }, []);
+
     const [filterClass, setFilterClass] = useState<string>("");
     const [filterSection, setFilterSection] = useState<string>("");
     const [filterVillage, setFilterVillage] = useState<string>("");
 
-    const [recentStudents, setRecentStudents] = useState<Student[]>(() => {
-        if (typeof window !== 'undefined' && selectedYear) {
-            const cached = localStorage.getItem(`${DASHBOARD_CACHE_KEY}_students`);
-            if (cached) { try { return JSON.parse(cached); } catch (e) { return []; } }
-        }
-        return [];
-    });
-    
+    const [recentStudents, setRecentStudents] = useState<Student[]>([]);
     const [pendingLeavesList, setPendingLeavesList] = useState<LeaveRequest[]>([]);
-    
-    const [stats, setStats] = useState<DashboardStats>(() => {
-        if (typeof window !== 'undefined' && selectedYear) {
-            const cached = localStorage.getItem(`${DASHBOARD_CACHE_KEY}_stats`);
-            if (cached) { try { return JSON.parse(cached); } catch (e) { return { totalStudents: 0, pendingFees: 0, leaveRequests: 0, totalLeaves: 0, todayCollection: 0, totalStaff: 0, staffPresent: 0 }; } }
-        }
-        return {
-            totalStudents: 0,
-            pendingFees: 0,
-            leaveRequests: 0,
-            totalLeaves: 0,
-            todayCollection: 0,
-            totalStaff: 0,
-            staffPresent: 0
-        };
+    const [stats, setStats] = useState<DashboardStats>({
+        totalStudents: 0,
+        pendingFees: 0,
+        leaveRequests: 0,
+        totalLeaves: 0,
+        todayCollection: 0,
+        totalStaff: 0,
+        staffPresent: 0
     });
 
     const [loading, setLoading] = useState(false);
+
+    // Hydration-safe cache loading
+    useEffect(() => {
+        if (typeof window !== 'undefined' && selectedYear) {
+            const cachedStudents = localStorage.getItem(`${DASHBOARD_CACHE_KEY}_students`);
+            if (cachedStudents) {
+                try { setRecentStudents(JSON.parse(cachedStudents)); } catch (e) {}
+            }
+            const cachedStats = localStorage.getItem(`${DASHBOARD_CACHE_KEY}_stats`);
+            if (cachedStats) {
+                try { setStats(prev => ({ ...prev, ...JSON.parse(cachedStats) })); } catch (e) {}
+            }
+        }
+    }, [selectedYear, DASHBOARD_CACHE_KEY]);
 
     useEffect(() => {
         if (!user) return;
@@ -329,7 +332,7 @@ export default function AdminDashboard() {
         return () => unsubscribe();
     }, [user, authRole]);
 
-    const columns = [
+    const columns = useMemo(() => [
         {
             key: "fullName",
             header: "Student Name",
@@ -360,7 +363,7 @@ export default function AdminDashboard() {
                 </span>
             )
         }
-    ];
+    ], [classes]);
 
     if (authRole === "MANAGER") {
         return (
@@ -379,7 +382,7 @@ export default function AdminDashboard() {
                                 <span>Growth Analytics</span>
                             </div>
                             <Badge variant="outline" className="text-[10px] border-white/5 bg-white/5 text-muted-foreground ml-2">
-                                Last Synced: {new Date().toLocaleTimeString()}
+                                Last Synced: {mounted ? new Date().toLocaleTimeString() : "..."}
                             </Badge>
                         </div>
                     </div>
