@@ -41,21 +41,16 @@ export async function POST(req: NextRequest) {
 
         // Validate Type
         const noticeType = type === "HOLIDAY" ? "HOLIDAY" : "REGULAR";
-
-        // Target Logic
-        // If Holiday, target is strictly 'ADMIN' (as per user request "Seen only by Admin")? 
-        // Or we stick to user's literal request.
-        // But field 'target' usually implies audience. 
-        // Let's set target='ADMIN' if type='HOLIDAY' to match strict visibility requirement.
-
         const audience = target || (noticeType === "HOLIDAY" ? "ALL" : "ALL");
-
         const actorSchoolId = userDoc.data()?.schoolId || "global";
+        
+        const noticeRef = adminDb.collection("notices").doc();
         
         const noticePayload: any = {
             id: noticeRef.id,
             title,
             content,
+
             type: noticeType,
             target: audience,
             schoolId: actorSchoolId,
