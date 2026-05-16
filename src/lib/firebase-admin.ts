@@ -38,6 +38,17 @@ function getAdminApp(): App {
 
     try {
         const rawKey = process.env.SERVICE_ACCOUNT_PRIVATE_KEY || SERVICE_ACCOUNT.privateKey;
+        const hasKey = !!rawKey;
+        const isProd = process.env.NODE_ENV === 'production';
+        
+        console.log(`[Firebase Admin] Initialization Attempt:`, {
+            hasPrivateKey: hasKey,
+            hasClientEmail: !!SERVICE_ACCOUNT.clientEmail,
+            projectId: SERVICE_ACCOUNT.projectId,
+            isProduction: isProd,
+            nodeEnv: process.env.NODE_ENV
+        });
+
         const privateKey = rawKey?.trim().replace(/^["']|["']$/g, '').replace(/\\n/g, '\n');
 
         const config: any = {

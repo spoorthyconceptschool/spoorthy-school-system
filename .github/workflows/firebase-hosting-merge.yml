@@ -27,7 +27,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Create .env
+      - name: Create Environment Files
         run: |
           cat << 'EOF' > .env
           NEXT_PUBLIC_FIREBASE_API_KEY=${{ env.NEXT_PUBLIC_FIREBASE_API_KEY }}
@@ -42,6 +42,10 @@ jobs:
           SERVICE_ACCOUNT_EMAIL=${{ env.FIREBASE_CLIENT_EMAIL }}
           SERVICE_ACCOUNT_PRIVATE_KEY="${{ secrets.FIREBASE_PRIVATE_KEY }}"
           EOF
+          cp .env .env.production
+          cp .env .env.local
+          echo "Verified: .env, .env.production, and .env.local created."
+          grep -q "SERVICE_ACCOUNT_PRIVATE_KEY" .env && echo "Variable injection confirmed."
       - run: npm ci && npm run build
       - name: Authenticate with Google Cloud
         id: auth
