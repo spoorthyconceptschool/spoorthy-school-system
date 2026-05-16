@@ -36,6 +36,11 @@ function AdminContent({ children }: { children: React.ReactNode }) {
         }
     }, [user, userData, loading, router]);
 
+    useEffect(() => {
+        const timer = setTimeout(() => setShowLoader(false), 5000);
+        return () => clearTimeout(timer);
+    }, []);
+
     // Hard fallback UI if user slips through somehow without data to stop loops dead in their tracks
     if (!loading && (!user || !userData || !userData.role)) {
         return (
@@ -48,11 +53,6 @@ function AdminContent({ children }: { children: React.ReactNode }) {
             </div>
         );
     }
-
-    useEffect(() => {
-        const timer = setTimeout(() => setShowLoader(false), 5000);
-        return () => clearTimeout(timer);
-    }, []);
 
     // Explicit loading state block
     const isAuthenticating = loading || (!userData && user && showLoader);
