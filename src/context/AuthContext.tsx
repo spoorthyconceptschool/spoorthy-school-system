@@ -33,19 +33,7 @@ const SESSION_KEY = "local_session_id";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
-    const [userData, setUserData] = useState<any>(() => {
-        if (typeof window !== 'undefined') {
-            const cached = localStorage.getItem(STORAGE_KEY);
-            if (cached) {
-                try {
-                    return JSON.parse(cached);
-                } catch (e) {
-                    return null;
-                }
-            }
-        }
-        return null;
-    });
+    const [userData, setUserData] = useState<any>(null);
     // System starts in a guarded loading state until Firebase physically confirms presence
     const [loading, setLoading] = useState(true);
     const [isInitialized, setIsInitialized] = useState(false);
@@ -54,8 +42,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
     const [pendingStudentLeaves, setPendingStudentLeaves] = useState(0);
 
+    // Initial hydration and cache recovery
     useEffect(() => {
         setMounted(true);
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(STORAGE_KEY);
+            if (cached) {
+                try {
+                    setUserData(JSON.parse(cached));
+                } catch (e) {
+                    console.error("Failed to parse cached user data", e);
+                }
+            }
+        }
 
         const syncLogout = (e: StorageEvent) => {
             if (e.key === "spoorthy_logout_sync") {
