@@ -142,39 +142,30 @@ const MASTER_CACHE_KEY = "spoorthy_master_cache";
  * UI components in sync with the school's master configuration.
  */
 export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
-    const [data, setData] = useState<Omit<MasterDataState, 'selectedYear' | 'setSelectedYear'>>(() => {
-        const base = { ...initialState };
-        if (typeof window !== 'undefined') {
-            const cached = localStorage.getItem(MASTER_CACHE_KEY);
-            if (cached) {
-                try {
-                    const parsed = JSON.parse(cached);
-                    return {
-                        ...base,
-                        ...parsed,
-                        branding: { ...initialState.branding, ...(parsed.branding || {}) },
-                        systemConfig: { ...initialState.systemConfig, ...(parsed.systemConfig || {}) },
-                        loading: false
-                    };
-                } catch (e) {
-                    return base;
-                }
-            }
-        }
-        return base;
-    });
-
-    const [selectedYear, setSelectedYear] = useState(() => {
-        if (typeof window !== 'undefined') {
-            return localStorage.getItem("spoorthy_academic_year") || "2025-2026";
-        }
-        return "2025-2026";
-    });
-
+    const [data, setData] = useState<Omit<MasterDataState, 'selectedYear' | 'setSelectedYear'>>(initialState);
+    const [selectedYear, setSelectedYear] = useState("2025-2026");
     const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
         setMounted(true);
+        if (typeof window !== 'undefined') {
+            const cachedYear = localStorage.getItem("spoorthy_academic_year");
+            if (cachedYear) setSelectedYear(cachedYear);
+
+            const cachedData = localStorage.getItem(MASTER_CACHE_KEY);
+            if (cachedData) {
+                try {
+                    const parsed = JSON.parse(cachedData);
+                    setData(prev => ({
+                        ...prev,
+                        ...parsed,
+                        branding: { ...initialState.branding, ...(parsed.branding || {}) },
+                        systemConfig: { ...initialState.systemConfig, ...(parsed.systemConfig || {}) },
+                        loading: false
+                    }));
+                } catch (e) {}
+            }
+        }
     }, []);
 
     useEffect(() => {
