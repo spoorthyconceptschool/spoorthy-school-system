@@ -18,7 +18,7 @@ function getAdminRoot() {
 const SERVICE_ACCOUNT = {
     projectId: "spoorthy-16292",
     clientEmail: "firebase-adminsdk-fbsvc@spoorthy-16292.iam.gserviceaccount.com",
-    privateKey: process.env.FIREBASE_PRIVATE_KEY ? process.env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n') : ""
+    privateKey: process.env.SERVICE_ACCOUNT_PRIVATE_KEY ? process.env.SERVICE_ACCOUNT_PRIVATE_KEY.replace(/\\n/g, '\n') : ""
 };
 
 let _adminApp: any = null;
@@ -37,7 +37,7 @@ function getAdminApp(): App {
     }
 
     try {
-        const rawKey = process.env.FIREBASE_PRIVATE_KEY || SERVICE_ACCOUNT.privateKey;
+        const rawKey = process.env.SERVICE_ACCOUNT_PRIVATE_KEY || SERVICE_ACCOUNT.privateKey;
         const privateKey = rawKey?.trim().replace(/^["']|["']$/g, '').replace(/\\n/g, '\n');
 
         const config: any = {
