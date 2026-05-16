@@ -27,7 +27,7 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: '22'
-      - name: Create .env.production
+      - name: Create .env.production and .env
         run: |
           cat << 'EOF' > .env.production
           NEXT_PUBLIC_FIREBASE_API_KEY=${{ env.NEXT_PUBLIC_FIREBASE_API_KEY }}
@@ -42,6 +42,7 @@ jobs:
           FIREBASE_CLIENT_EMAIL=${{ env.FIREBASE_CLIENT_EMAIL }}
           FIREBASE_PRIVATE_KEY="${{ secrets.FIREBASE_PRIVATE_KEY }}"
           EOF
+          cp .env.production .env
       - run: npm ci && npm run build
       - name: Authenticate with Google Cloud
         id: auth
