@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { collection, onSnapshot, query, orderBy, where, doc, limit, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
@@ -208,6 +208,41 @@ export default function AdminDashboard() {
 
     const [loading, setLoading] = useState(false);
 
+    // Derived Statistics Aggregator to prevent timing & race condition glitches
+    const calculatedStats = useMemo(() => {
+        const totalStud = stats.totalStudents || 0;
+        const totalTeach = (stats as any).totalTeachers || 0;
+        const totalStaf = stats.totalStaff || 0;
+
+        const presStud = stats.presentStudents || 0;
+        const absStud = (stats as any).absentStudents || 0;
+        const pendStud = Math.max(0, totalStud - presStud - absStud);
+
+        const presTeach = stats.presentTeachers || 0;
+        const absTeach = (stats as any).absentTeachers || 0;
+        const pendTeach = Math.max(0, totalTeach - presTeach - absTeach);
+
+        const presStaf = stats.presentStaff || 0;
+        const absStaf = (stats as any).absentStaff || 0;
+        const pendStaf = Math.max(0, totalStaf - presStaf - absStaf);
+
+        return {
+            ...stats,
+            totalStudents: totalStud,
+            totalTeachers: totalTeach,
+            totalStaff: totalStaf,
+            presentStudents: presStud,
+            absentStudents: absStud,
+            pendingStudents: pendStud,
+            presentTeachers: presTeach,
+            absentTeachers: absTeach,
+            pendingTeachers: pendTeach,
+            presentStaff: presStaf,
+            absentStaff: absStaf,
+            pendingStaff: pendStaf
+        };
+    }, [stats]);
+
     // Hydration-safe cache loading
     useEffect(() => {
         if (typeof window !== 'undefined' && selectedYear) {
@@ -224,6 +259,8 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         if (!user) return;
+
+        const isFiltered = !!(filterClass || filterSection || filterVillage);
 
         const fetchEnterpriseStats = async (isBackground = false) => {
             try {
@@ -243,7 +280,7 @@ export default function AdminDashboard() {
                 const res = await req.json();
                 if (res.success) {
                     setStats(prev => ({ ...prev, ...res.data }));
-                    if (!filterClass && !filterSection && !filterVillage) {
+                    if (!isFiltered) {
                         localStorage.setItem(`${DASHBOARD_CACHE_KEY}_stats`, JSON.stringify(res.data));
                     }
                 }
@@ -255,57 +292,83 @@ export default function AdminDashboard() {
         };
 
         fetchEnterpriseStats();
-        const interval = setInterval(() => fetchEnterpriseStats(true), 45000);
+        const interval = setInterval(() => fetchEnterpriseStats(true), 60000);
         
-        // --- ZERO-LATENCY REAL-TIME ATTENDANCE SYNC ---
-        // Listen to today's raw attendance records directly from Firebase.
-        // The moment a teacher or admin marks attendance, this listener fires instantly
-        // and triggers a background sync of the dashboard stats.
-        const todayStr = new Date().toISOString().split('T')[0];
-        const qAtt = query(collection(db, "attendance_daily"), where("date", "==", todayStr));
-        const unsubAtt = onSnapshot(qAtt, (snap) => {
-            // --- ABSOLUTE ZERO-LATENCY IN-MEMORY AGGREGATION ---
-            let presentStudents = 0, absentStudents = 0;
-            let presentTeachers = 0, absentTeachers = 0;
-            let presentStaff = 0, absentStaff = 0;
+        let unsubCounters = () => {};
+        let unsubPay = () => {};
+        let unsubAtt = () => {};
 
-            snap.docs.forEach(doc => {
-                const data = doc.data();
-                if (data.type === "TEACHERS") {
-                    presentTeachers += data.stats?.present || 0;
-                    absentTeachers += data.stats?.absent || 0;
-                } else if (data.type === "STAFF") {
-                    presentStaff += data.stats?.present || 0;
-                    absentStaff += data.stats?.absent || 0;
-                } else {
-                    presentStudents += data.stats?.present || 0;
-                    absentStudents += data.stats?.absent || 0;
-                }
+        // Only register real-time listeners for the global (unfiltered) view
+        if (!isFiltered) {
+            // --- REAL-TIME COUNTERS SYNC ---
+            unsubCounters = onSnapshot(collection(db, "counters"), (snap) => {
+                const counts: any = {};
+                snap.forEach(doc => { counts[doc.id] = doc.data().current || 0; });
+                setStats(prev => ({
+                    ...prev,
+                    totalStudents: counts.students || prev.totalStudents,
+                    totalTeachers: counts.teachers || (prev as any).totalTeachers,
+                    totalStaff: counts.staff || prev.totalStaff
+                }));
             });
 
-            // Inject the calculated counts directly into the UI state instantly
-            setStats(prev => {
-                const totalFac = (prev.totalStaff || 0) + ((prev as any).totalTeachers || 0);
-                return {
+            // --- REAL-TIME PAYMENTS SYNC (TODAY) ---
+            const todayStart = new Date();
+            todayStart.setHours(0, 0, 0, 0);
+            const qPay = query(collection(db, "payments"), where("createdAt", ">=", todayStart));
+            unsubPay = onSnapshot(qPay, (snap) => {
+                let total = 0;
+                snap.forEach(doc => {
+                    const data = doc.data();
+                    if (data.status === "success" || data.status === "SUCCESS" || !data.status) {
+                        total += Number(data.amount || 0);
+                    }
+                });
+                setStats(prev => ({ ...prev, todayCollection: total }));
+            });
+
+            // --- ZERO-LATENCY REAL-TIME ATTENDANCE SYNC ---
+            const todayStr = new Date().toISOString().split('T')[0];
+            const qAtt = query(collection(db, "attendance_daily"), where("date", "==", todayStr));
+            unsubAtt = onSnapshot(qAtt, (snap) => {
+                let presentStudents = 0, absentStudents = 0;
+                let presentTeachers = 0, absentTeachers = 0;
+                let presentStaff = 0, absentStaff = 0;
+
+                snap.docs.forEach(doc => {
+                    const data = doc.data();
+                    if (data.type === "TEACHERS") {
+                        presentTeachers += data.stats?.present || 0;
+                        absentTeachers += data.stats?.absent || 0;
+                    } else if (data.type === "STAFF") {
+                        presentStaff += data.stats?.present || 0;
+                        absentStaff += data.stats?.absent || 0;
+                    } else {
+                        presentStudents += data.stats?.present || 0;
+                        absentStudents += data.stats?.absent || 0;
+                    }
+                });
+
+                setStats(prev => ({
                     ...prev,
                     presentStudents,
                     absentStudents,
-                    pendingStudents: Math.max(0, (prev.totalStudents || 0) - presentStudents - absentStudents),
                     presentTeachers,
                     absentTeachers,
                     presentStaff,
                     absentStaff
-                };
-            });
+                }));
 
-            // We only trigger deep sync if there are actual changes to avoid initial double-fetch
-            if (!snap.metadata.hasPendingWrites) {
-                fetchEnterpriseStats(true);
-            }
-        });
+                if (!snap.metadata.hasPendingWrites) {
+                    fetchEnterpriseStats(true);
+                }
+            });
+        }
 
         return () => {
             clearInterval(interval);
+            unsubCounters();
+            unsubPay();
             unsubAtt();
         };
     }, [user, selectedYear, filterClass, filterSection, filterVillage]);
@@ -391,7 +454,7 @@ export default function AdminDashboard() {
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 px-2 md:px-0">
                     <KPICard
                         title="Today's Revenue"
-                        value={`₹${stats.todayCollection.toLocaleString()}`}
+                        value={`₹${calculatedStats.todayCollection.toLocaleString()}`}
                         icon={<IndianRupee className="w-4 h-4 text-emerald-400" />}
                         trend="Real-time Flow"
                         className="bg-emerald-500/5 border-emerald-500/10 cursor-pointer hover:bg-emerald-500/10 transition-all"
@@ -399,7 +462,7 @@ export default function AdminDashboard() {
                     />
                     <KPICard
                         title="Outstanding Fee Payment"
-                        value={`₹${((stats.finance?.totalFee || 0) - (stats.finance?.totalPaid || 0)).toLocaleString()}`}
+                        value={`₹${((calculatedStats.finance?.totalFee || 0) - (calculatedStats.finance?.totalPaid || 0)).toLocaleString()}`}
                         icon={<Database className="w-4 h-4 text-rose-400" />}
                         trend="Fee Payment Recovery"
                         className="bg-rose-500/5 border-rose-500/10 cursor-pointer hover:bg-rose-500/10 transition-all"
@@ -407,7 +470,7 @@ export default function AdminDashboard() {
                     />
                     <KPICard
                         title="Active Faculty"
-                        value={stats.totalStaff}
+                        value={calculatedStats.totalStaff}
                         icon={<Users className="w-4 h-4 text-blue-400" />}
                         trend="Total Staff strength"
                         className="bg-blue-500/5 border-blue-500/10 cursor-pointer hover:bg-blue-500/10 transition-all"
@@ -415,7 +478,7 @@ export default function AdminDashboard() {
                     />
                     <KPICard
                         title="Growth Index"
-                        value={stats.totalStudents}
+                        value={calculatedStats.totalStudents}
                         icon={<TrendingUp className="w-4 h-4 text-purple-400" />}
                         trend="Verified Enrollments"
                         className="bg-purple-500/5 border-purple-500/10 cursor-pointer hover:bg-purple-500/10 transition-all"
@@ -514,15 +577,15 @@ export default function AdminDashboard() {
                         <div className="flex flex-col gap-1 md:gap-2 mt-1 md:mt-2 w-full pr-2">
                             <div className="flex justify-between items-center group/row">
                                 <span className="text-[10px] md:text-xs font-black text-blue-400 uppercase tracking-widest italic">Students</span>
-                                <span className="text-sm md:text-2xl font-black text-blue-400 font-display italic leading-none">{stats.totalStudents || 0}</span>
+                                <span className="text-sm md:text-2xl font-black text-blue-400 font-display italic leading-none">{calculatedStats.totalStudents}</span>
                             </div>
                             <div className="flex justify-between items-center group/row border-t border-white/5 pt-1 md:pt-2">
                                 <span className="text-[10px] md:text-xs font-black text-purple-400 uppercase tracking-widest italic">Teachers</span>
-                                <span className="text-sm md:text-2xl font-black text-purple-400 font-display italic leading-none">{(stats as any).totalTeachers || 0}</span>
+                                <span className="text-sm md:text-2xl font-black text-purple-400 font-display italic leading-none">{calculatedStats.totalTeachers}</span>
                             </div>
                             <div className="flex justify-between items-center group/row border-t border-white/5 pt-1 md:pt-2">
                                 <span className="text-[10px] md:text-xs font-black text-indigo-400 uppercase tracking-widest italic">Support</span>
-                                <span className="text-sm md:text-2xl font-black text-indigo-400 font-display italic leading-none">{stats.totalStaff || 0}</span>
+                                <span className="text-sm md:text-2xl font-black text-indigo-400 font-display italic leading-none">{calculatedStats.totalStaff}</span>
                             </div>
                         </div>
                     }
@@ -536,15 +599,15 @@ export default function AdminDashboard() {
                         <div className="flex flex-col gap-1 md:gap-2 mt-1 md:mt-2 w-full pr-2">
                             <div className="flex justify-between items-center group/row">
                                 <span className="text-[10px] md:text-xs font-black text-emerald-400 uppercase tracking-widest italic">Present</span>
-                                <span className="text-sm md:text-2xl font-black text-emerald-400 font-display italic leading-none">{stats.presentStudents || 0}</span>
+                                <span className="text-sm md:text-2xl font-black text-emerald-400 font-display italic leading-none">{calculatedStats.presentStudents}</span>
                             </div>
                             <div className="flex justify-between items-center group/row border-t border-white/5 pt-1 md:pt-2">
                                 <span className="text-[10px] md:text-xs font-black text-rose-400 uppercase tracking-widest italic">Absent</span>
-                                <span className="text-sm md:text-2xl font-black text-rose-400 font-display italic leading-none">{(stats as any).absentStudents || 0}</span>
+                                <span className="text-sm md:text-2xl font-black text-rose-400 font-display italic leading-none">{calculatedStats.absentStudents}</span>
                             </div>
                             <div className="flex justify-between items-center group/row border-t border-white/5 pt-1 md:pt-2">
                                 <span className="text-[10px] md:text-xs font-black text-amber-400 uppercase tracking-widest italic">Pending</span>
-                                <span className="text-sm md:text-2xl font-black text-amber-400 font-display italic leading-none">{(stats as any).pendingStudents || 0}</span>
+                                <span className="text-sm md:text-2xl font-black text-amber-400 font-display italic leading-none">{calculatedStats.pendingStudents}</span>
                             </div>
                         </div>
                     }
@@ -558,15 +621,15 @@ export default function AdminDashboard() {
                         <div className="flex flex-col gap-1 md:gap-2 mt-1 md:mt-2 w-full pr-2">
                             <div className="flex justify-between items-center group/row">
                                 <span className="text-[10px] md:text-xs font-black text-emerald-400 uppercase tracking-widest italic">Present</span>
-                                <span className="text-sm md:text-2xl font-black text-emerald-400 font-display italic leading-none">{((stats.presentTeachers || 0) + (stats.presentStaff || 0))}</span>
+                                <span className="text-sm md:text-2xl font-black text-emerald-400 font-display italic leading-none">{calculatedStats.presentTeachers + calculatedStats.presentStaff}</span>
                             </div>
                             <div className="flex justify-between items-center group/row border-t border-white/5 pt-1 md:pt-2">
                                 <span className="text-[10px] md:text-xs font-black text-rose-400 uppercase tracking-widest italic">Absent</span>
-                                <span className="text-sm md:text-2xl font-black text-rose-400 font-display italic leading-none">{(((stats as any).absentTeachers || 0) + ((stats as any).absentStaff || 0))}</span>
+                                <span className="text-sm md:text-2xl font-black text-rose-400 font-display italic leading-none">{calculatedStats.absentTeachers + calculatedStats.absentStaff}</span>
                             </div>
                             <div className="flex justify-between items-center group/row border-t border-white/5 pt-1 md:pt-2">
                                 <span className="text-[10px] md:text-xs font-black text-amber-400 uppercase tracking-widest italic">Pending</span>
-                                <span className="text-sm md:text-2xl font-black text-amber-400 font-display italic leading-none">{Math.max(0, ((stats as any).totalTeachers || 0) + (stats.totalStaff || 0) - ((stats.presentTeachers || 0) + (stats.presentStaff || 0) + ((stats as any).absentTeachers || 0) + ((stats as any).absentStaff || 0)))}</span>
+                                <span className="text-sm md:text-2xl font-black text-amber-400 font-display italic leading-none">{calculatedStats.pendingTeachers + calculatedStats.pendingStaff}</span>
                             </div>
                         </div>
                     }
@@ -576,7 +639,7 @@ export default function AdminDashboard() {
                 />
                 <KPICard
                     title="Today's Collection"
-                    value={`₹${stats.todayCollection}`}
+                    value={`₹${calculatedStats.todayCollection}`}
                     icon={<IndianRupee className="w-4 h-4 text-emerald-400" />}
                     trend="Financial Flow"
                     className="bg-emerald-500/5 border-emerald-500/10 cursor-pointer"
@@ -654,21 +717,21 @@ export default function AdminDashboard() {
                                             <span className="text-[10px] font-black uppercase tracking-[0.2em]">Total Outstanding Revenue</span>
                                         </div>
                                         <h3 className="text-4xl md:text-6xl font-display font-bold text-white italic tracking-tighter">
-                                            ₹{((stats.finance?.totalFee || 0) - (stats.finance?.totalPaid || 0)).toLocaleString()}
+                                            ₹{((calculatedStats.finance?.totalFee || 0) - (calculatedStats.finance?.totalPaid || 0)).toLocaleString()}
                                         </h3>
-                                        <p className="text-xs text-muted-foreground italic">Combined Pending: School + Hostel + Transport + Custom</p>
+                                        <p className="text-xs text-muted-foreground italic">Combined Outstanding: School + Transport + Custom Fees</p>
                                     </div>
                                     <div className="flex flex-col justify-end md:items-end gap-1">
                                         <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Total Combined Target</p>
-                                        <p className="text-2xl md:text-3xl font-display font-bold text-indigo-300/80 italic">₹{(stats.finance?.totalFee || 0).toLocaleString()}</p>
+                                        <p className="text-2xl md:text-3xl font-display font-bold text-indigo-300/80 italic">₹{(calculatedStats.finance?.totalFee || 0).toLocaleString()}</p>
                                         <div className="w-full md:w-48 h-1 bg-white/5 rounded-full mt-2 overflow-hidden">
                                             <div 
                                                 className="h-full bg-indigo-500 transition-all duration-1000" 
-                                                style={{ width: `${stats.finance?.totalFee ? (stats.finance.totalPaid / stats.finance.totalFee) * 100 : 0}%` }}
+                                                style={{ width: `${calculatedStats.finance?.totalFee ? (calculatedStats.finance.totalPaid / calculatedStats.finance.totalFee) * 100 : 0}%` }}
                                             />
                                         </div>
                                         <p className="text-[10px] text-indigo-400/60 font-mono mt-1">
-                                            Collection Progress: {stats.finance?.totalFee ? Math.round((stats.finance.totalPaid / stats.finance.totalFee) * 100) : 0}%
+                                            Collection Progress: {calculatedStats.finance?.totalFee ? Math.round((calculatedStats.finance.totalPaid / calculatedStats.finance.totalFee) * 100) : 0}%
                                         </p>
                                     </div>
                                 </div>
@@ -676,10 +739,35 @@ export default function AdminDashboard() {
 
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                 {[
-                                    { label: "School Fee", paid: stats.finance?.schoolPaid || 0, total: stats.finance?.schoolFee || 0, color: "#60a5fa", icon: GraduationCap },
-                                    { label: "Hostel Fee", paid: stats.finance?.hostelPaid || 0, total: stats.finance?.hostelFee || 0, color: "#10b981", icon: Home },
-                                    { label: "Transport", paid: stats.finance?.transportPaid || 0, total: stats.finance?.transportFee || 0, color: "#3b82f6", icon: Bus },
-                                    { label: "Custom Fee", paid: stats.finance?.customPaid || 0, total: stats.finance?.customFee || 0, color: "#f59e0b", icon: Settings2 }
+                                    { label: "School Fee", paid: calculatedStats.finance?.schoolPaid || 0, total: calculatedStats.finance?.schoolFee || 0, color: "#60a5fa", icon: GraduationCap },
+                                    { label: "Transport", paid: calculatedStats.finance?.transportPaid || 0, total: calculatedStats.finance?.transportFee || 0, color: "#3b82f6", icon: Bus },
+                                    ...Object.entries(calculatedStats.finance?.customFees || {}).map(([name, data]: [string, any]) => {
+                                        const upperName = name.toUpperCase();
+                                        let color = "#f59e0b"; // Curated amber
+                                        let icon = Settings2;
+
+                                        if (upperName.includes("HOSTEL")) {
+                                            color = "#10b981"; // Emerald
+                                            icon = Home;
+                                        } else if (upperName.includes("EXAM")) {
+                                            color = "#a855f7"; // Purple
+                                            icon = FileText;
+                                        } else if (upperName.includes("BOOK") || upperName.includes("LIBRARY")) {
+                                            color = "#ec4899"; // Pink
+                                            icon = BookOpen;
+                                        } else if (upperName.includes("UNIFORM")) {
+                                            color = "#06b6d4"; // Cyan
+                                            icon = Layers;
+                                        }
+
+                                        return {
+                                            label: name,
+                                            paid: data.paid || 0,
+                                            total: data.total || 0,
+                                            color,
+                                            icon
+                                        };
+                                    })
                                 ].map((fee, idx) => (
                                     <div key={idx} className="p-6 rounded-3xl bg-black/40 border border-white/5 flex flex-col items-center justify-center text-center gap-4 group/item hover:border-white/20 transition-all relative min-h-[260px]">
                                         <div className="absolute top-4 right-4 z-20 opacity-0 group-hover/item:opacity-100 transition-opacity"><CardFilter villages={villages} classes={classes} sections={sections} filterVillage={filterVillage} setFilterVillage={setFilterVillage} filterClass={filterClass} setFilterClass={setFilterClass} filterSection={filterSection} setFilterSection={setFilterSection} size="xs" /></div>
@@ -717,7 +805,7 @@ export default function AdminDashboard() {
                             </div>
 
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
-                                {Object.entries(stats.finance?.terms || {}).sort().map(([name, data]) => (
+                                {Object.entries(calculatedStats.finance?.terms || {}).sort().map(([name, data]) => (
                                     <div key={name} className="p-4 rounded-2xl bg-blue-500/5 border border-blue-500/10 flex flex-col items-center text-center gap-3">
                                         <div className="relative w-12 h-12">
                                             <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">

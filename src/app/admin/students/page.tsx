@@ -105,6 +105,17 @@ export default function StudentsPage() {
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
     const [resetUser, setResetUser] = useState<{ uid: string, schoolId: string, name: string, role: string } | null>(null);
     const [isResetModalOpen, setIsResetModalOpen] = useState(false);
+    const [pendingStudents, setPendingStudents] = useState<Student[]>([]);
+
+    // Unified list of students (Real-time + Optimistic)
+    const allStudents = useMemo(() => {
+        // Create a map of real students by schoolId for fast lookup
+        const realSchoolIds = new Set(students.map(s => s.schoolId));
+        // Filter out pending students that have already been synchronized by onSnapshot
+        const filteredPending = pendingStudents.filter(ps => !realSchoolIds.has(ps.schoolId));
+        return [...filteredPending, ...students];
+    }, [students, pendingStudents]);
+
 
     // Loading Watchdog
     useEffect(() => {
@@ -158,6 +169,13 @@ export default function StudentsPage() {
             })) as Student[];
             setStudents(list);
             setLocalLoading(false);
+            
+            // Clean up pending students that are now in the real list
+            if (list.length > 0) {
+                const incomingIds = new Set(list.map(s => s.schoolId));
+                setPendingStudents(prev => prev.filter(ps => !incomingIds.has(ps.schoolId)));
+            }
+
             if (statusFilter === "ACTIVE" && classFilter === "all" && villageFilter === "all" && sectionFilter === "all" && !searchQuery) {
                 localStorage.setItem(STUDENT_CACHE_KEY, JSON.stringify(list.slice(0, 50))); // Cache first 50 for instant feel
             }
@@ -230,12 +248,16 @@ export default function StudentsPage() {
                             <>
                                 <StudentImportModal onSuccess={() => { window.location.reload(); }} />
                                 <AddStudentModal 
-                                    onSuccess={() => { }} 
+                                    onSuccess={(finalData) => {
+                                        if (finalData?.schoolId) {
+                                            setPendingStudents(prev => prev.map(ps => 
+                                                (ps.schoolId === "PENDING..." && ps.studentName === finalData.studentName) 
+                                                ? { ...ps, ...finalData } : ps
+                                            ));
+                                        }
+                                    }} 
                                     onOptimisticUpdate={(newStudent) => {
-                                        setStudents(prev => {
-                                            if (prev.find(s => s.schoolId === newStudent.schoolId || s.id === newStudent.id)) return prev;
-                                            return [newStudent, ...prev];
-                                        });
+                                        setPendingStudents(prev => [newStudent, ...prev]);
                                     }}
                                 />
                             </>
@@ -247,12 +269,16 @@ export default function StudentsPage() {
                 {activeTab === "directory" && isAdmin && (
                     <div className="fixed bottom-20 right-4 z-50 md:hidden">
                         <AddStudentModal 
-                            onSuccess={() => { }}
+                            onSuccess={(finalData) => {
+                                if (finalData?.schoolId) {
+                                    setPendingStudents(prev => prev.map(ps => 
+                                        (ps.schoolId === "PENDING..." && ps.studentName === finalData.studentName) 
+                                        ? { ...ps, ...finalData } : ps
+                                    ));
+                                }
+                            }}
                             onOptimisticUpdate={(newStudent) => {
-                                setStudents(prev => {
-                                    if (prev.find(s => s.schoolId === newStudent.schoolId || s.id === newStudent.id)) return prev;
-                                    return [newStudent, ...prev];
-                                });
+                                setPendingStudents(prev => [newStudent, ...prev]);
                             }}
                         >
                             <button className="w-14 h-14 rounded-full bg-accent text-black shadow-2xl shadow-accent/40 flex items-center justify-center">
@@ -372,7 +398,7 @@ export default function StudentsPage() {
                     {/* Content View - Non-blocking Table */}
                     <div className="relative min-h-[400px]">
                         <DataTable<Student>
-                            data={students}
+                            data={allStudents}
                             isLoading={isTableLoading}
                             pageSize={20}
                             onRowClick={(s) => router.push(`/admin/students/${s.schoolId}`)}
@@ -539,8 +565,7 @@ export default function StudentsPage() {
                                                                 <User size={14} /> Edit Profile
                                                             </DropdownMenuItem>
                                                             <DropdownMenuItem onClick={() => {
-                                                                if (!s.uid) { alert("UID Missing"); return; }
-                                                                setResetUser({ uid: s.uid, schoolId: s.schoolId, name: s.studentName, role: "STUDENT" });
+                                                                setResetUser({ uid: s.uid || "", schoolId: s.schoolId, name: s.studentName, role: "STUDENT" });
                                                                 setIsResetModalOpen(true);
                                                             }} className="rounded-lg gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors">
                                                                 <Key size={14} /> Reset Password

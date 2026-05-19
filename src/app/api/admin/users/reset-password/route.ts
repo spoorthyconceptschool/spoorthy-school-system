@@ -28,10 +28,63 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Invalid password parameters" }, { status: 400 });
         }
 
+        let resolvedUid = targetUid;
+        let displayName = "";
+        let email = "";
+
+        if (!resolvedUid && schoolId && role) {
+            console.log(`[Reset Password] targetUid is missing. Running dynamic lookup for schoolId: ${schoolId}, role: ${role}`);
+            // 1. Check collections to find existing UID or details
+            let collectionName = "";
+            if (role === "STUDENT") collectionName = "students";
+            else if (role === "TEACHER") collectionName = "teachers";
+            else if (role === "STAFF") collectionName = "staff";
+
+            if (collectionName) {
+                const docSnap = await adminDb.collection(collectionName).doc(schoolId).get();
+                if (docSnap.exists) {
+                    const docData = docSnap.data();
+                    resolvedUid = docData?.uid;
+                    displayName = docData?.studentName || docData?.name || `${role} ${schoolId}`;
+                    email = docData?.email || `${schoolId}@school.local`.toLowerCase();
+                }
+            }
+
+            // 2. If no UID, check by email
+            if (!resolvedUid) {
+                if (!email) email = `${schoolId}@school.local`.toLowerCase();
+                try {
+                    const authUser = await adminAuth.getUserByEmail(email);
+                    resolvedUid = authUser.uid;
+                    console.log(`[Reset Password] Resolved UID by email ${email}: ${resolvedUid}`);
+                } catch (authErr: any) {
+                    if (authErr.code === 'auth/user-not-found') {
+                        // Create user on-the-fly!
+                        console.log(`[Reset Password] Auth user not found. Creating user on-the-fly for ${email}`);
+                        const userRecord = await adminAuth.createUser({
+                            email,
+                            password: newPassword,
+                            displayName: displayName || `${role} ${schoolId}`
+                        });
+                        resolvedUid = userRecord.uid;
+                        await adminAuth.setCustomUserClaims(resolvedUid, { role });
+                        console.log(`[Reset Password] Created Auth user on-the-fly: ${resolvedUid}`);
+                    } else {
+                        throw authErr;
+                    }
+                }
+            }
+
+            // 3. Link the resolved UID back to the collection doc if missing
+            if (resolvedUid && collectionName) {
+                await adminDb.collection(collectionName).doc(schoolId).set({ uid: resolvedUid }, { merge: true });
+            }
+        }
+
         // 3. Update Firebase Auth Password if UID exists
-        if (targetUid) {
+        if (resolvedUid) {
             try {
-                await adminAuth.updateUser(targetUid, {
+                await adminAuth.updateUser(resolvedUid, {
                     password: newPassword
                 });
             } catch (authErr) {
@@ -43,24 +96,35 @@ export async function POST(req: NextRequest) {
         // We update users/{uid} AND the role-specific collection (students/teachers)
 
         const updateData: any = {
-            // Admin sets it, user can use it immediately.
-            mustChangePassword: false,
-            recoveryPassword: newPassword
+            // Force them to change on next login
+            mustChangePassword: true,
+            recoveryPassword: newPassword,
+            schoolId: schoolId || "N/A",
+            role: role || "STUDENT",
+            status: "ACTIVE",
+            updatedAt: new Date().toISOString()
         };
 
         // Batch writes for atomicity
         const batch = adminDb.batch();
 
-        if (targetUid) {
-            batch.set(adminDb.collection("users").doc(targetUid), updateData, { merge: true });
+        if (resolvedUid) {
+            batch.set(adminDb.collection("users").doc(resolvedUid), updateData, { merge: true });
+            // Map schoolId to uid in usersBySchoolId
+            if (schoolId) {
+                batch.set(adminDb.collection("usersBySchoolId").doc(schoolId), {
+                    uid: resolvedUid,
+                    role: role || "STUDENT"
+                }, { merge: true });
+            }
         }
 
         if (role === "STUDENT" && schoolId) {
-            batch.set(adminDb.collection("students").doc(schoolId), { recoveryPassword: newPassword }, { merge: true });
+            batch.set(adminDb.collection("students").doc(schoolId), { recoveryPassword: newPassword, uid: resolvedUid }, { merge: true });
         } else if (role === "TEACHER" && schoolId) {
-            batch.set(adminDb.collection("teachers").doc(schoolId), { recoveryPassword: newPassword }, { merge: true });
+            batch.set(adminDb.collection("teachers").doc(schoolId), { recoveryPassword: newPassword, uid: resolvedUid }, { merge: true });
         } else if (role === "STAFF" && schoolId) {
-            batch.set(adminDb.collection("staff").doc(schoolId), { recoveryPassword: newPassword }, { merge: true });
+            batch.set(adminDb.collection("staff").doc(schoolId), { recoveryPassword: newPassword, uid: resolvedUid }, { merge: true });
         }
 
         // Audit Log

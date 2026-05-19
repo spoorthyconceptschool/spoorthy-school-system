@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import { collection, addDoc, Timestamp, query, where, onSnapshot, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
@@ -25,6 +25,7 @@ export default function TeacherAddStudentsPage() {
     const [loading, setLoading] = useState(false);
     const [pendingStudents, setPendingStudents] = useState<any[]>([]);
     const [showForm, setShowForm] = useState(false);
+    const submittingRef = useRef(false);
 
     const [formData, setFormData] = useState({
         studentName: "",
@@ -83,12 +84,14 @@ export default function TeacherAddStudentsPage() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (submittingRef.current) return;
         if (!myClassSection || !teacherProfile) return;
         if (!formData.studentName || formData.studentName.length < 2) return toast({ title: "Name Required", type: "error" });
         if (!/^\d{10}$/.test(formData.parentPhone)) return toast({ title: "Invalid Mobile (10 digits)", type: "error" });
         if (!formData.villageId) return toast({ title: "Village Required", type: "error" });
         if (formData.gender === "select") return toast({ title: "Gender Required", type: "error" });
 
+        submittingRef.current = true;
         setLoading(true);
         try {
             const className = classesData[myClassSection.classId]?.name || myClassSection.classId;
@@ -122,6 +125,7 @@ export default function TeacherAddStudentsPage() {
             toast({ title: "Failed", description: err.message, type: "error" });
         } finally {
             setLoading(false);
+            submittingRef.current = false;
         }
     };
 
@@ -166,7 +170,10 @@ export default function TeacherAddStudentsPage() {
                     </div>
                 </div>
                 {!showForm && (
-                    <Button onClick={() => setShowForm(true)} className="gap-2 bg-accent text-accent-foreground font-bold h-10">
+                    <Button onClick={() => {
+                        setFormData({ studentName: "", parentName: "", parentPhone: "", villageId: "", dateOfBirth: "", gender: "select", transportRequired: false });
+                        setShowForm(true);
+                    }} className="gap-2 bg-accent text-accent-foreground font-bold h-10">
                         <Plus size={16} /> New Student
                     </Button>
                 )}
@@ -232,7 +239,10 @@ export default function TeacherAddStudentsPage() {
                                 <Button type="submit" disabled={loading} className="flex-1 bg-amber-500 text-black hover:bg-amber-600 font-bold h-11">
                                     {loading ? <Loader2 className="animate-spin" /> : "Submit for Approval"}
                                 </Button>
-                                <Button type="button" variant="ghost" onClick={() => setShowForm(false)} className="h-11">Cancel</Button>
+                                <Button type="button" variant="ghost" onClick={() => {
+                                    setShowForm(false);
+                                    setFormData({ studentName: "", parentName: "", parentPhone: "", villageId: "", dateOfBirth: "", gender: "select", transportRequired: false });
+                                }} className="h-11">Cancel</Button>
                             </div>
                         </form>
                     </CardContent>

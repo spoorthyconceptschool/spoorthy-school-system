@@ -330,8 +330,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                         actions={(t) => (
                             <div className="flex flex-col gap-1">
                                 <DropdownMenuItem onClick={() => {
-                                    if (!t.uid) { alert("UID Missing"); return; }
-                                    setResetUser({ uid: t.uid, schoolId: t.schoolId, name: t.name, role: "TEACHER" });
+                                    setResetUser({ uid: t.uid || "", schoolId: t.schoolId, name: t.name, role: "TEACHER" });
                                     setIsResetModalOpen(true);
                                 }} className="rounded-lg gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors">
                                     <Key size={14} /> Reset Password
@@ -440,8 +439,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                         actions={(s) => (
                             <div className="flex flex-col gap-1">
                                 <DropdownMenuItem onClick={() => {
-                                    if (!s.uid) { alert("UID Missing"); return; }
-                                    setResetUser({ uid: s.uid, schoolId: s.schoolId, name: s.name, role: "STAFF" });
+                                    setResetUser({ uid: s.uid || "", schoolId: s.schoolId, name: s.name, role: "STAFF" });
                                     setIsResetModalOpen(true);
                                 }} className="rounded-lg gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors">
                                     <Key size={14} /> Reset Password

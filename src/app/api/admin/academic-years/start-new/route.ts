@@ -48,7 +48,7 @@ export async function POST(req: NextRequest) {
         // 2. Fetch Current State
         const configRef = adminDb.collection("config").doc("academic_years");
         const configSnap = await configRef.get();
-        const currentYear = configSnap.exists ? configSnap.data()?.currentYear : "Unknown";
+        const currentYear = configSnap.exists ? (configSnap.data()?.currentYear || "2025-2026") : "2025-2026";
 
         if (newYearLabel === currentYear) {
             return NextResponse.json({ error: "Cannot transition to the same year." }, { status: 400 });
@@ -74,6 +74,7 @@ export async function POST(req: NextRequest) {
         for (const doc of assignmentsSnap.docs) {
             const data = doc.data();
             const classId = data.classId;
+            if (!classId) continue;
             const newRef = adminDb.collection("teaching_assignments").doc(`${newYearLabel}_${classId}`);
             batch.set(newRef, {
                 ...data,
@@ -89,6 +90,7 @@ export async function POST(req: NextRequest) {
             const data = doc.data();
             const classId = data.classId;
             const sectionId = data.sectionId;
+            if (!classId || !sectionId) continue;
             const newRef = adminDb.collection("class_timetables").doc(`${newYearLabel}_${classId}_${sectionId}`);
             batch.set(newRef, {
                 ...data,
@@ -113,7 +115,7 @@ export async function POST(req: NextRequest) {
         for (const studentDoc of studentsSnap.docs) {
             const student = studentDoc.data();
             const studentRef = studentDoc.ref;
-            const sId = student.schoolId;
+            const sId = student.schoolId || student.id || studentDoc.id;
 
             // Skip if already in the target year (idempotency)
             if (student.academicYear === newYearLabel) continue;
@@ -140,15 +142,15 @@ export async function POST(req: NextRequest) {
 
             // 2. Promotion Logic
             // Default: Active students are promoted. Explicit "DETAINED" students are retained.
-            let newClassId = student.classId;
-            let newClassName = student.className;
+            let newClassId = student.classId || "unknown";
+            let newClassName = student.className || "Unknown Class";
             let newStatus = "ACTIVE"; // The status in the NEW year
 
             const isDetained = student.status === "DETAINED" || student.promotionStatus === "RETAINED";
 
             if (!isDetained) {
                 // Promote
-                const next = getNextClass(student.classId);
+                const next = getNextClass(student.classId || "");
                 if (next) {
                     newClassId = next.id;
                     newClassName = next.name;
@@ -169,7 +171,7 @@ export async function POST(req: NextRequest) {
                 classId: newClassId,
                 className: newClassName,
                 status: newStatus,
-                previousYearStatus: student.status,
+                previousYearStatus: student.status || "ACTIVE",
                 updatedAt: new Date().toISOString()
             });
             ops++;

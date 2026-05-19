@@ -38,7 +38,7 @@ export class EnterpriseAttendanceService {
      * @returns A promise resolving to an object containing success status and statistics.
      * @throws Error if outside time window, section already marked, or database failure.
      */
-    static async markAttendance(date: string, classId: string, sectionId: string, records: Record<string, 'P' | 'A'>, markedBy: string, schoolId: string) {
+    static async markAttendance(date: string, classId: string, sectionId: string, records: Record<string, 'P' | 'A'>, markedBy: string, schoolId: string, touchedIds?: string[]) {
         // Enforce time window
         const now = new Date();
         const currentHour = now.getHours();
@@ -118,39 +118,53 @@ export class EnterpriseAttendanceService {
             newValue: pureAttendanceData
         }, batch);
 
-        // 3. Dispatch Notifications
+        // 3. Dispatch Notifications (Only write notification if touched or marked Absent on first-run)
         for (const [studentId, status] of Object.entries(validatedRecords)) {
             const uid = validStudentMap[studentId];
             if (uid) {
-                const notifRef = adminDb.collection("notifications").doc();
-                batch.set(notifRef, {
-                    userId: uid,
-                    title: "Attendance Marked",
-                    message: `Your attendance for ${date} has been marked as ${status === 'P' ? 'Present' : 'Absent'}.`,
-                    type: "ATTENDANCE",
-                    status: "UNREAD",
-                    target: "student",
-                    schoolId,
-                    createdAt: Timestamp.now(),
-                    metadata: { date, status }
-                });
+                const shouldNotify = touchedIds && touchedIds.length > 0
+                    ? touchedIds.includes(studentId)
+                    : (status === 'A');
+
+                if (shouldNotify) {
+                    const notifRef = adminDb.collection("notifications").doc();
+                    batch.set(notifRef, {
+                        userId: uid,
+                        title: "Attendance Marked",
+                        message: `Your attendance for ${date} has been marked as ${status === 'P' ? 'Present' : 'Absent'}.`,
+                        type: "ATTENDANCE",
+                        status: "UNREAD",
+                        target: "student",
+                        schoolId,
+                        createdAt: Timestamp.now(),
+                        metadata: { date, status }
+                    });
+                }
             }
         }
 
         await batch.commit();
 
-        // 4. Dispatch Push Notifications (Outside batch for performance)
+        // 4. Dispatch Push Notifications (Outside batch, asynchronously in background for zero latency)
         try {
-            const uids = Object.keys(validStudentMap).map(sid => validStudentMap[sid]).filter(Boolean);
-            if (uids.length > 0) {
-                await sendBulkPushNotifications(
-                    uids,
+            const uidsToNotify = Object.keys(validStudentMap)
+                .filter(sid => {
+                    return touchedIds && touchedIds.length > 0
+                        ? touchedIds.includes(sid)
+                        : records[sid] === 'A';
+                })
+                .map(sid => validStudentMap[sid])
+                .filter(Boolean);
+
+            if (uidsToNotify.length > 0) {
+                sendBulkPushNotifications(
+                    uidsToNotify,
                     {
                         title: "Attendance Updated",
                         body: `Attendance for ${date} has been marked for your class.`
                     },
                     { type: "ATTENDANCE", date, url: "https://spoorthy-16292.web.app/student/attendance" }
-                );
+                ).catch(e => console.error("[Attendance Push] Failed to dispatch:", e));
             }
         } catch (e) {
             console.error("[Attendance Push] Failed to dispatch:", e);
@@ -172,7 +186,7 @@ export class EnterpriseAttendanceService {
      * @returns A promise resolving to success status and faculty attendance stats.
      * @throws Error if submitted outside of configured active school hours.
      */
-    static async markTeacherAttendance(date: string, records: Record<string, 'P' | 'A'>, markedBy: string, schoolId: string) {
+    static async markTeacherAttendance(date: string, records: Record<string, 'P' | 'A'>, markedBy: string, schoolId: string, touchedIds?: string[]) {
         // Enforce time window
         const now = new Date();
         const currentHour = now.getHours();
@@ -246,35 +260,49 @@ export class EnterpriseAttendanceService {
         for (const [schoolId, status] of Object.entries(validatedRecords)) {
             const uid = validTeacherMap[schoolId];
             if (uid) {
-                const notifRef = adminDb.collection("notifications").doc();
-                batch.set(notifRef, {
-                    userId: uid,
-                    title: "Attendance Marked",
-                    message: `Your attendance for ${date} has been marked as ${status === 'P' ? 'Present' : 'Absent'}.`,
-                    type: "ATTENDANCE",
-                    status: "UNREAD",
-                    target: "teacher",
-                    schoolId,
-                    createdAt: Timestamp.now(),
-                    metadata: { date, status }
-                });
+                const shouldNotify = touchedIds && touchedIds.length > 0
+                    ? touchedIds.includes(schoolId)
+                    : (status === 'A');
+
+                if (shouldNotify) {
+                    const notifRef = adminDb.collection("notifications").doc();
+                    batch.set(notifRef, {
+                        userId: uid,
+                        title: "Attendance Marked",
+                        message: `Your attendance for ${date} has been marked as ${status === 'P' ? 'Present' : 'Absent'}.`,
+                        type: "ATTENDANCE",
+                        status: "UNREAD",
+                        target: "teacher",
+                        schoolId,
+                        createdAt: Timestamp.now(),
+                        metadata: { date, status }
+                    });
+                }
             }
         }
 
         await batch.commit();
 
-        // 4. Dispatch Push Notifications for Teachers
+        // 4. Dispatch Push Notifications for Teachers (Asynchronously in background for zero latency)
         try {
-            const uids = Object.values(validTeacherMap).filter(Boolean);
-            if (uids.length > 0) {
-                await sendBulkPushNotifications(
-                    uids,
+            const uidsToNotify = Object.keys(validTeacherMap)
+                .filter(tsid => {
+                    return touchedIds && touchedIds.length > 0
+                        ? touchedIds.includes(tsid)
+                        : records[tsid] === 'A';
+                })
+                .map(tsid => validTeacherMap[tsid])
+                .filter(Boolean);
+
+            if (uidsToNotify.length > 0) {
+                sendBulkPushNotifications(
+                    uidsToNotify,
                     {
                         title: "Staff Attendance Marked",
                         body: `Your attendance for ${date} has been recorded.`
                     },
                     { type: "ATTENDANCE", date }
-                );
+                ).catch(e => console.error("[Teacher Attendance Push] Failed to dispatch:", e));
             }
         } catch (e) {
             console.error("[Teacher Attendance Push] Failed to dispatch:", e);
@@ -295,7 +323,7 @@ export class EnterpriseAttendanceService {
      * @param markedBy - The UID of the administrator submitting the attendance.
      * @returns A promise resolving to the final attendance statistics for the day.
      */
-    static async markStaffAttendance(date: string, records: Record<string, 'P' | 'A'>, markedBy: string, schoolId: string) {
+    static async markStaffAttendance(date: string, records: Record<string, 'P' | 'A'>, markedBy: string, schoolId: string, touchedIds?: string[]) {
         // Enforce time window
         const now = new Date();
         const currentHour = now.getHours();
@@ -365,35 +393,49 @@ export class EnterpriseAttendanceService {
         for (const [schoolId, status] of Object.entries(validatedRecords)) {
             const uid = validStaffMap[schoolId];
             if (uid) {
-                const notifRef = adminDb.collection("notifications").doc();
-                batch.set(notifRef, {
-                    userId: uid,
-                    title: "Attendance Marked",
-                    message: `Your attendance for ${date} has been marked as ${status === 'P' ? 'Present' : 'Absent'}.`,
-                    type: "ATTENDANCE",
-                    status: "UNREAD",
-                    target: "staff",
-                    schoolId,
-                    createdAt: Timestamp.now(),
-                    metadata: { date, status }
-                });
+                const shouldNotify = touchedIds && touchedIds.length > 0
+                    ? touchedIds.includes(schoolId)
+                    : (status === 'A');
+
+                if (shouldNotify) {
+                    const notifRef = adminDb.collection("notifications").doc();
+                    batch.set(notifRef, {
+                        userId: uid,
+                        title: "Attendance Marked",
+                        message: `Your attendance for ${date} has been marked as ${status === 'P' ? 'Present' : 'Absent'}.`,
+                        type: "ATTENDANCE",
+                        status: "UNREAD",
+                        target: "staff",
+                        schoolId,
+                        createdAt: Timestamp.now(),
+                        metadata: { date, status }
+                    });
+                }
             }
         }
 
         await batch.commit();
 
-        // 4. Dispatch Push Notifications for Staff
+        // 4. Dispatch Push Notifications for Staff (Asynchronously in background for zero latency)
         try {
-            const uids = Object.values(validStaffMap).filter(Boolean);
-            if (uids.length > 0) {
-                await sendBulkPushNotifications(
-                    uids,
+            const uidsToNotify = Object.keys(validStaffMap)
+                .filter(tsid => {
+                    return touchedIds && touchedIds.length > 0
+                        ? touchedIds.includes(tsid)
+                        : records[tsid] === 'A';
+                })
+                .map(tsid => validStaffMap[tsid])
+                .filter(Boolean);
+
+            if (uidsToNotify.length > 0) {
+                sendBulkPushNotifications(
+                    uidsToNotify,
                     {
                         title: "Staff Attendance Marked",
                         body: `Your attendance for ${date} has been recorded.`
                     },
                     { type: "ATTENDANCE", date }
-                );
+                ).catch(e => console.error("[Staff Attendance Push] Failed to dispatch:", e));
             }
         } catch (e) {
             console.error("[Staff Attendance Push] Failed to dispatch:", e);

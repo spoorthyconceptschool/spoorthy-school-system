@@ -28,10 +28,11 @@ interface Payment {
 
 export default function PaymentsPage() {
     const { user } = useAuth();
-    const [payments, setPayments] = useState<Payment[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [allPayments, setAllPayments] = useState<Payment[]>([]);
+    const [paymentsLoaded, setPaymentsLoaded] = useState(false);
+    const [studentsLoaded, setStudentsLoaded] = useState(false);
     const [open, setOpen] = useState(false);
-    const { branding, selectedYear } = useMasterData();
+    const { branding, selectedYear, classes = {}, villages = {} } = useMasterData();
     const [role, setRole] = useState<string>("");
 
     useEffect(() => {
@@ -42,16 +43,14 @@ export default function PaymentsPage() {
         return () => unsub();
     }, [user]);
 
-    // Search State
-    const [searchTerm, setSearchTerm] = useState("");
+    // Search & Filter State
+    const [searchTerm, setSearchTerm] = useState(""); // For Record Fee Dialog
+    const [searchQuery, setSearchQuery] = useState(""); // For main list search
+    const [selectedClassFilter, setSelectedClassFilter] = useState("ALL");
+    const [selectedVillageFilter, setSelectedVillageFilter] = useState("ALL");
+
     const [allStudents, setAllStudents] = useState<any[]>([]);
     const [suggestions, setSuggestions] = useState<any[]>([]);
-
-    // Pagination & Stats State
-    const [pageTokens, setPageTokens] = useState<any[]>([]);
-    const [currentPage, setCurrentPage] = useState(0);
-    const PAGE_SIZE = 20;
-    const [stats, setStats] = useState({ total: 0, online: 0, cash: 0 });
 
     // Payment Form State
     const [selectedStudent, setSelectedStudent] = useState<any>(null);
@@ -64,80 +63,26 @@ export default function PaymentsPage() {
     });
     const [collectingFee, setCollectingFee] = useState(false);
 
-    // Provide fetchAggregates and fetchPage as stable references/callbacks
-    const fetchAggregates = async (yearId: string) => {
-        // Client-side aggregation from loaded payments to avoid Firestore index requirements
-        // Stats will update as payments are loaded
-    };
-
-    const fetchPage = async (pageIndex: number, yearId: string, newTokens: any[] = pageTokens) => {
-        if (!yearId) return;
-        setLoading(true);
-        try {
-            console.log(`[PaymentsPage] Fetching payments page ${pageIndex}`);
-            let baseConstraints: any[] = [
-                orderBy("createdAt", "desc"),
-                limit(PAGE_SIZE + 1)
-            ];
-
-            if (pageIndex > 0 && newTokens[pageIndex - 1]) {
-                baseConstraints.push(startAfter(newTokens[pageIndex - 1]));
-            }
-
-            const pq = query(collection(db, "payments"), ...baseConstraints);
-            const snapshot = await getDocs(pq);
-
-            const docs = snapshot.docs;
-            const hasMore = docs.length > PAGE_SIZE;
-            const displayDocs = hasMore ? docs.slice(0, PAGE_SIZE) : docs;
-
-            const loaded = displayDocs.map(doc => ({
-                id: doc.id,
-                ...doc.data()
-            })) as Payment[];
-
-            setPayments(loaded);
-
-            if (hasMore) {
-                const nextTokens = [...newTokens];
-                nextTokens[pageIndex] = displayDocs[displayDocs.length - 1];
-                setPageTokens(nextTokens);
-            }
-
-            setCurrentPage(pageIndex);
-        } catch (err: any) {
-            console.error("Payments Pagination error:", err);
-            if (err.message?.includes("index")) {
-                console.warn("[PaymentsPage] Missing index for payments query. Check console for URL.");
-            }
-        } finally {
-            setLoading(false);
-        }
-    };
-
     useEffect(() => {
         if (!selectedYear) return;
         let isMounted = true;
 
-        fetchPage(0, selectedYear, []);
-
-        // Compute stats client-side: fetch ALL payments for this purpose
+        // Listen to ALL payments ordered by date descending
         const allPaymentsQ = query(collection(db, "payments"), orderBy("date", "desc"));
         const unsubPayments = onSnapshot(allPaymentsQ, (snapshot) => {
             if (!isMounted) return;
-            let total = 0, online = 0, cash = 0;
-            snapshot.docs.forEach(doc => {
-                const d = doc.data();
-                const amt = d.amount || 0;
-                total += amt;
-                if (d.method === "razorpay" || d.method === "upi") online += amt;
-                if (d.method === "cash") cash += amt;
-            });
-            setStats({ total, online, cash });
+            const loaded = snapshot.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            })) as Payment[];
+            setAllPayments(loaded);
+            setPaymentsLoaded(true);
         }, (err) => {
             if (!isMounted) return;
-            console.warn("Stats listener error:", err.message);
+            console.warn("Payments list listener error:", err.message);
         });
+
+        // Listen to students of current year
         const sq = query(collection(db, "students"), where("academicYear", "==", selectedYear), orderBy("studentName", "asc"));
         const unsubStudents = onSnapshot(sq, (snapshot) => {
             if (!isMounted) return;
@@ -146,6 +91,7 @@ export default function PaymentsPage() {
                 ...doc.data()
             }));
             setAllStudents(loaded);
+            setStudentsLoaded(true);
         }, (err) => {
             if (!isMounted) return;
             console.warn("Students list listener error:", err.message);
@@ -229,9 +175,6 @@ export default function PaymentsPage() {
             setSelectedStudent(null);
             setStudentLedger(null);
 
-            // Refresh first page & Aggregates after correct payment processing
-            fetchPage(0, selectedYear, []);
-            fetchAggregates(selectedYear);
             alert("Payment Recorded & Ledger Updated");
 
         } catch (e: any) {
@@ -263,32 +206,100 @@ export default function PaymentsPage() {
         }
     };
 
+    // Client-side filtering logic for ultra high performance and total statistical consistency
+    const yearPayments = allPayments.filter(p => !selectedYear || p.academicYear === selectedYear);
+
+    const filteredPayments = yearPayments.filter((p) => {
+        const student = allStudents.find(s => s.id === p.studentId || s.schoolId === p.studentId);
+
+        // 1. Class Filter
+        if (selectedClassFilter !== "ALL" && student?.classId !== selectedClassFilter) {
+            return false;
+        }
+
+        // 2. Village Filter
+        if (selectedVillageFilter !== "ALL" && student?.villageId !== selectedVillageFilter) {
+            return false;
+        }
+
+        // 3. Search query: student name, student ID, remarks/receipt number, or payment ID
+        if (searchQuery) {
+            const queryLower = searchQuery.toLowerCase();
+            const matchesName = p.studentName?.toLowerCase().includes(queryLower);
+            const matchesId = p.studentId?.toLowerCase().includes(queryLower);
+            const matchesRemarks = p.remarks?.toLowerCase().includes(queryLower);
+            const matchesPaymentId = p.id?.toLowerCase().includes(queryLower);
+
+            if (!matchesName && !matchesId && !matchesRemarks && !matchesPaymentId) {
+                return false;
+            }
+        }
+
+        return true;
+    });
+
+    const dynamicStats = filteredPayments.reduce(
+        (acc, p) => {
+            const amt = p.amount || 0;
+            acc.total += amt;
+            if (p.method === "razorpay" || p.method === "upi") acc.online += amt;
+            if (p.method === "cash") acc.cash += amt;
+            return acc;
+        },
+        { total: 0, online: 0, cash: 0 }
+    );
+
+    const loading = !paymentsLoaded || !studentsLoaded;
+
     const columns = [
         { key: "studentId", header: "Student ID", render: (p: Payment) => <span className="font-mono text-xs">{p.studentId}</span> },
-        { key: "studentName", header: "Student Name" },
+        {
+            key: "studentName",
+            header: "Student Name",
+            render: (p: Payment) => {
+                const student = allStudents.find(s => s.id === p.studentId || s.schoolId === p.studentId);
+                const className = student?.className || "N/A";
+                const villageName = student?.villageName || "N/A";
+                return (
+                    <div className="flex flex-col">
+                        <span className="font-bold text-white group-hover:text-accent transition-colors">{p.studentName}</span>
+                        <span className="text-[10px] text-muted-foreground/80 font-medium mt-0.5">
+                            {className} • {villageName}
+                        </span>
+                    </div>
+                );
+            }
+        },
         {
             key: "amount",
             header: "Amount",
             render: (p: Payment) => (
-                <span className={`font-mono font-medium ${p.type === 'credit' ? 'text-green-500' : 'text-emerald-500'}`}>
+                <span className={`font-mono font-medium ${p.type === 'credit' ? 'text-green-500' : 'text-[#64FFDA]'}`}>
                     + ₹{p.amount.toLocaleString()}
                 </span>
             )
         },
         {
             key: "method",
-            header: "Method",
+            header: "Method / Remarks",
             render: (p: Payment) => (
-                <span className="capitalize text-xs text-muted-foreground border border-white/10 px-2 py-0.5 rounded">
-                    {p.method}
-                </span>
+                <div className="flex flex-col">
+                    <span className="capitalize text-xs text-white border border-white/10 px-2 py-0.5 rounded w-fit bg-white/5 font-semibold">
+                        {p.method}
+                    </span>
+                    {p.remarks && (
+                        <span className="text-[10px] text-muted-foreground mt-1 truncate max-w-[180px]" title={p.remarks}>
+                            {p.remarks}
+                        </span>
+                    )}
+                </div>
             )
         },
         {
             key: "status",
             header: "Status",
             render: (p: Payment) => (
-                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-green-500/10 text-green-500 capitalize">
+                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-bold bg-green-500/10 text-green-400 border border-green-500/20 capitalize">
                     {p.status}
                 </span>
             )
@@ -299,7 +310,7 @@ export default function PaymentsPage() {
             header: "",
             render: (p: Payment) => (
                 <Button variant="ghost" size="icon" onClick={() => handlePrintReceipt(p)} title="Print Receipt" className="h-8 w-8 hover:bg-white/10">
-                    <Printer className="w-4 h-4" />
+                    <Printer className="w-4 h-4 text-white" />
                 </Button>
             )
         }
@@ -453,7 +464,7 @@ export default function PaymentsPage() {
                     <div>
                         <p className="text-[8px] md:text-sm text-muted-foreground uppercase font-black tracking-widest">Total</p>
                         <h3 className="text-sm md:text-2xl font-bold mt-0.5 md:mt-1 text-white italic truncate">
-                            {loading ? <div className="h-8 w-20 bg-white/5 animate-pulse rounded" /> : `₹ ${stats.total.toLocaleString()}`}
+                            {loading ? <div className="h-8 w-20 bg-white/5 animate-pulse rounded" /> : `₹ ${dynamicStats.total.toLocaleString()}`}
                         </h3>
                     </div>
                 </div>
@@ -461,7 +472,7 @@ export default function PaymentsPage() {
                     <div>
                         <p className="text-[8px] md:text-sm text-muted-foreground uppercase font-black tracking-widest">Online</p>
                         <h3 className="text-sm md:text-2xl font-bold mt-0.5 md:mt-1 text-blue-400 italic truncate">
-                            {loading ? <div className="h-8 w-20 bg-white/5 animate-pulse rounded" /> : `₹ ${stats.online.toLocaleString()}`}
+                            {loading ? <div className="h-8 w-20 bg-white/5 animate-pulse rounded" /> : `₹ ${dynamicStats.online.toLocaleString()}`}
                         </h3>
                     </div>
                 </div>
@@ -469,21 +480,62 @@ export default function PaymentsPage() {
                     <div>
                         <p className="text-[8px] md:text-sm text-muted-foreground uppercase font-black tracking-widest">Cash</p>
                         <h3 className="text-sm md:text-2xl font-bold mt-0.5 md:mt-1 text-emerald-400 italic truncate">
-                            {loading ? <div className="h-8 w-20 bg-white/5 animate-pulse rounded" /> : `₹ ${stats.cash.toLocaleString()}`}
+                            {loading ? <div className="h-8 w-20 bg-white/5 animate-pulse rounded" /> : `₹ ${dynamicStats.cash.toLocaleString()}`}
                         </h3>
                     </div>
                 </div>
             </div>
 
+            {/* Premium Search & Filter Panel */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4 bg-[#112240] border border-[#64FFDA]/10 p-3 md:p-4 rounded-2xl backdrop-blur-md">
+                {/* Search Field */}
+                <div className="relative">
+                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+                    <Input
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        placeholder="Search student, ID, or receipt..."
+                        className="pl-9 h-11 bg-[#0A192F] border-white/10 rounded-xl text-white placeholder-muted-foreground/60 text-xs md:text-sm focus:ring-accent/30 focus:border-[#64FFDA]/30"
+                    />
+                </div>
+
+                {/* Class Dropdown */}
+                <div className="relative">
+                    <Select value={selectedClassFilter} onValueChange={setSelectedClassFilter}>
+                        <SelectTrigger className="h-11 bg-[#0A192F] border-white/10 text-white rounded-xl text-xs md:text-sm">
+                            <SelectValue placeholder="All Classes" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#0A192F] border-white/10 text-white rounded-xl">
+                            <SelectItem value="ALL" className="text-xs md:text-sm">All Classes</SelectItem>
+                            {Object.entries(classes).map(([id, cls]: any) => (
+                                <SelectItem key={id} value={id} className="text-xs md:text-sm">{cls.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+
+                {/* Village Dropdown */}
+                <div className="relative">
+                    <Select value={selectedVillageFilter} onValueChange={setSelectedVillageFilter}>
+                        <SelectTrigger className="h-11 bg-[#0A192F] border-white/10 text-white rounded-xl text-xs md:text-sm">
+                            <SelectValue placeholder="All Villages" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#0A192F] border-white/10 text-white rounded-xl">
+                            <SelectItem value="ALL" className="text-xs md:text-sm">All Villages</SelectItem>
+                            {Object.entries(villages).map(([id, vil]: any) => (
+                                <SelectItem key={id} value={id} className="text-xs md:text-sm">{vil.name}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+
             <DataTable
-                data={payments}
+                data={filteredPayments}
                 columns={columns}
                 isLoading={loading}
-                serverPagination={true}
-                hasNextPage={pageTokens.length > currentPage}
-                hasPrevPage={currentPage > 0}
-                onNextPage={() => fetchPage(currentPage + 1, selectedYear)}
-                onPrevPage={() => fetchPage(currentPage - 1, selectedYear)}
+                serverPagination={false}
+                pageSize={20}
             />
         </div>
     );

@@ -4,12 +4,13 @@ import { useEffect, useState } from "react";
 import { doc, getDoc, setDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useMasterData } from "@/context/MasterDataContext";
+import { createNotification } from "@/lib/notifications";
 import { useAuth } from "@/context/AuthContext";
 import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Save, Printer, FileText, CheckCircle2, AlertCircle } from "lucide-react";
+import { Loader2, Save, Printer, FileText, CheckCircle2, AlertCircle, Book, Calculator, Microscope, Globe, Laptop, Beaker, Code, Feather, Music, Dna } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
@@ -28,10 +29,23 @@ export function SyllabusManager({ examId, role }: SyllabusManagerProps) {
     const [saving, setSaving] = useState(false);
 
     // Filtered Selections
+    const [syllabusMode, setSyllabusMode] = useState<"COMBINED" | "INDIVIDUAL">("COMBINED");
+    const [selectedSectionId, setSelectedSectionId] = useState("");
     const [selectedClassId, setSelectedClassId] = useState("");
     const [selectedSubjectId, setSelectedSubjectId] = useState("");
     const [syllabusText, setSyllabusText] = useState("");
     const [currentSyllabus, setCurrentSyllabus] = useState<any>(null);
+    const [allStudentSyllabi, setAllStudentSyllabi] = useState<any[]>([]);
+
+    const getSubjectIcon = (subjectName: string) => {
+        const name = subjectName.toLowerCase();
+        if (name.includes("math")) return <Calculator className="w-8 h-8 text-blue-500" />;
+        if (name.includes("sci") || name.includes("phys") || name.includes("chem")) return <Microscope className="w-8 h-8 text-emerald-500" />;
+        if (name.includes("eng") || name.includes("lit") || name.includes("lang")) return <Book className="w-8 h-8 text-amber-500" />;
+        if (name.includes("soc") || name.includes("hist") || name.includes("geo")) return <Globe className="w-8 h-8 text-orange-500" />;
+        if (name.includes("comp") || name.includes("it")) return <Laptop className="w-8 h-8 text-cyan-500" />;
+        return <FileText className="w-8 h-8 text-purple-500" />;
+    };
 
     // Teacher's specific assignments
     const [teacherAssignments, setTeacherAssignments] = useState<any[]>([]); // {classId, sectionIds, subjectId}
@@ -88,7 +102,7 @@ export function SyllabusManager({ examId, role }: SyllabusManagerProps) {
                 // 2. Class Teacher Assignments
                 const ctClasses: string[] = [];
                 Object.values(classSections).forEach((cs: any) => {
-                    if ((cs.classTeacherId === teacherId || cs.classTeacherId === schoolId) && cs.active) {
+                    if ((cs.classTeacherId === teacherId || cs.classTeacherId === schoolId) && (cs.active || cs.isActive || cs.active !== false)) {
                         if (!ctClasses.includes(cs.classId)) ctClasses.push(cs.classId);
                     }
                 });
@@ -115,13 +129,26 @@ export function SyllabusManager({ examId, role }: SyllabusManagerProps) {
 
     // Load Syllabus when selection changes
     useEffect(() => {
-        if (!examId || !selectedClassId || !selectedSubjectId) {
+        if (!examId || !selectedClassId) {
             setSyllabusText("");
+            setAllStudentSyllabi([]);
             return;
         }
 
         const fetchSyllabus = async () => {
-            const docId = `${examId}_${selectedClassId}_${selectedSubjectId}`;
+            if (role === "STUDENT") {
+                const q = query(collection(db, "exam_syllabus"), where("examId", "==", examId), where("classId", "==", selectedClassId));
+                const snap = await getDocs(q);
+                setAllStudentSyllabi(snap.docs.map(d => d.data()));
+            }
+
+            if (!selectedSubjectId) return;
+
+            let docId = `${examId}_${selectedClassId}_${selectedSubjectId}`;
+            if (syllabusMode === "INDIVIDUAL" && selectedSectionId) {
+                docId = `${examId}_${selectedClassId}_${selectedSectionId}_${selectedSubjectId}`;
+            }
+
             const snap = await getDoc(doc(db, "exam_syllabus", docId));
             if (snap.exists()) {
                 const data = snap.data();
@@ -134,22 +161,44 @@ export function SyllabusManager({ examId, role }: SyllabusManagerProps) {
         };
 
         fetchSyllabus();
-    }, [examId, selectedClassId, selectedSubjectId]);
+    }, [examId, selectedClassId, selectedSubjectId, syllabusMode, selectedSectionId, role]);
 
     const handleSaveSyllabus = async () => {
         if (!selectedClassId || !selectedSubjectId) return;
+        if (syllabusMode === "INDIVIDUAL" && !selectedSectionId) {
+            alert("Please select a section for Individual Syllabus Mode.");
+            return;
+        }
+
         setSaving(true);
         try {
-            const docId = `${examId}_${selectedClassId}_${selectedSubjectId}`;
+            let docId = `${examId}_${selectedClassId}_${selectedSubjectId}`;
+            let targetGroup = `class_${selectedClassId}`;
+
+            if (syllabusMode === "INDIVIDUAL") {
+                docId = `${examId}_${selectedClassId}_${selectedSectionId}_${selectedSubjectId}`;
+                targetGroup = `section_${selectedSectionId}`;
+            }
+
             await setDoc(doc(db, "exam_syllabus", docId), {
                 examId,
                 classId: selectedClassId,
+                sectionId: syllabusMode === "INDIVIDUAL" ? selectedSectionId : null,
                 subjectId: selectedSubjectId,
                 content: syllabusText,
                 updatedAt: new Date(),
                 updatedBy: user?.uid,
                 updatedByName: user?.displayName
             }, { merge: true });
+
+            // Notify students of this class that the syllabus has been updated!
+            const subjectName = subjects[selectedSubjectId]?.name || "Subject";
+            await createNotification({
+                target: targetGroup,
+                title: "Exam Syllabus Updated",
+                message: `The syllabus for "${subjectName}" in exam "${exam?.name || 'Upcoming Exam'}" has been updated. Please review the topics.`,
+                type: "NOTICE"
+            }).catch(err => console.error("Syllabus notification error:", err));
 
             alert("Syllabus saved successfully!");
         } catch (e: any) {
@@ -240,15 +289,32 @@ export function SyllabusManager({ examId, role }: SyllabusManagerProps) {
 
     // Derived Lists for UI
     const allowedClasses = useMemo(() => {
-        if (role === "ADMIN") return Object.values(classes);
+        let list = Object.values(classes);
         if (role === "TEACHER") {
-            return Object.values(classes).filter(c =>
+            list = list.filter(c =>
                 teacherAssignments.some(a => a.classId === c.id) ||
                 classTeacherClasses.includes(c.id)
             );
+        } else if (role === "STUDENT") {
+            return selectedClassId ? [classes[selectedClassId]] : [];
         }
-        return selectedClassId ? [classes[selectedClassId]] : [];
-    }, [role, classes, teacherAssignments, classTeacherClasses, selectedClassId]);
+
+        // Apply exam class scoping if defined
+        if (exam?.classIds && Array.isArray(exam.classIds) && exam.classIds.length > 0) {
+            list = list.filter(c => exam.classIds.includes(c.id));
+        }
+
+        return list;
+    }, [role, classes, teacherAssignments, classTeacherClasses, selectedClassId, exam]);
+
+    // Auto-select first allowed class for admins/teachers if current selection is invalid or empty
+    useEffect(() => {
+        if ((role === "ADMIN" || role === "TEACHER") && allowedClasses.length > 0) {
+            if (!selectedClassId || !allowedClasses.some(c => c.id === selectedClassId)) {
+                setSelectedClassId(allowedClasses[0].id);
+            }
+        }
+    }, [allowedClasses, role, selectedClassId]);
 
     const allowedSubjects = useMemo(() => {
         if (!selectedClassId) return [];
@@ -285,6 +351,92 @@ export function SyllabusManager({ examId, role }: SyllabusManagerProps) {
 
     if (loading || mdLoading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin text-blue-500" /></div>;
 
+    if (role === "STUDENT") {
+        return (
+            <div className="space-y-6">
+                {/* Header Banner */}
+                <div className="flex flex-col md:flex-row justify-between items-center bg-[#0a192f] p-6 rounded-2xl border border-blue-500/20 shadow-[0_0_30px_-10px_theme(colors.blue.500/30)] relative overflow-hidden">
+                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-transparent pointer-events-none" />
+                    
+                    <div className="z-10 text-center md:text-left">
+                        <h2 className="text-2xl md:text-3xl font-black text-white uppercase tracking-wider">
+                            {exam?.name || "Exam"} Syllabus
+                        </h2>
+                        <div className="mt-2 flex items-center justify-center md:justify-start gap-2 text-blue-400 font-bold text-sm tracking-widest">
+                            <span className="bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20">
+                                {classes[selectedClassId]?.name || "Class"}
+                            </span>
+                            <span className="bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 text-emerald-400">
+                                {allowedSubjects.length} SUBJECTS
+                            </span>
+                        </div>
+                    </div>
+                    
+                    <div className="z-10 mt-4 md:mt-0">
+                        <Button onClick={() => handlePrintClassSyllabus(selectedClassId)} className="bg-white hover:bg-gray-100 text-[#0a192f] font-black tracking-widest uppercase rounded-xl h-12 px-6 shadow-lg">
+                            <Printer className="w-5 h-5 mr-2" /> Print Syllabus
+                        </Button>
+                    </div>
+                </div>
+
+                {/* Main Table */}
+                <div className="bg-[#112240] rounded-2xl border border-blue-500/10 overflow-hidden shadow-2xl">
+                    <div className="grid grid-cols-1 md:grid-cols-[30%_70%] bg-[#0a192f] border-b border-blue-500/20">
+                        <div className="p-4 md:p-6 text-center font-black text-[#8892B0] uppercase tracking-widest text-sm md:text-base border-b md:border-b-0 md:border-r border-blue-500/20">
+                            Subject
+                        </div>
+                        <div className="p-4 md:p-6 text-center font-black text-[#8892B0] uppercase tracking-widest text-sm md:text-base">
+                            Syllabus Details
+                        </div>
+                    </div>
+
+                    <div className="divide-y divide-blue-500/10">
+                        {allowedSubjects.map((s: any) => {
+                            const syllabusData = allStudentSyllabi.find(sy => sy.subjectId === s.id);
+                            const content = syllabusData?.content?.trim();
+                            const isUpdated = !!content;
+
+                            return (
+                                <div key={s.id} className="grid grid-cols-1 md:grid-cols-[30%_70%] transition-colors hover:bg-white/[0.02]">
+                                    {/* Subject Column */}
+                                    <div className="p-6 flex flex-col items-center justify-center gap-3 border-b md:border-b-0 md:border-r border-blue-500/10 bg-black/20">
+                                        <div className="p-4 rounded-2xl bg-[#0a192f] border border-white/5 shadow-inner">
+                                            {getSubjectIcon(s.name)}
+                                        </div>
+                                        <div className="text-center">
+                                            <h3 className="font-black text-white tracking-wide uppercase text-sm md:text-base">{s.name}</h3>
+                                        </div>
+                                    </div>
+
+                                    {/* Syllabus Details Column */}
+                                    <div className="p-6 md:p-8 flex items-center">
+                                        {!isUpdated ? (
+                                            <div className="w-full flex flex-col items-center justify-center p-8 border-2 border-dashed border-red-500/20 rounded-2xl bg-red-500/5 text-red-400">
+                                                <AlertCircle className="w-8 h-8 mb-2 opacity-80" />
+                                                <p className="font-bold text-sm tracking-widest uppercase">Not Updated Yet</p>
+                                                <p className="text-xs opacity-60 mt-2 text-center max-w-xs">The teacher has not provided the syllabus for this subject.</p>
+                                            </div>
+                                        ) : (
+                                            <div className="w-full whitespace-pre-wrap text-[#E6F1FF] text-sm md:text-base leading-relaxed bg-[#0a192f]/50 p-6 rounded-2xl border border-white/5">
+                                                {content}
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+
+                        {allowedSubjects.length === 0 && (
+                            <div className="p-12 text-center text-[#8892B0]">
+                                No subjects assigned for this exam yet.
+                            </div>
+                        )}
+                    </div>
+                </div>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
@@ -306,13 +458,22 @@ export function SyllabusManager({ examId, role }: SyllabusManagerProps) {
                 )}
             </div>
 
-            <Card className={cn("bg-black/20 border-white/10 overflow-hidden", role === "STUDENT" && "hidden")}>
+            <Card className="bg-black/20 border-white/10 overflow-hidden">
                 <CardHeader className="bg-white/5 border-b border-white/5">
                     <CardTitle className="text-sm uppercase tracking-widest text-[#8892B0]">Configuration</CardTitle>
                 </CardHeader>
                 <CardContent className="p-6">
-                    <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                        <div className="space-y-2">
+                    <div className="flex flex-col md:flex-row gap-6">
+                        {(role === "ADMIN" || role === "TEACHER") && (
+                            <div className="space-y-2 flex-1">
+                                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Syllabus Mode</label>
+                                <div className="flex bg-black/40 p-1 rounded-lg border border-white/10 h-12 items-center">
+                                    <button onClick={() => setSyllabusMode("COMBINED")} className={cn("flex-1 py-2 text-xs font-bold rounded-md transition-all h-full", syllabusMode === "COMBINED" ? "bg-white text-black shadow-sm" : "text-white/50 hover:text-white")}>Combined</button>
+                                    <button onClick={() => setSyllabusMode("INDIVIDUAL")} className={cn("flex-1 py-2 text-xs font-bold rounded-md transition-all h-full", syllabusMode === "INDIVIDUAL" ? "bg-white text-black shadow-sm" : "text-white/50 hover:text-white")}>Individual</button>
+                                </div>
+                            </div>
+                        )}
+                        <div className="space-y-2 flex-1">
                             <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Select Class</label>
                             <Select value={selectedClassId} onValueChange={(v) => { setSelectedClassId(v); setSelectedSubjectId(""); }}>
                                 <SelectTrigger className="bg-white/5 border-white/10 h-12">
@@ -326,7 +487,26 @@ export function SyllabusManager({ examId, role }: SyllabusManagerProps) {
                             </Select>
                         </div>
 
-                        <div className="space-y-2">
+                        {syllabusMode === "INDIVIDUAL" && selectedClassId && (role === "ADMIN" || role === "TEACHER") && (
+                            <div className="space-y-2 flex-1 animate-in fade-in slide-in-from-top-2">
+                                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Select Section</label>
+                                <Select value={selectedSectionId} onValueChange={setSelectedSectionId}>
+                                    <SelectTrigger className="bg-white/5 border-white/10 h-12">
+                                        <SelectValue placeholder="Choose Section" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {Object.values(classSections || {})
+                                            .filter((cs: any) => cs.classId === selectedClassId)
+                                            .map((cs: any) => {
+                                                const sec = sections[cs.sectionId];
+                                                return sec ? <SelectItem key={cs.sectionId} value={cs.sectionId}>{sec.name}</SelectItem> : null;
+                                            })}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+
+                        <div className="space-y-2 flex-1">
                             <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Select Subject</label>
                             <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId} disabled={!selectedClassId}>
                                 <SelectTrigger className="bg-white/5 border-white/10 h-12">
@@ -343,26 +523,8 @@ export function SyllabusManager({ examId, role }: SyllabusManagerProps) {
                 </CardContent>
             </Card>
 
-            {role === "STUDENT" && selectedClassId && (
-                <div className="flex gap-2 overflow-x-auto pb-2 no-scrollbar">
-                    {allowedSubjects.map(s => (
-                        <Button
-                            key={s.id}
-                            variant={selectedSubjectId === s.id ? "default" : "outline"}
-                            className={cn(
-                                "shrink-0 rounded-full px-6",
-                                selectedSubjectId === s.id ? "bg-blue-600 hover:bg-blue-700" : "border-white/10 hover:bg-white/5 text-[#8892B0]"
-                            )}
-                            onClick={() => setSelectedSubjectId(s.id)}
-                        >
-                            {s.name}
-                        </Button>
-                    ))}
-                </div>
-            )}
-
             {selectedClassId && selectedSubjectId && (
-                <Card className="bg-black/10 border-white/10 animate-in slide-in-from-bottom-2">
+                <Card className="bg-black/10 border-white/10 animate-in slide-in-from-bottom-2 mt-6">
                     <CardHeader className="pb-2">
                         <div className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
@@ -415,7 +577,7 @@ export function SyllabusManager({ examId, role }: SyllabusManagerProps) {
                                     Last updated by {currentSyllabus.updatedByName || "System"}
                                 </div>
                                 <div>
-                                    {new Date(currentSyllabus.updatedAt.seconds * 1000).toLocaleString()}
+                                    {currentSyllabus.updatedAt?.seconds ? new Date(currentSyllabus.updatedAt.seconds * 1000).toLocaleString() : ""}
                                 </div>
                             </div>
                         )}

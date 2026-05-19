@@ -97,10 +97,7 @@ service cloud.firestore {
     }
     
     match /teachers/{teacherId} {
-      allow read: if isSignedIn() && (
-        request.auth.uid == teacherId || 
-        isSameSchool(resource.data)
-      );
+      allow read: if isSignedIn();
       allow write: if isManager() && (isSuperAdmin() || request.resource.data.schoolId == getSchoolId());
     }
 
@@ -111,27 +108,32 @@ service cloud.firestore {
     }
 
     // Academic & Operations
+    match /exams/{id} {
+      allow read: if isSignedIn();
+      allow write: if isManager() && isSameSchool(resource.data);
+    }
+
     match /exam_results/{id} {
       allow read: if isSignedIn() && (
         request.auth.uid == resource.data.studentId || 
         (request.auth.token.email != null && request.auth.token.email.split('@')[0].upper() == resource.data.studentId) ||
         (isSameSchool(resource.data) && (isManager() || isTeacher()))
       );
-      allow write: if isManager() && isSameSchool(resource.data);
+      allow write: if (isManager() || isTeacher()) && (resource == null || isSameSchool(resource.data));
     }
 
     match /homework/{id} {
-      allow read: if isSignedIn() && isSameSchool(resource.data);
+      allow read: if isSignedIn();
       allow write: if (isManager() || isTeacher()) && (isSuperAdmin() || request.resource.data.schoolId == getSchoolId());
     }
     
     match /attendance/{id} {
-      allow read: if isSignedIn() && isSameSchool(resource.data);
+      allow read: if isSignedIn();
       allow write: if isManager() && isSameSchool(resource.data);
     }
     
     match /attendance_daily/{id} {
-      allow read: if isSignedIn() && isSameSchool(resource.data);
+      allow read: if isSignedIn();
       allow write: if isManager() && isSameSchool(resource.data);
     }
     
@@ -167,7 +169,7 @@ service cloud.firestore {
 
     // Communication & Notices
     match /notices/{id} {
-      allow read: if isSignedIn() && isSameSchool(resource.data);
+      allow read: if isSignedIn();
       allow write: if (isManager() || isTeacher()) && (isSuperAdmin() || request.resource.data.schoolId == getSchoolId());
     }
 
@@ -183,7 +185,7 @@ service cloud.firestore {
           isManager()
         ))
       );
-      allow write: if isManager() && isSameSchool(resource.data);
+      allow write: if (isManager() || isTeacher()) && (resource == null || isSameSchool(resource.data));
     }
 
     // Leave Management
@@ -222,8 +224,28 @@ service cloud.firestore {
     }
 
     match /exam_syllabus/{id} {
-      allow read: if isSignedIn() && isSameSchool(resource.data);
+      allow read: if isSignedIn();
       allow write: if isSameSchool(resource.data) && (isTeacher() || isManager());
+    }
+
+    match /timetable_entries/{id} {
+      allow read: if isSignedIn();
+      allow write: if isManager() && isSameSchool(resource.data);
+    }
+
+    match /custom_fees/{id} {
+      allow read: if isSignedIn() && isSameSchool(resource.data);
+      allow write: if isManager() && isSameSchool(resource.data);
+    }
+
+    match /staff/{id} {
+      allow read: if isSignedIn();
+      allow write: if isManager() && isSameSchool(resource.data);
+    }
+
+    match /groups/{id} {
+      allow read: if isSignedIn() && isSameSchool(resource.data);
+      allow write: if (isManager() || isTeacher()) && (resource == null || isSameSchool(resource.data));
     }
 
     // Complete Catch-all safeguard

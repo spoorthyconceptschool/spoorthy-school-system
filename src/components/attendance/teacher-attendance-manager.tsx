@@ -165,7 +165,22 @@ export default function TeacherAttendanceManager({
     };
 
     const handleSubmit = async () => {
+        const prevAlreadyMarked = alreadyMarked;
+        const prevIsModified = isModified;
+        const prevTouched = new Set(touched);
+
+        // Optimistic UI updates
+        setAlreadyMarked(true);
+        setIsModified(false);
+        setTouched(new Set());
         setSubmitting(true);
+
+        toast({
+            title: alreadyMarked ? "Attendance Updated" : "Attendance Submitted",
+            description: "Synchronizing with cloud databases...",
+            type: "success"
+        });
+
         try {
             const token = await user?.getIdToken(true);
             const res = await fetch("/api/admin/attendance/teachers/mark", {
@@ -187,18 +202,14 @@ export default function TeacherAttendanceManager({
             const data = await res.json();
             if (!data.success) throw new Error(data.error);
 
-            toast({
-                title: alreadyMarked ? "Attendance Updated" : "Attendance Submitted",
-                description: `Updated ${data.changesCount || 0} records.`,
-                type: "success"
-            });
-
-            setAlreadyMarked(true);
-            setIsModified(false);
-            setTouched(new Set());
+            console.log(`[Optimistic Teacher Attendance] Successfully synchronized. Changes: ${data.changesCount || 0}`);
         } catch (e: any) {
-            console.error(e);
-            toast({ title: "Failed", description: e.message, type: "error" });
+            console.error("[Optimistic Teacher Attendance] Sync failed, reverting state:", e);
+            // Revert state on failure
+            setAlreadyMarked(prevAlreadyMarked);
+            setIsModified(prevIsModified);
+            setTouched(prevTouched);
+            toast({ title: "Sync Failed", description: e.message, type: "error" });
         } finally {
             setSubmitting(false);
         }

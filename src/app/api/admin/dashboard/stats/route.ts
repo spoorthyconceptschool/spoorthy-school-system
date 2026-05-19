@@ -11,7 +11,13 @@ import { getInitError, adminDb, adminRtdb, adminAuth, Timestamp } from "@/lib/fi
 export async function GET(req: NextRequest) {
     try {
         const url = new URL(req.url);
-        const academicYear = url.searchParams.get("year") || "2025-2026";
+        let academicYear = url.searchParams.get("year");
+
+        // --- FETCH ACTIVE YEAR FROM CONFIG IF MISSING ---
+        if (!academicYear) {
+            const configSnap = await adminDb.collection("config").doc("academic_years").get();
+            academicYear = configSnap.data()?.currentYear || "2026-2027";
+        }
 
         const authHeader = req.headers.get("Authorization");
         if (!authHeader || !authHeader.startsWith("Bearer ")) {
@@ -144,10 +150,11 @@ export async function GET(req: NextRequest) {
             transportPaid: 0,
             schoolFee: 0,
             schoolPaid: 0,
+            customFees: {} as Record<string, { total: number; paid: number }>,
             terms: {} as Record<string, { total: number; paid: number }>
         };
 
-        ledgersSnap.forEach(doc => {
+        ledgersSnap.forEach((doc: any) => {
             const data = doc.data();
             const matchesSchool = isGlobal || data.branchId === schoolId || !data.branchId;
             if (!matchesSchool) return;
@@ -165,9 +172,6 @@ export async function GET(req: NextRequest) {
                 if (item.type === "TRANSPORT") {
                     finance.transportFee += amt;
                     finance.transportPaid += paid;
-                } else if (item.type === "CUSTOM") {
-                    finance.customFee += amt;
-                    finance.customPaid += paid;
                 } else if (item.type === "TERM") {
                     finance.schoolFee += amt;
                     finance.schoolPaid += paid;
@@ -178,9 +182,23 @@ export async function GET(req: NextRequest) {
                     }
                     finance.terms[termName].total += amt;
                     finance.terms[termName].paid += paid;
-                } else if (item.name?.toUpperCase().includes("HOSTEL") || item.type === "HOSTEL") {
-                    finance.hostelFee += amt;
-                    finance.hostelPaid += paid;
+                } else {
+                    // Dynamically group custom or other extra fees by their exact name
+                    const feeName = item.name || "Custom Fee";
+                    if (!finance.customFees[feeName]) {
+                        finance.customFees[feeName] = { total: 0, paid: 0 };
+                    }
+                    finance.customFees[feeName].total += amt;
+                    finance.customFees[feeName].paid += paid;
+
+                    // Legacy metric fallbacks for full system compatibility
+                    if (item.name?.toUpperCase().includes("HOSTEL") || item.type === "HOSTEL") {
+                        finance.hostelFee += amt;
+                        finance.hostelPaid += paid;
+                    } else {
+                        finance.customFee += amt;
+                        finance.customPaid += paid;
+                    }
                 }
             });
         });
@@ -199,7 +217,9 @@ export async function GET(req: NextRequest) {
             absentStudents,
             absentTeachers,
             absentStaff,
-            pendingStudents: filteredStudents.length - (presentStudents + absentStudents),
+            pendingStudents: Math.max(0, filteredStudents.length - (presentStudents + absentStudents)),
+            pendingTeachers: Math.max(0, filteredTeachers.length - (presentTeachers + absentTeachers)),
+            pendingStaff: Math.max(0, filteredStaff.length - (presentStaff + absentStaff)),
             finance
         };
 

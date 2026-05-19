@@ -15,12 +15,15 @@ import { cn } from "@/lib/utils";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createNotification } from "@/lib/notifications";
+import { useMasterData } from "@/context/MasterDataContext";
 
 export default function ExamsListPage() {
+    const { selectedYear, classes: classesData } = useMasterData();
     const [exams, setExams] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [createOpen, setCreateOpen] = useState(false);
     const [submitting, setSubmitting] = useState(false);
+    const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
     const router = useRouter();
 
     const [form, setForm] = useState({
@@ -29,11 +32,26 @@ export default function ExamsListPage() {
         endDate: ""
     });
 
+    const classes = Object.values(classesData || {}).map((c: any) => ({
+        id: c.id,
+        name: c.name,
+        order: c.order || 99
+    })).sort((a: any, b: any) => a.order - b.order);
+
     const fetchExams = async () => {
         try {
+            setLoading(true);
             const q = query(collection(db, "exams"), orderBy("createdAt", "desc"));
             const snap = await getDocs(q);
-            setExams(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            const allExams = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            
+            // Client-side filter to support backward compatibility for old exams
+            const filtered = allExams.filter((exam: any) => {
+                const examYear = exam.academicYear || "2025-2026";
+                return examYear === selectedYear;
+            });
+            
+            setExams(filtered);
         } catch (e) {
             console.error(e);
         } finally {
@@ -43,19 +61,29 @@ export default function ExamsListPage() {
 
     useEffect(() => {
         fetchExams();
-    }, []);
+    }, [selectedYear]);
 
     const handleCreate = async () => {
         if (!form.name || !form.startDate || !form.endDate) return;
+        if (selectedClasses.length === 0) {
+            alert("Please select at least one eligible class for this exam.");
+            return;
+        }
         setSubmitting(true);
         try {
             const docRef = await addDoc(collection(db, "exams"), {
                 ...form,
+                academicYear: selectedYear,
                 createdAt: serverTimestamp(),
-                status: "ACTIVE"
+                status: "ACTIVE",
+                hallTicketRule: "NO_RESTRICTION",
+                hallTicketLimitAmount: 0,
+                hallTicketTerm: "",
+                classIds: selectedClasses
             });
             setCreateOpen(false);
             setForm({ name: "", startDate: "", endDate: "" });
+            setSelectedClasses([]);
 
             // Notify all teachers
             await createNotification({
@@ -63,6 +91,16 @@ export default function ExamsListPage() {
                 title: "New Examination Announced",
                 message: `The ${form.name} session has been scheduled from ${new Date(form.startDate).toLocaleDateString()} to ${new Date(form.endDate).toLocaleDateString()}. Please prepare your subject syllabus.`,
                 type: "NOTICE"
+            });
+
+            // Notify only selected student class channels immediately!
+            selectedClasses.forEach(classId => {
+                createNotification({
+                    target: `class_${classId}`,
+                    title: `New Exam Scheduled: ${form.name}`,
+                    message: `The ${form.name} has been scheduled from ${new Date(form.startDate).toLocaleDateString()} to ${new Date(form.endDate).toLocaleDateString()}. Please check your exam portal.`,
+                    type: "NOTICE"
+                }).catch(err => console.error(`Failed notifying class_${classId}:`, err));
             });
 
             router.push(`/admin/exams/${docRef.id}`);
@@ -92,12 +130,19 @@ export default function ExamsListPage() {
                             Examinations
                         </h1>
                         <p className="text-[#8892B0] text-xs md:text-base font-medium leading-relaxed">
-                            Manage examination schedules, student roll numbers, and generate hall tickets for students.
+                            Manage examination schedules, student roll numbers, and generate hall tickets for academic year <span className="text-white font-bold">{selectedYear}</span>.
                         </p>
                     </div>
 
                     <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
                         <HallTicketGenerator />
+                        <Link href="/admin/exams/results">
+                            <Button
+                                className="bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest text-[9px] md:text-[10px] h-12 w-full sm:w-auto px-6 md:px-8 rounded-xl shadow-[0_0_20px_-5px_theme(colors.blue.500/0.5)] transition-all hover:scale-[1.02] active:scale-[0.98]"
+                            >
+                                <ClipboardCheck className="mr-2 h-4 w-4 stroke-[3px]" /> Academic Results
+                            </Button>
+                        </Link>
                         <Button
                             onClick={() => setCreateOpen(true)}
                             className="bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest text-[9px] md:text-[10px] h-12 px-6 md:px-8 rounded-xl shadow-[0_0_20px_-5px_theme(colors.emerald.500/0.5)] transition-all hover:scale-[1.02] active:scale-[0.98]"
@@ -242,6 +287,32 @@ export default function ExamsListPage() {
                                 />
                             </div>
                         </div>
+
+                        <div className="space-y-2">
+                            <Label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-[#8892B0]">Select Eligible Classes</Label>
+                            <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border border-white/10 rounded-xl p-3 bg-white/5">
+                                {classes.map((cls: any) => {
+                                    const isChecked = selectedClasses.includes(cls.id);
+                                    return (
+                                        <label key={cls.id} className="flex items-center gap-2 text-xs font-bold text-white cursor-pointer select-none py-1 hover:text-blue-400 transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                onChange={() => {
+                                                    if (isChecked) {
+                                                        setSelectedClasses(selectedClasses.filter(id => id !== cls.id));
+                                                    } else {
+                                                        setSelectedClasses([...selectedClasses, cls.id]);
+                                                    }
+                                                }}
+                                                className="rounded bg-black/40 border-white/20 text-blue-500 focus:ring-0 w-4 h-4 cursor-pointer"
+                                            />
+                                            {cls.name}
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        </div>
                     </div>
 
                     <div className="p-5 md:p-6 bg-white/[0.02] border-t border-white/5 flex flex-col md:flex-row gap-3">
@@ -252,9 +323,9 @@ export default function ExamsListPage() {
                         >
                             Cancel
                         </Button>
-                        <Button
+                         <Button
                             onClick={handleCreate}
-                            disabled={submitting || !form.name || !form.startDate || !form.endDate}
+                            disabled={submitting || !form.name || !form.startDate || !form.endDate || selectedClasses.length === 0}
                             className="flex-[2] bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest text-[10px] h-12 rounded-xl shadow-[0_0_20px_-5px_theme(colors.blue.600/0.5)] transition-all active:scale-95"
                         >
                             {submitting ? <Loader2 className="animate-spin" /> : "Save & Schedule"}

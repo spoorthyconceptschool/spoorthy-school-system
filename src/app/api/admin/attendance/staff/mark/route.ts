@@ -23,7 +23,8 @@ export async function POST(req: NextRequest) {
                 date,
                 records,
                 user.uid,
-                user.schoolId || "global"
+                user.schoolId || "global",
+                body.touchedIds
             );
 
             return NextResponse.json({

@@ -337,7 +337,22 @@ export default function AttendanceManager({
     };
 
     const handleSubmit = async () => {
+        const prevAlreadyMarked = alreadyMarked;
+        const prevIsModified = isModified;
+        const prevTouched = new Set(touched);
+
+        // Optimistic UI updates
+        setAlreadyMarked(true);
+        setIsModified(false);
+        setTouched(new Set());
         setSubmitting(true);
+
+        toast({
+            title: alreadyMarked ? "Attendance Updated" : "Attendance Submitted",
+            description: "Synchronizing with cloud databases...",
+            type: "success"
+        });
+
         try {
             const token = await user?.getIdToken(true);
             const res = await fetch("/api/attendance/mark", {
@@ -361,18 +376,15 @@ export default function AttendanceManager({
             const data = await res.json();
             if (!data.success) throw new Error(data.error);
 
-            toast({
-                title: alreadyMarked ? "Attendance Updated" : "Attendance Submitted",
-                description: `Updated ${data.changesCount || 0}. Sent ${data.notifCount || 0} notifications.${data.skippedCount ? ` (${data.skippedCount} users have no account)` : ''}`,
-                type: "success"
-            });
-
-            setAlreadyMarked(true);
-            setIsModified(false);
-            setTouched(new Set());
+            // Optional background confirmation toast if statistics change
+            console.log(`[Optimistic Attendance] Successfully synchronized. Changes: ${data.changesCount || 0}`);
         } catch (e: any) {
-            console.error(e);
-            toast({ title: "Failed", description: e.message, type: "error" });
+            console.error("[Optimistic Attendance] Sync failed, reverting state:", e);
+            // Revert state on failure
+            setAlreadyMarked(prevAlreadyMarked);
+            setIsModified(prevIsModified);
+            setTouched(prevTouched);
+            toast({ title: "Sync Failed", description: e.message, type: "error" });
         } finally {
             setSubmitting(false);
         }
@@ -392,265 +404,511 @@ export default function AttendanceManager({
     };
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-200">
-            {/* Stats */}
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                <Card className="bg-black/20 border-white/10 overflow-hidden">
-                    <div className="p-4 flex items-center justify-between">
-                        <div>
-                            <div className="text-xs text-muted-foreground uppercase font-black tracking-widest opacity-50">Total Students</div>
-                            <div className="text-2xl font-bold">{loading ? <div className="h-8 w-12 bg-white/5 animate-pulse rounded" /> : stats.total}</div>
+        <div className="w-full text-[#E6F1FF]">
+            {/* ========================================================================= */}
+            {/* MOBILE VIEWPORT (Optimized, High-density, Touch-ready list & dual buttons) */}
+            {/* ========================================================================= */}
+            <div className="lg:hidden block space-y-3">
+                {/* 3-Column Stats Grid */}
+                <div className="grid grid-cols-3 gap-2">
+                    <Card className="bg-black/25 border-white/5 p-2 rounded-xl text-center flex flex-col justify-center">
+                        <div className="text-[9px] uppercase tracking-wider text-white/40 font-black">Total</div>
+                        <div className="text-base font-bold text-white mt-0.5">
+                            {loading ? <span className="text-xs opacity-50">...</span> : stats.total}
                         </div>
-                        <div className="w-10 h-10 rounded-full bg-blue-500/10 flex items-center justify-center text-blue-500">
-                            <Users className="w-5 h-5" />
+                    </Card>
+                    <Card className="bg-black/25 border border-emerald-500/10 p-2 rounded-xl text-center flex flex-col justify-center border-l-2 border-l-emerald-500">
+                        <div className="text-[9px] uppercase tracking-wider text-emerald-500/60 font-black">Present</div>
+                        <div className="text-base font-bold text-emerald-400 mt-0.5">
+                            {loading ? <span className="text-xs opacity-50">...</span> : stats.present}
                         </div>
-                    </div>
-                </Card>
-                <Card className="bg-black/20 border-white/10 overflow-hidden">
-                    <div className="p-4 flex items-center justify-between border-l-4 border-emerald-500">
-                        <div>
-                            <div className="text-xs text-muted-foreground uppercase font-black tracking-widest opacity-50">Present</div>
-                            <div className="text-2xl font-bold text-emerald-500">{loading ? <div className="h-8 w-12 bg-white/5 animate-pulse rounded" /> : stats.present}</div>
+                    </Card>
+                    <Card className="bg-black/25 border border-red-500/10 p-2 rounded-xl text-center flex flex-col justify-center border-l-2 border-l-red-500">
+                        <div className="text-[9px] uppercase tracking-wider text-red-500/60 font-black">Absent</div>
+                        <div className="text-base font-bold text-red-400 mt-0.5">
+                            {loading ? <span className="text-xs opacity-50">...</span> : stats.absent}
                         </div>
-                        <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500">
-                            <Check className="w-5 h-5" />
-                        </div>
-                    </div>
-                </Card>
-                <Card className="bg-black/20 border-white/10 overflow-hidden">
-                    <div className="p-4 flex items-center justify-between border-l-4 border-red-500">
-                        <div>
-                            <div className="text-xs text-muted-foreground uppercase font-black tracking-widest opacity-50">Absent</div>
-                            <div className="text-2xl font-bold text-red-500">{loading ? <div className="h-8 w-12 bg-white/5 animate-pulse rounded" /> : stats.absent}</div>
-                        </div>
-                        <div className="w-10 h-10 rounded-full bg-red-500/10 flex items-center justify-center text-red-500">
-                            <X className="w-5 h-5" />
-                        </div>
-                    </div>
-                </Card>
-            </div>
-
-            {isHoliday && !viewStats ? (
-                <div className="bg-amber-500/10 border border-amber-500/20 text-amber-500 p-10 rounded-3xl text-center space-y-4 max-w-lg mx-auto my-10 backdrop-blur-md shadow-2xl animate-in zoom-in duration-300">
-                    <div className="w-20 h-20 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-500/30">
-                        <CalendarDays className="w-10 h-10" />
-                    </div>
-                    <h3 className="text-3xl font-display font-bold">Holiday</h3>
-                    <p className="text-sm uppercase tracking-widest font-black opacity-60">Classes dismissed. Attendance locked.</p>
+                    </Card>
                 </div>
-            ) : (
-                <>
-                    {/* List */}
-                    <Card className="bg-black/20 border-white/10">
-                <div className="p-4 border-b border-white/10 flex flex-col md:flex-row justify-between gap-4 items-center">
-                    <div className="flex bg-black/40 p-1 rounded-lg border border-white/10 items-center gap-2">
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setViewStats(false)}
-                            className={!viewStats ? "bg-emerald-500/20 text-emerald-500" : "text-muted-foreground hover:text-white"}
-                        >
-                            Daily View
-                        </Button>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() => setViewStats(true)}
-                            className={viewStats ? "bg-blue-500/20 text-blue-500" : "text-muted-foreground hover:text-white"}
-                        >
-                            Overall Stats
-                        </Button>
 
-                        {viewStats && (
-                            <>
-                                <Select value={statsMonth} onValueChange={setStatsMonth}>
-                                    <SelectTrigger className="w-[140px] h-8 bg-transparent border-white/10 text-xs">
-                                        <SelectValue placeholder="Period" />
-                                    </SelectTrigger>
-                                    <SelectContent className="bg-slate-900 border-white/10">
-                                        <SelectItem value="ALL">Full Year {new Date().getFullYear()}</SelectItem>
-                                        <SelectItem value="01">January</SelectItem>
-                                        <SelectItem value="02">February</SelectItem>
-                                        <SelectItem value="03">March</SelectItem>
-                                        <SelectItem value="04">April</SelectItem>
-                                        <SelectItem value="05">May</SelectItem>
-                                        <SelectItem value="06">June</SelectItem>
-                                        <SelectItem value="07">July</SelectItem>
-                                        <SelectItem value="08">August</SelectItem>
-                                        <SelectItem value="09">September</SelectItem>
-                                        <SelectItem value="10">October</SelectItem>
-                                        <SelectItem value="11">November</SelectItem>
-                                        <SelectItem value="12">December</SelectItem>
-                                    </SelectContent>
-                                </Select>
-
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-8 border-white/10 hover:bg-white/5 gap-2 px-3"
-                                    onClick={handlePrint}
+                {isHoliday && !viewStats ? (
+                    <div className="bg-amber-500/10 border border-amber-500/20 text-amber-500 p-8 rounded-2xl text-center space-y-2 mt-4">
+                        <CalendarDays className="w-8 h-8 mx-auto text-amber-400" />
+                        <h4 className="text-sm font-bold uppercase tracking-wider">Official School Holiday</h4>
+                        <p className="text-[10px] text-amber-400/60 leading-normal">Attendance is locked for today.</p>
+                    </div>
+                ) : (
+                    <div className="space-y-2">
+                        {/* Tab Switcher & Action Row */}
+                        <div className="flex flex-col gap-2 bg-black/20 border border-white/10 rounded-2xl p-2">
+                            <div className="grid grid-cols-2 gap-1 bg-black/40 p-1 rounded-xl border border-white/5">
+                                <button
+                                    onClick={() => setViewStats(false)}
+                                    className={cn(
+                                        "py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
+                                        !viewStats ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/10" : "text-white/60 hover:text-white"
+                                    )}
                                 >
-                                    <Printer className="w-3 h-3" /> Print Report
-                                </Button>
-                            </>
-                        )}
-                    </div>
+                                    Daily Roll Call
+                                </button>
+                                <button
+                                    onClick={() => setViewStats(true)}
+                                    className={cn(
+                                        "py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
+                                        viewStats ? "bg-blue-500 text-white shadow-md shadow-blue-500/10" : "text-white/60 hover:text-white"
+                                    )}
+                                >
+                                    Overall Stats
+                                </button>
+                            </div>
 
-                    {!viewStats && (
-                        <div className="relative flex-1 w-full md:max-w-xs">
-                            <Search className="absolute left-2 top-2.5 h-4 w-4 text-muted-foreground" />
-                            <Input
-                                placeholder="Search students..."
-                                value={searchQuery}
-                                onChange={(e) => setSearchQuery(e.target.value)}
-                                className="pl-8 bg-black/40 border-white/10 w-full"
-                            />
-                        </div>
-                    )}
-                </div>
+                            {/* Filters based on view mode */}
+                            {viewStats ? (
+                                <div className="flex items-center gap-1.5 justify-between">
+                                    <Select value={statsMonth} onValueChange={setStatsMonth}>
+                                        <SelectTrigger className="flex-1 h-8 bg-black/40 border-white/10 text-[10px] rounded-lg">
+                                            <SelectValue placeholder="Select Month" />
+                                        </SelectTrigger>
+                                        <SelectContent className="bg-slate-900 border-white/10 text-white">
+                                            <SelectItem value="ALL">Full Academic Year</SelectItem>
+                                            {["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"].map(m => (
+                                                <SelectItem key={m} value={m}>
+                                                    {new Date(2000, Number(m) - 1).toLocaleString('default', { month: 'long' })}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
 
-                <CardContent className="p-0">
-                    <DataTable
-                        data={viewStats ? statsData : filteredStudents}
-                        isLoading={loading}
-                        columns={viewStats ? [
-                            {
-                                key: "rollNumber",
-                                header: "Roll",
-                                render: (s: any, idx?: number) => (
-                                    <span className="font-mono text-sm">{s.rollNumber || (idx ?? 0) + 1}</span>
-                                )
-                            },
-                            {
-                                key: "studentName",
-                                header: "Student Name",
-                                render: (s: any) => (
-                                    <div>
-                                        <div className="font-medium text-white">{s.studentName}</div>
-                                        <div className="text-[10px] text-white/40 uppercase">{s.schoolId}</div>
-                                    </div>
-                                )
-                            },
-                            {
-                                key: "totalDays",
-                                header: "Total",
-                                cellClassName: "text-center",
-                                render: (s: any) => <span className="font-mono">{s.totalDays}</span>
-                            },
-                            {
-                                key: "presentDays",
-                                header: "Present",
-                                cellClassName: "text-center",
-                                render: (s: any) => <span className="font-bold text-emerald-400">{s.presentDays}</span>
-                            },
-                            {
-                                key: "percentage",
-                                header: "Attendance %",
-                                cellClassName: "text-center",
-                                render: (s: any) => (
-                                    <div className="flex flex-col items-center min-w-[80px]">
-                                        <span className={`font-bold ${Number(s.percentage) < 75 ? "text-red-400" : "text-emerald-400"}`}>
-                                            {s.percentage}%
-                                        </span>
-                                        <div className="w-full h-1 bg-white/10 rounded-full mt-1 overflow-hidden max-w-[60px]">
-                                            <div
-                                                className={`h-full ${Number(s.percentage) < 75 ? "bg-red-500" : "bg-emerald-500"}`}
-                                                style={{ width: `${s.percentage}%` }}
-                                            />
-                                        </div>
-                                    </div>
-                                )
-                            },
-                            {
-                                key: "statsStatus",
-                                header: "Status",
-                                cellClassName: "text-right",
-                                render: (s: any) => (
-                                    <Badge variant="outline" className={cn(
-                                        "text-[8px] uppercase font-black tracking-tighter",
-                                        Number(s.percentage) < 75 ? "text-red-400 border-red-500/30" : "text-emerald-400 border-emerald-500/30"
-                                    )}>
-                                        {Number(s.percentage) < 75 ? "Low" : "Good"}
-                                    </Badge>
-                                )
-                            }
-                        ] : [
-                            {
-                                key: "rollNumber",
-                                header: "Roll",
-                                render: (s: any, idx?: number) => (
-                                    <span className="font-mono text-sm">{s.rollNumber || (idx ?? 0) + 1}</span>
-                                )
-                            },
-                            {
-                                key: "studentName",
-                                header: "Student Name",
-                                render: (s: any) => (
-                                    <div>
-                                        <div className="font-medium text-white">{s.studentName}</div>
-                                        <div className="text-[10px] text-white/40 uppercase">{s.schoolId}</div>
-                                    </div>
-                                )
-                            },
-                            {
-                                key: "attendanceStatus",
-                                header: "Status",
-                                cellClassName: "text-center",
-                                render: (s: any) => (
-                                    <Badge className={cn(
-                                        "font-black uppercase tracking-tighter text-[9px]",
-                                        attendance[s.id] === 'P' ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : "bg-red-500/10 text-red-500 border border-red-500/20"
-                                    )}>
-                                        {attendance[s.id] === 'P' ? "Present" : "Absent"}
-                                    </Badge>
-                                )
-                            },
-                            {
-                                key: "action",
-                                header: "Action",
-                                cellClassName: "text-right",
-                                render: (s: any) => (
                                     <Button
                                         size="sm"
-                                        variant="ghost"
-                                        className={cn(
-                                            "h-8 text-[10px] font-black uppercase tracking-tighter px-3 rounded-lg",
-                                            attendance[s.id] === 'P'
-                                                ? "bg-red-500/10 text-red-400 hover:bg-red-500 hover:text-white"
-                                                : "bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500 hover:text-white"
-                                        )}
-                                        onClick={() => toggleStatus(s.id)}
+                                        variant="outline"
+                                        className="h-8 border-white/10 text-[10px] uppercase font-black tracking-wider rounded-lg"
+                                        onClick={handlePrint}
                                     >
-                                        {attendance[s.id] === 'P' ? "Mark Absent" : "Mark Present"}
+                                        <Printer className="w-3.5 h-3.5 mr-1" /> Print
                                     </Button>
-                                )
-                            }
-                        ]}
-                    />
-                </CardContent>
-            </Card>
+                                </div>
+                            ) : (
+                                <div className="relative">
+                                    <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-white/30" />
+                                    <Input
+                                        placeholder="Quick search student name..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="pl-8 h-8 bg-black/40 border-white/10 text-xs rounded-lg"
+                                    />
+                                </div>
+                            )}
+                        </div>
 
-            {!viewStats && (
-                <div className="flex justify-between items-center bg-white/5 p-4 rounded-lg border border-white/10">
-                    <div className="text-sm text-muted-foreground">
-                        {alreadyMarked
-                            ? (isModified ? "You have unsaved changes." : `Attendance already marked by ${user?.uid === "admin" ? "Admin" : "Teacher"}`)
-                            : "Ready to submit."
-                        }
+                        {/* List Area */}
+                        {loading ? (
+                            <div className="py-12 flex justify-center bg-transparent"><Loader2 className="animate-spin text-emerald-500 w-8 h-8" /></div>
+                        ) : viewStats ? (
+                            /* Mobile Stats List */
+                            <div className="space-y-1.5 max-h-[50vh] overflow-y-auto pr-1">
+                                {statsData.length === 0 ? (
+                                    <div className="text-center py-8 text-[11px] text-white/40 italic">No historical stats found.</div>
+                                ) : (
+                                    statsData.map((s: any, idx: number) => (
+                                        <div key={s.id} className="p-2 bg-black/20 border border-white/5 rounded-xl flex items-center justify-between gap-3">
+                                            <div className="flex items-center gap-2.5 min-w-0">
+                                                <div className="w-6 h-6 flex items-center justify-center rounded-lg bg-white/5 border border-white/10 text-[10px] font-mono text-white/60 shrink-0">
+                                                    #{s.rollNumber || idx + 1}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <div className="font-bold text-white truncate text-xs">{s.studentName}</div>
+                                                    <div className="text-[9px] text-white/40 mt-0.5">Present: {s.presentDays}/{s.totalDays} days</div>
+                                                </div>
+                                            </div>
+                                            <div className="text-right shrink-0">
+                                                <div className={cn(
+                                                    "text-[10px] font-mono font-black",
+                                                    Number(s.percentage) < 75 ? "text-red-400" : "text-emerald-400"
+                                                )}>
+                                                    {s.percentage}%
+                                                </div>
+                                                <div className="w-12 h-1 bg-white/5 rounded-full mt-1 overflow-hidden">
+                                                    <div
+                                                        className={cn(
+                                                            "h-full",
+                                                            Number(s.percentage) < 75 ? "bg-red-500" : "bg-emerald-500"
+                                                        )}
+                                                        style={{ width: `${s.percentage}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                            </div>
+                        ) : (
+                            /* Mobile Daily Attendance List with interactive P / A Dual Toggle */
+                            <div className="space-y-1.5 max-h-[55vh] overflow-y-auto pr-1">
+                                {filteredStudents.length === 0 ? (
+                                    <div className="text-center py-8 text-[11px] text-white/40 italic">No matching students found.</div>
+                                ) : (
+                                    filteredStudents.map((s: any, idx: number) => {
+                                        const isPresent = attendance[s.id] === 'P';
+                                        return (
+                                            <div
+                                                key={s.id}
+                                                className={cn(
+                                                    "p-2 rounded-xl border flex items-center justify-between gap-3 transition-colors",
+                                                    isPresent ? "bg-emerald-500/5 border-emerald-500/10" : "bg-red-500/5 border-red-500/10"
+                                                )}
+                                            >
+                                                <div className="flex items-center gap-2.5 min-w-0">
+                                                    <div className="w-6 h-6 flex items-center justify-center rounded-lg bg-black/40 border border-white/10 text-[10px] font-mono text-white/60 shrink-0">
+                                                        #{s.rollNumber || idx + 1}
+                                                    </div>
+                                                    <div className="min-w-0">
+                                                        <div className="font-bold text-white truncate text-xs leading-snug">{s.studentName}</div>
+                                                        <div className="text-[9px] text-white/40 font-mono leading-none mt-0.5">{s.schoolId || "STUDENT"}</div>
+                                                    </div>
+                                                </div>
+
+                                                {/* P / A Dual Click Toggle Button Pair */}
+                                                <div className="flex items-center gap-1 bg-black/40 border border-white/10 p-0.5 rounded-lg shrink-0">
+                                                    <button
+                                                        onClick={() => attendance[s.id] !== 'P' && toggleStatus(s.id)}
+                                                        className={cn(
+                                                            "w-7 h-6 rounded-md text-[10px] font-black transition-all",
+                                                            isPresent
+                                                                ? "bg-emerald-500 text-black shadow"
+                                                                : "text-white/30 hover:text-white"
+                                                        )}
+                                                    >
+                                                        P
+                                                    </button>
+                                                    <button
+                                                        onClick={() => attendance[s.id] !== 'A' && toggleStatus(s.id)}
+                                                        className={cn(
+                                                            "w-7 h-6 rounded-md text-[10px] font-black transition-all",
+                                                            !isPresent
+                                                                ? "bg-red-500 text-white shadow"
+                                                                : "text-white/30 hover:text-white"
+                                                        )}
+                                                    >
+                                                        A
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        )}
+
+                        {/* Floating bottom status & save row for mobile */}
+                        {!viewStats && (alreadyMarked || isModified) && (
+                            <div className="bg-black/80 border border-white/10 rounded-2xl p-2.5 flex items-center justify-between shadow-2xl backdrop-blur-md">
+                                <span className="text-[10px] font-bold text-white/60">
+                                    {isModified ? "Modified unsaved rows" : "All matches saved"}
+                                </span>
+                                <Button
+                                    size="sm"
+                                    onClick={handleSubmit}
+                                    disabled={submitting || !isModified}
+                                    className="bg-emerald-500 hover:bg-emerald-600 text-black text-[10px] font-black uppercase tracking-wider py-1 px-4 rounded-lg"
+                                >
+                                    {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Save className="w-3.5 h-3.5 mr-1" />}
+                                    Save
+                                </Button>
+                            </div>
+                        )}
                     </div>
-                    <Button
-                        size="lg"
-                        onClick={handleSubmit}
-                        disabled={submitting || (alreadyMarked && !isModified)}
-                        className="bg-emerald-600 hover:bg-emerald-700 text-white min-w-[200px]"
-                    >
-                        {submitting ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Save className="w-5 h-5 mr-2" />}
-                        {alreadyMarked ? "Update Attendance" : "Submit Attendance"}
-                    </Button>
+                )}
+            </div>
+
+            {/* ========================================================================= */}
+            {/* DESKTOP VIEWPORT (Wide, professional, feature-rich dashboard layout)      */}
+            {/* ========================================================================= */}
+            <div className="hidden lg:block space-y-6">
+                {/* 3-Column Stats Grid */}
+                <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    <Card className="bg-black/20 border-white/10 overflow-hidden rounded-[2rem]">
+                        <div className="p-6 flex items-center justify-between">
+                            <div>
+                                <div className="text-xs text-muted-foreground uppercase font-black tracking-widest opacity-50">Total Students</div>
+                                <div className="text-3xl font-bold mt-1">
+                                    {loading ? <div className="h-8 w-12 bg-white/5 animate-pulse rounded" /> : stats.total}
+                                </div>
+                            </div>
+                            <div className="w-12 h-12 rounded-2xl bg-blue-500/10 flex items-center justify-center text-blue-500">
+                                <Users className="w-6 h-6" />
+                            </div>
+                        </div>
+                    </Card>
+                    <Card className="bg-black/20 border-white/10 overflow-hidden rounded-[2rem] border-l-4 border-l-emerald-500">
+                        <div className="p-6 flex items-center justify-between">
+                            <div>
+                                <div className="text-xs text-muted-foreground uppercase font-black tracking-widest opacity-50">Present Today</div>
+                                <div className="text-3xl font-bold text-emerald-500 mt-1">
+                                    {loading ? <div className="h-8 w-12 bg-white/5 animate-pulse rounded" /> : stats.present}
+                                </div>
+                            </div>
+                            <div className="w-12 h-12 rounded-2xl bg-emerald-500/10 flex items-center justify-center text-emerald-500">
+                                <Check className="w-6 h-6" />
+                            </div>
+                        </div>
+                    </Card>
+                    <Card className="bg-black/20 border-white/10 overflow-hidden rounded-[2rem] border-l-4 border-l-red-500">
+                        <div className="p-6 flex items-center justify-between">
+                            <div>
+                                <div className="text-xs text-muted-foreground uppercase font-black tracking-widest opacity-50">Absent Today</div>
+                                <div className="text-3xl font-bold text-red-500 mt-1">
+                                    {loading ? <div className="h-8 w-12 bg-white/5 animate-pulse rounded" /> : stats.absent}
+                                </div>
+                            </div>
+                            <div className="w-12 h-12 rounded-2xl bg-red-500/10 flex items-center justify-center text-red-500">
+                                <X className="w-6 h-6" />
+                            </div>
+                        </div>
+                    </Card>
                 </div>
-            )}
-            </>
-            )}
+
+                {isHoliday && !viewStats ? (
+                    <div className="bg-amber-500/10 border border-amber-500/20 text-amber-500 p-10 rounded-[2rem] text-center space-y-4 max-w-lg mx-auto my-10 backdrop-blur-md shadow-2xl animate-in zoom-in duration-300">
+                        <div className="w-20 h-20 bg-amber-500/20 rounded-full flex items-center justify-center mx-auto mb-4 border border-amber-500/30">
+                            <CalendarDays className="w-10 h-10" />
+                        </div>
+                        <h3 className="text-3xl font-display font-bold">Holiday</h3>
+                        <p className="text-sm uppercase tracking-widest font-black opacity-60">Classes dismissed. Attendance locked.</p>
+                    </div>
+                ) : (
+                    <Card className="bg-black/20 border-white/10 shadow-2xl rounded-[2rem]">
+                        <div className="p-6 border-b border-white/5 flex flex-col md:flex-row justify-between gap-4 items-center">
+                            <div className="flex bg-black/40 p-1 rounded-xl border border-white/10 items-center gap-2">
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setViewStats(false)}
+                                    className={cn(
+                                        "rounded-lg px-4 h-9 font-bold text-xs uppercase tracking-wider transition-all",
+                                        !viewStats ? "bg-emerald-500/20 text-emerald-500 hover:text-emerald-400" : "text-muted-foreground hover:text-white"
+                                    )}
+                                >
+                                    Daily View
+                                </Button>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setViewStats(true)}
+                                    className={cn(
+                                        "rounded-lg px-4 h-9 font-bold text-xs uppercase tracking-wider transition-all",
+                                        viewStats ? "bg-blue-500/20 text-blue-500 hover:text-blue-400" : "text-muted-foreground hover:text-white"
+                                    )}
+                                >
+                                    Overall Stats
+                                </Button>
+
+                                {viewStats && (
+                                    <>
+                                        <Select value={statsMonth} onValueChange={setStatsMonth}>
+                                            <SelectTrigger className="w-[180px] h-9 bg-transparent border-white/10 text-xs font-bold rounded-lg ml-2">
+                                                <SelectValue placeholder="Period" />
+                                            </SelectTrigger>
+                                            <SelectContent className="bg-slate-900 border-white/10 text-white">
+                                                <SelectItem value="ALL">Full Academic Year</SelectItem>
+                                                <SelectItem value="01">January</SelectItem>
+                                                <SelectItem value="02">February</SelectItem>
+                                                <SelectItem value="03">March</SelectItem>
+                                                <SelectItem value="04">April</SelectItem>
+                                                <SelectItem value="05">May</SelectItem>
+                                                <SelectItem value="06">June</SelectItem>
+                                                <SelectItem value="07">July</SelectItem>
+                                                <SelectItem value="08">August</SelectItem>
+                                                <SelectItem value="09">September</SelectItem>
+                                                <SelectItem value="10">October</SelectItem>
+                                                <SelectItem value="11">November</SelectItem>
+                                                <SelectItem value="12">December</SelectItem>
+                                            </SelectContent>
+                                        </Select>
+
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            className="h-9 border-white/10 hover:bg-white/5 gap-2 px-4 rounded-lg text-xs font-bold"
+                                            onClick={handlePrint}
+                                        >
+                                            <Printer className="w-4 h-4" /> Print Report
+                                        </Button>
+                                    </>
+                                )}
+                            </div>
+
+                            {!viewStats && (
+                                <div className="relative flex-1 w-full md:max-w-xs">
+                                    <Search className="absolute left-3 top-3 h-4 w-4 text-muted-foreground" />
+                                    <Input
+                                        placeholder="Search students..."
+                                        value={searchQuery}
+                                        onChange={(e) => setSearchQuery(e.target.value)}
+                                        className="pl-9 h-10 bg-black/40 border-white/10 w-full rounded-xl text-sm"
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        <CardContent className="p-6">
+                            <DataTable
+                                data={viewStats ? statsData : filteredStudents}
+                                isLoading={loading}
+                                columns={viewStats ? [
+                                    {
+                                        key: "rollNumber",
+                                        header: "Roll",
+                                        render: (s: any, idx?: number) => (
+                                            <span className="font-mono text-sm font-semibold">{s.rollNumber || (idx ?? 0) + 1}</span>
+                                        )
+                                    },
+                                    {
+                                        key: "studentName",
+                                        header: "Student Name",
+                                        render: (s: any) => (
+                                            <div>
+                                                <div className="font-bold text-white text-sm">{s.studentName}</div>
+                                                <div className="text-[10px] text-white/40 uppercase font-mono tracking-wider mt-0.5">{s.schoolId}</div>
+                                            </div>
+                                        )
+                                    },
+                                    {
+                                        key: "totalDays",
+                                        header: "Total Days",
+                                        cellClassName: "text-center",
+                                        render: (s: any) => <span className="font-mono font-medium">{s.totalDays}</span>
+                                    },
+                                    {
+                                        key: "presentDays",
+                                        header: "Present Days",
+                                        cellClassName: "text-center",
+                                        render: (s: any) => <span className="font-bold text-emerald-400 font-mono">{s.presentDays}</span>
+                                    },
+                                    {
+                                        key: "percentage",
+                                        header: "Attendance %",
+                                        cellClassName: "text-center",
+                                        render: (s: any) => (
+                                            <div className="flex flex-col items-center min-w-[100px] justify-center mx-auto">
+                                                <span className={`font-bold font-mono text-sm ${Number(s.percentage) < 75 ? "text-red-400" : "text-emerald-400"}`}>
+                                                    {s.percentage}%
+                                                </span>
+                                                <div className="w-full h-1.5 bg-white/10 rounded-full mt-1.5 overflow-hidden max-w-[80px]">
+                                                    <div
+                                                        className={`h-full ${Number(s.percentage) < 75 ? "bg-red-500" : "bg-emerald-500"}`}
+                                                        style={{ width: `${s.percentage}%` }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )
+                                    },
+                                    {
+                                        key: "statsStatus",
+                                        header: "Status",
+                                        cellClassName: "text-right",
+                                        render: (s: any) => (
+                                            <Badge variant="outline" className={cn(
+                                                "text-[9px] uppercase font-black tracking-widest px-2.5 py-0.5",
+                                                Number(s.percentage) < 75 ? "text-red-400 border-red-500/30 bg-red-500/5" : "text-emerald-400 border-emerald-500/30 bg-emerald-500/5"
+                                            )}>
+                                                {Number(s.percentage) < 75 ? "Low" : "Good"}
+                                            </Badge>
+                                        )
+                                    }
+                                ] : [
+                                    {
+                                        key: "rollNumber",
+                                        header: "Roll Number",
+                                        render: (s: any, idx?: number) => (
+                                            <span className="font-mono text-sm font-semibold">{s.rollNumber || (idx ?? 0) + 1}</span>
+                                        )
+                                    },
+                                    {
+                                        key: "studentName",
+                                        header: "Student Name",
+                                        render: (s: any) => (
+                                            <div>
+                                                <div className="font-bold text-white text-sm">{s.studentName}</div>
+                                                <div className="text-[10px] text-white/40 uppercase font-mono tracking-wider mt-0.5">{s.schoolId}</div>
+                                            </div>
+                                        )
+                                    },
+                                    {
+                                        key: "attendanceStatus",
+                                        header: "Roll Status",
+                                        cellClassName: "text-center",
+                                        render: (s: any) => (
+                                            <Badge className={cn(
+                                                "font-black uppercase tracking-wider text-[9px] px-3 py-1",
+                                                attendance[s.id] === 'P' ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : "bg-red-500/10 text-red-500 border border-red-500/20"
+                                            )}>
+                                                {attendance[s.id] === 'P' ? "Present" : "Absent"}
+                                            </Badge>
+                                        )
+                                    },
+                                    {
+                                        key: "action",
+                                        header: "Marking Actions",
+                                        cellClassName: "text-right",
+                                        render: (s: any) => (
+                                            <div className="flex justify-end gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className={cn(
+                                                        "h-8 text-[10px] font-black uppercase tracking-wider px-3 rounded-lg border-white/5",
+                                                        attendance[s.id] === 'P'
+                                                            ? "bg-emerald-500 text-black border-transparent hover:bg-emerald-600 hover:text-black"
+                                                            : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white"
+                                                    )}
+                                                    onClick={() => attendance[s.id] !== 'P' && toggleStatus(s.id)}
+                                                >
+                                                    P
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className={cn(
+                                                        "h-8 text-[10px] font-black uppercase tracking-wider px-3 rounded-lg border-white/5",
+                                                        attendance[s.id] === 'A'
+                                                            ? "bg-red-500 text-white border-transparent hover:bg-red-600 hover:text-white"
+                                                            : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white"
+                                                    )}
+                                                    onClick={() => attendance[s.id] !== 'A' && toggleStatus(s.id)}
+                                                >
+                                                    A
+                                                </Button>
+                                            </div>
+                                        )
+                                    }
+                                ]}
+                            />
+                        </CardContent>
+                    </Card>
+                )}
+
+                {/* Desktop Save controls footer bar */}
+                {!viewStats && !isHoliday && (
+                    <div className="flex justify-between items-center bg-black/20 p-5 rounded-[2rem] border border-white/10 shadow-xl">
+                        <div className="text-sm text-muted-foreground font-medium">
+                            {alreadyMarked
+                                ? (isModified ? "You have modified unsaved rows. Please hit save." : `Attendance registered successfully.`)
+                                : "Awaiting submission."
+                            }
+                        </div>
+                        <Button
+                            size="lg"
+                            onClick={handleSubmit}
+                            disabled={submitting || (alreadyMarked && !isModified)}
+                            className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold px-8 rounded-xl transition-all shadow-md shadow-emerald-500/10 min-w-[220px]"
+                        >
+                            {submitting ? <Loader2 className="w-5 h-5 animate-spin mr-2" /> : <Save className="w-5 h-5 mr-2" />}
+                            {alreadyMarked ? "Update Records" : "Submit Attendance"}
+                        </Button>
+                    </div>
+                )}
+            </div>
         </div>
     );
 }

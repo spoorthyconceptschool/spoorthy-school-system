@@ -67,7 +67,8 @@ export async function POST(req: NextRequest) {
                 sectionId,
                 records,
                 user.uid,
-                actorSchoolId
+                actorSchoolId,
+                body.touchedIds
             );
 
             return NextResponse.json({

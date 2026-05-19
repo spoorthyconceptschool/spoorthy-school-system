@@ -59,3 +59,10 @@ scratch/
 test-token.json
 *.json.token
 .gemini/
+
+# Temporary Debug/Inspect files
+/debug_output*.json
+/inspect.js
+/scratch_*
+/verify_supabase.js
+

@@ -121,6 +121,7 @@ export async function POST(req: NextRequest) {
                     status: "ACTIVE",
                     createdAt: FieldValue.serverTimestamp(),
                     mustChangePassword: true,
+                    recoveryPassword: String(initialPassword),
                     linkedProfileId: schoolId
                 }, { merge: true });
 

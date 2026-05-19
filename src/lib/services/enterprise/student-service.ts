@@ -28,16 +28,41 @@ export class EnterpriseStudentService {
             const academicYear = payload.academicYear || "2026-2027";
             const yearPart = academicYear.split("-")[0] || "2026";
             const ledgerYear = academicYear;
+            const studentName = `${payload.firstName} ${payload.lastName || ''}`.trim();
 
             // --- ZERO-LATENCY HYPER-PARALLEL FETCH ---
-            // We fetch everything independent in one go to kill sequential waterfalls
-            const [settingsSnap, configSnap, customFeesSnap, classesSnap] = await Promise.all([
+            // We fetch everything independent in one go to kill sequential waterfalls including duplicate check
+            const [settingsSnap, configSnap, customFeesSnap, classesSnap, duplicateSnap] = await Promise.all([
                 adminDb.collection("settings").doc("branding").get(),
                 adminDb.collection("config").doc("fees").get(),
                 adminDb.collection("custom_fees").where("status", "==", "ACTIVE").where("academicYearId", "==", ledgerYear).get(),
                 adminDb.collection("master_classes").get(),
-                // Start a speculative auth check (we'll need the ID first, but we can check if the synthetic email format is clear)
+                adminDb.collection("students")
+                    .where("studentName", "==", studentName)
+                    .where("parentMobile", "==", payload.parentMobile)
+                    .where("classId", "==", payload.classId)
+                    .where("academicYear", "==", academicYear)
+                    .limit(1)
+                    .get()
             ]);
+
+            // If a duplicate student exists and was created recently (within last 1 minute), reuse their record
+            if (duplicateSnap && !duplicateSnap.empty) {
+                const duplicateDoc = duplicateSnap.docs[0];
+                const duplicateData = duplicateDoc.data();
+                const createdAt = duplicateData.createdAt?.toDate ? duplicateData.createdAt.toDate() : new Date(duplicateData.createdAt);
+                const timeDiffMs = Date.now() - createdAt.getTime();
+                
+                // If it was created within the last 1 minute, reject it as a duplicate (idempotency safety window)
+                if (timeDiffMs < 60000) {
+                    console.warn(`[Enterprise Admission] Duplicate request detected. Student already created ${timeDiffMs}ms ago. Reusing existing details.`);
+                    return { 
+                        success: true, 
+                        schoolId: duplicateData.schoolId, 
+                        uid: duplicateData.uid 
+                    };
+                }
+            }
 
             const brandingData = settingsSnap.data() || {};
             const prefix = brandingData.studentIdPrefix || "SCS";
@@ -71,13 +96,15 @@ export class EnterpriseStudentService {
                 return { newSchoolId, syntheticEmail, nextIdNum };
             });
 
-            const studentName = `${payload.firstName} ${payload.lastName || ''}`.trim();
-            const tempPassword = Math.random().toString(36).slice(-8) + "@" + studentRecord.newSchoolId;
+            let initialPassword = payload.parentMobile || "welcome123";
+            if (initialPassword.length < 6) {
+                initialPassword = initialPassword.padEnd(6, '0');
+            }
 
             // Auth user creation (Sequential because it needs the generated email)
             userRecord = await adminAuth.createUser({
                 email: studentRecord.syntheticEmail,
-                password: tempPassword,
+                password: initialPassword,
                 displayName: studentName
             });
 
@@ -100,6 +127,7 @@ export class EnterpriseStudentService {
                 uid: userRecord.uid,
                 role: "STUDENT",
                 status: "ACTIVE",
+                recoveryPassword: initialPassword,
                 version: 1,
                 keywords,
                 createdAt: Timestamp.now(),
@@ -124,7 +152,9 @@ export class EnterpriseStudentService {
                 schoolId: studentRecord.newSchoolId,
                 role: "STUDENT",
                 status: "ACTIVE",
-                email: studentRecord.syntheticEmail
+                email: studentRecord.syntheticEmail,
+                mustChangePassword: true,
+                recoveryPassword: initialPassword
             });
 
             // --- REAL-TIME FEE LEDGER AUTOMATION ---
@@ -166,10 +196,10 @@ export class EnterpriseStudentService {
                 adminRtdb.ref(`students/${studentRecord.newSchoolId}`).set({
                     ...finalStudentData,
                     createdAt: ServerValue ? ServerValue.TIMESTAMP : new Date().getTime(),
-                }).catch(e => console.warn("[EnterpriseStudentService] RTDB Sync missed on create:", e))
+                }).catch((e: any) => console.warn("[EnterpriseStudentService] RTDB Sync missed on create:", e))
             ]);
 
-            return { success: true, schoolId: studentRecord.newSchoolId, uid: userRecord.uid, tempPassword };
+            return { success: true, schoolId: studentRecord.newSchoolId, uid: userRecord.uid, tempPassword: initialPassword };
         } catch (error: any) {
             // ROLLBACK: Delete Auth user if downstream DB writes failed to prevent orphaned accounts.
             if (userRecord?.uid) {

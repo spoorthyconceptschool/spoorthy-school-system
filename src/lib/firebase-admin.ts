@@ -31,8 +31,9 @@ function getAdminApp(): App {
     if (_adminApp) return _adminApp;
 
     // Check if an app is already initialized with this name (usually [DEFAULT])
-    if (adminRoot.apps.length > 0) {
-        _adminApp = adminRoot.app();
+    const existingApp = adminRoot.apps.find(app => app?.name === "[DEFAULT]");
+    if (existingApp) {
+        _adminApp = existingApp;
         return _adminApp;
     }
 
@@ -41,13 +42,7 @@ function getAdminApp(): App {
         const hasKey = !!rawKey;
         const isProd = process.env.NODE_ENV === 'production';
         
-        console.log(`[Firebase Admin] Initialization Attempt:`, {
-            hasPrivateKey: hasKey,
-            hasClientEmail: !!SERVICE_ACCOUNT.clientEmail,
-            projectId: SERVICE_ACCOUNT.projectId,
-            isProduction: isProd,
-            nodeEnv: process.env.NODE_ENV
-        });
+        console.log(`[Firebase Admin] Initializing project: ${SERVICE_ACCOUNT.projectId}`);
 
         const privateKey = rawKey?.trim().replace(/^["']|["']$/g, '').replace(/\\n/g, '\n');
 
@@ -65,7 +60,16 @@ function getAdminApp(): App {
             });
         }
 
-        _adminApp = adminRoot.initializeApp(config);
+        try {
+            _adminApp = adminRoot.initializeApp(config);
+        } catch (initErr: any) {
+            if (initErr.code === 'app/already-exists') {
+                _adminApp = adminRoot.app();
+            } else {
+                throw initErr;
+            }
+        }
+        
         return _adminApp;
     } catch (e: any) {
         _initError = e.message || String(e);

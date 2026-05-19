@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { Loader2, LayoutDashboard, Wallet, BookOpen, Bell, Calendar, User, LogOut, Menu, X, FileText, Ticket, CalendarCheck } from "lucide-react";
+import { Loader2, LayoutDashboard, Wallet, BookOpen, Bell, Calendar, User, LogOut, Menu, X, FileText, Ticket, CalendarCheck, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { db } from "@/lib/firebase";
@@ -28,7 +28,7 @@ const STUDENT_NAV = [
     { label: "Attendance", icon: CalendarCheck, href: "/student/attendance" },
     { label: "Timetable", icon: Calendar, href: "/student/timetable" },
     { label: "Leave", icon: FileText, href: "/student/leaves" },
-    { label: "Hall Tickets", icon: Ticket, href: "/student/exams" },
+    { label: "Examinations", icon: Ticket, href: "/student/exams" },
     { label: "Holidays", icon: Calendar, href: "/student/holidays" },
     { label: "Profile", icon: User, href: "/student/profile" },
 ];
@@ -42,6 +42,7 @@ function StudentContent({ children }: { children: React.ReactNode }) {
     const [checking, setChecking] = useState(true);
     const [mustChangePassword, setMustChangePassword] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const { branding } = useMasterData();
     const [imageError, setImageError] = useState(false);
 
@@ -132,8 +133,9 @@ function StudentContent({ children }: { children: React.ReactNode }) {
 
             {/* Sidebar Drawer */}
             <aside className={cn(
-                "fixed lg:static inset-y-0 left-0 w-64 border-r border-[#64FFDA]/10 bg-[#0A192F]/80 backdrop-blur-xl flex-col h-full z-50 transition-transform duration-300",
-                mobileMenuOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0",
+                "fixed lg:static inset-y-0 left-0 border-r border-[#64FFDA]/10 bg-[#0A192F]/80 backdrop-blur-xl flex-col h-full z-50 transition-all duration-300 ease-in-out",
+                sidebarCollapsed ? "lg:w-20" : "lg:w-64",
+                mobileMenuOpen ? "translate-x-0 w-64" : "-translate-x-full lg:translate-x-0",
                 "flex"
             )}>
                 <div className="h-20 flex items-center justify-between px-6 border-b border-[#64FFDA]/10">
@@ -143,7 +145,7 @@ function StudentContent({ children }: { children: React.ReactNode }) {
                     >
                         <X size={20} />
                     </button>
-                    <div className="flex items-center gap-3">
+                    <div className={cn("flex items-center gap-3 w-full", sidebarCollapsed ? "justify-center" : "")}>
                         <div className="w-8 h-8 rounded bg-transparent flex items-center justify-center border border-white/20 shadow-md shrink-0 overflow-hidden">
                             {!imageError ? (
                                 <img
@@ -156,13 +158,15 @@ function StudentContent({ children }: { children: React.ReactNode }) {
                                 <div className="w-full h-full bg-[#3B82F6]/10 flex items-center justify-center text-[#3B82F6] font-bold font-mono text-sm">S</div>
                             )}
                         </div>
-                        <h1 className="font-display font-bold text-xl text-white tracking-tight truncate max-w-[150px]">
-                            {branding?.schoolName ? (
-                                <span className="text-white text-base md:text-lg">{branding.schoolName}</span>
-                            ) : (
-                                <>Student<span className="text-[#3B82F6]">.Panel</span></>
-                            )}
-                        </h1>
+                        {!sidebarCollapsed && (
+                            <h1 className="font-display font-bold text-xl text-white tracking-tight truncate max-w-[150px] transition-opacity duration-300">
+                                {branding?.schoolName ? (
+                                    <span className="text-white text-base md:text-lg">{branding.schoolName}</span>
+                                ) : (
+                                    <>Student<span className="text-[#3B82F6]">.Panel</span></>
+                                )}
+                            </h1>
+                        )}
                     </div>
                 </div>
 
@@ -175,27 +179,45 @@ function StudentContent({ children }: { children: React.ReactNode }) {
                                 href={item.href}
                                 onClick={() => setMobileMenuOpen(false)}
                                 className={cn(
-                                    "flex items-center gap-3 px-3 py-3 rounded-md transition-all duration-200 text-sm font-medium border border-transparent",
+                                    "flex items-center gap-3 rounded-md transition-all duration-200 text-sm font-medium border border-transparent",
                                     isActive
                                         ? "bg-[#3B82F6]/10 text-[#3B82F6] border-[#3B82F6]/20 shadow-[0_0_15px_-5px_#3B82F6]"
-                                        : "text-[#8892B0] hover:text-[#E6F1FF] hover:bg-white/5"
+                                        : "text-[#8892B0] hover:text-[#E6F1FF] hover:bg-white/5",
+                                    sidebarCollapsed ? "justify-center p-2.5 w-10 h-10 mx-auto" : "px-3 py-3"
                                 )}
+                                title={sidebarCollapsed ? item.label : ""}
                             >
-                                <item.icon size={18} />
-                                {item.label}
+                                <item.icon size={18} className="shrink-0" />
+                                {!sidebarCollapsed && <span>{item.label}</span>}
                             </Link>
                         );
                     })}
                 </nav>
 
-                <div className="p-4 border-t border-[#64FFDA]/10">
-                    <button onClick={signOut} className="flex items-center gap-3 px-3 py-3 text-sm font-medium text-[#8892B0] hover:text-[#FF5555] hover:bg-[#FF5555]/10 w-full rounded-md transition-colors">
-                        <LogOut size={18} />
-                        Sign Out
+                <div className="p-4 border-t border-[#64FFDA]/10 space-y-1.5">
+                    <button
+                        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
+                        className="hidden lg:flex items-center gap-3 px-3 py-3 text-sm font-medium text-[#8892B0] hover:text-[#3B82F6] hover:bg-[#3B82F6]/10 w-full rounded-md transition-all duration-300"
+                    >
+                        <ChevronLeft className={cn("w-4 h-4 transition-transform duration-300", sidebarCollapsed && "rotate-180")} />
+                        {!sidebarCollapsed && <span>Collapse</span>}
                     </button>
-                    <div className="mt-2 text-xs text-center text-[#8892B0]/50 font-mono">v1.2.0</div>
+
+                    <button 
+                        onClick={signOut} 
+                        className={cn(
+                            "flex items-center gap-3 text-sm font-medium text-[#8892B0] hover:text-[#FF5555] hover:bg-[#FF5555]/10 w-full rounded-md transition-colors",
+                            sidebarCollapsed ? "justify-center p-2.5 w-10 h-10 mx-auto" : "px-3 py-3"
+                        )}
+                        title={sidebarCollapsed ? "Sign Out" : ""}
+                    >
+                        <LogOut size={18} className="shrink-0" />
+                        {!sidebarCollapsed && <span>Sign Out</span>}
+                    </button>
+                    {!sidebarCollapsed && <div className="mt-2 text-xs text-center text-[#8892B0]/50 font-mono">v1.2.0</div>}
                 </div>
             </aside>
+
 
             {/* Main Content */}
             <main className="flex-1 flex flex-col relative min-w-0 overflow-hidden">
@@ -288,10 +310,14 @@ function StudentContent({ children }: { children: React.ReactNode }) {
     );
 }
 
+import { StudentDataProvider } from "@/context/StudentDataContext";
+
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
     return (
         <AuthenticatedProvider>
-            <StudentContent>{children}</StudentContent>
+            <StudentDataProvider>
+                <StudentContent>{children}</StudentContent>
+            </StudentDataProvider>
         </AuthenticatedProvider>
     );
 }

@@ -204,7 +204,7 @@ export default function StudentNotificationsPage() {
                             key={n.id}
                             onClick={() => markAsRead(n.id, n.status)}
                             className={cn(
-                                "bg-black/20 border border-white/10 rounded-lg transition-all hover:bg-white/5 cursor-pointer group relative overflow-hidden",
+                                "bg-[#112240]/40 border border-white/10 rounded-lg transition-all hover:bg-white/5 cursor-pointer group relative overflow-hidden",
                                 isUnread ? "border-l-4 border-l-[#3B82F6] bg-[#3B82F6]/5" : "opacity-80"
                             )}
                         >

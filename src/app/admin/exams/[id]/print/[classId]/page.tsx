@@ -210,10 +210,9 @@ export default function HallTicketPrintPage({ params }: { params: Promise<{ id: 
 
                     .ticket-wrapper {
                         width: 210mm;
-                        height: 148mm;
-                        padding: 10mm; 
+                        height: 59mm;
+                        padding: 2mm 5mm; 
                         display: flex;
-                        flex-direction: column;
                         background: #fff;
                         position: relative;
                         overflow: hidden;
@@ -223,10 +222,11 @@ export default function HallTicketPrintPage({ params }: { params: Promise<{ id: 
                     .hall-ticket {
                         height: 100% !important;
                         flex: 1;
-                        padding: 3px;
-                        border: 2pt solid #000;
+                        padding: 2px;
+                        border: 1.5pt solid #000;
                         display: flex;
-                        flex-direction: column;
+                        flex-direction: row;
+                        align-items: stretch;
                         background: #fff;
                     }
 
@@ -234,111 +234,122 @@ export default function HallTicketPrintPage({ params }: { params: Promise<{ id: 
                         height: 100%;
                         flex: 1;
                         border: 1pt solid #000;
-                        padding: 6mm;
+                        padding: 3mm;
                         display: flex;
-                        flex-direction: column;
+                        flex-direction: row;
+                        align-items: center;
+                        gap: 10px;
                     }
 
                     .header-grid {
                         display: flex;
-                        align-items: center;
-                        gap: 15px;
-                        border-bottom: 2pt solid #000;
-                        padding-bottom: 8px;
-                    }
-
-                    .logo-box, .photo-box {
-                        width: 65px;
-                        height: 75px;
-                        border: 1.5pt solid #000;
-                        display: flex;
+                        flex-direction: column;
                         align-items: center;
                         justify-content: center;
-                        font-size: 8px;
-                        font-weight: 900;
-                        flex-shrink: 0;
-                        background: #fff;
-                        overflow: hidden;
+                        border-right: 1.5pt solid #000;
+                        padding-right: 10px;
+                        width: 140px;
                     }
 
-                    .center-header { flex: 1; text-align: center; }
-                    .school-name { font-size: 20px; font-weight: 950; line-height: 1; margin: 0; letter-spacing: -0.5px; }
+                    .logo-box {
+                        width: 28px;
+                        height: 28px;
+                        margin-bottom: 2px;
+                    }
+
+                    .school-name { font-size: 11px; font-weight: 950; line-height: 1; margin: 0; text-align: center; }
+                    .school-motto { display: none; }
                     .exam-title-badge { 
                         display: inline-block;
-                        border: 1.5pt solid #000;
-                        padding: 2px 15px;
-                        margin-top: 5px;
-                        font-size: 13px;
+                        border: 1pt solid #000;
+                        padding: 1px 4px;
+                        margin-top: 2px;
+                        font-size: 8px;
                         font-weight: 950;
-                        text-transform: uppercase;
                         background: #000;
                         color: #fff;
+                        text-align: center;
                     }
 
                     .info-section {
                         display: grid;
-                        grid-template-columns: 1fr 1fr;
-                        gap: 4px 20px;
-                        margin: 12px 0;
+                        grid-template-columns: 1fr;
+                        gap: 1px;
+                        flex: 1;
                     }
-                    .info-item { font-size: 12px; display: flex; align-items: baseline; gap: 6px; }
-                    .tag { font-size: 9px; font-weight: 950; color: #000; width: 55px; flex-shrink: 0; opacity: 0.7; }
-                    .val { font-weight: 950; border-bottom: 1px solid #000; color: #000; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 13px; }
+                    .info-item { font-size: 10px; display: flex; align-items: baseline; gap: 4px; }
+                    .tag { font-size: 8px; font-weight: 950; color: #000; width: 45px; flex-shrink: 0; }
+                    .val { font-weight: 950; border-bottom: 0.5px solid #000; color: #000; flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; font-size: 10px; }
                     
                     .roll-pill {
-                        border: 2pt solid #000;
-                        padding: 2px 25px;
+                        border: 1.5pt solid #000;
+                        padding: 1px 10px;
                         font-family: monospace;
                         font-weight: 950;
-                        font-size: 15px;
-                        background: #fff;
-                        color: #000;
-                        box-shadow: 4px 4px 0px #eee;
+                        font-size: 11px;
+                        margin-top: 3px;
+                        display: inline-block;
                     }
 
-                    .timetable-container { flex: 1; margin: 5px 0; }
-                    .subject-record {
-                        border: 1.5pt solid #000;
-                        padding: 4px 8px;
-                        margin-bottom: 5px;
-                        background: #fff;
+                    .photo-box {
+                        width: 40px;
+                        height: 48px;
+                        border: 1pt solid #000;
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        font-size: 6px;
+                        font-weight: 900;
+                        flex-shrink: 0;
+                        margin-left: auto;
+                        margin-right: 10px;
                     }
-                    .sub-meta { display: flex; justify-content: space-between; font-size: 9px; font-weight: 950; color: #000; border-bottom: 0.5px solid #000; margin-bottom: 2px; }
-                    .sub-header { display: flex; justify-content: space-between; align-items: center; }
-                    .sub-name { font-weight: 950; font-size: 11px; text-transform: uppercase; }
-                    .sub-sign { font-size: 8px; font-family: sans-serif; font-weight: 950; opacity: 0.5; }
+
+                    .timetable-container { width: 220px; border-left: 1pt solid #000; padding-left: 10px; height: 100%; display: flex; flex-direction: column; justify-content: center; }
+                    .subject-record {
+                        display: flex;
+                        justify-content: space-between;
+                        font-size: 7px;
+                        border-bottom: 0.5px solid #ccc;
+                        padding: 1px 0;
+                    }
+                    .sub-date { font-weight: 900; width: 40px; }
+                    .sub-name { font-weight: 900; flex: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+                    .sub-time { font-family: monospace; width: 60px; text-align: right; }
 
                     .footer-grid { 
                         display: flex; 
-                        align-items: flex-end; 
-                        justify-content: space-between; 
-                        margin-top: auto; 
-                        border-top: 2pt solid #000; 
-                        padding-top: 8px; 
+                        flex-direction: column;
+                        justify-content: center;
+                        align-items: center;
+                        border-left: 1pt solid #000; 
+                        padding-left: 10px; 
+                        width: 80px;
+                        height: 100%;
                     }
-                    .instructions { flex: 1; margin-right: 20px; }
-                    .titles { font-size: 10px; font-weight: 950; text-decoration: underline; margin-bottom: 4px; }
                     
-                    .signatures { display: flex; gap: 20px; }
-                    .sig-slot { text-align: center; min-width: 100px; }
-                    .line { border-top: 1.5pt solid #000; margin-bottom: 4px; }
-                    .sig-slot p { font-size: 11px; font-weight: 950; margin: 0; }
+                    .instructions { display: none; }
+                    
+                    .signatures { display: flex; flex-direction: column; gap: 10px; width: 100%; }
+                    .sig-slot { text-align: center; width: 100%; }
+                    .line { border-top: 1pt solid #000; margin-bottom: 2px; }
+                    .sig-slot p { font-size: 7px; font-weight: 950; margin: 0; }
 
                     .cut-line-wrapper {
                         position: absolute; bottom: 0; left: 0; width: 100%; height: 2px; 
-                        display: flex; align-items: center; justify-content: center; gap: 15px;
-                        color: #ddd; font-size: 10px;
+                        display: flex; align-items: center; justify-content: center; gap: 10px;
                     }
-                    .cut-line-wrapper .line { flex: 1; border-top: 1px dashed #ddd; margin: 0; }
-                    .label { font-size: 9px; font-weight: 900; letter-spacing: 3px; font-family: sans-serif; }
+                    .cut-line-wrapper .line { flex: 1; border-top: 0.5px dashed #ccc; margin: 0; }
+                    .label { font-size: 6px; font-weight: 900; letter-spacing: 2px; font-family: sans-serif; color: #ccc;}
                 }
 
                 @media print {
                     html, body { height: auto !important; overflow: visible !important; }
                     header, nav, aside, .sidebar, .topbar, .print\\:hidden { display: none !important; }
                     @page { size: A4 portrait; margin: 0 !important; }
-                    .ticket-wrapper { break-inside: avoid !important; page-break-inside: avoid !important; margin: 0 !important; height: 148mm !important; }
-                    .ticket-wrapper:nth-child(even) { break-after: page !important; page-break-after: always !important; }
+                    .ticket-wrapper { break-inside: avoid !important; page-break-inside: avoid !important; margin: 0 !important; height: 59mm !important; }
+                    .ticket-wrapper:nth-child(5n) { break-after: page !important; page-break-after: always !important; }
+                    .ticket-wrapper:nth-child(5n) .cut-line-wrapper { display: none; }
                 }
             `}</style>
         </div>

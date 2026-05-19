@@ -2,110 +2,65 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { useStudentData } from "@/context/StudentDataContext";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, CheckCircle, Wallet, History, FileText, Printer } from "lucide-react";
-import { collection, query, where, getDocs, doc, getDoc, orderBy, limit, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { Checkbox } from "@/components/ui/checkbox";
+import {
+    Loader2,
+    CheckCircle,
+    Wallet,
+    History,
+    FileText,
+    Printer,
+    CreditCard,
+    Clock,
+    Info,
+    AlertCircle
+} from "lucide-react";
 import { printPaymentReceipt } from "@/lib/export-utils";
 
 export default function StudentFeesPage() {
     const { user } = useAuth();
-    const [ledger, setLedger] = useState<any>(() => {
-        if (typeof window !== 'undefined') {
-            try { return JSON.parse(localStorage.getItem("student_ledger_cache") || "null"); } catch (e) { return null; }
-        }
-        return null;
-    });
-    const [transactions, setTransactions] = useState<any[]>(() => {
-        if (typeof window !== 'undefined') {
-            try { return JSON.parse(localStorage.getItem("student_tx_cache") || "[]"); } catch (e) { return []; }
-        }
-        return [];
-    });
-    const [loading, setLoading] = useState(() => {
-        if (typeof window !== 'undefined') return !localStorage.getItem("student_ledger_cache");
-        return true;
-    });
+    const { profile, ledger, transactions, loading } = useStudentData();
+
+    const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
+    const [paymentAmounts, setPaymentAmounts] = useState<{ [key: string]: string }>({});
     const [paying, setPaying] = useState(false);
-    const [studentId, setStudentId] = useState<string | null>(null);
-    const [studentData, setStudentData] = useState<any>(null);
 
+    // Auto-select unpaid items and calculate initial payment amounts
     useEffect(() => {
-        if (!user?.email) return;
+        if (!ledger) return;
+        const initialSelected = new Set<string>();
+        const initialAmounts: { [key: string]: string } = {};
+        const rawItems = ledger.items || [];
+        const totalReduction = rawItems
+            .filter((i: any) => i.amount < 0)
+            .reduce((s: number, i: any) => s + Math.abs(i.amount - (i.paidAmount || 0)), 0);
+        let reductionRemaining = totalReduction;
 
-        const schoolIdFromEmail = user.email.split('@')[0].toUpperCase();
-        let unsubLedger: (() => void) | null = null;
-        let unsubPayments: (() => void) | null = null;
+        rawItems.filter((i: any) => i.amount > 0).forEach((item: any) => {
+            const remaining = item.amount - (item.paidAmount || 0);
+            const discountForThisItem = Math.min(remaining, reductionRemaining);
+            const netRemaining = remaining - discountForThisItem;
+            reductionRemaining -= discountForThisItem;
 
-        const setupChildListeners = (student: any, docId: string) => {
-            const sId = student.schoolId || docId;
-            setStudentId(sId);
-            setStudentData(student);
-
-            // 1. Listen to Ledger
-            if (unsubLedger) unsubLedger();
-            const yearId = student.academicYear || "2025-2026";
-            unsubLedger = onSnapshot(doc(db, "student_fee_ledgers", `${sId}_${yearId}`), (lSnap) => {
-                if (lSnap.exists()) {
-                    setLedger(lSnap.data());
-                    if (typeof window !== 'undefined') localStorage.setItem("student_ledger_cache", JSON.stringify(lSnap.data()));
-                }
-                setLoading(false);
-            }, (err) => {
-                console.warn("[Fees] Ledger sync error:", err.message);
-                setLoading(false);
-            });
-
-            // 2. Listen to Payments
-            if (unsubPayments) unsubPayments();
-            const pxQ = query(collection(db, "payments"), where("studentId", "==", sId), orderBy("createdAt", "desc"), limit(20));
-            unsubPayments = onSnapshot(pxQ, (pxSnap) => {
-                const list = pxSnap.docs.map(d => ({ id: d.id, ...d.data() }));
-                setTransactions(list);
-                if (typeof window !== 'undefined') localStorage.setItem("student_tx_cache", JSON.stringify(list));
-            }, (err) => {
-                console.warn("Payments sync error (index?):", err);
-                // Fallback query without orderBy if index is missing
-                const pxQ2 = query(collection(db, "payments"), where("studentId", "==", sId));
-                onSnapshot(pxQ2, (pxSnap2) => {
-                    const sorted = pxSnap2.docs.map(d => ({ id: d.id, ...d.data() })).sort((a: any, b: any) => (b.date?.seconds || 0) - (a.date?.seconds || 0));
-                    setTransactions(sorted);
-                    if (typeof window !== 'undefined') localStorage.setItem("student_tx_cache", JSON.stringify(sorted));
-                });
-            });
-        };
-
-        // 1. Listen to Student Profile (Dual Strategy)
-        const unsubProfile = onSnapshot(doc(db, "students", schoolIdFromEmail), (pSnap) => {
-            if (pSnap.exists()) {
-                setupChildListeners(pSnap.data(), pSnap.id);
-            } else if (user.uid) {
-                const q = query(collection(db, "students"), where("uid", "==", user.uid));
-                const unsubQuery = onSnapshot(q, (qSnap) => {
-                    if (!qSnap.empty) setupChildListeners(qSnap.docs[0].data(), qSnap.docs[0].id);
-                    else setLoading(false);
-                });
-            } else {
-                setLoading(false);
+            if (netRemaining > 0) {
+                initialSelected.add(item.id);
+                initialAmounts[item.id] = netRemaining.toString();
             }
-        }, (err) => {
-            console.warn("[Fees] Profile sync error:", err.message);
-            setLoading(false);
         });
-
-        return () => {
-            unsubProfile();
-            if (unsubLedger) unsubLedger();
-            if (unsubPayments) unsubPayments();
-        };
-    }, [user]);
-
-    const fetchFees = () => { }; // No longer used, but kept to avoid breaking other calls if any
+        setSelectedItems(initialSelected);
+        setPaymentAmounts(initialAmounts);
+    }, [ledger]);
 
     const loadRazorpay = () => {
         return new Promise((resolve) => {
+            if ((window as any).Razorpay) {
+                resolve(true);
+                return;
+            }
             const script = document.createElement("script");
             script.src = "https://checkout.razorpay.com/v1/checkout.js";
             script.onload = () => resolve(true);
@@ -114,7 +69,59 @@ export default function StudentFeesPage() {
         });
     };
 
-    const handlePay = async (amount: number) => {
+    const handleToggleItem = (itemId: string, remaining: number) => {
+        if (remaining < 0) return; // reductions are not individually toggleable
+
+        const next = new Set(selectedItems);
+        if (next.has(itemId)) {
+            next.delete(itemId);
+            const nextAmounts = { ...paymentAmounts };
+            delete nextAmounts[itemId];
+            setPaymentAmounts(nextAmounts);
+        } else {
+            next.add(itemId);
+            setPaymentAmounts({ ...paymentAmounts, [itemId]: remaining.toString() });
+        }
+        setSelectedItems(next);
+    };
+
+    const handleAmountChange = (itemId: string, val: string, max: number) => {
+        const numeric = val.replace(/[^0-9.-]/g, "");
+
+        if (max < 0) {
+            if (Number(numeric) < max) return;
+            if (Number(numeric) > 0) return;
+        } else {
+            if (Number(numeric) > max) return;
+            if (Number(numeric) < 0) return;
+        }
+
+        setPaymentAmounts({ ...paymentAmounts, [itemId]: numeric });
+    };
+
+    // Current transactional total based on selected checked items
+    const totalToPay = Array.from(selectedItems).reduce((sum, id) => {
+        const item = ledger?.items?.find((i: any) => i.id === id);
+        const amt = Number(paymentAmounts[id]) || 0;
+        return sum + (item && item.amount > 0 ? amt : 0);
+    }, 0);
+
+    const handlePay = async () => {
+        const hasPositiveSelection = Array.from(selectedItems).some(id => {
+            const item = ledger?.items?.find((i: any) => i.id === id);
+            return item && item.amount > 0 && (Number(paymentAmounts[id]) || 0) > 0;
+        });
+
+        if (totalToPay <= 0 && hasPositiveSelection) {
+            alert("This selection is fully covered by your scholarship/benefits. No payment is required.");
+            return;
+        }
+
+        if (totalToPay <= 0) {
+            alert("Please select at least one item and enter a valid amount.");
+            return;
+        }
+
         setPaying(true);
         try {
             const res = await loadRazorpay();
@@ -123,23 +130,25 @@ export default function StudentFeesPage() {
                 return;
             }
 
-            // 1. Create Order
+            // 1. Create Order via Backend API
             const orderRes = await fetch("/api/payments/razorpay/create-order", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ amount, currency: "INR" })
+                body: JSON.stringify({ amount: totalToPay, currency: "INR" })
             });
 
             if (!orderRes.ok) throw new Error("Failed to create order");
             const order = await orderRes.json();
+
+            const studentId = profile?.schoolId || profile?.id;
 
             // 2. Options
             const options = {
                 key: process.env.NEXT_PUBLIC_RAZORPAY_KEY_ID,
                 amount: order.amount,
                 currency: order.currency,
-                name: "Spoorthy School",
-                description: "Fee Payment",
+                name: "Spoorthy Concept School",
+                description: `Fee Payment - ${profile?.studentName}`,
                 order_id: order.id,
                 handler: async function (response: any) {
                     // 3. Verify Payment
@@ -152,8 +161,8 @@ export default function StudentFeesPage() {
                                 razorpay_payment_id: response.razorpay_payment_id,
                                 razorpay_signature: response.razorpay_signature,
                                 studentId: studentId,
-                                studentName: studentData?.studentName || "Student",
-                                amount: amount,
+                                studentName: profile?.studentName || "Student",
+                                amount: totalToPay,
                                 ledger: ledger
                             })
                         });
@@ -161,7 +170,7 @@ export default function StudentFeesPage() {
                         const verifyData = await verifyRes.json();
                         if (verifyRes.ok) {
                             alert("Payment Successful! Receipt generated.");
-                            fetchFees(); // Refresh data
+                            window.location.reload(); // Refresh to rebuild cache context
                         } else {
                             alert("Payment Verification Failed: " + verifyData.error);
                         }
@@ -170,13 +179,11 @@ export default function StudentFeesPage() {
                     }
                 },
                 prefill: {
-                    name: studentData?.studentName,
+                    name: profile?.studentName,
                     email: user?.email,
-                    contact: studentData?.parentMobile
+                    contact: profile?.parentMobile
                 },
-                theme: {
-                    color: "#3B82F6"
-                }
+                theme: { color: "#3B82F6" }
             };
 
             const paymentObject = new (window as any).Razorpay(options);
@@ -190,149 +197,340 @@ export default function StudentFeesPage() {
         }
     };
 
-    if (loading) return <div className="p-10 flex justify-center text-[#E6F1FF]"><Loader2 className="animate-spin" /></div>;
+    if (loading) {
+        return (
+            <div className="h-[40vh] flex flex-col items-center justify-center gap-4 text-[#64FFDA]">
+                <Loader2 className="w-10 h-10 animate-spin" />
+                <p className="text-xs font-black uppercase tracking-widest text-[#8892B0] font-mono animate-pulse">
+                    Loading outstanding ledger...
+                </p>
+            </div>
+        );
+    }
 
     const ledgerItems = ledger?.items || [];
-    const totalDue = ledgerItems.reduce((sum: number, item: any) => sum + (item.amount - (item.paidAmount || 0)), 0);
+    const ledgerTotalFee = ledgerItems.reduce((sum: number, i: any) => sum + (i.amount > 0 ? i.amount : 0), 0);
+    const ledgerTotalReductions = ledgerItems.reduce((sum: number, i: any) => sum + (i.amount < 0 ? Math.abs(i.amount) : 0), 0);
+    const ledgerPendingFee = Math.max(0, ledgerTotalFee - (ledger?.totalPaid || 0) - ledgerTotalReductions);
+
+    const termFees = ledgerItems.filter((i: any) => i.type !== "CUSTOM" && i.amount > 0);
+    const customFees = ledgerItems.filter((i: any) => i.type === "CUSTOM" && i.amount > 0);
+    const reductions = ledgerItems.filter((i: any) => i.amount < 0);
 
     return (
-        <div className="max-w-6xl mx-auto space-y-8 pb-10">
-            <div className="flex justify-between items-center">
-                <h1 className="text-3xl font-bold text-[#E6F1FF]">Fee Payment</h1>
-                <Badge variant={totalDue <= 0 ? "default" : "destructive"} className={totalDue <= 0 ? "bg-green-500/20 text-green-400" : ""}>
-                    {totalDue <= 0 ? "All Dues Cleared" : "Payment Pending"}
+        <div className="max-w-7xl mx-auto space-y-8 p-4 md:p-8 animate-in fade-in duration-500 pb-20 relative overflow-hidden select-none bg-gradient-to-b from-[#0a192f] via-[#0f224a] to-[#0a192f] min-h-[calc(100vh-100px)] rounded-3xl">
+            {/* Glowing accents */}
+            <div className="absolute top-[-5%] left-[-5%] w-[40%] h-[30%] bg-blue-500/10 rounded-full blur-[80px] pointer-events-none" />
+            <div className="absolute bottom-[-5%] right-[-5%] w-[40%] h-[30%] bg-emerald-500/10 rounded-full blur-[80px] pointer-events-none" />
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                <div>
+                    <h1 className="text-3xl md:text-4xl font-display font-black text-white tracking-tight">
+                        Fee Payment Portal
+                    </h1>
+                    <p className="text-white/60 font-medium text-sm">
+                        Select individual classes or term elements to pay securely.
+                    </p>
+                </div>
+                <Badge className={ledgerPendingFee <= 0 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 py-1.5 px-4 font-black uppercase tracking-widest text-[10px]" : "bg-yellow-500/10 text-yellow-500 border-yellow-500/20 py-1.5 px-4 font-black uppercase tracking-widest text-[10px]"}>
+                    {ledgerPendingFee <= 0 ? "Dues Cleared" : "Payment Outstanding"}
                 </Badge>
             </div>
 
-            {/* Overview Section */}
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-                {/* Due Amount Card */}
-                <Card className="bg-[#112240] border-[#64FFDA]/10 lg:col-span-1">
-                    <CardHeader>
-                        <CardTitle className="text-[#64FFDA] flex items-center gap-2">
-                            <Wallet className="w-5 h-5" /> Total Payable
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <div className="text-4xl font-bold text-[#E6F1FF] font-mono">
-                            ₹ {totalDue.toLocaleString()}
+            {/* Core Workspace */}
+            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
+                {/* Left side: Interactive checklist options */}
+                <div className="lg:col-span-2 space-y-6">
+                    {/* Scholarships & Reductions Info */}
+                    {reductions.length > 0 && (
+                        <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                            <div className="flex items-center gap-3">
+                                <div className="bg-emerald-500/20 p-2.5 rounded-xl border border-emerald-500/30">
+                                    <CheckCircle className="w-5 h-5 text-emerald-400" />
+                                </div>
+                                <div className="space-y-0.5">
+                                    <h3 className="font-bold text-emerald-400 text-sm tracking-wide uppercase">
+                                        Applied Scholarships / Credits
+                                    </h3>
+                                    <p className="text-[10px] text-emerald-400/60 font-bold uppercase">
+                                        Scholarships are auto-deducted from terms below.
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="text-right">
+                                <span className="text-[9px] text-emerald-500/50 uppercase font-black tracking-widest">Total Value</span>
+                                <p className="text-2xl font-black text-emerald-400">- ₹{ledgerTotalReductions.toLocaleString()}</p>
+                            </div>
                         </div>
-                        <p className="text-sm text-[#8892B0] mt-2 mb-6">
-                            Outstanding amount for current academic year.
+                    )}
+
+                    {/* Term Fees Checklist */}
+                    <div className="bg-[#112240]/40 border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
+                        <div className="bg-white/[0.03] px-6 py-4 flex justify-between items-center border-b border-white/10">
+                            <h3 className="font-bold text-white tracking-wide uppercase text-xs">Standard Term Fees</h3>
+                            <span className="text-[10px] text-white/40 bg-white/5 px-2 py-0.5 rounded font-black tracking-widest uppercase">Tuition</span>
+                        </div>
+                        <div className="p-4 space-y-3">
+                            {(() => {
+                                let rollingReduction = ledgerTotalReductions;
+                                return termFees.length > 0 ? (
+                                    termFees.map((item: any) => {
+                                        const remaining = item.amount - (item.paidAmount || 0);
+                                        const discountForThisItem = Math.min(remaining, rollingReduction);
+                                        const netRemaining = Math.max(0, remaining - discountForThisItem);
+                                        rollingReduction -= discountForThisItem;
+
+                                        const isSelected = selectedItems.has(item.id);
+
+                                        return (
+                                            <div
+                                                key={item.id}
+                                                className={`flex flex-col md:flex-row md:items-center justify-between p-4 rounded-2xl border transition-all ${
+                                                    isSelected
+                                                        ? "bg-[#3B82F6]/10 border-[#3B82F6]/20 shadow-[0_0_15px_-5px_#3B82F6]"
+                                                        : "bg-[#0A192F]/60 hover:bg-white/5 border-transparent"
+                                                } ${netRemaining === 0 ? "opacity-60 grayscale-[0.3]" : ""}`}
+                                            >
+                                                <div className="flex items-center gap-4">
+                                                    {netRemaining === 0 ? (
+                                                        <div className="w-5 h-5 flex items-center justify-center bg-emerald-500 rounded-md">
+                                                            <CheckCircle className="w-4 h-4 text-white" />
+                                                        </div>
+                                                    ) : (
+                                                        <Checkbox
+                                                            checked={isSelected}
+                                                            onCheckedChange={() => handleToggleItem(item.id, netRemaining)}
+                                                        />
+                                                    )}
+                                                    <div>
+                                                        <h4 className="font-bold text-white text-base tracking-tight flex items-center flex-wrap gap-2">
+                                                            {item.name}
+                                                            {discountForThisItem > 0 && (
+                                                                <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-black uppercase tracking-widest">
+                                                                    ₹{discountForThisItem.toLocaleString()} Deducted
+                                                                </span>
+                                                            )}
+                                                        </h4>
+                                                        <p className="text-[10px] text-white/40 flex items-center gap-1 uppercase tracking-wider font-bold mt-1">
+                                                            <Clock className="w-3.5 h-3.5 text-white/30" /> Fee: ₹{item.amount.toLocaleString()} • Due: {item.dueDate || "N/A"}
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="flex items-center gap-6 mt-4 md:mt-0 justify-between md:justify-end">
+                                                    <div className="text-right">
+                                                        <span className="text-[9px] text-white/40 uppercase font-black tracking-widest">Net Balance</span>
+                                                        <p className={`font-mono font-bold text-base ${netRemaining === 0 ? "text-emerald-400" : "text-white"}`}>
+                                                            ₹{netRemaining.toLocaleString()}
+                                                        </p>
+                                                    </div>
+                                                    <div className={`w-32 bg-[#0A192F]/80 rounded-xl border border-white/10 p-1 flex items-center px-3 gap-1.5 ${netRemaining === 0 ? "opacity-25" : ""}`}>
+                                                        <span className="text-xs text-white/40 font-bold">₹</span>
+                                                        <input
+                                                            type="text"
+                                                            value={paymentAmounts[item.id] || ""}
+                                                            onChange={(e) => handleAmountChange(item.id, e.target.value, netRemaining)}
+                                                            className="bg-transparent border-none outline-none text-sm font-bold w-full text-white"
+                                                            placeholder="0"
+                                                            disabled={!isSelected || netRemaining === 0}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })
+                                ) : (
+                                    <div className="p-8 text-center text-white/40 text-sm">No standard term tuition assigned.</div>
+                                );
+                            })()}
+                        </div>
+                    </div>
+
+                    {/* Custom Fees Checklist */}
+                    {customFees.length > 0 && (
+                        <div className="bg-[#112240]/40 border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
+                            <div className="bg-white/[0.03] px-6 py-4 flex justify-between items-center border-b border-white/10">
+                                <h3 className="font-bold text-amber-500 tracking-wide uppercase text-xs">Special / Custom Fees</h3>
+                            </div>
+                            <div className="p-4 space-y-3">
+                                {customFees.map((item: any) => {
+                                    const remaining = item.amount - (item.paidAmount || 0);
+                                    const isSelected = selectedItems.has(item.id);
+
+                                    return (
+                                        <div
+                                            key={item.id}
+                                            className={`flex flex-col md:flex-row md:items-center justify-between p-4 rounded-2xl border transition-all ${
+                                                isSelected
+                                                    ? "bg-amber-500/10 border-amber-500/20"
+                                                    : "bg-[#0A192F]/60 hover:bg-white/5 border-transparent"
+                                            } ${remaining === 0 ? "opacity-60 grayscale-[0.3]" : ""}`}
+                                        >
+                                            <div className="flex items-center gap-4">
+                                                {remaining === 0 ? (
+                                                    <div className="w-5 h-5 flex items-center justify-center bg-emerald-500 rounded-md">
+                                                        <CheckCircle className="w-4 h-4 text-white" />
+                                                    </div>
+                                                ) : (
+                                                    <Checkbox
+                                                        checked={isSelected}
+                                                        onCheckedChange={() => handleToggleItem(item.id, remaining)}
+                                                        className="data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
+                                                    />
+                                                )}
+                                                <div>
+                                                    <h4 className="font-bold text-white text-base tracking-tight">{item.name}</h4>
+                                                    <p className="text-[10px] text-white/40 uppercase tracking-widest font-black mt-1">Special / Custom Activity</p>
+                                                </div>
+                                            </div>
+
+                                            <div className="flex items-center gap-6 mt-4 md:mt-0 justify-between md:justify-end">
+                                                <div className="text-right">
+                                                    <span className="text-[9px] text-white/40 uppercase font-black tracking-widest">Balance</span>
+                                                    <p className={`font-mono font-bold text-base ${remaining === 0 ? "text-emerald-400" : "text-white"}`}>
+                                                        ₹{remaining.toLocaleString()}
+                                                    </p>
+                                                </div>
+                                                <div className={`w-32 bg-[#0A192F]/80 rounded-xl border border-white/10 p-1 flex items-center px-3 gap-1.5 ${remaining === 0 ? "opacity-25" : ""}`}>
+                                                    <span className="text-xs text-white/40 font-bold">₹</span>
+                                                    <input
+                                                        type="text"
+                                                        value={paymentAmounts[item.id] || ""}
+                                                        onChange={(e) => handleAmountChange(item.id, e.target.value, remaining)}
+                                                        className="bg-transparent border-none outline-none text-sm font-bold w-full text-white"
+                                                        placeholder="0"
+                                                        disabled={!isSelected || remaining === 0}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        </div>
+                    )}
+                </div>
+
+                {/* Right side: Razorpay Summary checkout card & payment history */}
+                <div className="space-y-6">
+                    {/* Checkout Card */}
+                    <div className="bg-[#112240] p-6 md:p-8 rounded-3xl border border-white/5 shadow-2xl relative overflow-hidden">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-[#3B82F6]/5 rounded-full blur-3xl pointer-events-none" />
+                        <h2 className="text-lg font-bold mb-6 flex items-center gap-2 text-white">
+                            <CreditCard className="w-5 h-5 text-[#3B82F6]" />
+                            Checkout Summary
+                        </h2>
+
+                        <div className="space-y-4 mb-6">
+                            <div className="space-y-2.5 p-4 bg-[#0A192F]/60 rounded-2xl border border-white/5 text-xs font-bold font-mono">
+                                <div className="flex justify-between items-center text-white/50">
+                                    <span>TUITION TOTAL</span>
+                                    <span>₹{ledgerTotalFee.toLocaleString()}</span>
+                                </div>
+                                <div className="flex justify-between items-center text-emerald-400">
+                                    <span>SCHOLARSHIPS</span>
+                                    <span>- ₹{ledgerTotalReductions.toLocaleString()}</span>
+                                </div>
+                                <div className="h-px bg-white/15 my-1" />
+                                <div className="flex justify-between items-center text-[#3B82F6] text-sm">
+                                    <span>TOTAL REMAINING</span>
+                                    <span>₹{ledgerPendingFee.toLocaleString()}</span>
+                                </div>
+                            </div>
+
+                            <div className="h-px bg-white/5 w-full" />
+
+                            <div className="space-y-1.5">
+                                <span className="text-[9px] text-white/40 uppercase font-black tracking-widest">
+                                    Amount selected to pay
+                                </span>
+                                <div className="flex items-baseline gap-1">
+                                    <span className="text-xl font-bold text-[#3B82F6]">₹</span>
+                                    <p className="text-4xl font-black text-white font-mono">
+                                        {Math.max(0, totalToPay).toLocaleString()}
+                                    </p>
+                                </div>
+                            </div>
+                        </div>
+
+                        <Button
+                            onClick={handlePay}
+                            disabled={totalToPay === 0 || paying}
+                            className="w-full h-14 bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-2xl font-black text-lg shadow-[0_10px_25px_rgba(59,130,246,0.3)] transition-all flex items-center justify-center gap-2"
+                        >
+                            {paying ? (
+                                <Loader2 className="w-5 h-5 animate-spin mr-1" />
+                            ) : (
+                                <>
+                                    <CreditCard className="w-5 h-5" /> Pay Selected Fees
+                                </>
+                            )}
+                        </Button>
+
+                        <p className="text-[9px] text-center text-white/40 mt-4 font-bold tracking-widest uppercase">
+                            🔒 Secured Payments powered by Razorpay
                         </p>
+                    </div>
 
-                        {totalDue > 0 ? (
-                            <Button
-                                onClick={() => handlePay(totalDue)}
-                                disabled={paying}
-                                className="w-full bg-[#3B82F6] hover:bg-[#2563EB] text-white font-bold h-12 text-lg shadow-[0_0_20px_-5px_#3B82F6]"
-                            >
-                                {paying ? <Loader2 className="animate-spin mr-2" /> : "Make Payment Now"}
-                            </Button>
-                        ) : (
-                            <div className="flex items-center justify-center p-4 bg-green-500/10 rounded-lg text-green-400 font-medium">
-                                <CheckCircle className="mr-2 h-5 w-5" /> No Dues Pending
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Transaction History */}
-                <Card className="bg-[#112240] border-[#64FFDA]/10 lg:col-span-2 flex flex-col">
-                    <CardHeader>
-                        <CardTitle className="text-[#E6F1FF] flex items-center gap-2">
-                            <History className="w-5 h-5" /> Payment History
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="flex-1 overflow-auto max-h-[300px] scrollbar-thin scrollbar-thumb-white/10">
-                        {transactions.length === 0 ? (
-                            <div className="text-center py-10 text-[#8892B0]">
-                                No payment history found.
-                            </div>
-                        ) : (
-                            <div className="space-y-3">
-                                {transactions.map((tx, i) => (
-                                    <div key={i} className="flex items-center justify-between p-3 rounded bg-[#0A192F]/50 border border-white/5 hover:border-[#64FFDA]/20 transition-colors">
+                    {/* Transaction History Card */}
+                    <Card className="bg-[#112240]/40 border-white/5 shadow-2xl rounded-3xl overflow-hidden">
+                        <CardHeader className="bg-white/[0.01] border-b border-white/5 py-4 px-6 flex justify-between items-center">
+                            <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                                <History className="w-4 h-4 text-emerald-400" /> Payment History
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 max-h-[350px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 space-y-3">
+                            {transactions.length === 0 ? (
+                                <div className="text-center py-12 text-white/30 text-xs font-bold uppercase tracking-widest italic">
+                                    No transaction logs found.
+                                </div>
+                            ) : (
+                                transactions.map((tx, idx) => (
+                                    <div
+                                        key={idx}
+                                        className="flex items-center justify-between p-3 rounded-2xl bg-[#0A192F]/60 border border-white/5 hover:border-emerald-500/20 transition-all"
+                                    >
                                         <div className="flex items-center gap-3">
-                                            <div className="p-2 rounded-full bg-green-500/10 text-green-400">
-                                                <CheckCircle size={16} />
+                                            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                                <CheckCircle className="w-4 h-4" />
                                             </div>
                                             <div>
-                                                <div className="font-mono text-[#E6F1FF]">
+                                                <div className="font-mono font-bold text-sm text-white">
                                                     ₹{Number(tx.amount).toLocaleString()}
                                                 </div>
-                                                <div className="text-xs text-[#8892B0] flex gap-2">
-                                                    <span>{tx.date?.toDate ? tx.date.toDate().toLocaleDateString() : 'N/A'}</span>
+                                                <div className="text-[10px] text-white/40 flex items-center gap-2 font-bold uppercase tracking-wider mt-1">
+                                                    <span>
+                                                        {tx.createdAt?.seconds
+                                                            ? new Date(tx.createdAt.seconds * 1000).toLocaleDateString()
+                                                            : tx.date?.seconds
+                                                            ? new Date(tx.date.seconds * 1000).toLocaleDateString()
+                                                            : "Recent"}
+                                                    </span>
                                                     <span>•</span>
-                                                    <span className="uppercase">{tx.method}</span>
+                                                    <span className="text-emerald-400">{tx.method || "ONLINE"}</span>
                                                 </div>
                                             </div>
                                         </div>
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            className="border-[#64FFDA]/20 text-[#64FFDA] hover:bg-[#64FFDA]/10"
-                                            onClick={() => printPaymentReceipt({ payment: tx, student: studentData, ledger })}
+                                            className="border-white/10 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-white/60 hover:text-white text-[10px] font-bold py-1 px-3 h-8 rounded-xl"
+                                            onClick={() =>
+                                                printPaymentReceipt({
+                                                    payment: tx,
+                                                    student: profile,
+                                                    ledger
+                                                })
+                                            }
                                         >
-                                            <Printer className="w-3 h-3 mr-2" /> Receipt
+                                            <Printer className="w-3.5 h-3.5 mr-1" /> Receipt
                                         </Button>
                                     </div>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
+                                ))
+                            )}
+                        </CardContent>
+                    </Card>
+                </div>
             </div>
-
-            {/* Fee Structure / Ledger Breakdown */}
-            <Card className="bg-[#112240] border-[#64FFDA]/10">
-                <CardHeader>
-                    <CardTitle className="text-[#E6F1FF] flex items-center gap-2">
-                        <FileText className="w-5 h-5" /> Fee Payment Breakdown
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {!ledgerItems.length ? (
-                        <div className="text-center py-10 text-[#8892B0]">No active fee structure assigned.</div>
-                    ) : (
-                        <div className="space-y-4">
-                            {ledgerItems.map((item: any, i: number) => {
-                                const paid = item.paidAmount || 0;
-                                const due = item.amount - paid;
-                                const isPaid = due <= 0;
-
-                                return (
-                                    <div key={i} className="flex flex-col md:flex-row md:items-center justify-between p-4 rounded-lg bg-[#0A192F]/50 border border-white/5 hover:border-white/10 transition-colors">
-                                        <div className="mb-2 md:mb-0">
-                                            <div className="flex items-center gap-2">
-                                                <span className="font-bold text-lg text-[#E6F1FF]">{item.name}</span>
-                                                <Badge variant="outline" className="text-xs border-white/10 text-[#8892B0] uppercase">{item.type || "FEE"}</Badge>
-                                            </div>
-                                            <div className="text-sm text-[#8892B0] mt-1">Due Date: {item.dueDate || "N/A"}</div>
-                                        </div>
-
-                                        <div className="flex items-center gap-6">
-                                            <div className="text-right">
-                                                <div className="text-xs text-[#8892B0] uppercase tracking-wider mb-1">Status</div>
-                                                <div className={`font-bold text-sm ${isPaid ? "text-green-400" : "text-yellow-400"}`}>
-                                                    {isPaid ? "PAID" : "PENDING"}
-                                                </div>
-                                            </div>
-                                            <div className="text-right min-w-[100px]">
-                                                <div className="text-xs text-[#8892B0] uppercase tracking-wider mb-1">Amount</div>
-                                                <div className="font-mono text-xl text-[#E6F1FF]">₹ {item.amount.toLocaleString()}</div>
-                                                {paid > 0 && !isPaid && (
-                                                    <div className="text-xs text-green-400">Paid: ₹{paid.toLocaleString()}</div>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
-                        </div>
-                    )}
-                </CardContent>
-            </Card>
         </div>
     );
 }

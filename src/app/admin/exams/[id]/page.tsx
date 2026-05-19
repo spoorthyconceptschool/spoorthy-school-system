@@ -6,6 +6,7 @@ import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useMasterData } from "@/context/MasterDataContext";
 import { Button } from "@/components/ui/button";
+import { createNotification } from "@/lib/notifications";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
@@ -23,16 +24,97 @@ import { useRouter } from "next/navigation";
 export default function ExamDetailsPage({ params }: { params: Promise<{ id: string }> }) {
     const { id: examId } = use(params);
     const router = useRouter();
-    const { classes: classesData, subjects: subjectsData, classSubjects } = useMasterData();
+    const { classes: classesData, subjects: subjectsData, classSubjects, sections: sectionsData, classSections } = useMasterData();
     const [exam, setExam] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
 
     const [selectedClassId, setSelectedClassId] = useState("");
+    const [timetableMode, setTimetableMode] = useState<"COMBINED" | "INDIVIDUAL">("COMBINED");
+    const [selectedSectionId, setSelectedSectionId] = useState("");
     const [timetable, setTimetable] = useState<any>({}); // Current class timetable
+    const [students, setStudents] = useState<any[]>([]);
+    const [loadingStudents, setLoadingStudents] = useState(false);
+
+    useEffect(() => {
+        if (!selectedClassId) {
+            setStudents([]);
+            return;
+        }
+        const fetchStudents = async () => {
+            setLoadingStudents(true);
+            try {
+                const q = query(collection(db, "students"), where("classId", "==", selectedClassId), where("status", "==", "ACTIVE"));
+                const snap = await getDocs(q);
+                const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                list.sort((a: any, b: any) => (parseInt(a.rollNo) || 999) - (parseInt(b.rollNo) || 999));
+                setStudents(list);
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setLoadingStudents(false);
+            }
+        };
+        fetchStudents();
+    }, [selectedClassId]);
+
+    const handleToggleOverride = async (studentId: string, currentOverride: boolean) => {
+        if (!exam) return;
+        try {
+            const updatedOverrides = {
+                ...(exam.hallTicketOverrides || {})
+            };
+            
+            if (!currentOverride) {
+                updatedOverrides[studentId] = true;
+            } else {
+                delete updatedOverrides[studentId];
+            }
+
+            const { id, ...examDataWithoutId } = exam;
+            await setDoc(doc(db, "exams", examId), {
+                ...examDataWithoutId,
+                hallTicketOverrides: updatedOverrides
+            });
+
+            setExam((prev: any) => ({
+                ...prev,
+                hallTicketOverrides: updatedOverrides
+            }));
+
+            // Notify student of this release!
+            if (!currentOverride) {
+                await createNotification({
+                    target: `student_${studentId}`,
+                    title: "Hall Ticket Manually Released",
+                    message: `Your hall ticket for "${exam.name}" has been manually released by the administrator. You can now download it on your portal.`,
+                    type: "NOTICE"
+                }).catch(err => console.error("Notification override error:", err));
+            }
+        } catch (e: any) {
+            console.error("Override Toggle Error:", e);
+            alert("Error: " + e.message);
+        }
+    };
 
     // Convert master data
     const classes = Object.values(classesData).map((c: any) => ({ id: c.id, name: c.name, order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
+
+    const filteredClasses = useMemo(() => {
+        if (exam?.classIds && Array.isArray(exam.classIds) && exam.classIds.length > 0) {
+            return classes.filter((c: any) => exam.classIds.includes(c.id));
+        }
+        return classes;
+    }, [classes, exam]);
+
+    // Auto-select the first filtered class if the current selection is empty or invalid
+    useEffect(() => {
+        if (filteredClasses.length > 0) {
+            if (!selectedClassId || !filteredClasses.some(c => c.id === selectedClassId)) {
+                setSelectedClassId(filteredClasses[0].id);
+            }
+        }
+    }, [filteredClasses, selectedClassId]);
 
     const fetchExam = async () => {
         try {
@@ -74,28 +156,58 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
 
     useEffect(() => {
         if (selectedClassId && exam) {
-            // Load existing timetable for this class or init empty
-            const existing = exam.timetables?.[selectedClassId] || {};
+            // Target key depends on mode and selection
+            let targetKey = selectedClassId;
+            if (timetableMode === "INDIVIDUAL") {
+                if (!selectedSectionId) {
+                    setTimetable({});
+                    return;
+                }
+                targetKey = `${selectedClassId}_${selectedSectionId}`;
+            }
+
+            // Load existing timetable for this key or init empty
+            const existing = exam.timetables?.[targetKey] || {};
 
             const initial: any = {};
             relevantSubjects.forEach(s => {
                 if (existing[s.id]) {
-                    initial[s.id] = { ...existing[s.id], enabled: true };
+                    initial[s.id] = {
+                        ...existing[s.id],
+                        maxMarks: existing[s.id].maxMarks || "100",
+                        passMarks: existing[s.id].passMarks || "35",
+                        enabled: true
+                    };
                 } else {
-                    initial[s.id] = { date: "", startTime: "09:00", endTime: "12:00", enabled: false };
+                    initial[s.id] = { date: "", startTime: "09:00", endTime: "12:00", maxMarks: "100", passMarks: "35", enabled: false };
                 }
             });
             setTimetable(initial);
+        } else {
+            setTimetable({});
         }
-    }, [selectedClassId, exam, relevantSubjects]);
+    }, [selectedClassId, selectedSectionId, timetableMode, exam, relevantSubjects]);
 
     const handleSaveTimetable = async () => {
         if (!selectedClassId || !exam) {
-            console.error("Missing selectedClassId or exam data", { selectedClassId, exam });
+            console.error("Missing selectedClassId or exam data");
             return;
         }
+
+        let targetKey = selectedClassId;
+        let targetLabel = classesData[selectedClassId]?.name || "Class";
+
+        if (timetableMode === "INDIVIDUAL") {
+            if (!selectedSectionId) {
+                alert("Please select a section for Individual Timetable Mode.");
+                return;
+            }
+            targetKey = `${selectedClassId}_${selectedSectionId}`;
+            targetLabel = `${targetLabel} - ${sectionsData?.[selectedSectionId]?.name || "Section"}`;
+        }
+
         setSaving(true);
-        console.log("Saving timetable for class:", selectedClassId);
+        console.log("Saving timetable for targetKey:", targetKey);
 
         try {
             // Filter only enabled subjects
@@ -105,7 +217,9 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                     cleanTimetable[subId] = {
                         date: data.date,
                         startTime: data.startTime || "09:00",
-                        endTime: data.endTime || "12:00"
+                        endTime: data.endTime || "12:00",
+                        maxMarks: data.maxMarks || "100",
+                        passMarks: data.passMarks || "35"
                     };
                 }
             });
@@ -115,7 +229,7 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
             const { id, ...examDataWithoutId } = exam;
             const updatedTimetables = {
                 ...(examDataWithoutId.timetables || {}),
-                [selectedClassId]: cleanTimetable
+                [targetKey]: cleanTimetable
             };
 
             await setDoc(doc(db, "exams", examId), {
@@ -130,7 +244,15 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                 timetables: updatedTimetables
             });
 
-            alert(`Timetable for ${classesData[selectedClassId]?.name || "Class"} Saved Successfully!`);
+            // Notify students of this class that the exam timetable has been updated!
+            await createNotification({
+                target: `class_${selectedClassId}`,
+                title: "Exam Timetable Updated",
+                message: `The examination timetable for "${exam?.name || 'Upcoming Exam'}" has been updated. Please check your exam portal.`,
+                type: "NOTICE"
+            }).catch(err => console.error("Timetable notification error:", err));
+
+            alert(`Timetable for ${targetLabel} Saved Successfully!`);
         } catch (e: any) {
             console.error("Save Timetable Error:", e);
             alert("Failed to save: " + e.message);
@@ -152,8 +274,12 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
         startDate: "",
         endDate: "",
         examCenter: "SCS-HYD",
-        academicYear: "2025-26",
-        instructions: "Carry this Hall Ticket to the exam hall.\nReport 15 mins before time.\nNo electronic gadgets allowed."
+        academicYear: "2025-2026",
+        instructions: "Carry this Hall Ticket to the exam hall.\nReport 15 mins before time.\nNo electronic gadgets allowed.",
+        hallTicketRule: "NO_RESTRICTION",
+        hallTicketLimitAmount: 0,
+        hallTicketTerm: "",
+        classIds: [] as string[]
     });
 
     // Initialize edit form when exam loads
@@ -164,14 +290,22 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                 startDate: exam.startDate,
                 endDate: exam.endDate,
                 examCenter: exam.examCenter || "SCS-HYD",
-                academicYear: exam.academicYear || "2025-26",
-                instructions: exam.instructions || "Carry this Hall Ticket to the exam hall.\nReport 15 mins before time.\nNo electronic gadgets allowed."
+                academicYear: exam.academicYear || "2025-2026",
+                instructions: exam.instructions || "Carry this Hall Ticket to the exam hall.\nReport 15 mins before time.\nNo electronic gadgets allowed.",
+                hallTicketRule: exam.hallTicketRule || "NO_RESTRICTION",
+                hallTicketLimitAmount: exam.hallTicketLimitAmount || 0,
+                hallTicketTerm: exam.hallTicketTerm || "",
+                classIds: exam.classIds || []
             });
         }
     }, [exam]);
 
     const handleUpdateExam = async () => {
         if (!editForm.name || !editForm.startDate || !editForm.endDate) return;
+        if (editForm.classIds.length === 0) {
+            alert("Please select at least one eligible class for this exam.");
+            return;
+        }
         setSaving(true);
         try {
             await setDoc(doc(db, "exams", examId), {
@@ -267,6 +401,32 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                                 <Input className="bg-white/5 border-white/10" value={editForm.examCenter} onChange={e => setEditForm({ ...editForm, examCenter: e.target.value })} />
                             </div>
                         </div>
+
+                        <div className="space-y-2">
+                            <Label>Select Eligible Classes <span className="text-red-500">*</span></Label>
+                            <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border border-white/10 rounded-xl p-3 bg-white/5">
+                                {classes.map((cls: any) => {
+                                    const isChecked = editForm.classIds.includes(cls.id);
+                                    return (
+                                        <label key={cls.id} className="flex items-center gap-2 text-xs font-bold text-white cursor-pointer select-none py-1 hover:text-blue-400 transition-colors">
+                                            <input
+                                                type="checkbox"
+                                                checked={isChecked}
+                                                onChange={() => {
+                                                    if (isChecked) {
+                                                        setEditForm({ ...editForm, classIds: editForm.classIds.filter(id => id !== cls.id) });
+                                                    } else {
+                                                        setEditForm({ ...editForm, classIds: [...editForm.classIds, cls.id] });
+                                                    }
+                                                }}
+                                                className="rounded bg-black/40 border-white/20 text-blue-500 focus:ring-0 w-4 h-4 cursor-pointer"
+                                            />
+                                            {cls.name}
+                                        </label>
+                                    );
+                                })}
+                            </div>
+                        </div>
                         <div className="space-y-2">
                             <Label>Hall Ticket Instructions (one per line)</Label>
                             <textarea
@@ -275,7 +435,65 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                                 onChange={e => setEditForm({ ...editForm, instructions: e.target.value })}
                             />
                         </div>
-                        <Button onClick={handleUpdateExam} disabled={saving} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white mt-4">
+
+                        <div className="space-y-4 border-t border-white/5 pt-4">
+                            <h3 className="text-xs font-black uppercase tracking-widest text-[#64FFDA]">Hall Ticket Release Policy</h3>
+                            
+                            <div className="space-y-2">
+                                <Label>Select Release Criteria</Label>
+                                <Select 
+                                    value={editForm.hallTicketRule} 
+                                    onValueChange={val => setEditForm({ ...editForm, hallTicketRule: val })}
+                                >
+                                    <SelectTrigger className="w-full bg-white/5 border-white/10 h-10">
+                                        <SelectValue placeholder="Select Criteria" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-black border-white/10 text-white">
+                                        <SelectItem value="NO_RESTRICTION">Unrestricted Access (Free for all)</SelectItem>
+                                        <SelectItem value="PAID_FULL_FEE">Must Clear 100% of Total Dues</SelectItem>
+                                        <SelectItem value="PAID_SPECIFIC_TERM">Must Clear Dues up to a Specific Term</SelectItem>
+                                        <SelectItem value="PENDING_LIMIT">Dues Must be Below a Maximum Amount</SelectItem>
+                                        <SelectItem value="PAID_EXAM_FEE">Must Clear the "Exam Fee" Item</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+
+                            {editForm.hallTicketRule === "PENDING_LIMIT" && (
+                                <div className="space-y-2 animate-in fade-in duration-200">
+                                    <Label>Maximum Allowed Pending Balance (₹)</Label>
+                                    <Input 
+                                        type="number"
+                                        className="bg-white/5 border-white/10"
+                                        placeholder="e.g. 5000"
+                                        value={editForm.hallTicketLimitAmount}
+                                        onChange={e => setEditForm({ ...editForm, hallTicketLimitAmount: Number(e.target.value) })}
+                                    />
+                                    <p className="text-[10px] text-muted-foreground">Students with outstanding dues greater than this amount will be locked.</p>
+                                </div>
+                            )}
+
+                            {editForm.hallTicketRule === "PAID_SPECIFIC_TERM" && (
+                                <div className="space-y-2 animate-in fade-in duration-200">
+                                    <Label>Select Target Term</Label>
+                                    <Select 
+                                        value={editForm.hallTicketTerm} 
+                                        onValueChange={val => setEditForm({ ...editForm, hallTicketTerm: val })}
+                                    >
+                                        <SelectTrigger className="w-full bg-white/5 border-white/10 h-10">
+                                            <SelectValue placeholder="Choose Term" />
+                                        </SelectTrigger>
+                                        <SelectContent className="bg-black text-white border-white/10">
+                                            <SelectItem value="Term 1">Term 1</SelectItem>
+                                            <SelectItem value="Term 2">Term 2</SelectItem>
+                                            <SelectItem value="Term 3">Term 3</SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <p className="text-[10px] text-muted-foreground">Ensures Term 1 and any terms prior to or including this target term are fully cleared.</p>
+                                </div>
+                            )}
+                        </div>
+
+                        <Button onClick={handleUpdateExam} disabled={saving} className="w-full bg-emerald-600 hover:bg-emerald-700 text-white mt-4 font-black uppercase tracking-widest text-[10px] h-12 rounded-xl">
                             {saving ? <Loader2 className="animate-spin" /> : "Save Changes"}
                         </Button>
                     </div>
@@ -303,22 +521,45 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                             <CardDescription>Select a class to set exam dates and times for each subject.</CardDescription>
                         </CardHeader>
                         <CardContent className="space-y-6">
-                            <div className="flex flex-col md:flex-row md:items-center gap-4">
-                                <div className="flex items-center gap-4 flex-1">
-                                    <Label className="shrink-0 text-xs md:text-sm">Select Class:</Label>
+                            <div className="flex flex-col lg:flex-row lg:items-end gap-4 bg-white/5 p-4 rounded-xl border border-white/10">
+                                <div className="space-y-2 flex-1">
+                                    <Label className="text-xs md:text-sm font-bold text-white/70">Timetable Mode</Label>
+                                    <div className="flex bg-black/40 p-1 rounded-lg border border-white/10">
+                                        <button onClick={() => setTimetableMode("COMBINED")} className={cn("flex-1 py-2 text-xs font-bold rounded-md transition-all", timetableMode === "COMBINED" ? "bg-white text-black shadow-sm" : "text-white/50 hover:text-white")}>Combined Sections</button>
+                                        <button onClick={() => setTimetableMode("INDIVIDUAL")} className={cn("flex-1 py-2 text-xs font-bold rounded-md transition-all", timetableMode === "INDIVIDUAL" ? "bg-white text-black shadow-sm" : "text-white/50 hover:text-white")}>Individual Sections</button>
+                                    </div>
+                                </div>
+                                <div className="space-y-2 flex-1">
+                                    <Label className="text-xs md:text-sm font-bold text-white/70">Select Class</Label>
                                     <Select value={selectedClassId} onValueChange={setSelectedClassId}>
-                                        <SelectTrigger className="w-full md:w-[200px] bg-white/5 border-white/10 h-10 md:h-9"><SelectValue placeholder="Choose Class" /></SelectTrigger>
+                                        <SelectTrigger className="w-full bg-black/40 border-white/10 h-10"><SelectValue placeholder="Choose Class" /></SelectTrigger>
                                         <SelectContent>
-                                            {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                            {filteredClasses.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
                                 </div>
-                                {selectedClassId && (
-                                    <Button onClick={handleSaveTimetable} disabled={saving} className="w-full md:w-auto bg-emerald-600 hover:bg-emerald-700 text-white h-11 md:h-9 text-[10px] font-bold uppercase tracking-widest gap-2">
-                                        {saving ? <Loader2 className="animate-spin w-4 h-4" /> : <Save className="w-4 h-4" />}
-                                        Save Timetable
-                                    </Button>
+                                {timetableMode === "INDIVIDUAL" && selectedClassId && (
+                                    <div className="space-y-2 flex-1 animate-in fade-in slide-in-from-top-2">
+                                        <Label className="text-xs md:text-sm font-bold text-white/70">Select Section</Label>
+                                        <Select value={selectedSectionId} onValueChange={setSelectedSectionId}>
+                                            <SelectTrigger className="w-full bg-black/40 border-white/10 h-10"><SelectValue placeholder="Choose Section" /></SelectTrigger>
+                                            <SelectContent>
+                                                {Object.values(classSections || {})
+                                                    .filter((cs: any) => cs.classId === selectedClassId)
+                                                    .map((cs: any) => {
+                                                        const sec = sectionsData?.[cs.sectionId];
+                                                        return sec ? <SelectItem key={cs.sectionId} value={cs.sectionId}>{sec.name}</SelectItem> : null;
+                                                    })}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
                                 )}
+                                <div className="space-y-2">
+                                    <Button onClick={handleSaveTimetable} disabled={saving || !selectedClassId || (timetableMode === 'INDIVIDUAL' && !selectedSectionId)} className="w-full lg:w-auto bg-emerald-600 hover:bg-emerald-700 text-white h-10 text-[10px] font-black uppercase tracking-widest gap-2 shadow-[0_0_15px_-3px_theme(colors.emerald.500/0.4)]">
+                                        {saving ? <Loader2 className="animate-spin w-4 h-4" /> : <Save className="w-4 h-4" />}
+                                        Save
+                                    </Button>
+                                </div>
                             </div>
 
                             {selectedClassId && (
@@ -394,6 +635,30 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                                                                     />
                                                                 </div>
                                                             </div>
+                                                            <div className="grid grid-cols-2 gap-3 mt-1">
+                                                                <div className="space-y-1.5 font-mono">
+                                                                    <label className="text-[8px] font-black text-muted-foreground uppercase tracking-widest italic">
+                                                                        Max Marks
+                                                                    </label>
+                                                                    <Input
+                                                                        type="number"
+                                                                        value={data.maxMarks || "100"}
+                                                                        onChange={e => updateSubject(subject.id, 'maxMarks', e.target.value)}
+                                                                        className="h-10 bg-white/5 border-white/10 w-full text-xs text-center font-bold text-emerald-400"
+                                                                    />
+                                                                </div>
+                                                                <div className="space-y-1.5 font-mono">
+                                                                    <label className="text-[8px] font-black text-muted-foreground uppercase tracking-widest italic">
+                                                                        Pass Marks
+                                                                    </label>
+                                                                    <Input
+                                                                        type="number"
+                                                                        value={data.passMarks || "35"}
+                                                                        onChange={e => updateSubject(subject.id, 'passMarks', e.target.value)}
+                                                                        className="h-10 bg-white/5 border-white/10 w-full text-xs text-center font-bold text-rose-400"
+                                                                    />
+                                                                </div>
+                                                            </div>
                                                         </div>
                                                     )}
                                                 </div>
@@ -411,6 +676,8 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                                                     <th className="p-3 text-left">Date</th>
                                                     <th className="p-3 text-left">Start Time</th>
                                                     <th className="p-3 text-left">End Time</th>
+                                                    <th className="p-3 text-left w-24">Max Marks</th>
+                                                    <th className="p-3 text-left w-24">Pass Marks</th>
                                                 </tr>
                                             </thead>
                                             <tbody className="divide-y divide-white/5">
@@ -467,6 +734,26 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                                                                     disabled={!data.enabled}
                                                                 />
                                                             </td>
+                                                            <td className="p-3">
+                                                                <Input
+                                                                    type="number"
+                                                                    value={data.maxMarks || "100"}
+                                                                    onChange={e => updateSubject(subId, 'maxMarks', e.target.value)}
+                                                                    className="h-8 bg-black/20 border-white/10 w-20 text-center font-bold text-emerald-400"
+                                                                    disabled={!data.enabled}
+                                                                    placeholder="100"
+                                                                />
+                                                            </td>
+                                                            <td className="p-3">
+                                                                <Input
+                                                                    type="number"
+                                                                    value={data.passMarks || "35"}
+                                                                    onChange={e => updateSubject(subId, 'passMarks', e.target.value)}
+                                                                    className="h-8 bg-black/20 border-white/10 w-20 text-center font-bold text-rose-400"
+                                                                    disabled={!data.enabled}
+                                                                    placeholder="35"
+                                                                />
+                                                            </td>
                                                         </tr>
                                                     );
                                                 })}
@@ -519,6 +806,66 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                                     </div>
                                 )}
                             </div>
+
+                            {selectedClassId && (
+                                <div className="space-y-4 border-t border-white/5 pt-6 mt-6">
+                                    <div className="flex justify-between items-center">
+                                        <h3 className="text-xs font-black uppercase tracking-widest text-[#64FFDA]">Manual Student Hall Ticket Overrides</h3>
+                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{students.length} Students found</span>
+                                    </div>
+                                    
+                                    {loadingStudents ? (
+                                        <div className="flex justify-center p-6"><Loader2 className="animate-spin text-blue-500" /></div>
+                                    ) : (
+                                        <div className="border border-white/10 rounded-xl overflow-hidden bg-black/10">
+                                            <table className="w-full text-left border-collapse text-xs">
+                                                <thead>
+                                                    <tr className="bg-white/5 border-b border-white/10 text-muted-foreground uppercase tracking-widest font-black text-[9px]">
+                                                        <th className="p-3 w-16">Roll No</th>
+                                                        <th className="p-3 w-32">Admission No</th>
+                                                        <th className="p-3">Name</th>
+                                                        <th className="p-3 w-48 text-center">Override Status</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {students.map((student: any) => {
+                                                        const isOverridden = exam?.hallTicketOverrides?.[student.id] === true;
+                                                        return (
+                                                            <tr key={student.id} className="border-b border-white/5 hover:bg-white/5 transition-all">
+                                                                <td className="p-3 font-mono font-bold text-blue-400">{student.rollNo || "-"}</td>
+                                                                <td className="p-3 font-mono">{student.admissionNo || "-"}</td>
+                                                                <td className="p-3 font-bold text-white">{student.studentName}</td>
+                                                                <td className="p-3 text-center">
+                                                                    <Button
+                                                                        size="sm"
+                                                                        variant={isOverridden ? "default" : "outline"}
+                                                                        onClick={() => handleToggleOverride(student.id, isOverridden)}
+                                                                        className={cn(
+                                                                            "h-8 px-4 font-bold text-[9px] uppercase tracking-widest rounded-lg transition-all",
+                                                                            isOverridden 
+                                                                                ? "bg-emerald-600 hover:bg-emerald-700 text-white font-black" 
+                                                                                : "border-white/10 text-muted-foreground hover:bg-white/5 hover:text-white"
+                                                                        )}
+                                                                    >
+                                                                        {isOverridden ? "Force Released" : "Policy Default"}
+                                                                    </Button>
+                                                                </td>
+                                                            </tr>
+                                                        );
+                                                    })}
+                                                    {students.length === 0 && (
+                                                        <tr>
+                                                            <td colSpan={4} className="p-8 text-center text-muted-foreground italic">
+                                                                No active students found in this class.
+                                                            </td>
+                                                        </tr>
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    )}
+                                </div>
+                            )}
 
                             <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4 text-emerald-300 text-sm">
                                 <h4 className="font-bold flex items-center mb-2"><FileText className="w-4 h-4 mr-2" /> Printing Instructions</h4>

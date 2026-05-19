@@ -15,6 +15,7 @@ export default function StudentHallTicketPage({ params }: { params: Promise<{ id
 
     const [loading, setLoading] = useState(true);
     const [denied, setDenied] = useState(false);
+    const [denialReason, setDenialReason] = useState("");
     const [data, setData] = useState<{ exam: any, student: any, schedule: any[] } | null>(null);
 
     useEffect(() => {
@@ -35,23 +36,7 @@ export default function StudentHallTicketPage({ params }: { params: Promise<{ id
             const sData = { id: sSnap.docs[0].id, ...sSnap.docs[0].data() } as any;
             const schoolId = sData.schoolId || sData.id;
 
-            // 2. Check Fees (Security)
-            const yearId = sData.academicYear || "2025-2026";
-            const ledgerRef = doc(db, "student_fee_ledgers", `${schoolId}_${yearId}`);
-            const ledgerSnap = await getDoc(ledgerRef);
-            let totalDue = 0;
-            if (ledgerSnap.exists()) {
-                const items = ledgerSnap.data().items || [];
-                totalDue = items.reduce((sum: number, item: any) => sum + (item.amount - (item.paidAmount || 0)), 0);
-            }
-
-            if (totalDue > 0) {
-                setDenied(true);
-                setLoading(false);
-                return;
-            }
-
-            // 3. Fetch Exam
+            // 2. Fetch Exam details
             const examSnap = await getDoc(doc(db, "exams", examId));
             if (!examSnap.exists()) {
                 setLoading(false);
@@ -59,7 +44,79 @@ export default function StudentHallTicketPage({ params }: { params: Promise<{ id
             }
             const examData = { id: examSnap.id, ...examSnap.data() } as any;
 
-            // 4. Process Schedule
+            // 3. Fetch Fee Ledger for dynamic evaluation
+            const yearId = sData.academicYear || "2025-2026";
+            const ledgerRef = doc(db, "student_fee_ledgers", `${schoolId}_${yearId}`);
+            const ledgerSnap = await getDoc(ledgerRef);
+            let ledgerItems: any[] = [];
+            if (ledgerSnap.exists()) {
+                ledgerItems = ledgerSnap.data().items || [];
+            }
+
+            // 4. Evaluate release policy security guard
+            let isAllowed = true;
+            let reason = "";
+
+            if (examData.hallTicketOverrides && examData.hallTicketOverrides[sData.id] === true) {
+                isAllowed = true;
+            } else {
+                const rule = examData.hallTicketRule || "NO_RESTRICTION";
+                const totalDue = ledgerItems.reduce((sum: number, item: any) => sum + (item.amount - (item.paidAmount || 0)), 0);
+                
+                if (rule === "PAID_FULL_FEE") {
+                    isAllowed = totalDue <= 0;
+                    reason = "All outstanding school fee dues must be fully cleared.";
+                } else if (rule === "PENDING_LIMIT") {
+                    const limit = Number(examData.hallTicketLimitAmount || 0);
+                    isAllowed = totalDue <= limit;
+                    reason = `Your pending balance (₹${totalDue.toLocaleString()}) exceeds the allowed limit of ₹${limit.toLocaleString()}.`;
+                } else if (rule === "PAID_EXAM_FEE") {
+                    const examFeeItems = ledgerItems.filter((item: any) => 
+                        item.name?.toUpperCase().includes("EXAM")
+                    );
+                    if (examFeeItems.length > 0) {
+                        const unpaidExamFees = examFeeItems.filter((item: any) => 
+                            (item.amount - (item.paidAmount || 0)) > 0
+                        );
+                        isAllowed = unpaidExamFees.length === 0;
+                        const unpaidAmount = unpaidExamFees.reduce((sum: number, item: any) => sum + (item.amount - (item.paidAmount || 0)), 0);
+                        reason = `You have ₹${unpaidAmount.toLocaleString()} pending in Exam Fees. Please clear this to unlock.`;
+                    }
+                } else if (rule === "PAID_SPECIFIC_TERM") {
+                    const targetTerm = examData.hallTicketTerm || "";
+                    if (targetTerm) {
+                        const targetMatch = targetTerm.match(/\d+/);
+                        const targetDigit = targetMatch ? parseInt(targetMatch[0], 10) : null;
+                        const termItems = ledgerItems.filter((item: any) => item.type === "TERM");
+                        
+                        const unpaidMatchingTerms = termItems.filter((item: any) => {
+                            const itemDue = item.amount - (item.paidAmount || 0);
+                            if (itemDue <= 0) return false;
+                            if (targetDigit !== null) {
+                                const itemMatch = item.name?.match(/\d+/);
+                                const itemDigit = itemMatch ? parseInt(itemMatch[0], 10) : null;
+                                if (itemDigit !== null) {
+                                    return itemDigit <= targetDigit;
+                                }
+                            }
+                            return item.name?.toUpperCase().includes(targetTerm.toUpperCase());
+                        });
+                        
+                        isAllowed = unpaidMatchingTerms.length === 0;
+                        const unpaidAmount = unpaidMatchingTerms.reduce((sum: number, item: any) => sum + (item.amount - (item.paidAmount || 0)), 0);
+                        reason = `Clear pending dues for ${targetTerm} (₹${unpaidAmount.toLocaleString()}) to unlock.`;
+                    }
+                }
+            }
+
+            if (!isAllowed) {
+                setDenied(true);
+                setDenialReason(reason);
+                setLoading(false);
+                return;
+            }
+
+            // 5. Process Schedule
             const myClassId = sData.classId;
             const rawTimetable = examData.timetables?.[myClassId] || {};
             const schedule = Object.entries(rawTimetable)
@@ -89,7 +146,7 @@ export default function StudentHallTicketPage({ params }: { params: Promise<{ id
                 </div>
                 <h1 className="text-2xl font-bold text-gray-800">Access Denied</h1>
                 <p className="text-gray-500 mt-2 max-w-md">
-                    Hall Ticket access is restricted due to pending fee dues. Please clear your outstanding balance to download your hall ticket.
+                    {denialReason || "Hall Ticket access is restricted due to pending fee dues. Please clear your outstanding balance to download your hall ticket."}
                 </p>
                 <Button className="mt-6" variant="outline" onClick={() => window.close()}>Close Window</Button>
             </div>

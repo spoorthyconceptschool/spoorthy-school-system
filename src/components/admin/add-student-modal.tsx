@@ -3,7 +3,7 @@
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-import { useState } from "react";
+import { useState, useRef } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -15,12 +15,13 @@ import { useMasterData } from "@/context/MasterDataContext";
 import { toast } from "@/lib/toast-store";
 import { exportSingleStudentFee, printStudentFeeStructure } from "@/lib/export-utils";
 
-export function AddStudentModal({ onSuccess, onOptimisticUpdate, children }: { onSuccess?: () => void, onOptimisticUpdate?: (student: any) => void, children?: React.ReactNode }) {
+export function AddStudentModal({ onSuccess, onOptimisticUpdate, children }: { onSuccess?: (student: { schoolId: string, studentName: string }) => void, onOptimisticUpdate?: (student: any) => void, children?: React.ReactNode }) {
     const { user, callApi } = useAuth();
     const { villages: villagesData, classes: classesData, sections: sectionsData, classSections, branding, loading: masterDataLoading, selectedYear } = useMasterData();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [successData, setSuccessData] = useState<{ schoolId: string, studentName: string, className: string } | null>(null);
+    const submittingRef = useRef(false);
 
     const [formData, setFormData] = useState({
         studentName: "",
@@ -48,24 +49,21 @@ export function AddStudentModal({ onSuccess, onOptimisticUpdate, children }: { o
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (submittingRef.current) return;
         if (!user) return toast({ title: "Auth Required", description: "Please log in to confirm admission.", type: "error" });
         if (!formData.studentName || formData.studentName.length < 2) return toast({ title: "Name Required", type: "error" });
         if (!/^\d{10}$/.test(formData.parentPhone)) return toast({ title: "Invalid Mobile", type: "error" });
         if (!formData.villageId || !formData.classId) return toast({ title: "Missing Fields", type: "error" });
         if (formData.gender === "select") return toast({ title: "Gender Required", type: "error" });
 
+        submittingRef.current = true;
         setLoading(true);
         
-        // 1. Immediately paint the success state (Sub-16ms transition)
+        // 1. Trigger Optimistic Update in parent list
         const optimisticId = `temp-${Date.now()}`;
         const selectedClass = classesList.find(c => c.id === formData.classId)?.name || "N/A";
         const selectedVillage = villages.find(v => v.id === formData.villageId)?.name || "N/A";
 
-        setSuccessData({ 
-            schoolId: "GENERATING...", 
-            studentName: formData.studentName, 
-            className: selectedClass
-        });
 
         // 2. Trigger Optimistic Update in parent list
         onOptimisticUpdate?.({
@@ -129,22 +127,27 @@ export function AddStudentModal({ onSuccess, onOptimisticUpdate, children }: { o
             }
 
                 const finalSchoolId = data.data?.schoolId || data.schoolId;
+                const studentNameVal = payload.studentName;
                 
-                // RECONCILIATION: Update the optimistic state with final server data
+                // 3. SHOW SUCCESS STATE ONLY AFTER CONFIRMATION
                 setSuccessData({ 
                     schoolId: finalSchoolId, 
-                    studentName: formData.studentName, 
+                    studentName: studentNameVal, 
                     className: selectedClass || "N/A" 
                 });
                 
                 toast({ title: "Admission Successful", type: "success" });
                 setFormData({ studentName: "", parentName: "", parentPhone: "", villageId: "", classId: "", sectionId: "", dateOfBirth: "", gender: "select", transportRequired: false });
-                onSuccess?.();
+                onSuccess?.({
+                    schoolId: finalSchoolId,
+                    studentName: studentNameVal
+                });
             } catch (error: any) {
                 setSuccessData(null);
                 toast({ title: "Admission Failed", description: error.message, type: "error" });
             } finally {
                 setLoading(false);
+                submittingRef.current = false;
             }
         };
 
@@ -152,10 +155,27 @@ export function AddStudentModal({ onSuccess, onOptimisticUpdate, children }: { o
         processAdmission();
     };
 
+    const resetState = () => {
+        setFormData({
+            studentName: "",
+            parentName: "",
+            parentPhone: "",
+            villageId: "",
+            classId: "",
+            sectionId: "",
+            dateOfBirth: "",
+            gender: "select",
+            transportRequired: false
+        });
+        setSuccessData(null);
+        setLoading(false);
+        submittingRef.current = false;
+    };
+
     return (
         <Dialog open={open} onOpenChange={(val) => {
             setOpen(val);
-            if (!val) setSuccessData(null);
+            resetState();
         }}>
             <DialogTrigger asChild>
                 {children || (

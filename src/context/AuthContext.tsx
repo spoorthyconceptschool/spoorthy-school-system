@@ -126,19 +126,24 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
         const unsub = onSnapshot(doc(db, "user_sessions", user.uid), (snap) => {
             if (snap.exists()) {
-                const dbSessionId = snap.data().currentSessionId;
+                const data = snap.data();
+                const dbSessionId = data.currentSessionId;
+                const dbOrigin = data.origin;
                 const localSessionId = localStorage.getItem(SESSION_KEY);
                 
-                // Only enforce eviction if BOTH sessions exist but don't match.
-                // This prevents race conditions where local storage is temporarily empty during transitions.
+                // Only enforce eviction if BOTH sessions exist, don't match, and are on the SAME origin.
+                // This prevents race conditions, and allows developers to run localhost & production simultaneously.
                 if (dbSessionId && localSessionId && dbSessionId !== localSessionId) {
-                    console.error("[Auth] SESSION OVERRIDE DETECTED. Executing emergency logout.");
-                    firebaseSignOut(auth);
-                    localStorage.removeItem(STORAGE_KEY);
-                    localStorage.removeItem(SESSION_KEY);
-                    setUser(null);
-                    setUserData(null);
-                    router.push("/login?error=session_expired");
+                    const currentOrigin = typeof window !== "undefined" ? window.location.origin : "";
+                    if (!dbOrigin || dbOrigin === currentOrigin) {
+                        console.error("[Auth] SESSION OVERRIDE DETECTED. Executing emergency logout.");
+                        firebaseSignOut(auth);
+                        localStorage.removeItem(STORAGE_KEY);
+                        localStorage.removeItem(SESSION_KEY);
+                        setUser(null);
+                        setUserData(null);
+                        router.push("/login?error=session_expired");
+                    }
                 }
             }
         });
@@ -208,6 +213,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             
             await setDoc(doc(db, "user_sessions", result.user.uid), {
                 currentSessionId: newSessionId,
+                origin: typeof window !== "undefined" ? window.location.origin : "",
                 lastActive: new Date().toISOString()
             }, { merge: true });
 

@@ -59,27 +59,29 @@ export async function POST(req: NextRequest) {
             const purgeType = body.type || 'OPERATIONAL_ONLY';
             console.log("[Purge] Mode:", purgeType);
 
-            // 1. Define Target Collections
-            const operationalCols = [
-                "student_fee_ledgers", "payments", "invoices", "transactions", "fee_structures", "fee_types", "ledger", "expenses", "payroll",
-                "attendance", "leaves", "class_timetables", "teacher_schedules", "substitutions", "coverage_tasks",
-                "homework", "homework_submissions", "exam_results", "grades", "leave_requests",
-                "announcements", "events", "notifications", "audit_logs", "notices", "analytics", "reports",
-                "feedback", "enquiries", "applications", "custom_fees", "exams", "salaries", "teaching_assignments",
-                "timetable_settings", "search_index", "student_leaves"
-            ];
+            // 1. DYNAMIC COLLECTION DISCOVERY (TRUE NUKE)
+            const allCollections = await adminDb.listCollections();
+            const whitelist = ["config", "siteContent", "users", "master_staff_roles"];
+            
+            const collectionsToWipe = allCollections
+                .map(c => c.id)
+                .filter(id => {
+                    if (purgeType === 'FULL_SYSTEM') {
+                        // In full system, we only keep the bare essentials
+                        return !whitelist.includes(id);
+                    } else {
+                        // In operational only, we keep core registries
+                        const registries = ["students", "teachers", "staff", "groups", "villages", "users"];
+                        return !whitelist.includes(id) && !registries.includes(id);
+                    }
+                });
 
-            const systemCols = ["students", "teachers", "staff", "user_actions", "student_keywords", "teacher_keywords", "usersBySchoolId"];
-
-            let collectionsToWipe = [...operationalCols];
-            if (purgeType === 'FULL_SYSTEM') {
-                collectionsToWipe = [...collectionsToWipe, ...systemCols];
-            }
+            console.log(`[Purge] Wiping discovered collections: ${collectionsToWipe.join(", ")}`);
 
             // 2. Execute Firestore Wipes
-            const results = await parallelWipe(collectionsToWipe, 6);
+            const results = await parallelWipe(collectionsToWipe, 8);
 
-            // 3. Perform Auth Cleanup & User Registry Reset (Full Nuke Only)
+            // 3. Perform Auth Cleanup & Counter Reset (Full Nuke Only)
             if (purgeType === 'FULL_SYSTEM') {
                 console.log("[Purge] Commencing Auth User Deletion...");
 
@@ -90,9 +92,6 @@ export async function POST(req: NextRequest) {
                 const userSnap = await adminDb.collection("users").get();
                 const uidsToDelete: string[] = [];
 
-                console.log(`[Purge] Found ${userSnap.docs.length} users. Filtering...`);
-
-                // 3a. Firestore User Reset (Chunked commits to prevent batch limit crash)
                 let userBatch = adminDb.batch();
                 let batchCount = 0;
                 let totalDeleted = 0;
@@ -105,7 +104,6 @@ export async function POST(req: NextRequest) {
                         batchCount++;
                         totalDeleted++;
 
-                        // Commit every 450 operations (Firestore limit is 500)
                         if (batchCount >= 450) {
                             await userBatch.commit();
                             userBatch = adminDb.batch();
@@ -114,32 +112,31 @@ export async function POST(req: NextRequest) {
                     }
                 }
                 if (batchCount > 0) await userBatch.commit();
-                console.log(`[Purge] Firestore registry cleared (${totalDeleted} records).`);
 
-                // 3b. Auth User Deletion (Admin SDK limit is 1000 per call)
-                console.log(`[Purge] Deleting ${uidsToDelete.length} Auth accounts...`);
+                // Auth Deletion
                 for (let i = 0; i < uidsToDelete.length; i += 1000) {
                     const chunk = uidsToDelete.slice(i, i + 1000);
-                    try {
-                        await adminAuth.deleteUsers(chunk);
-                    } catch (e: any) {
-                        console.error("[Purge] Auth Chunk Delete Failure:", e.message);
-                    }
+                    try { await adminAuth.deleteUsers(chunk); } catch (e) {}
                 }
 
-                // Reset Counters
+                // Reset Counters & Metadata
                 await adminDb.collection("counters").doc("students").set({ current: 0 }, { merge: true });
                 await adminDb.collection("counters").doc("teachers").set({ current: 0 }, { merge: true });
+                await adminDb.collection("counters").doc("staff").set({ current: 0 }, { merge: true });
 
-                // RTDB Cleanup
+                // RTDB Cleanup - Thorough
                 try {
                     if (adminRtdb) {
-                        await adminRtdb.ref("analytics").remove();
-                        await adminRtdb.ref("attendance").remove();
-                        await adminRtdb.ref("realtime_notifications").remove();
-                        await adminRtdb.ref("master").remove();
-                        await adminRtdb.ref("teachers").remove();
-                        await adminRtdb.ref("staff").remove();
+                        await adminRtdb.ref().update({
+                            analytics: null,
+                            attendance: null,
+                            realtime_notifications: null,
+                            master: null,
+                            teachers: null,
+                            staff: null,
+                            students: null,
+                            timetables: null
+                        });
                     }
                 } catch (rtdbErr) {
                     console.warn("[Purge] RTDB Cleanup missed:", rtdbErr);

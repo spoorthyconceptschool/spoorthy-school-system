@@ -184,7 +184,7 @@ export function AcademicYearManager() {
     };
 
     const handleDeleteYear = async (year: string) => {
-        if (!confirm(`Are you sure you want to delete the academic year ${year}? This only removes the configuration entry, but linked data like students or fees might remain orphaned.`)) return;
+        if (!confirm(`CRITICAL WARNING: Deleting academic year "${year}" will PERMANENTLY WIPE all linked fees, payments, attendance, and timetables for this session. Students will NOT be deleted, but their history for this year will be lost. Are you absolutely sure?`)) return;
 
         try {
             const token = await user?.getIdToken();

@@ -1,629 +1,518 @@
 "use client";
 
-import { useState, useEffect } from "react";
-import { doc, getDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { useAuth } from "@/context/AuthContext";
-import { CheckCircle, Clock } from "lucide-react";
-import { Button } from "@/components/ui/button";
-import { Checkbox } from "@/components/ui/checkbox";
-import { Input } from "@/components/ui/input";
-import { CreditCard, Wallet, Calendar, Info, BookOpen, User, Bookmark, Loader2 } from "lucide-react";
-import { collection, query, where, onSnapshot, orderBy, limit } from "firebase/firestore";
-import { Skeleton } from "@/components/ui/skeleton";
+import { useState } from "react";
+import { useStudentData } from "@/context/StudentDataContext";
+import { BookOpen, Bell, Calendar, ChevronRight, AlertCircle, AlertTriangle, CheckCircle2, Megaphone, MapPin, Loader2, ArrowRight, Clock, User, CalendarCheck, Wallet, FileText } from "lucide-react";
 import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { Card, CardContent } from "@/components/ui/card";
+import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function StudentDashboard() {
-    const { user, userData } = useAuth();
-    const [isLoading, setIsLoading] = useState(() => {
-        if (typeof window !== 'undefined') {
-            return !localStorage.getItem("student_ledger_cache");
-        }
-        return true;
-    });
-    const [profile, setProfile] = useState<any>(() => {
-        if (typeof window !== 'undefined') {
-            try { return JSON.parse(localStorage.getItem("student_profile_cache") || "null"); } catch (e) { return null; }
-        }
-        return null;
-    });
-    const [ledger, setLedger] = useState<any>(() => {
-        if (typeof window !== 'undefined') {
-            try { return JSON.parse(localStorage.getItem("student_ledger_cache") || "null"); } catch (e) { return null; }
-        }
-        return null;
-    });
-    const [config, setConfig] = useState<{ keyId: string } | null>(null);
-    const [paymentStatus, setPaymentStatus] = useState<"pending" | "paid">("pending");
-
-    // Selection & Partial Payment State
-    const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
-    const [paymentAmounts, setPaymentAmounts] = useState<{ [key: string]: string }>({});
-    const [useHomeworkFallback, setUseHomeworkFallback] = useState(false);
-    const [recentHomework, setRecentHomework] = useState<any[]>(() => {
-        if (typeof window !== 'undefined') {
-            try { return JSON.parse(localStorage.getItem("student_recent_hw_cache") || "[]"); } catch (e) { return []; }
-        }
-        return [];
-    });
+    const { profile, homework, notices, attendanceStats, ledger, leaves, loading } = useStudentData();
     const router = useRouter();
 
-    useEffect(() => {
-        if (!user?.uid) return;
+    // Segment tab control state for mobile view
+    const [activeTab, setActiveTab] = useState<'notices' | 'homework'>('notices');
 
-        // 1. Load Razorpay Script
-        const script = document.createElement("script");
-        script.src = "https://checkout.razorpay.com/v1/checkout.js";
-        script.async = true;
-        document.body.appendChild(script);
+    const formatTimestamp = (timestamp: any) => {
+        if (!timestamp) return "";
+        const date = new Date(timestamp.seconds * 1000);
+        const now = Date.now();
+        const diff = now - date.getTime();
 
-        // A. Derived Identifiers
-        const schoolIdFromEmail = user?.email?.split('@')[0]?.toUpperCase();
-        if (!schoolIdFromEmail) {
-            console.warn("[Dashboard] Could not derive schoolId from email:", user?.email);
-            setIsLoading(false);
-            return;
-        }
-
-        let unsubLedger: (() => void) | null = null;
-        const yearId = "2025-2026";
-
-        const processProfileSnap = (pData: any, docId: string) => {
-            setProfile(pData);
-            if (typeof window !== 'undefined') localStorage.setItem("student_profile_cache", JSON.stringify(pData));
-            const sId = pData.schoolId || docId;
-
-            if (sId) {
-                if (unsubLedger) unsubLedger();
-                unsubLedger = onSnapshot(doc(db, "student_fee_ledgers", `${sId}_${yearId}`), (lSnap) => {
-                    if (lSnap.exists()) {
-                        const lData = lSnap.data();
-                        setLedger(lData);
-                        if (typeof window !== 'undefined') localStorage.setItem("student_ledger_cache", JSON.stringify(lData));
-                        setPaymentStatus(lData.status === "PAID" ? "paid" : "pending");
-
-                        const initialSelected = new Set<string>();
-                        const initialAmounts: { [key: string]: string } = {};
-                        const rawItems = lData.items || [];
-                        const totalReduction = rawItems.filter((i: any) => i.amount < 0).reduce((s: number, i: any) => s + Math.abs(i.amount - (i.paidAmount || 0)), 0);
-                        let reductionRemaining = totalReduction;
-
-                        rawItems.filter((i: any) => i.amount > 0).forEach((item: any) => {
-                            const remaining = item.amount - (item.paidAmount || 0);
-                            const discountForThisItem = Math.min(remaining, reductionRemaining);
-                            const netRemaining = remaining - discountForThisItem;
-                            reductionRemaining -= discountForThisItem;
-
-                            if (netRemaining > 0) {
-                                initialSelected.add(item.id);
-                                initialAmounts[item.id] = netRemaining.toString();
-                            }
-                        });
-                        setSelectedItems(initialSelected);
-                        setPaymentAmounts(initialAmounts);
-                    }
-                    setIsLoading(false);
-                }, (err) => {
-                    console.warn("[Dashboard] Ledger sync error:", err.message);
-                    setIsLoading(false);
-                });
-            } else {
-                if (!localStorage.getItem("student_ledger_cache")) {
-                    setIsLoading(false);
-                }
-            }
-        };
-
-        // Primary Listener: Profile
-        const unsubProfile = onSnapshot(doc(db, "students", schoolIdFromEmail), (pSnap) => {
-            if (pSnap.exists()) {
-                processProfileSnap(pSnap.data(), pSnap.id);
-            } else {
-                // Secondary Fallback: UID Query
-                const qProfile = query(
-                    collection(db, "students"), 
-                    where("uid", "==", user.uid),
-                    where("schoolId", "==", userData?.schoolId || "global")
-                );
-                onSnapshot(qProfile, (qSnap) => {
-                    if (!qSnap.empty) {
-                        processProfileSnap(qSnap.docs[0].data(), qSnap.docs[0].id);
-                    } else {
-                        console.warn("[Dashboard] Student profile not found in any form.");
-                        setIsLoading(false);
-                    }
-                }, (err) => console.warn("[Dashboard] Fallback profile sync error:", err.message));
-            }
-        }, (err) => {
-            console.warn("[Dashboard] Profile sync error:", err.message);
-            setIsLoading(false);
-        });
-
-        // Razorpay Config
-        const unsubConfig = onSnapshot(doc(db, "config", "razorpay"), (snap) => {
-            if (snap.exists()) setConfig(snap.data() as { keyId: string });
-        }, (err) => {
-            console.warn("[Dashboard] Razorpay config sync error:", err.message);
-        });
-
-        return () => {
-            unsubProfile();
-            if (unsubLedger) unsubLedger();
-            unsubConfig();
-            if (script && document.body.contains(script)) {
-                document.body.removeChild(script);
-            }
-        };
-    }, [user]);
-
-    const displaySchoolId = profile?.schoolId || user?.email?.split('@')[0].toUpperCase();
-
-    // Homework Real-time Listener for Dashboard
-    useEffect(() => {
-        if (!profile?.classId) return;
-
-        let isMounted = true;
-
-        console.log("[Dashboard] Listening for homework targeting:", { classId: profile.classId, sectionId: profile.sectionId });
-
-        const hQ = useHomeworkFallback
-            ? query(
-                collection(db, "homework"), 
-                where("classId", "==", profile.classId),
-                where("schoolId", "==", userData?.schoolId || profile.schoolId || "global"),
-                limit(10)
-            )
-            : query(
-                collection(db, "homework"), 
-                where("classId", "==", profile.classId), 
-                where("schoolId", "==", userData?.schoolId || profile.schoolId || "global"),
-                orderBy("createdAt", "desc"), 
-                limit(10)
-            );
-
-        const unsubscribe = onSnapshot(hQ, (snapshot) => {
-            if (!isMounted) return;
-            let list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-
-            // Filter by section if student has one, otherwise show all for class
-            let filtered = profile.sectionId
-                ? list.filter((hw: any) => !hw.sectionId || hw.sectionId === profile.sectionId || hw.sectionId === "ALL" || hw.sectionId === "GENERAL")
-                : list;
-
-            if (useHomeworkFallback) {
-                filtered = [...filtered].sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-            }
-
-            console.log("[Dashboard] Homework received/filtered:", filtered.length);
-            const top3 = filtered.slice(0, 3);
-            setRecentHomework(top3);
-            if (typeof window !== 'undefined') localStorage.setItem("student_recent_hw_cache", JSON.stringify(top3));
-        }, (err) => {
-            if (!isMounted) return;
-            if (err.message.includes('index') && !useHomeworkFallback) {
-                console.warn("[Dashboard] Index missing, switching to fallback query.");
-                setUseHomeworkFallback(true);
-            } else if (!err.message.includes('index')) {
-                console.warn("[Dashboard] Homework Sync Error:", err.message);
-            }
-        });
-
-        return () => {
-            isMounted = false;
-            unsubscribe();
-        };
-    }, [profile?.classId, profile?.sectionId, useHomeworkFallback]);
-
-    const handleToggleItem = (itemId: string, remaining: number) => {
-        // Reductions (negative balance) cannot be unselected
-        if (remaining < 0) return;
-
-        const next = new Set(selectedItems);
-        if (next.has(itemId)) {
-            next.delete(itemId);
-            const nextAmounts = { ...paymentAmounts };
-            delete nextAmounts[itemId];
-            setPaymentAmounts(nextAmounts);
-        } else {
-            next.add(itemId);
-            setPaymentAmounts({ ...paymentAmounts, [itemId]: remaining.toString() });
-        }
-        setSelectedItems(next);
+        if (diff < 60 * 1000) return "Just now";
+        if (diff < 60 * 60 * 1000) return `${Math.floor(diff / (60 * 1000))} min ago`;
+        if (diff < 24 * 60 * 60 * 1000) return `${Math.floor(diff / (60 * 60 * 1000))} hours ago`;
+        return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
     };
 
-    const handleAmountChange = (itemId: string, val: string, max: number) => {
-        // Allow leading minus sign and decimals
-        const numeric = val.replace(/[^0-9.-]/g, '');
-
-        // If it's a reduction (max < 0), we want to allow negative values up to that max
-        if (max < 0) {
-            if (Number(numeric) < max) return;
-            if (Number(numeric) > 0) return; // Can't pay 'positive' on a reduction
-        } else {
-            if (Number(numeric) > max) return;
-            if (Number(numeric) < 0) return; // Can't pay 'negative' on a normal fee
+    const getNoticeStyles = (type: string) => {
+        switch (type?.toUpperCase()) {
+            case "URGENT":
+                return {
+                    icon: <AlertTriangle className="w-4 h-4 text-rose-400" />,
+                    border: "border-rose-500/20",
+                    bg: "bg-rose-500/10",
+                    badgeBg: "bg-rose-500/20",
+                    badgeText: "text-rose-400",
+                };
+            case "HOLIDAY":
+                return {
+                    icon: <Calendar className="w-4 h-4 text-amber-400" />,
+                    border: "border-amber-500/20",
+                    bg: "bg-amber-500/10",
+                    badgeBg: "bg-amber-500/20",
+                    badgeText: "text-amber-400",
+                };
+            case "EVENT":
+                return {
+                    icon: <MapPin className="w-4 h-4 text-indigo-400" />,
+                    border: "border-indigo-500/20",
+                    bg: "bg-indigo-500/10",
+                    badgeBg: "bg-indigo-500/20",
+                    badgeText: "text-indigo-400",
+                };
+            case "ACADEMIC":
+                return {
+                    icon: <CheckCircle2 className="w-4 h-4 text-emerald-400" />,
+                    border: "border-emerald-500/20",
+                    bg: "bg-emerald-500/10",
+                    badgeBg: "bg-emerald-500/20",
+                    badgeText: "text-emerald-400",
+                };
+            default:
+                return {
+                    icon: <Megaphone className="w-4 h-4 text-[#64FFDA]" />,
+                    border: "border-[#64FFDA]/20",
+                    bg: "bg-[#64FFDA]/10",
+                    badgeBg: "bg-[#64FFDA]/20",
+                    badgeText: "text-[#64FFDA]",
+                };
         }
-
-        setPaymentAmounts({ ...paymentAmounts, [itemId]: numeric });
     };
 
-    // 1. Transaction-specific total (What the user is paying right now)
-    const totalToPay = Array.from(selectedItems).reduce((sum, id) => {
-        // Find the item to check if it's a reduction
-        const item = ledger?.items?.find((i: any) => i.id === id);
-        // Only sum if it's a positive fee item
-        const amt = Number(paymentAmounts[id]) || 0;
-        return sum + (item && item.amount > 0 ? amt : 0);
-    }, 0);
+    if (loading) {
+        return (
+            <div className="h-[60vh] w-full flex flex-col items-center justify-center gap-4 text-[#64FFDA]">
+                <Loader2 className="w-10 h-10 animate-spin" />
+                <p className="text-xs font-black uppercase tracking-widest text-[#8892B0] font-mono animate-pulse">
+                    Warming dashboard cache...
+                </p>
+            </div>
+        );
+    }
 
-    // 2. Ledger-wide historical totals (The full picture)
-    const ledgerTotalFee = ledger?.items?.reduce((sum: number, i: any) => sum + (i.amount > 0 ? i.amount : 0), 0) || 0;
-    const ledgerTotalReductions = ledger?.items?.reduce((sum: number, i: any) => sum + (i.amount < 0 ? Math.abs(i.amount) : 0), 0) || 0;
-    const ledgerPendingFee = Math.max(0, ledgerTotalFee - (ledger?.totalPaid || 0) - ledgerTotalReductions);
+    const studentName = profile?.studentName || profile?.name || "Student";
+    const studentClass = `${profile?.className || "Class 7"} (${profile?.sectionName || "B"})`;
+    const studentId = profile?.schoolId || profile?.id || "SHS1400";
 
-    const feeCurrency = "INR";
+    // Ledger Dues Calculation
+    const ledgerItems = ledger?.items || [];
+    const dueAmount = ledgerItems.reduce((sum: number, item: any) => sum + (item.amount - (item.paidAmount || 0)), 0);
 
-    const handlePayment = () => {
-        const hasPositiveSelection = Array.from(selectedItems).some(id => {
-            const item = ledger?.items?.find((i: any) => i.id === id);
-            return item && item.amount > 0 && (Number(paymentAmounts[id]) || 0) > 0;
-        });
+    // Leaves Count
+    const pendingLeaves = leaves?.filter((l: any) => l.status?.toUpperCase() === "PENDING")?.length || 0;
 
-        if (totalToPay <= 0 && hasPositiveSelection) {
-            alert("This selection is fully covered by your scholarship/benefits. No payment is required.");
-            return;
-        }
-
-        if (totalToPay <= 0) {
-            alert("Please select at least one item and enter a valid amount.");
-            return;
-        }
-
-        if (!config?.keyId) {
-            alert("Payment gateway not configured. Please contact admin.");
-            return;
-        }
-
-        const options = {
-            key: config.keyId,
-            amount: Math.round(totalToPay * 100), // Amount in paise
-            currency: feeCurrency,
-            name: "Spoorthy Concept School",
-            description: `Fee Payment - ${profile?.studentName}`,
-            handler: function (response: any) {
-                console.log(response);
-                alert(`Payment Successful! (Demo Mode)\nPayment ID: ${response.razorpay_payment_id}\nAmount: ₹${totalToPay}`);
-                // In production, sync with backend here
-            },
-            prefill: {
-                name: profile?.studentName,
-                email: user?.email,
-                contact: profile?.parentMobile
-            },
-            theme: { color: "#d4af37" }
-        };
-
-        const rzp = new (window as any).Razorpay(options);
-        rzp.open();
-    };
-
-    const termFees = ledger?.items?.filter((i: any) => i.type !== "CUSTOM" && (i.amount - (i.paidAmount || 0)) >= 0) || [];
-    const customFees = ledger?.items?.filter((i: any) => i.type === "CUSTOM" && (i.amount - (i.paidAmount || 0)) >= 0) || [];
-    const reductions = ledger?.items?.filter((i: any) => (i.amount - (i.paidAmount || 0)) < 0) || [];
+    // Limit active notices and homework to exactly 5
+    const dashboardNotices = notices.slice(0, 5);
+    const dashboardHomework = homework.slice(0, 5);
 
     return (
-        <div className="space-y-6 md:space-y-8 pb-12">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 px-2 md:px-0">
-                <div>
-                    <h1 className="font-display text-3xl md:text-5xl font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic">
-                        My Dashboard
-                    </h1>
-                    <p className="text-muted-foreground flex items-center gap-2">
-                        <Calendar className="w-4 h-4 text-accent" />
-                        Academic Year {ledger?.academicYearId || "2025-2026"}
-                    </p>
+        <div className="w-full h-full overflow-y-auto">
+            {/* =======================================
+                DESKTOP VIEW (>= lg Breakpoint)
+                ======================================= */}
+            <div className="hidden lg:flex lg:flex-col lg:space-y-6 w-full max-w-7xl mx-auto px-6 py-8 animate-in fade-in duration-500 relative">
+                
+                {/* Glowing Blur Decorations */}
+                <div className="absolute top-[-10%] left-[-5%] w-[35%] h-[40%] bg-blue-500/10 rounded-full blur-[100px] pointer-events-none" />
+                <div className="absolute top-[20%] right-[-5%] w-[35%] h-[40%] bg-purple-500/5 rounded-full blur-[100px] pointer-events-none" />
+
+                {/* Welcome Card & Summary Details */}
+                <Card className="bg-[#112240]/40 border-white/10 backdrop-blur-md shadow-2xl relative overflow-hidden">
+                    <CardContent className="p-6 flex items-center justify-between gap-6">
+                        <div className="flex items-center gap-5">
+                            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-blue-500 via-indigo-600 to-purple-600 flex items-center justify-center text-white text-2xl font-black border-2 border-white/20 shadow-xl shadow-blue-500/20">
+                                {studentName.charAt(0)}
+                            </div>
+                            <div className="text-left space-y-1">
+                                <span className="text-[10px] font-black text-blue-400 uppercase tracking-widest font-mono">Student Account</span>
+                                <h2 className="text-2xl font-extrabold text-white tracking-tight">{studentName}</h2>
+                                <p className="text-xs text-neutral-400">
+                                    School ID: <span className="text-emerald-400 font-mono font-bold">{studentId}</span>
+                                </p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-4">
+                            <div className="text-right">
+                                <span className="text-[10px] font-black text-neutral-500 uppercase tracking-widest">Current Class</span>
+                                <div className="text-lg font-extrabold text-white mt-0.5">{studentClass}</div>
+                            </div>
+                            <Badge className="bg-blue-500/10 text-blue-400 border border-blue-500/20 px-3 py-1 text-xs font-bold rounded-xl select-none">
+                                Academic Year {profile?.academicYear || "2025-2026"}
+                            </Badge>
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* KPI Metrics Widgets Bar */}
+                <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+                    {/* 1. Attendance Rate */}
+                    <Link href="/student/attendance">
+                        <Card className="bg-[#112240]/40 border-white/10 hover:border-emerald-500/30 backdrop-blur-md shadow-md cursor-pointer transition-all hover:scale-[1.02] duration-300">
+                            <CardContent className="p-5 flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Attendance Rate</span>
+                                    <div className="text-3xl font-black text-emerald-400">{attendanceStats?.percentage || 0}%</div>
+                                    <p className="text-[10px] text-neutral-400">{attendanceStats?.present || 0} Present / {attendanceStats?.total || 0} Days</p>
+                                </div>
+                                <div className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-400">
+                                    <CalendarCheck className="w-6 h-6" />
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </Link>
+
+                    {/* 2. Outstanding Dues */}
+                    <Link href="/student/fees">
+                        <Card className="bg-[#112240]/40 border-white/10 hover:border-rose-500/30 backdrop-blur-md shadow-md cursor-pointer transition-all hover:scale-[1.02] duration-300">
+                            <CardContent className="p-5 flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Outstanding Dues</span>
+                                    <div className={`text-3xl font-black ${dueAmount > 0 ? "text-rose-400" : "text-emerald-400"}`}>
+                                        ₹{dueAmount.toLocaleString()}
+                                    </div>
+                                    <p className="text-[10px] text-neutral-400">{dueAmount > 0 ? "Pending Term Fees" : "Dues fully cleared"}</p>
+                                </div>
+                                <div className={`w-12 h-12 rounded-xl flex items-center justify-center ${dueAmount > 0 ? "bg-rose-500/10 border border-rose-500/20 text-rose-400" : "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400"}`}>
+                                    <Wallet className="w-6 h-6" />
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </Link>
+
+                    {/* 3. Leave Balance */}
+                    <Link href="/student/leaves">
+                        <Card className="bg-[#112240]/40 border-white/10 hover:border-indigo-500/30 backdrop-blur-md shadow-md cursor-pointer transition-all hover:scale-[1.02] duration-300">
+                            <CardContent className="p-5 flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Leave Requests</span>
+                                    <div className="text-3xl font-black text-indigo-400">{pendingLeaves} Pending</div>
+                                    <p className="text-[10px] text-neutral-400">Total applied: {leaves?.length || 0}</p>
+                                </div>
+                                <div className="w-12 h-12 rounded-xl bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400">
+                                    <FileText className="w-6 h-6" />
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </Link>
+
+                    {/* 4. Active Notices count */}
+                    <Link href="/student/notices">
+                        <Card className="bg-[#112240]/40 border-white/10 hover:border-amber-500/30 backdrop-blur-md shadow-md cursor-pointer transition-all hover:scale-[1.02] duration-300">
+                            <CardContent className="p-5 flex items-center justify-between">
+                                <div className="space-y-1">
+                                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-wider">Notice Board</span>
+                                    <div className="text-3xl font-black text-amber-400">{notices.length} Active</div>
+                                    <p className="text-[10px] text-neutral-400">Official Announcements</p>
+                                </div>
+                                <div className="w-12 h-12 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center text-amber-400">
+                                    <Bell className="w-6 h-6" />
+                                </div>
+                            </CardContent>
+                        </Card>
+                    </Link>
+                </div>
+
+                {/* Main 2-Column Responsive Dashboard Content Grid */}
+                <div className="grid grid-cols-12 gap-6 items-start">
+                    
+                    {/* Left Column: Notices Inbox Feed */}
+                    <div className="col-span-12 lg:col-span-7 flex flex-col space-y-4">
+                        <div className="flex justify-between items-center px-1">
+                            <div className="flex items-center gap-2">
+                                <Bell className="w-5 h-5 text-amber-400" />
+                                <h3 className="text-base font-extrabold text-white">Important School Notices</h3>
+                            </div>
+                            <Link href="/student/notices">
+                                <Button variant="ghost" className="text-xs text-blue-400 hover:text-blue-300 gap-1 p-0 hover:bg-transparent">
+                                    View All Notices <ArrowRight className="w-3.5 h-3.5" />
+                                </Button>
+                            </Link>
+                        </div>
+
+                        <div className="bg-[#112240]/40 border border-white/10 backdrop-blur-md rounded-2xl p-5 space-y-4">
+                            {dashboardNotices.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-20 text-center">
+                                    <Bell className="w-10 h-10 text-neutral-600 mb-3" />
+                                    <h4 className="text-sm font-bold text-white uppercase tracking-widest">No Active Announcements</h4>
+                                    <p className="text-xs text-neutral-400 max-w-[240px] mt-1.5 leading-relaxed">
+                                        Check back later! You are completely up to date with school events and news.
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3.5">
+                                    {dashboardNotices.map((n) => {
+                                        const styles = getNoticeStyles(n.type);
+                                        return (
+                                            <div
+                                                key={n.id}
+                                                className={`group relative overflow-hidden rounded-xl bg-white/[0.02] hover:bg-white/[0.04] border ${styles.border} transition-all duration-300 p-4 flex gap-4`}
+                                            >
+                                                <div className={`p-2.5 rounded-xl ${styles.bg} border ${styles.border} shrink-0 h-fit text-[#64FFDA] mt-0.5`}>
+                                                    {styles.icon}
+                                                </div>
+                                                <div className="space-y-1.5 min-w-0 flex-1 text-left">
+                                                    <div className="flex justify-between items-start gap-2">
+                                                        <h4 className="font-extrabold text-white text-sm tracking-tight truncate group-hover:text-blue-400 transition-colors">
+                                                            {n.title}
+                                                        </h4>
+                                                        {n.type && (
+                                                            <span className={`text-[8px] px-2 py-0.5 uppercase tracking-widest font-black rounded ${styles.badgeBg} ${styles.badgeText} shrink-0`}>
+                                                                {n.type}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <p className="text-xs text-[#8892B0] leading-relaxed whitespace-pre-line">
+                                                        {n.content}
+                                                    </p>
+                                                    <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[9px] text-[#8892B0]/50 font-bold">
+                                                        <span className="truncate">Publisher: {n.senderName || "Admin Department"}</span>
+                                                        <span className="font-mono">{formatTimestamp(n.createdAt)}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                            )}
+                        </div>
+                    </div>
+
+                    {/* Right Column: Homework Diary ruled lines */}
+                    <div className="col-span-12 lg:col-span-5 flex flex-col space-y-4">
+                        <div className="flex justify-between items-center px-1">
+                            <div className="flex items-center gap-2">
+                                <BookOpen className="w-5 h-5 text-emerald-400" />
+                                <h3 className="text-base font-extrabold text-white">Daily Homework Diary</h3>
+                            </div>
+                            <Link href="/student/homework">
+                                <Button variant="ghost" className="text-xs text-blue-400 hover:text-blue-300 gap-1 p-0 hover:bg-transparent">
+                                    Open Full Diary <ArrowRight className="w-3.5 h-3.5" />
+                                </Button>
+                            </Link>
+                        </div>
+
+                        <div className="bg-[#112240]/40 border border-white/10 backdrop-blur-md rounded-2xl p-5 space-y-4">
+                            {dashboardHomework.length === 0 ? (
+                                <div className="flex flex-col items-center justify-center py-20 text-center">
+                                    <BookOpen className="w-10 h-10 text-neutral-600 mb-3" />
+                                    <h4 className="text-sm font-bold text-white uppercase tracking-widest">No Homework Assigned</h4>
+                                    <p className="text-xs text-neutral-400 max-w-[240px] mt-1.5 leading-relaxed">
+                                        Your study diary is empty. Excellent job completing all your academic assignments!
+                                    </p>
+                                </div>
+                            ) : (
+                                <div className="space-y-3.5">
+                                    {dashboardHomework.map((hw) => (
+                                        <div
+                                            key={hw.id}
+                                            className="group relative overflow-hidden rounded-xl bg-white/[0.02] hover:bg-white/[0.04] border border-white/5 hover:border-emerald-500/20 transition-all duration-300 p-4 border-l-4 border-l-emerald-500/80"
+                                        >
+                                            <div className="space-y-2 min-w-0 flex-1 text-left">
+                                                <div className="flex justify-between items-start gap-2">
+                                                    <h4 className="font-extrabold text-white text-sm tracking-tight truncate group-hover:text-emerald-400 transition-colors">
+                                                        {hw.title}
+                                                    </h4>
+                                                    <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[8px] font-black tracking-wider uppercase py-0.5 px-2 shrink-0">
+                                                        {hw.subjectId || "General"}
+                                                    </Badge>
+                                                </div>
+                                                <p className="text-xs text-[#8892B0] leading-relaxed whitespace-pre-line line-clamp-3">
+                                                    {hw.description}
+                                                </p>
+                                                <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[9px] text-[#8892B0]/50 font-bold">
+                                                    <span className="truncate">Teacher: {hw.teacherName || "Subject Faculty"}</span>
+                                                    {hw.dueDate && (
+                                                        <span className="text-rose-400/90 font-bold flex items-center gap-0.5 shrink-0">
+                                                            <Clock className="w-3.5 h-3.5" /> Due: {hw.dueDate}
+                                                        </span>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+                        </div>
+                    </div>
                 </div>
             </div>
 
-            {/* Quick Stats / Homework Alert */}
-            {isLoading ? <Skeleton className="h-32 w-full rounded-3xl" /> : (
-                recentHomework.length > 0 && (
-                    <div className="grid grid-cols-1 md:grid-cols-3 gap-6 animate-in slide-in-from-top duration-700">
-                        <div className="md:col-span-3 glass-panel p-6 rounded-3xl border-accent/20 bg-accent/5 flex flex-col md:flex-row items-center justify-between gap-6">
-                            <div className="flex items-center gap-4">
-                                <div className="w-12 h-12 rounded-2xl bg-accent/10 flex items-center justify-center border border-accent/20">
-                                    <BookOpen className="w-6 h-6 text-accent" />
-                                </div>
-                                <div>
-                                    <h3 className="font-bold text-lg italic">New Assignments Received</h3>
-                                    <p className="text-xs text-muted-foreground font-medium uppercase tracking-widest">
-                                        {recentHomework.length} items requiring your attention
-                                    </p>
-                                </div>
-                            </div>
-                            <div className="flex -space-x-4 overflow-hidden">
-                                {recentHomework.map((hw, i) => (
-                                    <div key={hw.id} className="inline-block h-8 w-8 rounded-full ring-2 ring-black bg-neutral-800 flex items-center justify-center text-[10px] font-black uppercase" title={hw.title}>
-                                        {hw.subjectId?.substring(0, 1)}
-                                    </div>
-                                ))}
-                            </div>
-                            <Button variant="outline" className="rounded-xl border-accent/20 text-accent hover:bg-accent hover:text-accent-foreground font-bold italic h-12 px-8" onClick={() => router.push('/student/homework')}>
-                                View Homework Feed
-                            </Button>
-                        </div>
-                    </div>
-                )
-            )}
+            {/* =======================================
+                MOBILE VIEW (< lg Breakpoint)
+                ======================================= */}
+            <div className="max-w-md mx-auto flex lg:hidden flex-col h-[calc(100vh-100px)] space-y-3.5 animate-in fade-in duration-500 pb-3 relative overflow-hidden select-none bg-gradient-to-b from-[#0a192f] via-[#0f224a] to-[#0a192f] px-2.5">
+                
+                {/* Glowing blur decorations */}
+                <div className="absolute top-[-5%] left-[-5%] w-[40%] h-[30%] bg-blue-500/10 rounded-full blur-[80px] pointer-events-none" />
+                <div className="absolute bottom-[-5%] right-[-5%] w-[40%] h-[30%] bg-emerald-500/5 rounded-full blur-[80px] pointer-events-none" />
 
-            <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Left Column: Profile & Detailed Selection */}
-                <div className="lg:col-span-2 space-y-8">
-                    {/* Profile Card */}
-                    {isLoading ? <Skeleton className="h-64 w-full rounded-3xl" /> : (
-                        <div className="glass-panel p-8 rounded-3xl relative overflow-hidden group">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-accent/5 rounded-full -mr-16 -mt-16 blur-3xl group-hover:bg-accent/10 transition-colors" />
-                            <h2 className="text-xl font-bold mb-6 flex items-center gap-3">
-                                <Info className="w-5 h-5 text-accent" />
-                                Student Profile
-                            </h2>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 text-sm">
-                                <div className="space-y-1">
-                                    <span className="text-muted-foreground uppercase text-[10px] tracking-widest font-bold">Full Name</span>
-                                    <p className="text-lg font-semibold text-accent">{profile?.studentName || "..."}</p>
+                {/* 1. COMPACT WELCOME HEADER BANNER */}
+                <Card className="bg-white/5 border-white/10 shadow-lg relative overflow-hidden shrink-0 mt-2">
+                    <CardContent className="p-3.5 flex items-center justify-between gap-3">
+                        <div className="flex items-center gap-3 truncate">
+                            <div className="relative shrink-0 select-none">
+                                <div className="w-10 h-10 rounded-full bg-gradient-to-tr from-blue-500 to-indigo-600 flex items-center justify-center text-white text-sm font-black border-2 border-white/20 shadow-lg shadow-blue-500/10">
+                                    {studentName.charAt(0)}
                                 </div>
-                                <div className="space-y-1">
-                                    <span className="text-muted-foreground uppercase text-[10px] tracking-widest font-bold">School ID</span>
-                                    <p className="text-lg font-mono font-bold">{displaySchoolId}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <span className="text-muted-foreground uppercase text-[10px] tracking-widest font-bold">Grade / Class</span>
-                                    <p className="text-lg font-semibold">{profile?.className || "..."} {profile?.sectionName ? `(${profile.sectionName})` : ""}</p>
-                                </div>
-                                <div className="space-y-1">
-                                    <span className="text-muted-foreground uppercase text-[10px] tracking-widest font-bold">Parent Contact</span>
-                                    <p className="text-lg font-semibold">{profile?.parentName || "..."} - {profile?.parentMobile || "..."}</p>
-                                </div>
+                            </div>
+                            <div className="text-left space-y-0.5 truncate">
+                                <h2 className="text-xs font-black text-white/55 leading-none uppercase tracking-widest">Welcome Back</h2>
+                                <h3 className="text-sm font-extrabold text-white truncate leading-tight">{studentName}</h3>
                             </div>
                         </div>
-                    )}
+                        <Badge className="text-[9px] font-black bg-blue-500/10 text-blue-400 border border-blue-500/20 px-2 py-0.5 shrink-0 select-none">
+                            {studentClass}
+                        </Badge>
+                    </CardContent>
+                </Card>
 
-                    {/* Detailed Fee Selection */}
-                    <div className="space-y-6">
-                        <h2 className="text-2xl font-bold flex items-center gap-3 italic">
-                            <Wallet className="w-6 h-6 text-accent" />
-                            Fee Payment Breakdown & Selection
-                        </h2>
-
-                        {/* Applied Benefits Header (Non-selectable) */}
-                        {reductions.length > 0 && (
-                            <div className="glass-panel rounded-3xl overflow-hidden border-green-500/20 bg-green-500/5">
-                                <div className="px-6 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                    <div className="flex items-center gap-3">
-                                        <div className="bg-green-500/20 p-2 rounded-xl">
-                                            <CheckCircle className="w-5 h-5 text-green-400" />
-                                        </div>
-                                        <div>
-                                            <h3 className="font-bold text-green-400 text-sm italic uppercase tracking-widest">Active Scholarships & Credits</h3>
-                                            <p className="text-[10px] text-green-400/60 font-bold uppercase">These benefits are automatically deducted from your fee payment below.</p>
-                                        </div>
-                                    </div>
-                                    <div className="text-right">
-                                        <p className="text-[10px] text-green-500/50 uppercase font-black">Total Benefit Value</p>
-                                        <p className="text-2xl font-black text-green-400">- ₹{ledgerTotalReductions.toLocaleString()}</p>
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-
-                        {isLoading ? <Skeleton className="h-96 w-full rounded-3xl" /> : (
-                            <>
-                                {/* Term Fees */}
-                                <div className="glass-panel rounded-3xl overflow-hidden border-white/5 shadow-2xl">
-                                    <div className="bg-white/5 px-6 py-4 flex justify-between items-center border-b border-white/10">
-                                        <h3 className="font-bold text-accent tracking-wide uppercase text-xs">Fee Payment</h3>
-                                        <span className="text-[10px] text-muted-foreground bg-white/5 px-2 py-1 rounded">MANDATORY</span>
-                                    </div>
-                                    <div className="p-2">
-                                        {(() => {
-                                            let rollingReduction = ledgerTotalReductions;
-                                            return termFees.length > 0 ? termFees.map((item: any) => {
-                                                const remaining = item.amount - (item.paidAmount || 0);
-                                                const discountForThisItem = Math.min(remaining, rollingReduction);
-                                                const netRemaining = remaining - discountForThisItem;
-                                                rollingReduction -= discountForThisItem;
-
-                                                const isSelected = selectedItems.has(item.id);
-
-                                                return (
-                                                    <div key={item.id} className={`flex flex-col md:flex-row md:items-center justify-between p-4 rounded-2xl mb-2 transition-all ${isSelected ? 'bg-accent/10 border border-accent/20' : 'hover:bg-white/5 border border-transparent'} ${netRemaining === 0 ? 'opacity-60 grayscale-[0.5]' : ''}`}>
-                                                        <div className="flex items-center gap-4">
-                                                            {netRemaining === 0 ? (
-                                                                <div className="w-5 h-5 flex items-center justify-center bg-green-500 rounded-md">
-                                                                    <CheckCircle className="w-4 h-4 text-white" />
-                                                                </div>
-                                                            ) : (
-                                                                <Checkbox
-                                                                    checked={isSelected}
-                                                                    onCheckedChange={() => handleToggleItem(item.id, netRemaining)}
-                                                                />
-                                                            )}
-                                                            <div>
-                                                                <p className="font-bold flex items-center gap-2">
-                                                                    {item.name}
-                                                                    {discountForThisItem > 0 && (
-                                                                        <span className="text-[9px] bg-green-500/20 text-green-400 px-1.5 py-0.5 rounded-full font-black uppercase tracking-tighter">
-                                                                            ₹{discountForThisItem.toLocaleString()} DEDUCTED
-                                                                        </span>
-                                                                    )}
-                                                                </p>
-                                                                <p className="text-[10px] text-muted-foreground flex items-center gap-1 uppercase tracking-tighter">
-                                                                    <Clock className="w-3 h-3" /> Originally ₹{item.amount.toLocaleString()} • Due: {item.dueDate}
-                                                                </p>
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center gap-6 mt-4 md:mt-0">
-                                                            <div className="text-right hidden md:block">
-                                                                <p className={`text-[10px] uppercase tracking-widest font-bold ${netRemaining === 0 ? 'text-green-500' : 'text-muted-foreground'}`}>
-                                                                    {netRemaining === 0 ? 'PAID / COVERED' : 'Net Balance'}
-                                                                </p>
-                                                                <p className={`font-bold text-lg ${netRemaining === 0 ? 'text-green-400' : 'text-white'}`}>
-                                                                    ₹{netRemaining.toLocaleString()}
-                                                                </p>
-                                                            </div>
-                                                            <div className={`w-32 bg-black/40 rounded-xl border border-white/10 p-1 flex items-center px-3 gap-1 ${netRemaining === 0 ? 'opacity-20 cursor-not-allowed' : ''}`}>
-                                                                <span className="text-xs text-muted-foreground">₹</span>
-                                                                <input
-                                                                    type="text"
-                                                                    value={paymentAmounts[item.id] || ""}
-                                                                    onChange={(e) => handleAmountChange(item.id, e.target.value, netRemaining)}
-                                                                    className="bg-transparent border-none outline-none text-sm font-bold w-full text-white"
-                                                                    placeholder="0"
-                                                                    disabled={!isSelected || netRemaining === 0}
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            }) : <p className="p-8 text-center text-muted-foreground text-sm">No fee payment assigned or all paid.</p>;
-                                        })()}
-                                    </div>
-                                </div>
-
-                                {/* Custom Fees */}
-                                {customFees.length > 0 && (
-                                    <div className="glass-panel rounded-3xl overflow-hidden border-white/5 shadow-2xl">
-                                        <div className="bg-white/5 px-6 py-4 flex justify-between items-center border-b border-white/10">
-                                            <h3 className="font-bold text-amber-500 tracking-wide uppercase text-xs">Special & Custom Fees</h3>
-                                        </div>
-                                        <div className="p-2">
-                                            {customFees.map((item: any) => {
-                                                const remaining = item.amount - (item.paidAmount || 0);
-                                                const isSelected = selectedItems.has(item.id);
-                                                return (
-                                                    <div key={item.id} className={`flex flex-col md:flex-row md:items-center justify-between p-4 rounded-2xl mb-2 transition-all ${isSelected ? 'bg-amber-500/10 border border-amber-500/20' : 'hover:bg-white/5 border border-transparent'}`}>
-                                                        <div className="flex items-center gap-4">
-                                                            <Checkbox
-                                                                checked={isSelected}
-                                                                onCheckedChange={() => handleToggleItem(item.id, remaining)}
-                                                                disabled={remaining === 0}
-                                                                className="data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
-                                                            />
-                                                            <div>
-                                                                <p className="font-bold">{item.name}</p>
-                                                                <p className="text-[10px] text-muted-foreground uppercase tracking-tighter">Event / Special Fee</p>
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center gap-6 mt-4 md:mt-0">
-                                                            <div className="text-right hidden md:block">
-                                                                <p className="text-[10px] text-muted-foreground uppercase tracking-widest">Balance</p>
-                                                                <p className="font-bold text-lg">₹{remaining.toLocaleString()}</p>
-                                                            </div>
-                                                            <div className="w-32 bg-black/40 rounded-xl border border-white/10 p-1 flex items-center px-3 gap-1">
-                                                                <span className="text-xs text-muted-foreground">₹</span>
-                                                                <input
-                                                                    type="text"
-                                                                    value={paymentAmounts[item.id] || ""}
-                                                                    onChange={(e) => handleAmountChange(item.id, e.target.value, remaining)}
-                                                                    className="bg-transparent border-none outline-none text-sm font-bold w-full text-white"
-                                                                    placeholder="0"
-                                                                    disabled={!isSelected}
-                                                                />
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                )}
-                            </>
-                        )}
-                    </div>
+                {/* 2. SEGMENT CONTROL TOGGLER */}
+                <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 w-full select-none shrink-0">
+                    <button
+                        onClick={() => setActiveTab('notices')}
+                        className={`flex-1 py-2 text-xs font-black rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 ${
+                            activeTab === 'notices'
+                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                                : 'text-white/60 hover:text-white'
+                        }`}
+                    >
+                        <Bell className="w-3.5 h-3.5" /> Important Notices
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('homework')}
+                        className={`flex-1 py-2 text-xs font-black rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 ${
+                            activeTab === 'homework'
+                                ? 'bg-blue-600 text-white shadow-lg shadow-blue-500/20'
+                                : 'text-white/60 hover:text-white'
+                        }`}
+                    >
+                        <BookOpen className="w-3.5 h-3.5" /> Homework Diary
+                    </button>
                 </div>
 
-                {/* Right Column: Checkout Summary */}
-                <div className="lg:col-span-1">
-                    {isLoading ? <Skeleton className="h-96 w-full rounded-3xl" /> : (
-                        <div className="sticky top-8 space-y-6">
-                            <div className="glass-panel p-8 rounded-3xl border-accent/20 shadow-[0_20px_50px_rgba(212,175,55,0.1)] relative overflow-hidden">
-                                <div className="absolute -top-10 -left-10 w-40 h-40 bg-accent/10 rounded-full blur-3xl" />
-
-                                <h2 className="text-xl font-bold mb-6 flex items-center gap-2">
-                                    <CreditCard className="w-5 h-5 text-accent" />
-                                    Payment Summary
-                                </h2>
-
-                                <div className="space-y-4 mb-8">
-                                    <div className="space-y-2 p-4 bg-white/5 rounded-2xl border border-white/10">
-                                        <div className="flex justify-between items-center text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
-                                            <span>Full Year Tuition</span>
-                                            <span>₹{ledgerTotalFee.toLocaleString()}</span>
-                                        </div>
-                                        <div className="flex justify-between items-center text-[10px] text-green-400 uppercase tracking-widest font-bold">
-                                            <span>Scholarship Applied</span>
-                                            <span>- ₹{ledgerTotalReductions.toLocaleString()}</span>
-                                        </div>
-                                        <div className="h-px bg-white/10 my-1" />
-                                        <div className="flex justify-between items-center text-xs font-bold text-accent">
-                                            <span>TOTAL PENDING FEE</span>
-                                            <span className="text-sm">₹{ledgerPendingFee.toLocaleString()}</span>
-                                        </div>
-                                    </div>
-
-                                    <div className="h-px bg-white/5 w-full" />
-
-                                    <div className="space-y-2 pt-2">
-                                        <p className="text-[10px] text-muted-foreground uppercase tracking-[0.2em] font-bold">
-                                            {totalToPay > 0 ? "Amount to Pay Now" : "Select items to pay"}
-                                        </p>
-                                        <div className="flex items-baseline gap-2">
-                                            <span className="text-xl font-medium text-accent">₹</span>
-                                            <p className="text-5xl font-bold font-display drop-shadow-2xl text-white">
-                                                {Math.max(0, totalToPay).toLocaleString()}
-                                            </p>
-                                        </div>
-                                    </div>
+                {/* 3. DETAILED STREAM CONTENT WIDGETS */}
+                <div className="flex-1 flex flex-col min-h-0 bg-[#112240]/40 border border-white/10 backdrop-blur-md rounded-2xl relative p-3">
+                    <AnimatePresence mode="wait">
+                        {activeTab === 'homework' ? (
+                            <motion.div
+                                key="homework-feed"
+                                initial={{ opacity: 0, y: 5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -5 }}
+                                transition={{ duration: 0.15 }}
+                                className="flex flex-col h-full min-h-0"
+                            >
+                                <div className="flex justify-between items-center mb-2 shrink-0 px-1">
+                                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Assigned Homework (Last 5)</span>
+                                    <Link href="/student/homework" className="text-[10px] text-blue-400 font-bold hover:underline flex items-center gap-0.5">
+                                        Full Diary <ChevronRight className="w-3 h-3" />
+                                    </Link>
                                 </div>
-
-                                <Button
-                                    onClick={handlePayment}
-                                    className="w-full h-16 bg-accent text-accent-foreground hover:bg-accent/90 rounded-2xl font-black text-xl shadow-[0_10px_30px_rgba(212,175,55,0.3)] group transition-all transform hover:-translate-y-1"
-                                    disabled={totalToPay === 0 || isLoading}
-                                >
-                                    {isLoading ? (
-                                        <span className="animate-pulse">PROCESSING...</span>
-                                    ) : (
-                                        <>
-                                            <CreditCard className="mr-2 group-hover:scale-125 transition-transform" />
-                                            PROCEED TO PAY
-                                        </>
-                                    )}
-                                </Button>
-
-                                <p className="text-[9px] text-center text-muted-foreground mt-4 font-bold tracking-widest uppercase opacity-90">
-                                    🔒 Secure Payment powered by Razorpay
-                                </p>
-                            </div>
-
-                            {/* Status Legend */}
-                            <div className="glass-panel p-6 rounded-3xl border-white/5 space-y-4">
-                                <h3 className="text-xs font-bold text-muted-foreground uppercase tracking-widest">Ledger Status</h3>
-                                <div className="flex items-center justify-between">
-                                    <span className="text-sm font-medium">Overall Status</span>
-                                    {paymentStatus === "paid" ? (
-                                        <div className="flex items-center gap-2 text-green-500 font-bold bg-green-500/10 px-4 py-2 rounded-xl text-xs">
-                                            <CheckCircle className="w-4 h-4" /> CLEAR
+                                
+                                <div className="flex-1 overflow-y-auto pr-0.5 space-y-2.5 min-h-0">
+                                    {dashboardHomework.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center py-16 text-center h-full">
+                                            <BookOpen className="w-8 h-8 text-neutral-600 mb-2" />
+                                            <p className="text-[10px] text-neutral-500 uppercase tracking-widest font-black">Diary is Empty</p>
+                                            <p className="text-[9px] text-neutral-600 font-medium mt-0.5">No tasks assigned for today.</p>
                                         </div>
                                     ) : (
-                                        <div className="flex items-center gap-2 text-yellow-500 font-bold bg-yellow-500/10 px-4 py-2 rounded-xl text-xs">
-                                            <Clock className="w-4 h-4" /> PENDING
-                                        </div>
+                                        dashboardHomework.map((hw) => (
+                                            <div
+                                                key={hw.id}
+                                                className="group relative overflow-hidden rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border border-white/5 hover:border-emerald-500/20 transition-all duration-300 p-3 flex gap-3 border-l-3 border-l-emerald-500/80"
+                                            >
+                                                <div className="space-y-1.5 min-w-0 flex-1 text-left">
+                                                    <div className="flex justify-between items-start gap-2">
+                                                        <h4 className="font-extrabold text-white text-xs tracking-tight truncate">
+                                                            {hw.title}
+                                                        </h4>
+                                                        <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[7px] font-black tracking-wider uppercase py-0 px-1.5 shrink-0">
+                                                            {hw.subjectId || "General"}
+                                                        </Badge>
+                                                    </div>
+                                                    <p className="text-[10px] text-[#8892B0] line-clamp-2 leading-relaxed">
+                                                        {hw.description}
+                                                    </p>
+                                                    <div className="flex items-center justify-between pt-1.5 border-t border-white/5 text-[8px] text-[#8892B0]/50 font-bold">
+                                                        <span className="truncate">By: {hw.teacherName || "Subject Teacher"}</span>
+                                                        {hw.dueDate && (
+                                                            <span className="text-rose-400/90 font-bold flex items-center gap-0.5">
+                                                                <Clock className="w-2.5 h-2.5" /> Due: {hw.dueDate}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))
                                     )}
                                 </div>
-                            </div>
-                        </div>
-                    )}
+                            </motion.div>
+                        ) : (
+                            <motion.div
+                                key="notices-feed"
+                                initial={{ opacity: 0, y: 5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -5 }}
+                                transition={{ duration: 0.15 }}
+                                className="flex flex-col h-full min-h-0"
+                            >
+                                <div className="flex justify-between items-center mb-2 shrink-0 px-1">
+                                    <span className="text-[10px] font-bold text-neutral-400 uppercase tracking-widest">Active Notices (Last 5)</span>
+                                    <Link href="/student/notices" className="text-[10px] text-blue-400 font-bold hover:underline flex items-center gap-0.5">
+                                        Inbox <ChevronRight className="w-3 h-3" />
+                                    </Link>
+                                </div>
+                                
+                                <div className="flex-1 overflow-y-auto pr-0.5 space-y-2.5 min-h-0">
+                                    {dashboardNotices.length === 0 ? (
+                                        <div className="flex flex-col items-center justify-center py-16 text-center h-full">
+                                            <Bell className="w-8 h-8 text-neutral-600 mb-2" />
+                                            <p className="text-[10px] text-neutral-500 uppercase tracking-widest font-black">Inbox is Empty</p>
+                                            <p className="text-[9px] text-neutral-600 font-medium mt-0.5">No announcements posted.</p>
+                                        </div>
+                                    ) : (
+                                        dashboardNotices.map((n) => {
+                                            const styles = getNoticeStyles(n.type);
+                                            return (
+                                                <div
+                                                    key={n.id}
+                                                    className={`group relative overflow-hidden rounded-xl bg-white/[0.03] hover:bg-white/[0.06] border ${styles.border} transition-all duration-300 p-3 flex gap-3`}
+                                                >
+                                                    <div className={`p-2 rounded-lg ${styles.bg} border ${styles.border} shrink-0 h-fit text-[#64FFDA] mt-0.5`}>
+                                                        {styles.icon}
+                                                    </div>
+                                                    <div className="space-y-1.5 min-w-0 flex-1 text-left">
+                                                        <div className="flex justify-between items-start gap-2">
+                                                            <h4 className="font-extrabold text-white text-xs tracking-tight truncate">
+                                                                {n.title}
+                                                            </h4>
+                                                            {n.type && (
+                                                                <span className={`text-[7px] px-1.5 py-0 uppercase tracking-widest font-black rounded ${styles.badgeBg} ${styles.badgeText} shrink-0`}>
+                                                                    {n.type}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                        <p className="text-[10px] text-[#8892B0] line-clamp-2 leading-relaxed">
+                                                            {n.content}
+                                                        </p>
+                                                        <div className="flex items-center justify-between pt-1.5 border-t border-white/5 text-[8px] text-[#8892B0]/50 font-bold">
+                                                            <span className="truncate">Sender: {n.senderName || "Admin"}</span>
+                                                            <span className="font-mono">{formatTimestamp(n.createdAt)}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
+                </div>
+
+                {/* 4. VIEW ALL ROUTING ACTION FOOTER */}
+                <div className="shrink-0 flex items-center justify-between px-1.5 py-1 text-neutral-400 text-[10px] font-medium bg-white/5 border border-white/10 rounded-xl select-none mb-2">
+                    <span>App Version 2.4.0</span>
+                    <Link href="/student/notices" className="text-blue-400 font-bold flex items-center gap-0.5 hover:underline">
+                        View All Notices <ArrowRight className="w-3 h-3" />
+                    </Link>
                 </div>
             </div>
         </div>

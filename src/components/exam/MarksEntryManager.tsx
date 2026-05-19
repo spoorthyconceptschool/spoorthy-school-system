@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { doc, getDoc, collection, query, where, getDocs, writeBatch, setDoc } from "firebase/firestore";
+import { useEffect, useState, useMemo } from "react";
+import { doc, getDoc, collection, query, where, getDocs, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useMasterData } from "@/context/MasterDataContext";
 import { Button } from "@/components/ui/button";
@@ -10,8 +10,8 @@ import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Loader2, ArrowLeft, Save } from "lucide-react";
 import { useRouter } from "next/navigation";
-import { SingleReportCardButton } from "@/components/admin/SingleReportCardButton";
 import { createNotification } from "@/lib/notifications";
+import { useAuth } from "@/context/AuthContext";
 
 interface MarksEntryManagerProps {
     examId: string;
@@ -20,7 +20,9 @@ interface MarksEntryManagerProps {
 
 export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
     const router = useRouter();
-    const { classes, sections, subjects, classSections, classSubjects, loading: mdLoading } = useMasterData();
+    const { classes, sections, subjects, classSections, classSubjects, subjectTeachers, loading: mdLoading } = useMasterData();
+    const { user, isAdmin } = useAuth();
+    const [teacherId, setTeacherId] = useState<string | null>(null);
 
     const [exam, setExam] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -38,6 +40,23 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
 
     const [fetchingStudents, setFetchingStudents] = useState(false);
     const [saving, setSaving] = useState(false);
+
+    // Fetch Teacher ID if logged in as teacher
+    useEffect(() => {
+        if (!user?.uid || isAdmin) return;
+        const fetchTeacherId = async () => {
+            try {
+                const q = query(collection(db, "teachers"), where("uid", "==", user.uid));
+                const snap = await getDocs(q);
+                if (!snap.empty) {
+                    setTeacherId(snap.docs[0].id);
+                }
+            } catch (e) {
+                console.error("Error fetching teacher doc ID:", e);
+            }
+        };
+        fetchTeacherId();
+    }, [user, isAdmin]);
 
     // Load Exam Details
     useEffect(() => {
@@ -59,26 +78,66 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
         fetchExam();
     }, [examId, backUrl, router]);
 
-    // Derived Lists
-    const availableSections = Object.values(classSections)
-        .filter((cs: any) => cs.classId === selectedClassId && cs.active)
-        .map((cs: any) => sections[cs.sectionId])
-        .filter(Boolean);
+    // Derived Lists & Filters
+    const filteredClasses = useMemo(() => {
+        const rawClasses = Object.values(classes);
+        if (isAdmin || !teacherId) return rawClasses;
 
-    const availableSubjects = Object.keys(classSubjects[selectedClassId] || {})
-        .filter(sid => classSubjects[selectedClassId][sid] && subjects[sid])
-        .filter(sid => {
-            // Only show subjects that are in the exam timetable
-            if (!exam?.timetables?.[selectedClassId]) return true; // If no timetable set, show all
-            return !!exam.timetables[selectedClassId][sid];
-        })
-        .map(sid => subjects[sid]);
+        // Filter classes where teacher has any subject assigned in any section
+        return rawClasses.filter((c: any) => {
+            return Object.entries(subjectTeachers || {}).some(([classSectionKey, subs]: [string, any]) => {
+                const [cId] = classSectionKey.split("_");
+                if (cId !== c.id) return false;
+                return Object.values(subs || {}).some(tId => tId === teacherId);
+            });
+        });
+    }, [classes, subjectTeachers, teacherId, isAdmin]);
+
+    const availableSections = useMemo(() => {
+        return Object.values(classSections)
+            .filter((cs: any) => cs.classId === selectedClassId && (cs.active || cs.isActive || cs.active !== false))
+            .map((cs: any) => sections[cs.sectionId])
+            .filter(Boolean)
+            .filter((sec: any) => {
+                if (isAdmin || !teacherId) return true;
+                const classSectionKey = `${selectedClassId}_${sec.id}`;
+                const subs = subjectTeachers?.[classSectionKey] || {};
+                return Object.values(subs).some(tId => tId === teacherId);
+            });
+    }, [classSections, selectedClassId, sections, subjectTeachers, teacherId, isAdmin]);
+
+    const availableSubjects = useMemo(() => {
+        return Object.keys(classSubjects[selectedClassId] || {})
+            .filter(sid => classSubjects[selectedClassId][sid] && subjects[sid])
+            .filter(sid => {
+                // Only show subjects that are in the exam timetable
+                if (!exam?.timetables?.[selectedClassId]) return true; // If no timetable set, show all
+                return !!exam.timetables[selectedClassId][sid];
+            })
+            .filter(sid => {
+                if (isAdmin || !teacherId) return true;
+                if (!selectedSectionId) return false;
+                const classSectionKey = `${selectedClassId}_${selectedSectionId}`;
+                return subjectTeachers?.[classSectionKey]?.[sid] === teacherId;
+            })
+            .map(sid => subjects[sid]);
+    }, [classSubjects, selectedClassId, subjects, exam, selectedSectionId, subjectTeachers, teacherId, isAdmin]);
 
     // Fetch Students & Existing Marks
     const handleLoadStudents = async () => {
         if (!selectedClassId || !selectedSectionId || !selectedSubjectId) {
             alert("Please select Class, Section and Subject");
             return;
+        }
+
+        // Secure teacher assignment boundary
+        if (!isAdmin && teacherId) {
+            const classSectionKey = `${selectedClassId}_${selectedSectionId}`;
+            const assignedTeacherId = subjectTeachers?.[classSectionKey]?.[selectedSubjectId];
+            if (assignedTeacherId !== teacherId) {
+                alert("Permission Denied: You are not the assigned subject teacher for this subject in this section.");
+                return;
+            }
         }
 
         setFetchingStudents(true);
@@ -115,7 +174,6 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
                     if (subData) {
                         marksMap[student.id] = subData.obtained;
                         remarkMap[student.id] = subData.remarks || "";
-                        // Ideally we check maxMarks consistency here but we let user override
                     }
                 }
             });
@@ -133,8 +191,61 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
         }
     };
 
+    // Real-time Marks Capping & Validation
+    const handleMarkChange = (studentId: string, val: string) => {
+        if (val === "") {
+            setMarks(prev => ({ ...prev, [studentId]: "" }));
+            return;
+        }
+        const maxVal = parseFloat(maxMarks) || 100;
+        const numVal = parseFloat(val);
+        if (!isNaN(numVal)) {
+            if (numVal > maxVal) {
+                setMarks(prev => ({ ...prev, [studentId]: String(maxVal) }));
+            } else if (numVal < 0) {
+                setMarks(prev => ({ ...prev, [studentId]: "0" }));
+            } else {
+                setMarks(prev => ({ ...prev, [studentId]: val }));
+            }
+        } else {
+            setMarks(prev => ({ ...prev, [studentId]: val }));
+        }
+    };
+
     const handleSave = async () => {
         if (!selectedSubjectId) return;
+
+        // 1. Guard teacher assignments
+        if (!isAdmin && teacherId) {
+            const classSectionKey = `${selectedClassId}_${selectedSectionId}`;
+            const assignedTeacherId = subjectTeachers?.[classSectionKey]?.[selectedSubjectId];
+            if (assignedTeacherId !== teacherId) {
+                alert("Permission Denied: You are not the assigned subject teacher for this subject in this section.");
+                return;
+            }
+        }
+
+        // 2. Validate marks don't exceed max marks
+        const maxVal = parseFloat(maxMarks) || 100;
+        for (const student of students) {
+            const markStr = marks[student.id];
+            if (markStr !== undefined && markStr !== "") {
+                const markVal = parseFloat(markStr);
+                if (isNaN(markVal)) {
+                    alert(`Invalid mark entered for ${student.studentName}`);
+                    return;
+                }
+                if (markVal > maxVal) {
+                    alert(`Error: Entered marks (${markVal}) for ${student.studentName} exceeds maximum marks (${maxVal})`);
+                    return;
+                }
+                if (markVal < 0) {
+                    alert(`Error: Entered marks (${markVal}) for ${student.studentName} cannot be negative`);
+                    return;
+                }
+            }
+        }
+
         setSaving(true);
         try {
             const batch = writeBatch(db);
@@ -152,7 +263,7 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
                     subjects: {
                         [selectedSubjectId]: {
                             obtained: mark,
-                            maxMarks: maxMarks, // Uses currently set max marks
+                            maxMarks: maxMarks,
                             remarks: remark
                         }
                     },
@@ -201,6 +312,42 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
         }
     };
 
+    // Check if marks entry is locked due to time
+    const isLocked = useMemo(() => {
+        if (!exam || !selectedClassId || !selectedSubjectId) return false;
+        
+        let targetKey = selectedClassId;
+        // If there's an individual timetable for this section, prefer it
+        if (selectedSectionId && exam.timetables?.[`${selectedClassId}_${selectedSectionId}`]) {
+            targetKey = `${selectedClassId}_${selectedSectionId}`;
+        }
+        
+        const subjectTimetable = exam.timetables?.[targetKey]?.[selectedSubjectId];
+        if (!subjectTimetable || !subjectTimetable.date || !subjectTimetable.endTime) return false;
+        
+        const now = new Date();
+        const endDateTime = new Date(`${subjectTimetable.date}T${subjectTimetable.endTime}`);
+        
+        return now < endDateTime;
+    }, [exam, selectedClassId, selectedSubjectId, selectedSectionId]);
+
+    // Prefill Max Marks from Timetable when selection changes
+    useEffect(() => {
+        if (!exam || !selectedClassId || !selectedSubjectId) return;
+
+        let targetKey = selectedClassId;
+        if (selectedSectionId && exam.timetables?.[`${selectedClassId}_${selectedSectionId}`]) {
+            targetKey = `${selectedClassId}_${selectedSectionId}`;
+        }
+
+        const subjectTimetable = exam.timetables?.[targetKey]?.[selectedSubjectId];
+        if (subjectTimetable?.maxMarks) {
+            setMaxMarks(subjectTimetable.maxMarks);
+        } else {
+            setMaxMarks("100"); // fallback default
+        }
+    }, [exam, selectedClassId, selectedSectionId, selectedSubjectId]);
+
     if (loading || mdLoading) return <div className="flex justify-center p-20"><Loader2 className="animate-spin" /></div>;
     if (!exam) return null;
 
@@ -227,7 +374,7 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
                             <Select value={selectedClassId} onValueChange={(v) => { setSelectedClassId(v); setSelectedSectionId(""); setSelectedSubjectId(""); }}>
                                 <SelectTrigger className="bg-white/5 border-white/10 h-11 md:h-10 rounded-xl focus:ring-emerald-500/20"><SelectValue placeholder="Class" /></SelectTrigger>
                                 <SelectContent className="bg-slate-900 border-white/10 text-white">
-                                    {Object.values(classes).map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                                    {filteredClasses.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                                 </SelectContent>
                             </Select>
                         </div>
@@ -244,7 +391,7 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
 
                         <div className="space-y-2">
                             <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] italic ml-1">Subject</label>
-                            <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId} disabled={!selectedClassId}>
+                            <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId} disabled={!selectedSectionId}>
                                 <SelectTrigger className="bg-white/5 border-white/10 h-11 md:h-10 rounded-xl focus:ring-emerald-500/20"><SelectValue placeholder="Subject" /></SelectTrigger>
                                 <SelectContent className="bg-slate-900 border-white/10 text-white">
                                     {availableSubjects.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
@@ -265,6 +412,11 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
 
             {students.length > 0 && (
                 <div className="space-y-4">
+                    {isLocked && (
+                        <div className="bg-orange-500/10 border border-orange-500/20 text-orange-400 p-4 rounded-xl text-sm font-bold flex items-center gap-3">
+                            ⚠️ Marks entry is locked. You can only enter marks after the scheduled exam time has concluded.
+                        </div>
+                    )}
                     <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 bg-white/5 p-4 md:p-5 rounded-2xl border border-white/10 backdrop-blur-md">
                         <div className="flex items-center justify-between md:justify-start gap-4 flex-1">
                             <span className="font-bold text-lg text-white">{students.length} Students</span>
@@ -276,8 +428,24 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
                                     onChange={e => setMaxMarks(e.target.value)}
                                 />
                             </div>
+                            {/* Pass Marks display */}
+                            {(() => {
+                                let targetKey = selectedClassId;
+                                if (selectedSectionId && exam.timetables?.[`${selectedClassId}_${selectedSectionId}`]) {
+                                    targetKey = `${selectedClassId}_${selectedSectionId}`;
+                                }
+                                const passVal = exam.timetables?.[targetKey]?.[selectedSubjectId]?.passMarks;
+                                if (passVal) {
+                                    return (
+                                        <div className="flex items-center gap-2 bg-rose-500/10 border border-rose-500/20 px-3 py-1 text-rose-400 text-xs font-bold rounded-lg">
+                                            Pass Marks: {passVal}
+                                        </div>
+                                    );
+                                }
+                                return null;
+                            })()}
                         </div>
-                        <Button onClick={handleSave} disabled={saving} className="w-full md:w-auto bg-blue-600 hover:bg-blue-500 text-white gap-2 h-11 md:h-10 rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-blue-500/20 transition-all active:scale-95">
+                        <Button onClick={handleSave} disabled={saving || isLocked} className="w-full md:w-auto bg-blue-600 hover:bg-blue-500 text-white gap-2 h-11 md:h-10 rounded-xl font-bold uppercase tracking-widest text-[10px] shadow-lg shadow-blue-500/20 transition-all active:scale-95">
                             {saving ? <Loader2 className="animate-spin w-4 h-4" /> : <Save className="w-4 h-4" />}
                             Save All Marks
                         </Button>
@@ -296,7 +464,6 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
                                         </div>
                                         <h3 className="font-bold text-lg text-white tracking-tight">{student.studentName}</h3>
                                     </div>
-                                    <SingleReportCardButton exam={exam} student={student} />
                                 </div>
 
                                 <div className="grid grid-cols-1 gap-4 pt-4 border-t border-white/5 relative z-10">
@@ -306,20 +473,22 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
                                             <span className="text-[8px] text-emerald-500/60 lowercase font-normal italic">/ {maxMarks} max</span>
                                         </label>
                                         <Input
-                                            className="h-12 bg-white/5 border-white/10 text-center text-xl font-bold text-emerald-400 rounded-2xl focus:ring-emerald-500/20"
+                                            className="h-12 bg-white/5 border-white/10 text-center text-xl font-bold text-emerald-400 rounded-2xl focus:ring-emerald-500/20 disabled:opacity-50"
                                             value={marks[student.id] || ""}
-                                            onChange={e => setMarks({ ...marks, [student.id]: e.target.value })}
+                                            onChange={e => handleMarkChange(student.id, e.target.value)}
                                             placeholder="0"
                                             type="number"
+                                            disabled={isLocked}
                                         />
                                     </div>
                                     <div className="space-y-2">
                                         <label className="text-[9px] font-black text-white/40 uppercase tracking-[0.3em]">Remarks</label>
                                         <Input
-                                            className="h-12 bg-white/5 border-white/10 text-sm font-medium rounded-2xl focus:ring-blue-500/20"
+                                            className="h-12 bg-white/5 border-white/10 text-sm font-medium rounded-2xl focus:ring-blue-500/20 disabled:opacity-50"
                                             value={remarks[student.id] || ""}
                                             onChange={e => setRemarks({ ...remarks, [student.id]: e.target.value })}
                                             placeholder="Performance notes..."
+                                            disabled={isLocked}
                                         />
                                     </div>
                                 </div>
@@ -336,7 +505,6 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
                                     <th className="p-4 text-left">Student</th>
                                     <th className="p-4 text-center w-32">Marks</th>
                                     <th className="p-4 text-left">Remarks</th>
-                                    <th className="p-4 text-center w-16">Print</th>
                                 </tr>
                             </thead>
                             <tbody className="divide-y divide-white/5">
@@ -346,22 +514,21 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
                                         <td className="p-4 font-bold text-white tracking-tight">{student.studentName}</td>
                                         <td className="p-4 text-center">
                                             <Input
-                                                className="w-24 h-9 text-center bg-black/40 border-white/10 focus:border-emerald-500 mx-auto rounded-lg font-bold text-emerald-400"
+                                                className="w-24 h-9 text-center bg-black/40 border-white/10 focus:border-emerald-500 mx-auto rounded-lg font-bold text-emerald-400 disabled:opacity-50"
                                                 value={marks[student.id] || ""}
-                                                onChange={e => setMarks({ ...marks, [student.id]: e.target.value })}
+                                                onChange={e => handleMarkChange(student.id, e.target.value)}
                                                 placeholder="0"
+                                                disabled={isLocked}
                                             />
                                         </td>
                                         <td className="p-4">
                                             <Input
-                                                className="w-full h-9 bg-transparent border-transparent hover:border-white/10 focus:border-white/20 transition-all font-medium text-white/80"
+                                                className="w-full h-9 bg-transparent border-transparent hover:border-white/10 focus:border-white/20 transition-all font-medium text-white/80 disabled:opacity-50"
                                                 value={remarks[student.id] || ""}
                                                 onChange={e => setRemarks({ ...remarks, [student.id]: e.target.value })}
                                                 placeholder="Add remark..."
+                                                disabled={isLocked}
                                             />
-                                        </td>
-                                        <td className="p-4 text-center">
-                                            <SingleReportCardButton exam={exam} student={student} />
                                         </td>
                                     </tr>
                                 ))}

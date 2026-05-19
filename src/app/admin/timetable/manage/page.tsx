@@ -64,11 +64,12 @@ export default function TimetableManagePage() {
         }
 
         const classSpecificSubjects = classSubjects[selectedClassId] || {};
+        const hasSpecificSubjects = Object.keys(classSpecificSubjects).filter(k => k !== 'id' && classSpecificSubjects[k]).length > 0;
         
         // Use Object.entries to guarantee we have the correct subject ID (key) even if s.id is missing
         const filtered = Object.entries(masterSubjects || {})
             .map(([key, s]: [string, any]) => ({ ...s, id: key }))
-            .filter(s => s.isActive !== false && classSpecificSubjects[s.id])
+            .filter(s => s.isActive !== false && (!hasSpecificSubjects || classSpecificSubjects[s.id]))
             .sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
 
         setSubjects(filtered);

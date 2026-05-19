@@ -13,7 +13,7 @@ body {
 
 @theme {
   --breakpoint-xs: 400px;
-  --font-sans: var(--font-body);
+  --font-sans: var(--font-sans), system-ui, -apple-system, sans-serif;
   --font-serif: ui-serif, Georgia, Cambria, "Times New Roman", Times, serif;
   --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
   --color-red-100: oklch(0.936 0.032 17.717);
@@ -176,10 +176,10 @@ body {
   --aspect-video: 16 / 9;
   --default-transition-duration: 0.15s;
   --default-transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  --default-font-family: var(--font-body);
+  --default-font-family: var(--font-sans);
   --default-mono-font-family: var(--font-mono);
-  --font-display: var(--font-display, serif);
-  --font-body: 'Inter', 'system-ui', sans-serif;
+  --font-display: var(--font-display), system-ui, -apple-system, sans-serif;
+  --font-body: var(--font-sans), system-ui, -apple-system, sans-serif;
 
   /* Core Theme Colors with Hex for maximum compatibility */
   --color-background: #050505;
@@ -303,4 +303,38 @@ body {
 
 .animate-marquee {
   animation: marquee 40s linear infinite;
+}
+
+/* Micro-typography legibility rules */
+.text-\[8px\] {
+  letter-spacing: 0.03em !important;
+  line-height: 1.4 !important;
+}
+.text-\[8\.5px\] {
+  letter-spacing: 0.03em !important;
+  line-height: 1.4 !important;
+}
+.text-\[9px\] {
+  letter-spacing: 0.03em !important;
+  line-height: 1.4 !important;
+}
+.text-\[9\.5px\] {
+  letter-spacing: 0.03em !important;
+  line-height: 1.4 !important;
+}
+.text-\[10px\] {
+  letter-spacing: 0.025em !important;
+  line-height: 1.45 !important;
+}
+.text-\[10\.5px\] {
+  letter-spacing: 0.025em !important;
+  line-height: 1.45 !important;
+}
+.text-\[11px\] {
+  letter-spacing: 0.02em !important;
+  line-height: 1.45 !important;
+}
+.text-xs {
+  letter-spacing: 0.015em !important;
+  line-height: 1.5 !important;
 }

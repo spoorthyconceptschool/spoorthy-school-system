@@ -51,7 +51,7 @@ export default function FeePendingsPage() {
     const [collectingFee, setCollectingFee] = useState(false);
     const [receiptData, setReceiptData] = useState<any>(null);
 
-    const { classes: classesData, villages: villagesData, branding, selectedYear, feeConfig, customFees } = useMasterData();
+    const { classes: classesData, villages: villagesData, branding, selectedYear, setSelectedYear, academicYears, feeConfig, customFees } = useMasterData();
     const classes = Object.values(classesData || {}).map((c: any) => ({ id: c.id, name: c.name, order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
     const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name || "Unknown Village" })).sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)));
 
@@ -446,6 +446,18 @@ export default function FeePendingsPage() {
                     />
                 </div>
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex lg:flex-wrap gap-2">
+                    <Select value={selectedYear} onValueChange={setSelectedYear}>
+                        <SelectTrigger className="w-full lg:w-[200px] h-12 bg-white/5 border-white/10 rounded-xl font-bold text-red-400">
+                            <SelectValue placeholder="Academic Year" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-zinc-900 border-white/10 text-white font-semibold">
+                            {Object.keys(academicYears || {}).map(year => (
+                                <SelectItem key={year} value={year}>
+                                    Session: {year} {!academicYears[year]?.active ? "(Archived)" : "(Active)"}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                     <Select value={classFilter} onValueChange={setClassFilter}>
                         <SelectTrigger className="w-full lg:w-[180px] h-12 bg-white/5 border-white/10 rounded-xl">
                             <SelectValue placeholder="All Classes" />

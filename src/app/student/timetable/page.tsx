@@ -1,82 +1,51 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState, useEffect } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Users, Coffee, ArrowRight, Printer } from "lucide-react";
-import { collection, query, getDocs, doc, getDoc, where } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { Loader2, Coffee, Printer, Calendar, Clock, ArrowLeft, ArrowRight, UserCheck, Sparkles, BookOpen } from "lucide-react";
 import { useMasterData } from "@/context/MasterDataContext";
+import { useStudentData } from "@/context/StudentDataContext";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function StudentTimetablePage() {
-    const { user, userData } = useAuth();
+    const { user } = useAuth();
     const { subjects, classes, sections } = useMasterData();
-    const [schedule, setSchedule] = useState<any>(null); // weeklySchedule
-    const [substitutions, setSubstitutions] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [classId, setClassId] = useState("");
-    const [sectionId, setSectionId] = useState("");
-    const [teacherMap, setTeacherMap] = useState<Record<string, string>>({});
-    const [holidays, setHolidays] = useState<any[]>([]);
+    const { profile, schedule, substitutions, teacherMap, notices, loading } = useStudentData();
+    
+    const [activeTab, setActiveTab] = useState<'today' | 'weekly'>('today');
+    const [selectedWeeklyDay, setSelectedWeeklyDay] = useState<string>("MONDAY");
+    const [todayDayName, setTodayDayName] = useState<string>("MONDAY");
 
-    // Day Ordering
+    const classId = profile?.classId || "";
+    const sectionId = profile?.sectionId || "";
+    const holidays = notices.filter((n: any) => n.type === "HOLIDAY");
+
     const DAYS = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+    const PERIOD_IDS = [1, 2, 3, 4, 5, 6, 7, 8];
+
+    // Standard Period Timings
+    const PERIOD_TIMINGS: Record<number, string> = {
+        1: "08:30 - 09:20",
+        2: "09:20 - 10:10",
+        3: "10:10 - 11:00",
+        4: "11:15 - 12:05",
+        5: "12:05 - 12:50",
+        6: "01:30 - 02:15",
+        7: "02:15 - 03:00",
+        8: "03:00 - 03:45"
+    };
 
     useEffect(() => {
-        if (user) {
-            fetchMySchedule();
-            fetchTeachers();
-            fetchHolidays();
+        const today = new Date();
+        const dayName = today.toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
+        setTodayDayName(dayName);
+        if (DAYS.includes(dayName)) {
+            setSelectedWeeklyDay(dayName);
         }
-    }, [user]);
-
-    const fetchHolidays = async () => {
-        try {
-            const hQuery = query(
-                collection(db, "notices"), 
-                where("type", "==", "HOLIDAY"),
-                where("schoolId", "in", [userData?.schoolId || "global", "global"])
-            );
-            const hSnap = await getDocs(hQuery);
-            setHolidays(hSnap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
-        } catch (e) { console.error(e); }
-    };
-
-    const fetchTeachers = async () => {
-        try {
-            const q = query(
-                collection(db, "teachers"),
-                where("schoolId", "==", userData?.schoolId || "global")
-            );
-            const snap = await getDocs(q);
-            const map: Record<string, string> = {};
-            snap.docs.forEach(d => {
-                const data = d.data();
-                if (data.schoolId) map[data.schoolId] = data.name;
-                // Also map by doc ID just in case
-                map[d.id] = data.name;
-            });
-            setTeacherMap(map);
-        } catch (e) { console.error("Error fetching teachers:", e); }
-    };
-
-    const fetchMySchedule = async () => {
-        try {
-            const res = await fetch("/api/timetable/my-schedule", {
-                headers: { "Authorization": `Bearer ${await user?.getIdToken()}` }
-            });
-            const data = await res.json();
-            if (data.success) {
-                setSchedule(data.data.weeklySchedule || {});
-                setSubstitutions(data.data.substitutions || []);
-                setClassId(data.data.classId);
-                setSectionId(data.data.sectionId);
-            }
-        } catch (e) { console.error(e); }
-        finally { setLoading(false); }
-    };
+    }, []);
 
     const isDateHoliday = (date: Date) => {
         return holidays.some(h => {
@@ -97,13 +66,12 @@ export default function StudentTimetablePage() {
         const isHoliday = isDateHoliday(today);
         if (isHoliday) return { dayName, dateKey, slots: [], isHoliday: true };
 
-        if (!schedule || !schedule[dayName]) return { dayName, slots: [] };
+        if (!schedule || !schedule[dayName]) return { dayName, dateKey, slots: [], isHoliday: false };
 
         const todaySlots = [];
         const rawDay = schedule[dayName] || {};
-        const maxSlots = 8;
 
-        for (let i = 1; i <= maxSlots; i++) {
+        for (let i = 1; i <= 8; i++) {
             const base = rawDay[i];
             if (!base) continue;
 
@@ -120,228 +88,615 @@ export default function StudentTimetablePage() {
 
     const todayData = getTodaySchedule();
 
-    if (loading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin" /></div>;
+    const getWeeklyScheduleForDay = (dayName: string) => {
+        const today = new Date();
+        const currentDay = today.getDay();
+        const dIdx = DAYS.indexOf(dayName);
+        const distance = (dIdx + 1) - currentDay;
+        const targetDate = new Date(today);
+        targetDate.setDate(today.getDate() + distance);
+        const isHoliday = isDateHoliday(targetDate);
+        const dateKey = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
+
+        if (isHoliday) return { slots: [], isHoliday: true, dateLabel: targetDate.toLocaleDateString([], { month: 'short', day: 'numeric' }), dateKey };
+
+        const daySchedule = schedule?.[dayName] || {};
+        const slots = [];
+        
+        for (let i = 1; i <= 8; i++) {
+            const base = daySchedule[i];
+            if (!base) continue;
+
+            const sub = substitutions.find(s => s.date === dateKey && s.slotId === i);
+            slots.push({
+                id: i,
+                ...base,
+                substitution: sub
+            });
+        }
+
+        return { slots, isHoliday: false, dateLabel: targetDate.toLocaleDateString([], { month: 'short', day: 'numeric' }), dateKey };
+    };
+
+    const weeklyDayData = getWeeklyScheduleForDay(selectedWeeklyDay);
+
+    if (loading) {
+        return (
+            <div className="flex h-[50vh] items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
+            </div>
+        );
+    }
 
     return (
-        <div className="space-y-6 max-w-5xl mx-auto p-4 md:p-6 animate-in fade-in">
-            <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
-                <div>
-                    <h1 className="text-3xl font-display font-bold">My Timetable</h1>
-                    <p className="text-muted-foreground">
-                        {classes[classId]?.name || `Class ${classId}`}
-                        {sectionId && sections && sections[sectionId] ? ` (${sections[sectionId].name})` : ""}
-                    </p>
-                </div>
-                <Button onClick={() => window.print()} variant="outline" className="gap-2 print:hidden bg-white/5 border-white/10 hover:bg-white/10 hover:text-white">
-                    <Printer className="w-4 h-4" /> Print Timetable
-                </Button>
-            </div>
+        <div className="w-full h-full overflow-y-auto">
+            {/* =======================================
+                DESKTOP FULL RESPONSIVE VIEW (>= lg)
+                ======================================= */}
+            <div className="hidden lg:flex lg:flex-col lg:space-y-6 w-full max-w-7xl mx-auto px-6 py-8 animate-in fade-in duration-500 relative">
+                
+                {/* Glowing Accents */}
+                <div className="absolute top-[-5%] left-[-5%] w-[35%] h-[35%] bg-amber-500/10 rounded-full blur-[90px] pointer-events-none" />
+                <div className="absolute bottom-[-10%] right-[-5%] w-[35%] h-[35%] bg-blue-500/10 rounded-full blur-[90px] pointer-events-none" />
 
-            {/* TODAY'S EFFECTIVE VIEW */}
-            <Card className={`print:hidden overflow-hidden relative border-white/10 ${todayData.isHoliday ? "bg-red-500/10 border-red-500/20" : "bg-black/20"}`}>
-                <div className={`absolute top-0 left-0 w-1 h-full ${todayData.isHoliday ? "bg-red-500" : "bg-emerald-500"}`}></div>
-                <CardHeader>
-                    <CardTitle className="flex justify-between items-center">
-                        <span>Today ({todayData.dayName})</span>
-                        <span className="text-sm font-normal text-muted-foreground">{todayData.dateKey}</span>
-                    </CardTitle>
-                </CardHeader>
-                <CardContent>
-                    {todayData.isHoliday ? (
-                        <div className="py-12 flex flex-col items-center justify-center text-red-400 gap-4">
-                            <Coffee className="w-12 h-12 opacity-90" />
-                            <div className="text-center">
-                                <h3 className="text-2xl font-bold uppercase tracking-widest">Holiday</h3>
-                                <p className="text-sm text-red-400/60 mt-1">School is closed for today. Enjoy your break!</p>
-                            </div>
+                {/* Top header row */}
+                <div className="flex justify-between items-center border-b border-white/10 pb-4 relative z-10 select-none">
+                    <div className="flex items-center gap-3">
+                        <div className="w-10 h-10 rounded-xl bg-amber-500/10 border border-amber-500/20 flex items-center justify-center shadow-lg">
+                            <Calendar className="w-5 h-5 text-amber-400" />
                         </div>
+                        <div>
+                            <h1 className="text-2xl font-black font-display text-white tracking-tight">Interactive Timetable Matrix</h1>
+                            <p className="text-xs text-neutral-400 font-medium font-sans">
+                                Class {classes[classId]?.name || `Grade ${classId}`} {sectionId && sections && sections[sectionId] ? ` - Section ${sections[sectionId].name}` : ""} • Live Timeline & Weekly Schedule
+                            </p>
+                        </div>
+                    </div>
+
+                    <div className="flex gap-2">
+                        <Button 
+                            onClick={() => window.print()} 
+                            variant="outline" 
+                            className="gap-2 bg-white/5 border-white/10 hover:bg-white/10 text-white rounded-xl font-bold font-sans"
+                        >
+                            <Printer className="w-4 h-4 text-amber-400" /> Print Timetable
+                        </Button>
+                    </div>
+                </div>
+
+                {/* ==========================================
+                    NEW FEATURE: TODAY'S LIVE SCHEDULE TIMELINE
+                    ========================================== */}
+                <div className="relative z-10 w-full">
+                    <div className="flex items-center gap-2 mb-3.5 select-none">
+                        <Clock className="w-4 h-4 text-emerald-400" />
+                        <h3 className="text-xs font-black uppercase text-emerald-400 tracking-wider font-sans">Today's Live Schedule</h3>
+                        <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/25 text-[9px] font-black uppercase ml-1 rounded">
+                            {todayDayName}
+                        </Badge>
+                    </div>
+
+                    {todayData.isHoliday ? (
+                        <Card className="bg-[#112240]/40 border border-amber-500/20 backdrop-blur-md p-6 rounded-2xl flex items-center justify-center gap-3 text-amber-500 select-none">
+                            <Coffee className="w-6 h-6 animate-pulse" />
+                            <div className="text-left">
+                                <h4 className="text-sm font-black uppercase tracking-wider font-display">Term Holiday / Public Break Today</h4>
+                                <p className="text-xs text-amber-500/60 font-medium font-sans">No classes scheduled for today.</p>
+                            </div>
+                        </Card>
+                    ) : !DAYS.includes(todayDayName) ? (
+                        <Card className="bg-[#112240]/40 border border-white/5 backdrop-blur-md p-5 rounded-2xl flex items-center gap-3 text-neutral-400 select-none">
+                            <Coffee className="w-5 h-5" />
+                            <div className="text-left">
+                                <h4 className="text-xs font-black uppercase tracking-wider font-display">Weekend Rest Day</h4>
+                                <p className="text-[11px] text-neutral-500 font-medium font-sans">Enjoy your weekend! Standard classes resume on Monday.</p>
+                            </div>
+                        </Card>
+                    ) : todayData.slots.length === 0 ? (
+                        <Card className="bg-[#112240]/40 border border-white/5 backdrop-blur-md p-5 rounded-2xl text-center text-neutral-400 italic text-xs font-medium font-sans select-none">
+                            No classes or schedule information available for today.
+                        </Card>
                     ) : (
-                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                            {todayData.slots.length === 0 ? <p className="text-muted-foreground">No classes scheduled for today.</p> :
-                                todayData.slots.map((slot: any) => {
-                                    const isSub = !!slot.substitution;
-                                    const isLeisure = isSub && slot.substitution.resolutionType === "LEISURE";
-                                    const rawSubjectId = isLeisure ? "leisure" : (slot.subjectId === "leisure" ? "leisure" : slot.subjectId);
-                                    const subjectName = subjects[rawSubjectId]?.name || rawSubjectId;
-
-                                    const getTeacherDisplay = () => {
-                                        if (isSub && slot.substitution.substituteTeacherId) {
-                                            return teacherMap[slot.substitution.substituteTeacherId] || slot.substitution.substituteTeacherId;
-                                        }
-                                        return teacherMap[slot.teacherId] || slot.teacherId || "No Teacher";
-                                    };
-
+                        <div className="grid grid-cols-8 gap-3">
+                            {PERIOD_IDS.map(pId => {
+                                const slot = todayData.slots.find((s: any) => s.id === pId);
+                                
+                                if (!slot) {
                                     return (
-                                        <div key={slot.id} className={`p-4 rounded-lg border flex flex-col gap-2 ${isSub ? "bg-yellow-500/10 border-yellow-500/30" : "bg-white/5 border-white/10"}`}>
-                                            <div className="flex justify-between items-start">
-                                                <span className="text-xs font-bold text-muted-foreground">Period {slot.id}</span>
-                                                {isSub && <Badge variant="outline" className="text-[10px] bg-yellow-500/20 text-yellow-500 border-yellow-500/50">Changed</Badge>}
+                                        <Card key={`today-timeline-free-${pId}`} className="bg-white/[0.01] border border-dashed border-white/5 rounded-2xl p-3 flex flex-col justify-between h-[82px] text-left select-none opacity-50">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[9px] font-black text-neutral-600 font-mono">P{pId}</span>
+                                                <span className="text-[8px] font-semibold text-neutral-600 font-mono">{PERIOD_TIMINGS[pId]}</span>
                                             </div>
-                                            <div className="font-bold text-lg truncate">
+                                            <span className="text-[10px] font-semibold text-neutral-600 uppercase tracking-wider">Free Slot</span>
+                                        </Card>
+                                    );
+                                }
+
+                                if (slot.type === "BREAK") {
+                                    return (
+                                        <Card key={`today-timeline-break-${pId}`} className="bg-white/5 border border-white/5 p-3 flex flex-col justify-between h-[82px] text-left select-none">
+                                            <div className="flex justify-between items-center">
+                                                <span className="text-[9px] font-black text-neutral-500 font-mono">P{pId}</span>
+                                                <span className="text-[8px] font-semibold text-neutral-500 font-mono">{PERIOD_TIMINGS[pId]}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                <Coffee className="w-3.5 h-3.5 text-neutral-500 shrink-0" />
+                                                <span className="text-[9px] font-black uppercase text-neutral-400 tracking-wider">Break</span>
+                                            </div>
+                                        </Card>
+                                    );
+                                }
+
+                                const isSub = !!slot.substitution;
+                                const isLeisure = isSub && slot.substitution.resolutionType === "LEISURE";
+                                const rawSubjectId = isLeisure ? "leisure" : (slot.subjectId === "leisure" ? "leisure" : slot.subjectId);
+                                const subjectName = subjects[rawSubjectId]?.name || rawSubjectId;
+
+                                const teacherName = isSub && slot.substitution.substituteTeacherId
+                                    ? (teacherMap[slot.substitution.substituteTeacherId] || slot.substitution.substituteTeacherId)
+                                    : (teacherMap[slot.teacherId] || slot.teacherId || "Staff");
+
+                                return (
+                                    <Card 
+                                        key={`today-timeline-slot-${pId}`}
+                                        className={`p-3 flex flex-col justify-between h-[82px] text-left relative overflow-hidden transition-all duration-300 ${
+                                            isSub
+                                                ? "bg-yellow-500/10 border-yellow-500/35 shadow-md shadow-yellow-500/5 hover:border-yellow-500/50"
+                                                : isLeisure || rawSubjectId === "leisure"
+                                                ? "bg-emerald-500/5 border-emerald-500/20 hover:border-emerald-500/40"
+                                                : "bg-[#112240]/60 border-white/10 hover:border-white/20"
+                                        }`}
+                                    >
+                                        <div className="flex justify-between items-center select-none">
+                                            <span className="text-[9.5px] font-black text-neutral-400 font-mono">P{pId}</span>
+                                            <span className="text-[8.5px] font-semibold text-neutral-400 font-mono">{PERIOD_TIMINGS[pId]}</span>
+                                        </div>
+
+                                        <div className="truncate my-0.5">
+                                            <h4 className="font-black text-[11px] text-white tracking-tight capitalize truncate">
                                                 {isLeisure || rawSubjectId === "leisure" ? (
-                                                    <span className="flex items-center gap-2 text-emerald-400 font-medium">
-                                                        <Coffee className="w-5 h-5" /> Free Period
-                                                    </span>
-                                                ) : <span className="capitalize">{subjectName}</span>}
-                                            </div>
-                                            {!isLeisure && rawSubjectId !== "leisure" && (
-                                                <div className="text-sm text-muted-foreground flex items-center gap-2">
-                                                    <Users className="w-3 h-3" />
-                                                    <span className="truncate">{getTeacherDisplay()}</span>
-                                                </div>
+                                                    <span className="text-emerald-400 font-bold uppercase tracking-wider text-[9px]">Free</span>
+                                                ) : (
+                                                    `${subjectName} (${teacherName})`
+                                                )}
+                                            </h4>
+                                        </div>
+
+                                        <div className="truncate shrink-0 flex items-center justify-between">
+                                            <div />
+                                            {isSub && (
+                                                <Badge className="text-[7px] bg-yellow-500 text-neutral-900 border-none font-extrabold px-1 py-0 rounded shrink-0 select-none">
+                                                    Sub
+                                                </Badge>
                                             )}
                                         </div>
-                                    );
-                                })
-                            }
+                                    </Card>
+                                );
+                            })}
                         </div>
                     )}
-                </CardContent>
-            </Card>
+                </div>
 
-            {/* WEEKLY STANDARD VIEW (DYNAMIC FOR SCREEN) */}
-            <Card className="bg-black/20 border-white/10 print:hidden">
-                <CardHeader><CardTitle>Weekly Schedule</CardTitle></CardHeader>
-                <CardContent>
-                    <div className="overflow-x-auto">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b border-white/10">
-                                    <th className="p-3 text-left">Day</th>
-                                    {[1, 2, 3, 4, 5, 6, 7, 8].map(i => <th key={i} className="p-3 text-center">P{i}</th>)}
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {DAYS.map((day, dIdx) => {
-                                    // Calculate date for this day of current week
-                                    const today = new Date();
-                                    const currentDay = today.getDay();
-                                    const distance = (dIdx + 1) - currentDay;
-                                    const targetDate = new Date(today);
-                                    targetDate.setDate(today.getDate() + distance);
-                                    const isHoliday = isDateHoliday(targetDate);
+                {/* 2D Matrix Table Grid Container */}
+                <div className="relative z-10 w-full">
+                    <div className="flex items-center gap-2 mb-3.5 select-none">
+                        <BookOpen className="w-4 h-4 text-amber-400" />
+                        <h3 className="text-xs font-black uppercase text-amber-400 tracking-wider font-sans">Weekly Timetable Matrix</h3>
+                    </div>
+
+                    <Card className="bg-[#112240]/40 border-white/5 backdrop-blur-md shadow-2xl rounded-3xl overflow-hidden">
+                        <CardContent className="p-5">
+                            <div className="grid grid-cols-9 gap-2.5 items-stretch text-center">
+                                
+                                {/* Grid Corner Header (Day / Periods) */}
+                                <div className="bg-[#0f1d3a] rounded-2xl border border-white/5 p-2 flex flex-col justify-center items-center h-14 select-none shadow-inner">
+                                    <span className="text-[9px] font-black uppercase text-amber-400 tracking-wider font-display">Days</span>
+                                    <div className="h-px bg-white/10 w-6 my-0.5" />
+                                    <span className="text-[9px] font-black uppercase text-neutral-400 tracking-wider font-display">Periods</span>
+                                </div>
+
+                                {/* Periods Columns Headers (Period 1 to 8) */}
+                                {PERIOD_IDS.map(pId => (
+                                    <div 
+                                        key={`header-period-${pId}`} 
+                                        className="bg-white/5 rounded-2xl border border-white/5 p-2 flex flex-col justify-center items-center h-14 shadow-inner select-none"
+                                    >
+                                        <span className="text-xs font-black text-white tracking-tight font-display">Period {pId}</span>
+                                        <span className="text-[8.5px] text-neutral-400 font-bold font-mono mt-0.5">{PERIOD_TIMINGS[pId]}</span>
+                                    </div>
+                                ))}
+
+                                {/* Matrix Rows (Days Monday to Saturday) */}
+                                {DAYS.map(dayName => {
+                                    const rowData = getWeeklyScheduleForDay(dayName);
+                                    const isToday = dayName === todayDayName;
 
                                     return (
-                                        <tr key={day} className={`border-b border-white/5 transition-colors ${isHoliday ? "bg-red-500/5" : "hover:bg-white/5"}`}>
-                                            <td className="p-3 font-medium text-muted-foreground flex flex-col">
-                                                <span>{day.substring(0, 3)}</span>
-                                                <span className="text-[10px] opacity-40 font-normal">{targetDate.toLocaleDateString([], { month: 'short', day: 'numeric' })}</span>
-                                            </td>
-                                            {isHoliday ? (
-                                                <td colSpan={8} className="p-3 text-center text-red-400/80 font-bold uppercase tracking-widest text-[10px]">Holiday</td>
-                                            ) : (
-                                                [1, 2, 3, 4, 5, 6, 7, 8].map(i => {
-                                                    const dateKey = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
-                                                    const sub = substitutions.find(s => s.date === dateKey && s.slotId === i);
-                                                    const slot = schedule?.[day]?.[i];
+                                        <div key={`matrix-row-${dayName}`} className="contents">
+                                            
+                                            {/* Day Column label (Column 1) */}
+                                            <div 
+                                                className={`rounded-2xl border flex flex-col justify-center items-center h-[72px] shadow-sm select-none transition-all ${
+                                                    isToday
+                                                        ? "bg-amber-400 border-amber-300 text-neutral-900 shadow-amber-500/10"
+                                                        : "bg-[#0A192F]/60 border-white/5 text-white"
+                                                }`}
+                                            >
+                                                <span className="text-xs font-black uppercase tracking-widest font-display">{dayName.substring(0, 3)}</span>
+                                                <span className={`text-[8.5px] font-extrabold uppercase mt-0.5 ${isToday ? "text-neutral-800" : "text-neutral-400"}`}>
+                                                    {rowData.dateLabel}
+                                                </span>
+                                                {isToday && (
+                                                    <Badge className="bg-neutral-900 text-white text-[7px] font-black uppercase px-1.5 py-0.2 mt-1 border-none">
+                                                        Today
+                                                    </Badge>
+                                                )}
+                                            </div>
 
-                                                    if (sub) {
-                                                        const isLeisure = sub.resolutionType === "LEISURE";
+                                            {/* 8 Periods Slots Columns (Columns 2 to 9) */}
+                                            {rowData.isHoliday ? (
+                                                /* Holiday Row Span */
+                                                <div className="col-span-8 bg-amber-500/5 border border-amber-500/15 rounded-2xl flex items-center justify-center gap-3 text-amber-500 h-[72px] shadow-inner select-none">
+                                                    <Coffee className="w-4 h-4 animate-pulse" />
+                                                    <div className="text-left">
+                                                        <h4 className="text-xs font-black uppercase tracking-widest font-display">Holiday / Public Break</h4>
+                                                        <p className="text-[9.5px] text-amber-500/60 font-semibold font-sans">Class timetable suspended for this date.</p>
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                PERIOD_IDS.map(pId => {
+                                                    const slot = rowData.slots.find((s: any) => s.id === pId);
+                                                    
+                                                    if (!slot) {
                                                         return (
-                                                            <td key={i} className="p-3 text-center border-l border-white/5 bg-yellow-500/10">
-                                                                <div className="font-semibold text-yellow-500">
-                                                                    {isLeisure ? "Free Period" : (subjects[slot?.subjectId]?.name || slot?.subjectId)}
-                                                                </div>
-                                                                {!isLeisure && (
-                                                                    <div className="text-[10px] text-yellow-500/60 font-medium">
-                                                                        {teacherMap[sub.substituteTeacherId] || sub.substituteTeacherId}
-                                                                    </div>
-                                                                )}
-                                                            </td>
+                                                            <div 
+                                                                key={`matrix-slot-${dayName}-${pId}`} 
+                                                                className="bg-white/[0.01] border border-dashed border-white/5 rounded-2xl flex items-center justify-center text-neutral-600 text-[11px] font-mono h-[72px] select-none"
+                                                            >
+                                                                —
+                                                            </div>
                                                         );
                                                     }
 
-                                                    if (!slot) return <td key={i} className="p-3"></td>;
-                                                    if (slot.type === "BREAK") return <td key={i} className="p-3 bg-white/5 text-center text-[10px] diagonal-stripe opacity-90"></td>;
+                                                    if (slot.type === "BREAK") {
+                                                        return (
+                                                            <div 
+                                                                key={`matrix-slot-${dayName}-${pId}`} 
+                                                                className="bg-white/5 border border-white/5 hover:bg-white/10 rounded-2xl flex flex-col justify-center items-center text-neutral-400 gap-0.5 h-[72px] shadow-inner select-none transition-all"
+                                                            >
+                                                                <Coffee className="w-3.5 h-3.5 text-neutral-500" />
+                                                                <span className="text-[8px] font-black uppercase tracking-wider text-neutral-500 font-display">Recess</span>
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    const isSub = !!slot.substitution;
+                                                    const isLeisure = isSub && slot.substitution.resolutionType === "LEISURE";
+                                                    const rawSubjectId = isLeisure ? "leisure" : (slot.subjectId === "leisure" ? "leisure" : slot.subjectId);
+                                                    const subjectName = subjects[rawSubjectId]?.name || rawSubjectId;
+
+                                                    const teacherName = isSub && slot.substitution.substituteTeacherId
+                                                        ? (teacherMap[slot.substitution.substituteTeacherId] || slot.substitution.substituteTeacherId)
+                                                        : (teacherMap[slot.teacherId] || slot.teacherId || "Staff");
+
                                                     return (
-                                                        <td key={i} className="p-3 text-center border-l border-white/5">
-                                                            <div className="font-semibold">{slot.subjectId === "leisure" ? "Leisure" : (subjects[slot.subjectId]?.name || slot.subjectId)}</div>
-                                                            <div className="text-[10px] text-muted-foreground">{teacherMap[slot.teacherId] || slot.teacherId}</div>
-                                                        </td>
+                                                        <div 
+                                                            key={`matrix-slot-${dayName}-${pId}`}
+                                                            className={`group relative overflow-hidden p-2.5 rounded-2xl border transition-all duration-300 flex flex-col justify-between text-left h-[72px] ${
+                                                                isSub
+                                                                    ? "bg-yellow-500/10 border-yellow-500/25 shadow-md shadow-yellow-500/5 hover:border-yellow-500/40"
+                                                                    : isLeisure || rawSubjectId === "leisure"
+                                                                    ? "bg-emerald-500/5 border-emerald-500/15 hover:border-emerald-500/30"
+                                                                    : "bg-[#0A192F]/40 border-white/5 hover:border-white/15"
+                                                            }`}
+                                                        >
+                                                            {/* Top indicator tag */}
+                                                            <div className="flex justify-between items-center gap-1 shrink-0 select-none">
+                                                                <span className="text-[8px] font-black text-neutral-500 font-mono">P{pId}</span>
+                                                                {isSub && (
+                                                                    <Badge className="text-[7px] bg-yellow-500 text-neutral-900 border-none font-black px-1 py-0 rounded">
+                                                                        Sub
+                                                                    </Badge>
+                                                                )}
+                                                            </div>
+
+                                                            {/* Subject name */}
+                                                            <div className="truncate my-0.5">
+                                                                <h4 className="font-extrabold text-[10.5px] text-white tracking-tight capitalize truncate group-hover:text-amber-400 transition-colors font-display">
+                                                                    {isLeisure || rawSubjectId === "leisure" ? (
+                                                                        <span className="text-emerald-400 font-semibold uppercase tracking-wider text-[8.5px]">Free</span>
+                                                                    ) : (
+                                                                        subjectName
+                                                                    )}
+                                                                </h4>
+                                                            </div>
+
+                                                            {/* Faculty name footnote */}
+                                                            <div className="truncate shrink-0">
+                                                                {!isLeisure && rawSubjectId !== "leisure" && (
+                                                                    <span className="text-[8.5px] text-neutral-400 font-medium truncate block font-sans">({teacherName})</span>
+                                                                )}
+                                                            </div>
+                                                        </div>
                                                     );
                                                 })
                                             )}
-                                        </tr>
+                                        </div>
                                     );
                                 })}
-                            </tbody>
-                        </table>
-                    </div>
-                </CardContent>
-            </Card>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </div>
+            </div>
 
-            {/* PRINT-ONLY GENERIC MASTER SCHEDULE */}
-            <div className="hidden print:flex flex-col text-black bg-white min-h-screen">
-                <div className="w-full max-w-6xl mx-auto py-12">
-                    {/* Print Header */}
-                    <div className="flex items-end justify-between border-b-2 border-slate-900 pb-8 mb-12">
-                        <div>
-                            <h1 className="text-4xl font-black uppercase tracking-tight text-slate-900 mb-2">Master Timetable</h1>
-                            <p className="text-sm font-bold tracking-widest uppercase text-slate-500">
-                                {classes[classId]?.name || `Class ${classId}`} {sectionId && sections && sections[sectionId] ? `• ${sections[sectionId].name}` : ""}
-                            </p>
-                        </div>
-                        <div className="text-right">
-                            <p className="text-[10px] font-black tracking-widest uppercase text-slate-400 mb-1">Generated</p>
-                            <p className="text-sm font-medium text-slate-800">{new Date().toLocaleDateString([], { month: 'long', day: 'numeric', year: 'numeric' })}</p>
-                        </div>
-                    </div>
+            {/* =======================================
+                MOBILE VIEW (< lg Breakpoint)
+                ======================================= */}
+            <div className="max-w-md mx-auto lg:hidden flex flex-col h-[calc(100vh-100px)] space-y-4 animate-in fade-in duration-500 pb-4 relative overflow-hidden select-none bg-gradient-to-b from-[#0a192f] via-[#0f224a] to-[#0a192f] px-2.5">
+                
+                {/* Glowing Accents */}
+                <div className="absolute top-[-5%] left-[-5%] w-[40%] h-[30%] bg-amber-500/10 rounded-full blur-[80px] pointer-events-none" />
+                <div className="absolute bottom-[-5%] right-[-5%] w-[40%] h-[30%] bg-blue-500/10 rounded-full blur-[80px] pointer-events-none" />
 
-                    {/* Print Grid */}
-                    <table className="w-full border-collapse border-y-2 border-slate-900">
-                        <thead>
-                            <tr className="bg-slate-50">
-                                <th className="border-b-2 border-slate-900 p-4 font-black text-slate-900 uppercase tracking-widest text-[11px] text-left w-28">Day</th>
-                                {[1, 2, 3, 4, 5, 6, 7, 8].map(i => (
-                                    <th key={i} className="border-b-2 border-slate-900 p-4 font-black text-slate-900 uppercase tracking-widest text-[11px] text-center w-32">
-                                        Period {i}
-                                    </th>
-                                ))}
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-slate-200">
-                            {DAYS.map((day) => (
-                                <tr key={day} className="hover:bg-slate-50/50 transition-colors">
-                                    <td className="p-4 align-middle">
-                                        <span className="font-bold text-slate-900 uppercase tracking-widest">{day.substring(0, 3)}</span>
-                                    </td>
-                                    {[1, 2, 3, 4, 5, 6, 7, 8].map(i => {
-                                        const slot = schedule?.[day]?.[i];
-                                        if (!slot) return <td key={i} className="p-4 text-center align-middle border-l border-slate-100"><span className="text-slate-200 font-light">-</span></td>;
-                                        
-                                        if (slot.type === "BREAK") return (
-                                            <td key={i} className="p-4 text-center align-middle bg-slate-50 border-l border-slate-200">
-                                                <span className="text-[9px] uppercase font-black text-slate-400 tracking-[0.2em]">Break</span>
-                                            </td>
-                                        );
-
-                                        const isLeisure = slot.subjectId === "leisure";
-                                        return (
-                                            <td key={i} className="p-4 text-center align-middle border-l border-slate-100">
-                                                <div className="flex flex-col items-center justify-center gap-1">
-                                                    <span className={`font-bold uppercase text-[11px] tracking-wide ${isLeisure ? 'text-slate-400' : 'text-slate-900'}`}>
-                                                        {isLeisure ? "Leisure" : (subjects[slot.subjectId]?.name || slot.subjectId)}
-                                                    </span>
-                                                    {!isLeisure && (
-                                                        <span className="text-[9px] font-medium text-slate-500 uppercase tracking-wider">
-                                                            {teacherMap[slot.teacherId] || slot.teacherId}
-                                                        </span>
-                                                    )}
-                                                </div>
-                                            </td>
-                                        );
-                                    })}
-                                </tr>
-                            ))}
-                        </tbody>
-                    </table>
-
-                    {/* Print Footer */}
-                    <div className="mt-16 text-center">
-                        <p className="text-[10px] font-bold uppercase tracking-widest text-slate-400">
-                            Official Document • Spoorthy Concept School
+                {/* Header Area */}
+                <div className="flex justify-between items-center px-1 mt-2">
+                    <div>
+                        <h1 className="text-base font-extrabold text-white">My Timetable</h1>
+                        <p className="text-[10px] text-neutral-400">
+                            {classes[classId]?.name || `Class ${classId}`}
+                            {sectionId && sections && sections[sectionId] ? ` (${sections[sectionId].name})` : ""}
                         </p>
                     </div>
+                    
+                    <Button 
+                        onClick={() => window.print()} 
+                        variant="outline" 
+                        className="gap-1.5 print:hidden bg-white/5 border-white/10 hover:bg-white/10 text-white px-2.5 py-1 text-[10px] font-bold h-7 rounded-xl"
+                    >
+                        <Printer className="w-3 h-3 text-amber-400" /> Print
+                    </Button>
+                </div>
+
+                {/* Segment Toggler */}
+                <div className="flex bg-white/5 p-1 rounded-2xl border border-white/10 w-full select-none shrink-0">
+                    <button
+                        onClick={() => setActiveTab('today')}
+                        className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 ${
+                            activeTab === 'today'
+                                ? 'bg-amber-400 text-neutral-900 shadow-lg shadow-amber-500/20'
+                                : 'text-white/60 hover:text-white'
+                        }`}
+                    >
+                        <Clock className="w-3.5 h-3.5" /> Today
+                    </button>
+                    <button
+                        onClick={() => setActiveTab('weekly')}
+                        className={`flex-1 py-2 text-xs font-bold rounded-xl transition-all duration-300 flex items-center justify-center gap-1.5 ${
+                            activeTab === 'weekly'
+                                ? 'bg-amber-400 text-neutral-900 shadow-lg shadow-amber-500/20'
+                                : 'text-white/60 hover:text-white'
+                        }`}
+                    >
+                        <Calendar className="w-3.5 h-3.5" /> Weekly View
+                    </button>
+                </div>
+
+                {/* View Panels */}
+                <div className="flex-1 flex flex-col justify-between">
+                    <AnimatePresence mode="wait">
+                        {activeTab === 'today' ? (
+                            <motion.div
+                                key="today-tab"
+                                initial={{ opacity: 0, y: 5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -5 }}
+                                transition={{ duration: 0.15 }}
+                                className="flex-1 flex flex-col"
+                            >
+                                <Card className="bg-[#112240]/40 border-white/10 backdrop-blur-md shadow-lg flex-1 flex flex-col overflow-hidden">
+                                    <CardHeader className="pb-2.5 p-4 flex flex-row items-center justify-between shrink-0">
+                                        <CardTitle className="text-xs font-bold text-white flex items-center gap-1.5">
+                                            <Clock className="w-4 h-4 text-emerald-400" />
+                                            Today ({todayData.dayName.substring(0, 3)})
+                                        </CardTitle>
+                                        <span className="text-[9px] font-mono text-neutral-400 font-bold bg-white/5 px-2 py-0.5 rounded">
+                                            {todayData.dateKey ? new Date(todayData.dateKey).toLocaleDateString([], {month: 'short', day: 'numeric'}) : ''}
+                                        </span>
+                                    </CardHeader>
+                                    <CardContent className="px-3 pb-3 flex-1 flex flex-col overflow-hidden">
+                                        {todayData.isHoliday ? (
+                                            <div className="flex-1 flex flex-col items-center justify-center text-red-400 gap-2.5">
+                                                <Coffee className="w-10 h-10 opacity-80" />
+                                                <div className="text-center">
+                                                    <h3 className="text-xs font-bold uppercase tracking-wider">Holiday</h3>
+                                                    <p className="text-[10px] text-red-400/60 mt-0.5">Enjoy your holiday!</p>
+                                                </div>
+                                            </div>
+                                        ) : todayData.slots.length === 0 ? (
+                                            <div className="flex-1 flex items-center justify-center text-neutral-400 italic text-xs font-medium font-sans">
+                                                No classes scheduled.
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-1.5 overflow-y-auto max-h-[350px] pr-0.5">
+                                                {todayData.slots.map((slot: any) => {
+                                                    const isSub = !!slot.substitution;
+                                                    const isLeisure = isSub && slot.substitution.resolutionType === "LEISURE";
+                                                    const rawSubjectId = isLeisure ? "leisure" : (slot.subjectId === "leisure" ? "leisure" : slot.subjectId);
+                                                    const subjectName = subjects[rawSubjectId]?.name || rawSubjectId;
+
+                                                    const getTeacherDisplay = () => {
+                                                        if (isSub && slot.substitution.substituteTeacherId) {
+                                                            return teacherMap[slot.substitution.substituteTeacherId] || slot.substitution.substituteTeacherId;
+                                                        }
+                                                        return teacherMap[slot.teacherId] || slot.teacherId || "No Teacher";
+                                                    };
+
+                                                    if (slot.type === "BREAK") {
+                                                        return (
+                                                            <div key={`mob-today-slot-${slot.id}`} className="py-1 rounded-lg bg-white/5 border border-white/5 flex items-center justify-center gap-1.5 select-none shrink-0 h-7">
+                                                                <Coffee className="w-3 h-3 text-neutral-500 shrink-0" />
+                                                                <span className="text-[9px] font-black uppercase text-neutral-400 tracking-wider">Recess Break</span>
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    return (
+                                                        <div 
+                                                            key={`mob-today-slot-${slot.id}`} 
+                                                            className={`p-2 rounded-xl border flex items-center justify-between gap-3 ${
+                                                                isSub 
+                                                                    ? "bg-yellow-500/10 border-yellow-500/20" 
+                                                                    : "bg-white/5 border-white/10"
+                                                            }`}
+                                                        >
+                                                            <div className="flex items-center gap-2.5 truncate">
+                                                                <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center text-[10px] font-black text-amber-400 shrink-0 select-none">
+                                                                    P{slot.id}
+                                                                </div>
+                                                                <div className="truncate">
+                                                                    <div className="font-extrabold text-xs text-white truncate capitalize">
+                                                                        {isLeisure || rawSubjectId === "leisure" ? (
+                                                                            <span className="text-emerald-400 font-medium">Free Period</span>
+                                                                        ) : (
+                                                                            `${subjectName} (${getTeacherDisplay()})`
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            {isSub && (
+                                                                <Badge className="text-[7.5px] bg-yellow-500/20 text-yellow-500 border-none font-bold px-1 py-0.2 shrink-0 select-none">
+                                                                    Changed
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </motion.div>
+                        ) : (
+                            <motion.div
+                                key="weekly-tab"
+                                initial={{ opacity: 0, y: 5 }}
+                                animate={{ opacity: 1, y: 0 }}
+                                exit={{ opacity: 0, y: -5 }}
+                                transition={{ duration: 0.15 }}
+                                className="flex-1 flex flex-col"
+                            >
+                                <Card className="bg-[#112240]/40 border-white/10 backdrop-blur-md shadow-lg flex-1 flex flex-col overflow-hidden">
+                                    <CardHeader className="pb-2.5 p-4 space-y-2.5 shrink-0">
+                                        <CardTitle className="text-xs font-bold text-white flex items-center justify-between">
+                                            <span className="flex items-center gap-1.5 font-display">
+                                                <Calendar className="w-4 h-4 text-amber-400" />
+                                                Weekly Schedule
+                                            </span>
+                                            <span className="text-[9px] font-mono text-neutral-400 font-bold bg-white/5 px-2 py-0.5 rounded">
+                                                {weeklyDayData.dateLabel}
+                                            </span>
+                                        </CardTitle>
+
+                                        {/* Horizontal Week Bubble Strip */}
+                                        <div className="flex gap-1 bg-white/5 p-0.5 rounded-xl border border-white/5 select-none w-full">
+                                            {DAYS.map(day => {
+                                                const isSelected = selectedWeeklyDay === day;
+                                                return (
+                                                    <button
+                                                        key={`mob-week-day-${day}`}
+                                                        onClick={() => setSelectedWeeklyDay(day)}
+                                                        className={`flex-1 py-1.5 text-[9px] font-black rounded-lg uppercase tracking-wider transition-all duration-300 font-display ${
+                                                            isSelected
+                                                                ? "bg-amber-400 text-neutral-900 shadow-sm font-black"
+                                                                : "text-white/60 hover:text-white"
+                                                        }`}
+                                                    >
+                                                        {day.substring(0, 3)}
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </CardHeader>
+
+                                    <CardContent className="px-3 pb-3 flex-1 flex flex-col overflow-hidden">
+                                        {weeklyDayData.isHoliday ? (
+                                            <div className="flex-1 flex flex-col items-center justify-center text-red-400 gap-2.5">
+                                                <Coffee className="w-10 h-10 opacity-80" />
+                                                <div className="text-center">
+                                                    <h3 className="text-xs font-bold uppercase tracking-wider">Holiday</h3>
+                                                    <p className="text-[10px] text-red-400/60 mt-0.5">School closed today.</p>
+                                                </div>
+                                            </div>
+                                        ) : weeklyDayData.slots.length === 0 ? (
+                                            <div className="flex-1 flex items-center justify-center text-neutral-400 italic text-xs font-medium font-sans">
+                                                No classes scheduled.
+                                            </div>
+                                        ) : (
+                                            <div className="space-y-1.5 overflow-y-auto max-h-[290px] pr-0.5">
+                                                {weeklyDayData.slots.map((slot: any) => {
+                                                    const isSub = !!slot.substitution;
+                                                    const isLeisure = isSub && slot.substitution.resolutionType === "LEISURE";
+                                                    const rawSubjectId = isLeisure ? "leisure" : (slot.subjectId === "leisure" ? "leisure" : slot.subjectId);
+                                                    const subjectName = subjects[rawSubjectId]?.name || rawSubjectId;
+
+                                                    const getTeacherDisplay = () => {
+                                                        if (isSub && slot.substitution.substituteTeacherId) {
+                                                            return teacherMap[slot.substitution.substituteTeacherId] || slot.substitution.substituteTeacherId;
+                                                        }
+                                                        return teacherMap[slot.teacherId] || slot.teacherId || "No Teacher";
+                                                    };
+
+                                                    if (slot.type === "BREAK") {
+                                                        return (
+                                                            <div key={`mob-week-slot-${slot.id}`} className="py-1 rounded-lg bg-white/5 border border-white/5 flex items-center justify-center gap-1.5 select-none shrink-0 h-7">
+                                                                <Coffee className="w-3 h-3 text-neutral-500 shrink-0" />
+                                                                <span className="text-[9px] font-black uppercase text-neutral-400 tracking-wider">Recess Break</span>
+                                                            </div>
+                                                        );
+                                                    }
+
+                                                    return (
+                                                        <div 
+                                                            key={`mob-week-slot-${slot.id}`} 
+                                                            className={`p-2 rounded-xl border flex items-center justify-between gap-3 ${
+                                                                isSub 
+                                                                    ? "bg-yellow-500/10 border-yellow-500/20" 
+                                                                    : "bg-white/5 border-white/10"
+                                                            }`}
+                                                        >
+                                                            <div className="flex items-center gap-2.5 truncate">
+                                                                <div className="w-7 h-7 rounded-lg bg-white/5 flex items-center justify-center text-[10px] font-black text-amber-400 shrink-0 select-none">
+                                                                    P{slot.id}
+                                                                </div>
+                                                                <div className="truncate">
+                                                                    <div className="font-extrabold text-xs text-white truncate capitalize">
+                                                                        {isLeisure || rawSubjectId === "leisure" ? (
+                                                                            <span className="text-emerald-400 font-medium">Free Period</span>
+                                                                        ) : (
+                                                                            `${subjectName} (${getTeacherDisplay()})`
+                                                                        )}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+
+                                                            {isSub && (
+                                                                <Badge className="text-[7.5px] bg-yellow-500/20 text-yellow-500 border-none font-bold px-1 py-0.2 shrink-0 select-none">
+                                                                    Changed
+                                                                </Badge>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                })}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </motion.div>
+                        )}
+                    </AnimatePresence>
                 </div>
             </div>
         </div>
