@@ -329,8 +329,125 @@ export default function TeacherDashboard() {
     const DAYS_OF_WEEK = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
     const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
 
+    const getPeriodTiming = (period: number) => {
+        const timings: Record<number, string> = {
+            1: "08:00 - 08:40",
+            2: "08:40 - 09:20",
+            3: "09:20 - 10:00",
+            4: "10:20 - 11:00",
+            5: "11:00 - 11:40",
+            6: "11:40 - 12:20",
+            7: "12:40 - 01:20",
+            8: "01:20 - 02:00",
+            9: "02:00 - 02:40",
+            10: "02:40 - 03:20"
+        };
+        return timings[period] || "";
+    };
+
+    const getSubjectCode = (name: string = "") => {
+        const n = name.toUpperCase();
+        if (n.includes("MATH")) return "MATH";
+        if (n.includes("ENGLISH") || n.includes("ENG")) return "ENG";
+        if (n.includes("SCIENCE") || n.includes("SCI")) return "SCI";
+        if (n.includes("HINDI") || n.includes("HIN")) return "HIN";
+        if (n.includes("SOCIAL") || n.includes("SST")) return "SST";
+        if (n.includes("COMPUTER") || n.includes("COMP")) return "COMP";
+        if (n.includes("ART") || n.includes("DRAW")) return "ART";
+        if (n.includes("PHYSIC") || n.includes("PHY")) return "PHY";
+        if (n.includes("GENERAL KNOWLEDGE") || n.includes("G.K")) return "G.K.";
+        if (n.includes("TELUGU") || n.includes("TEL")) return "TEL";
+        return name.substring(0, 4).toUpperCase();
+    };
+
+    const getSubjectStyle = (name: string = "") => {
+        const n = name.toUpperCase();
+        if (n.includes("MATH")) return "bg-emerald-500/10 border border-emerald-500/35 text-emerald-400";
+        if (n.includes("ENG") || n.includes("LIT") || n.includes("G.K")) return "bg-blue-500/10 border border-blue-500/35 text-blue-400";
+        if (n.includes("SCI") || n.includes("PHY") || n.includes("CHEM") || n.includes("BIO")) return "bg-amber-500/10 border border-amber-500/35 text-amber-400";
+        if (n.includes("HIN") || n.includes("TEL") || n.includes("LANG")) return "bg-purple-500/10 border border-purple-500/35 text-purple-400";
+        if (n.includes("SST") || n.includes("SOC") || n.includes("HIS") || n.includes("GEO")) return "bg-cyan-500/10 border border-cyan-500/35 text-cyan-400";
+        if (n.includes("COMP") || n.includes("ART") || n.includes("DRAW")) return "bg-orange-500/10 border border-orange-500/35 text-orange-400";
+        return "bg-slate-500/10 border border-slate-500/35 text-slate-400";
+    };
+
+    const getTodayCardStyles = (count: number) => {
+        if (count <= 5) {
+            return {
+                gridClass: "grid w-full gap-2 sm:gap-4",
+                cardClass: "p-2.5 sm:p-4.5 min-h-[95px] sm:min-h-[125px] rounded-xl sm:rounded-2xl shadow-[0_4px_12px_rgba(0,0,0,0.15)]",
+                periodNum: "text-[9px] sm:text-xs font-black",
+                mainText: "text-xs sm:text-sm font-black tracking-tight",
+                subText: "text-[8px] sm:text-[10px] font-bold mt-0.5 sm:mt-1",
+                timeText: "text-[7.5px] sm:text-[9.5px] font-mono mt-0.5 sm:mt-1"
+            };
+        }
+        if (count <= 7) {
+            return {
+                gridClass: "grid w-full gap-1.5 sm:gap-3",
+                cardClass: "p-2 sm:p-3.5 min-h-[85px] sm:min-h-[110px] rounded-lg sm:rounded-xl shadow-[0_3px_8px_rgba(0,0,0,0.12)]",
+                periodNum: "text-[8px] sm:text-xs font-black",
+                mainText: "text-[10px] sm:text-xs font-black tracking-tight",
+                subText: "text-[7.5px] sm:text-[9px] font-bold mt-0.5",
+                timeText: "text-[7px] sm:text-[8px] font-mono mt-0.5"
+            };
+        }
+        return {
+            gridClass: "grid w-full gap-0.5 xs:gap-1 sm:gap-2 md:gap-3",
+            cardClass: "p-0.5 xs:p-1.5 sm:p-2.5 min-h-[70px] xs:min-h-[85px] sm:min-h-[105px] rounded-md xs:rounded-xl shadow-[0_2px_6px_rgba(0,0,0,0.1)]",
+            periodNum: "text-[6.5px] xs:text-[8px] sm:text-[10px] font-black",
+            mainText: "text-[7.5px] xs:text-[9.5px] sm:text-xs font-black tracking-tight leading-tight",
+            subText: "text-[6px] xs:text-[7.5px] sm:text-[9px] font-bold mt-0.5",
+            timeText: "text-[5.5px] xs:text-[7px] sm:text-[8px] font-mono mt-0.5"
+        };
+    };
+
+    const getWeeklyTableStyles = (count: number) => {
+        if (count <= 5) {
+            return {
+                cellPadding: "p-3 sm:p-4",
+                dayColWidth: "w-20 sm:w-28",
+                dayTitle: "text-[11px] sm:text-xs",
+                daySub: "text-[8px] sm:text-[9px]",
+                periodTitle: "text-[10px] sm:text-xs",
+                periodTime: "text-[8px] sm:text-[9px]",
+                cellText: "text-[10px] sm:text-xs",
+                cellSub: "text-[8px] sm:text-[9px]",
+                slotClass: "p-2 rounded-xl min-h-[48px]"
+            };
+        }
+        if (count <= 7) {
+            return {
+                cellPadding: "p-2 sm:p-3.5",
+                dayColWidth: "w-16 sm:w-24",
+                dayTitle: "text-[9.5px] sm:text-xs",
+                daySub: "text-[7.5px] sm:text-[8.5px]",
+                periodTitle: "text-[9px] sm:text-xs",
+                periodTime: "text-[7.5px] sm:text-[8px]",
+                cellText: "text-[9px] sm:text-[11px]",
+                cellSub: "text-[7.5px] sm:text-[8.5px]",
+                slotClass: "p-1.5 rounded-lg min-h-[42px]"
+            };
+        }
+        return {
+            cellPadding: "p-0.5 xs:p-1.5 sm:p-2.5",
+            dayColWidth: "w-10 xs:w-16 sm:w-24",
+            dayTitle: "text-[8px] xs:text-[9.5px] sm:text-[11px]",
+            daySub: "text-[6px] xs:text-[7px] sm:text-[8px]",
+            periodTitle: "text-[7.5px] xs:text-[9px] sm:text-[10px]",
+            periodTime: "text-[6px] xs:text-[7px] sm:text-[8px]",
+            cellText: "text-[7.5px] xs:text-[9.5px] sm:text-[10px]",
+            cellSub: "text-[6.5px] xs:text-[7.5px] sm:text-[8px]",
+            slotClass: "p-0.5 xs:p-1 sm:p-2 rounded-lg min-h-[34px] xs:min-h-[40px] sm:min-h-[48px]"
+        };
+    };
+
+    const todaySlotCount = todaySlots.length || 8;
+    const cardStyles = getTodayCardStyles(todaySlotCount);
+    const tableStyles = getWeeklyTableStyles(PERIODS.length || 8);
+
     return (
-        <div className="animate-in fade-in duration-200 w-full text-[#E6F1FF] min-h-screen pb-16">
+        <div className="animate-in fade-in duration-200 w-full text-[#E6F1FF] min-h-screen pb-16 bg-gradient-to-br from-[#070F1E] via-[#0A192F] to-[#0F223D]">
             
             {/* ========================================================================= */}
             {/* MOBILE VIEW (Strictly Optimized for compact, high-density, no scrolling) */}
@@ -463,34 +580,59 @@ export default function TeacherDashboard() {
                             No classes scheduled today!
                         </div>
                     ) : (
-                        <div className="flex gap-2 overflow-x-auto py-1 scrollbar-none snap-x snap-mandatory">
-                            {todaySlots.map(slot => (
-                                <div
-                                    key={slot.id}
-                                    className={cn(
-                                        "snap-center shrink-0 w-24 p-2.5 rounded-xl border flex flex-col justify-between transition-colors shadow-sm",
-                                        slot.type === "SUBSTITUTION"
-                                            ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-500"
-                                            : slot.type === "LEAVE"
-                                                ? "bg-red-500/10 border-red-500/20 opacity-70"
-                                                : "bg-white/5 border-white/10 hover:bg-white/10"
-                                    )}
-                                >
-                                    <div className="flex items-center justify-between">
-                                        <span className="font-mono text-[9px] font-black opacity-40">P{slot.id}</span>
-                                        {slot.type === "SUBSTITUTION" && <span className="text-[8px] bg-yellow-500/20 px-1 py-0.2 rounded font-black">SUB</span>}
-                                        {slot.type === "LEAVE" && <span className="text-[8px] bg-red-500/20 px-1 py-0.2 rounded font-black text-red-500">OFF</span>}
-                                    </div>
-                                    <div className="mt-1.5">
-                                        <div className="text-[11px] font-black truncate text-white leading-tight">
-                                            {slot.type === "SUBSTITUTION" ? "Substitution" : (slot.subjectName || "Class")}
+                        <div 
+                            className={cn("w-full pt-1", cardStyles.gridClass)}
+                            style={{ gridTemplateColumns: `repeat(${todaySlotCount}, minmax(0, 1fr))` }}
+                        >
+                            {todaySlots.map(slot => {
+                                const subjectName = slot.subjectName || slot.subjectId || "";
+                                const subjectCode = getSubjectCode(subjectName);
+                                const isFree = slot.type === "FREE";
+
+                                return (
+                                    <div
+                                        key={slot.id}
+                                        className={cn(
+                                            "flex flex-col justify-between text-center transition-all hover:scale-[1.02] duration-200 cursor-default border",
+                                            cardStyles.cardClass,
+                                            isFree 
+                                                ? "bg-[#040B16]/50 border-white/5 hover:border-white/10 text-white/20" 
+                                                : slot.type === "SUBSTITUTION" 
+                                                    ? "bg-amber-500/10 border-amber-500/30 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.06)] hover:bg-amber-500/15"
+                                                    : slot.type === "LEAVE"
+                                                        ? "bg-rose-500/10 border-rose-500/30 text-rose-400 opacity-60 line-through hover:opacity-70"
+                                                        : `${getSubjectStyle(subjectName)} shadow-[0_0_12px_rgba(100,255,218,0.04)]`
+                                        )}
+                                    >
+                                        <span className={cn("text-white/30 tracking-widest uppercase font-mono block", cardStyles.periodNum)}>P{slot.id}</span>
+                                        
+                                        <div className="my-1 flex flex-col items-center justify-center min-w-0">
+                                            {isFree ? (
+                                                <span className={cn("font-black uppercase text-white/15 block", cardStyles.mainText)}>FREE</span>
+                                            ) : slot.type === "SUBSTITUTION" ? (
+                                                <>
+                                                    <span className={cn("font-black uppercase tracking-tight text-amber-400 truncate block w-full", cardStyles.mainText)}>SUB</span>
+                                                    <span className={cn("font-bold text-white/50 block truncate w-full", cardStyles.subText)}>{slot.classId}</span>
+                                                </>
+                                            ) : slot.type === "LEAVE" ? (
+                                                <>
+                                                    <span className={cn("font-black uppercase tracking-tight text-rose-400 line-through truncate block w-full", cardStyles.mainText)}>OFF</span>
+                                                    <span className={cn("font-bold text-white/30 block truncate w-full", cardStyles.subText)}>{slot.classId}</span>
+                                                </>
+                                            ) : (
+                                                <>
+                                                    <span className={cn("font-black uppercase tracking-tight truncate block w-full", cardStyles.mainText)}>{subjectCode}</span>
+                                                    <span className={cn("font-bold text-white/50 block truncate w-full", cardStyles.subText)}>({slot.classId})</span>
+                                                </>
+                                            )}
                                         </div>
-                                        <div className="text-[9px] text-white/50 truncate font-semibold mt-0.5">
-                                            ({slot.classId})
-                                        </div>
+
+                                        <span className={cn("font-mono text-white/30 font-semibold tracking-tighter block truncate w-full", cardStyles.timeText)}>
+                                            {slot.time || getPeriodTiming(slot.id)}
+                                        </span>
                                     </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </div>
@@ -748,81 +890,115 @@ export default function TeacherDashboard() {
                                     No scheduled classes assigned for today. Take a break!
                                 </div>
                             ) : (
-                                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3">
-                                    {todaySlots.map(slot => (
-                                        <div key={slot.id} className={cn(
-                                            "p-3.5 rounded-xl border flex flex-col justify-between transition-all hover:scale-[1.01]",
-                                            slot.type === "SUBSTITUTION" ? "bg-yellow-500/10 border-yellow-500/30 text-yellow-500" :
-                                            slot.type === "LEAVE" ? "bg-red-500/10 border border-red-500/20 opacity-80" : "bg-white/5 border border-white/10 hover:bg-white/10"
-                                        )}>
-                                            <div className="flex items-center justify-between">
-                                                <div className="h-6 w-6 flex items-center justify-center rounded-lg bg-black/40 border border-white/10 text-xs font-black text-white/60">
-                                                    P{slot.id}
+                                <div 
+                                    className={cn("w-full pt-1", cardStyles.gridClass)}
+                                    style={{ gridTemplateColumns: `repeat(${todaySlotCount}, minmax(0, 1fr))` }}
+                                >
+                                    {todaySlots.map(slot => {
+                                        const subjectName = slot.subjectName || slot.subjectId || "";
+                                        const subjectCode = getSubjectCode(subjectName);
+                                        const isFree = slot.type === "FREE";
+
+                                        return (
+                                            <div 
+                                                key={slot.id} 
+                                                className={cn(
+                                                    "flex flex-col justify-between text-center transition-all hover:scale-[1.02] hover:-translate-y-0.5 duration-200 cursor-default border",
+                                                    cardStyles.cardClass,
+                                                    isFree 
+                                                        ? "bg-[#040B16]/50 border-white/5 hover:border-white/10 text-white/20" 
+                                                        : slot.type === "SUBSTITUTION" 
+                                                            ? "bg-amber-500/10 border-amber-500/30 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.06)] hover:bg-amber-500/15"
+                                                            : slot.type === "LEAVE" 
+                                                                ? "bg-rose-500/10 border border-rose-500/20 opacity-80 hover:opacity-95" 
+                                                                : `${getSubjectStyle(subjectName)} shadow-[0_0_12px_rgba(100,255,218,0.04)]`
+                                                )}
+                                            >
+                                                <span className={cn("text-white/30 tracking-widest uppercase font-mono block", cardStyles.periodNum)}>P{slot.id}</span>
+                                                
+                                                <div className="my-1 flex flex-col items-center justify-center min-w-0">
+                                                    {isFree ? (
+                                                        <span className={cn("font-black uppercase text-white/15 block", cardStyles.mainText)}>FREE</span>
+                                                    ) : slot.type === "SUBSTITUTION" ? (
+                                                        <>
+                                                            <span className={cn("font-black uppercase tracking-tight text-amber-400 truncate block w-full", cardStyles.mainText)}>SUB</span>
+                                                            <span className={cn("font-bold text-white/50 block truncate w-full", cardStyles.subText)}>{slot.classId}</span>
+                                                        </>
+                                                    ) : slot.type === "LEAVE" ? (
+                                                        <>
+                                                            <span className={cn("font-black uppercase tracking-tight text-rose-400 line-through truncate block w-full", cardStyles.mainText)}>OFF</span>
+                                                            <span className={cn("font-bold text-white/30 block truncate w-full", cardStyles.subText)}>{slot.classId}</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <span className={cn("font-black uppercase tracking-tight truncate block w-full", cardStyles.mainText)}>{subjectCode}</span>
+                                                            <span className={cn("font-bold text-white/50 block truncate w-full", cardStyles.subText)}>({slot.classId})</span>
+                                                        </>
+                                                    )}
                                                 </div>
-                                                {slot.type === "SUBSTITUTION" && <Badge className="bg-yellow-500 text-black font-black text-[8px] px-1.5 py-0.2">SUB</Badge>}
-                                                {slot.type === "LEAVE" && <Badge variant="destructive" className="font-black uppercase text-[8px] px-1.5 py-0.2">OFF</Badge>}
-                                            </div>
-                                            <div className="mt-3">
-                                                <span className="font-black text-sm text-white/90 leading-tight block truncate">{slot.classId}</span>
-                                                <span className="text-[10px] font-bold text-white/50 uppercase tracking-wide truncate block mt-0.5">
-                                                    {slot.type === "SUBSTITUTION" ? "Substitution Coverage" : (slot.subjectName || "Lecture")}
+
+                                                <span className={cn("font-mono text-white/30 font-semibold tracking-tighter block truncate w-full", cardStyles.timeText)}>
+                                                    {slot.time || getPeriodTiming(slot.id)}
                                                 </span>
-                                                {slot.time && <span className="text-[9px] font-mono text-white/30 block mt-1">{slot.time}</span>}
                                             </div>
-                                        </div>
-                                    ))}
+                                        );
+                                    })}
                                 </div>
                             )}
                         </div>
 
                         {/* Beautiful color-coded Weekly Schedule Matrix */}
-                        <div className="bg-[#0A192F]/50 border border-white/10 rounded-[2rem] p-6 backdrop-blur-md shadow-xl space-y-4">
+                        <div className="bg-[#0A192F]/50 border border-white/10 rounded-[2rem] p-4 md:p-6 backdrop-blur-md shadow-xl space-y-4">
                             <div className="flex justify-between items-center border-b border-white/5 pb-3">
                                 <h3 className="flex items-center gap-2 font-bold text-lg text-white">
                                     <CheckSquare className="w-5 h-5 text-blue-400" /> Weekly Timetable Overview
                                 </h3>
-                                <span className="text-[10px] text-white/30 font-mono">10 Periods System Active</span>
+                                <span className="text-[10px] text-white/30 font-mono">{PERIODS.length} Periods System Active</span>
                             </div>
 
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-left border-collapse min-w-[700px]">
+                            <div className="rounded-2xl border border-white/10 bg-black/10 overflow-hidden">
+                                <table className="w-full text-center border-collapse table-fixed">
                                     <thead>
-                                        <tr className="border-b border-white/10 text-white/40 text-xs uppercase font-black">
-                                            <th className="py-3 px-2 w-24">Day</th>
+                                        <tr className="bg-white/5 border-b border-white/10 text-white/40 font-black uppercase tracking-widest">
+                                            <th className={cn("text-left text-white/60", tableStyles.cellPadding, tableStyles.dayColWidth)}>Day</th>
                                             {PERIODS.map(p => (
-                                                <th key={p} className="py-3 px-2 text-center">P{p}</th>
+                                                <th key={p} className={cn("border-l border-white/5", tableStyles.cellPadding)}>
+                                                    <div className="flex flex-col items-center">
+                                                        <span className={tableStyles.periodTitle}>P{p}</span>
+                                                        <span className={cn("text-white/30 font-mono font-medium mt-0.5 block truncate w-full", tableStyles.periodTime)}>{getPeriodTiming(p)}</span>
+                                                    </div>
+                                                </th>
                                             ))}
                                         </tr>
                                     </thead>
                                     <tbody className="divide-y divide-white/5">
                                         {DAYS_OF_WEEK.map(day => (
-                                            <tr key={day} className="hover:bg-white/20 transition-colors">
-                                                <td className="py-3.5 px-2 font-black text-xs text-white/70 uppercase tracking-wider">{day.substring(0, 3)}</td>
+                                            <tr key={day} className="hover:bg-white/[0.02] transition-colors">
+                                                <td className={cn("text-left font-black leading-none", tableStyles.cellPadding)}>
+                                                    <span className={cn("uppercase text-purple-400 tracking-wider block", tableStyles.dayTitle)}>{day.substring(0, 3)}</span>
+                                                    <span className={cn("text-white/30 font-semibold font-mono mt-1 block", tableStyles.daySub)}>{getPeriodTiming(1).split(" ")[0]}</span>
+                                                </td>
                                                 {PERIODS.map(period => {
                                                     const daySchedule = scheduleData?.weeklySchedule?.[day] || {};
                                                     const slot = daySchedule[period];
                                                     
-                                                    // Beautiful color mappings based on subject name
-                                                    const isMath = slot?.subjectName?.toUpperCase().includes("MATH");
-                                                    const isEnglish = slot?.subjectName?.toUpperCase().includes("ENG") || slot?.subjectName?.toUpperCase().includes("LIT");
-                                                    const isScience = slot?.subjectName?.toUpperCase().includes("SCI") || slot?.subjectName?.toUpperCase().includes("PHY") || slot?.subjectName?.toUpperCase().includes("CHEM");
-                                                    
                                                     return (
-                                                        <td key={period} className="py-2.5 px-1 text-center">
+                                                        <td key={period} className={cn("border-l border-white/5 text-center", tableStyles.cellPadding)}>
                                                             {slot ? (
                                                                 <div className={cn(
-                                                                    "p-1.5 rounded-lg border text-[9px] font-black tracking-tight flex flex-col justify-center min-h-[44px]",
-                                                                    isMath ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-400" :
-                                                                    isEnglish ? "bg-blue-500/10 border-blue-500/30 text-blue-400" :
-                                                                    isScience ? "bg-purple-500/10 border-purple-500/30 text-purple-400" :
-                                                                    "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                                                                    "text-[10px] font-black tracking-tight flex flex-col justify-center mx-auto w-full",
+                                                                    tableStyles.slotClass,
+                                                                    getSubjectStyle(slot.subjectName || slot.subjectId)
                                                                 )}>
-                                                                    <span className="text-white truncate max-w-[80px]">{slot.className}-{slot.sectionName}</span>
-                                                                    <span className="opacity-75 truncate max-w-[80px] mt-0.5">{slot.subjectName}</span>
+                                                                    <span className={cn("text-white truncate block w-full", tableStyles.cellText)}>{slot.className}-{slot.sectionName}</span>
+                                                                    <span className={cn("opacity-75 truncate block mt-0.5 w-full", tableStyles.cellSub)}>{getSubjectCode(slot.subjectName || slot.subjectId)}</span>
                                                                 </div>
                                                             ) : (
-                                                                <div className="h-11 border border-dashed border-white/5 rounded-lg bg-black/10 flex items-center justify-center text-[8px] text-white/10 font-bold">
-                                                                    FREE
+                                                                <div className={cn(
+                                                                    "border border-dashed border-white/5 rounded-lg bg-black/10 flex items-center justify-center font-bold w-full",
+                                                                    tableStyles.slotClass
+                                                                )}>
+                                                                    <span className={cn("text-white/10 font-bold block", tableStyles.cellText)}>FREE</span>
                                                                 </div>
                                                             )}
                                                         </td>

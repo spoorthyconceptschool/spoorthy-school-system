@@ -281,8 +281,85 @@ export default function TeacherTimetablePage() {
     const todayName = new Date().toLocaleDateString('en-US', { weekday: 'long' }).toUpperCase();
     const activeDayData = getDaySchedule(DAYS.includes(todayName) ? todayName : "MONDAY");
 
+    const slotCount = activeDayData.slots.length || 10;
+    const periodCount = PERIODS.length || 10;
+
+    const getTodayCardStyles = (count: number) => {
+        if (count <= 5) {
+            return {
+                gridClass: "grid w-full gap-2 sm:gap-4",
+                cardClass: "p-3 sm:p-5 min-h-[110px] sm:min-h-[135px] rounded-2xl shadow-[0_4px_12px_rgba(0,0,0,0.15)]",
+                periodNum: "text-[9px] sm:text-xs font-black",
+                mainText: "text-xs sm:text-sm font-black tracking-tight",
+                subText: "text-[8px] sm:text-[10px] font-bold mt-1",
+                timeText: "text-[8px] sm:text-[9.5px] font-mono mt-1"
+            };
+        }
+        if (count <= 7) {
+            return {
+                gridClass: "grid w-full gap-1.5 sm:gap-3",
+                cardClass: "p-2 sm:p-4 min-h-[95px] sm:min-h-[120px] rounded-xl sm:rounded-2xl shadow-[0_3px_8px_rgba(0,0,0,0.12)]",
+                periodNum: "text-[8px] sm:text-xs font-black",
+                mainText: "text-[10px] sm:text-xs font-black tracking-tight",
+                subText: "text-[7.5px] sm:text-[9px] font-bold mt-0.5",
+                timeText: "text-[7px] sm:text-[8px] font-mono mt-0.5"
+            };
+        }
+        return {
+            gridClass: "grid w-full gap-0.5 xs:gap-1 sm:gap-2 md:gap-3",
+            cardClass: "p-0.5 xs:p-1.5 sm:p-3 min-h-[75px] xs:min-h-[90px] sm:min-h-[115px] rounded-lg xs:rounded-xl sm:rounded-2xl shadow-[0_2px_6px_rgba(0,0,0,0.1)]",
+            periodNum: "text-[6.5px] xs:text-[8px] sm:text-[10px] font-black",
+            mainText: "text-[8px] xs:text-[9.5px] sm:text-xs font-black tracking-tight leading-tight",
+            subText: "text-[6.5px] xs:text-[7.5px] sm:text-[9px] font-bold mt-0.5",
+            timeText: "text-[6px] xs:text-[7px] sm:text-[8px] font-mono mt-0.5"
+        };
+    };
+
+    const getWeeklyTableStyles = (count: number) => {
+        if (count <= 5) {
+            return {
+                cellPadding: "p-3 sm:p-4",
+                dayColWidth: "w-20 sm:w-28",
+                dayTitle: "text-[11px] sm:text-xs",
+                daySub: "text-[8px] sm:text-[9px]",
+                periodTitle: "text-[10px] sm:text-xs",
+                periodTime: "text-[8px] sm:text-[9px]",
+                cellText: "text-[10px] sm:text-xs",
+                cellSub: "text-[8px] sm:text-[9px]",
+                slotClass: "p-2 rounded-xl min-h-[48px]"
+            };
+        }
+        if (count <= 7) {
+            return {
+                cellPadding: "p-2 sm:p-3.5",
+                dayColWidth: "w-16 sm:w-24",
+                dayTitle: "text-[9.5px] sm:text-xs",
+                daySub: "text-[7.5px] sm:text-[8.5px]",
+                periodTitle: "text-[9px] sm:text-xs",
+                periodTime: "text-[7.5px] sm:text-[8px]",
+                cellText: "text-[9px] sm:text-[11px]",
+                cellSub: "text-[7.5px] sm:text-[8.5px]",
+                slotClass: "p-1.5 rounded-lg min-h-[42px]"
+            };
+        }
+        return {
+            cellPadding: "p-0.5 xs:p-1 sm:p-2",
+            dayColWidth: "w-10 xs:w-16 sm:w-24",
+            dayTitle: "text-[8px] xs:text-[9.5px] sm:text-[11px]",
+            daySub: "text-[6px] xs:text-[7px] sm:text-[8px]",
+            periodTitle: "text-[7.5px] xs:text-[9px] sm:text-[10px]",
+            periodTime: "text-[6px] xs:text-[7px] sm:text-[8px]",
+            cellText: "text-[7.5px] xs:text-[9.5px] sm:text-[10px]",
+            cellSub: "text-[6.5px] xs:text-[7.5px] sm:text-[8px]",
+            slotClass: "p-0.5 xs:p-1 sm:p-2 rounded-lg min-h-[34px] xs:min-h-[40px] sm:min-h-[48px]"
+        };
+    };
+
+    const cardStyles = getTodayCardStyles(slotCount);
+    const tableStyles = getWeeklyTableStyles(periodCount);
+
     return (
-        <div className="w-full text-[#E6F1FF] min-h-screen pb-16">
+        <div className="w-full text-[#E6F1FF] min-h-screen pb-16 bg-gradient-to-br from-[#070F1E] via-[#0A192F] to-[#0F223D]">
             
             {/* Main Timetable Content */}
             <div className="p-4 md:p-10 lg:p-12 space-y-6 max-w-[1600px] mx-auto print:hidden">
@@ -312,7 +389,7 @@ export default function TeacherTimetablePage() {
                 </div>
 
                 {/* 2. Today's Schedule timeline block */}
-                <div className="bg-black/20 border border-white/10 rounded-3xl p-5 md:p-6 backdrop-blur-md shadow-2xl space-y-4">
+                <div className="bg-black/20 border border-white/10 rounded-3xl p-4 md:p-6 backdrop-blur-md shadow-2xl space-y-4">
                     <div className="flex items-center gap-3.5 border-b border-white/5 pb-4">
                         <div className="h-10 w-10 rounded-full bg-blue-500/10 border border-blue-500/25 flex items-center justify-center text-blue-400">
                             <Calendar className="w-5 h-5 text-blue-400" />
@@ -334,7 +411,10 @@ export default function TeacherTimetablePage() {
                             </div>
                         </div>
                     ) : (
-                        <div className="flex gap-3 overflow-x-auto pb-4 pt-1 scrollbar-thin scrollbar-thumb-white/10 scrollbar-track-transparent snap-x snap-mandatory">
+                        <div 
+                            className={cn("w-full pt-1", cardStyles.gridClass)}
+                            style={{ gridTemplateColumns: `repeat(${slotCount}, minmax(0, 1fr))` }}
+                        >
                             {activeDayData.slots.map((slot: any) => {
                                 const subjectName = slot.subjectId ? (subjects?.[slot.subjectId]?.name || slot.subjectId) : "";
                                 const subjectCode = getSubjectCode(subjectName);
@@ -344,40 +424,41 @@ export default function TeacherTimetablePage() {
                                     <div 
                                         key={slot.id}
                                         className={cn(
-                                            "snap-center shrink-0 p-3 rounded-2xl border flex flex-col justify-between text-center min-h-[110px] w-[105px] transition-all hover:scale-[1.02]",
+                                            "flex flex-col justify-between text-center transition-all hover:scale-[1.02] hover:-translate-y-0.5 duration-200 cursor-default border",
+                                            cardStyles.cardClass,
                                             isFree 
-                                                ? "bg-black/40 border-white/5 hover:border-white/10" 
+                                                ? "bg-[#040B16]/50 border-white/5 hover:border-white/10 text-white/20" 
                                                 : slot.type === "SUBSTITUTION" 
-                                                    ? "bg-blue-500/10 border-blue-500/30 text-blue-400"
+                                                    ? "bg-amber-500/10 border-amber-500/30 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.06)] hover:bg-amber-500/15"
                                                     : slot.type === "LEAVE"
-                                                        ? "bg-rose-500/10 border-rose-500/30 text-rose-400 opacity-60 line-through"
-                                                        : getSubjectStyle(subjectName)
+                                                        ? "bg-rose-500/10 border-rose-500/30 text-rose-400 opacity-60 line-through hover:opacity-70"
+                                                        : `${getSubjectStyle(subjectName)} shadow-[0_0_12px_rgba(100,255,218,0.04)]`
                                         )}
                                     >
-                                        <span className="text-[10px] font-black text-white/30 tracking-widest uppercase">P{slot.id}</span>
+                                        <span className={cn("text-white/30 tracking-widest uppercase font-mono block", cardStyles.periodNum)}>P{slot.id}</span>
                                         
-                                        <div className="my-1.5 flex flex-col items-center justify-center">
+                                        <div className="my-1 flex flex-col items-center justify-center min-w-0">
                                             {isFree ? (
-                                                <span className="text-lg font-extrabold text-white/20">-</span>
+                                                <span className={cn("font-black uppercase text-white/15 block", cardStyles.mainText)}>FREE</span>
                                             ) : slot.type === "SUBSTITUTION" ? (
                                                 <>
-                                                    <span className="text-xs font-black uppercase tracking-tight text-blue-400">SUB</span>
-                                                    <span className="text-[8px] font-bold text-white/50 block truncate max-w-[85px] mt-0.5">{slot.classId}</span>
+                                                    <span className={cn("font-black uppercase tracking-tight text-amber-400 truncate block w-full", cardStyles.mainText)}>SUB</span>
+                                                    <span className={cn("font-bold text-white/50 block truncate w-full", cardStyles.subText)}>{slot.classId}</span>
                                                 </>
                                             ) : slot.type === "LEAVE" ? (
                                                 <>
-                                                    <span className="text-xs font-black uppercase tracking-tight text-rose-400 line-through">OFF</span>
-                                                    <span className="text-[8px] font-bold text-white/30 block truncate max-w-[85px] mt-0.5">{slot.classId}</span>
+                                                    <span className={cn("font-black uppercase tracking-tight text-rose-400 line-through truncate block w-full", cardStyles.mainText)}>OFF</span>
+                                                    <span className={cn("font-bold text-white/30 block truncate w-full", cardStyles.subText)}>{slot.classId}</span>
                                                 </>
                                             ) : (
                                                 <>
-                                                    <span className="text-xs font-black uppercase tracking-tight truncate max-w-[85px]">{subjectCode}</span>
-                                                    <span className="text-[8px] font-bold text-white/50 block truncate max-w-[85px] mt-0.5">({slot.classId})</span>
+                                                    <span className={cn("font-black uppercase tracking-tight truncate block w-full", cardStyles.mainText)}>{subjectCode}</span>
+                                                    <span className={cn("font-bold text-white/50 block truncate w-full", cardStyles.subText)}>({slot.classId})</span>
                                                 </>
                                             )}
                                         </div>
 
-                                        <span className="text-[8px] font-mono text-white/30 font-semibold tracking-tighter">
+                                        <span className={cn("font-mono text-white/30 font-semibold tracking-tighter block truncate w-full", cardStyles.timeText)}>
                                             {getPeriodTiming(slot.id)}
                                         </span>
                                     </div>
@@ -388,7 +469,7 @@ export default function TeacherTimetablePage() {
                 </div>
 
                 {/* 3. Weekly Overview Card */}
-                <div className="bg-[#0A192F]/40 border border-white/10 rounded-[2rem] p-5 md:p-6 backdrop-blur-md shadow-2xl space-y-4">
+                <div className="bg-[#0A192F]/40 border border-white/10 rounded-[2rem] p-4 md:p-6 backdrop-blur-md shadow-2xl space-y-4">
                     <div className="flex items-center gap-3.5 border-b border-white/5 pb-4">
                         <div className="h-10 w-10 rounded-full bg-indigo-500/10 border border-indigo-500/25 flex items-center justify-center text-indigo-400">
                             <Clock className="w-5 h-5 text-indigo-400" />
@@ -399,16 +480,16 @@ export default function TeacherTimetablePage() {
                         </div>
                     </div>
 
-                    <div className="overflow-x-auto rounded-2xl border border-white/10 bg-black/10">
-                        <table className="w-full text-xs text-center border-collapse min-w-[1000px]">
+                    <div className="rounded-2xl border border-white/10 bg-black/10 overflow-hidden">
+                        <table className="w-full text-center border-collapse table-fixed">
                             <thead>
-                                <tr className="bg-white/5 border-b border-white/10 text-white/40 text-[10px] font-black uppercase tracking-widest">
-                                    <th className="p-4 text-left w-28 text-white/60">Day</th>
+                                <tr className="bg-white/5 border-b border-white/10 text-white/40 font-black uppercase tracking-widest">
+                                    <th className={cn("text-left text-white/60", tableStyles.cellPadding, tableStyles.dayColWidth)}>Day</th>
                                     {PERIODS.map(i => (
-                                        <th key={i} className="p-4 border-l border-white/5">
+                                        <th key={i} className={cn("border-l border-white/5", tableStyles.cellPadding)}>
                                             <div className="flex flex-col items-center">
-                                                <span>P{i}</span>
-                                                <span className="text-[8px] text-white/30 font-mono font-medium mt-0.5">{getPeriodTiming(i)}</span>
+                                                <span className={tableStyles.periodTitle}>P{i}</span>
+                                                <span className={cn("text-white/30 font-mono font-medium mt-0.5 block truncate w-full", tableStyles.periodTime)}>{getPeriodTiming(i)}</span>
                                             </div>
                                         </th>
                                     ))}
@@ -421,9 +502,9 @@ export default function TeacherTimetablePage() {
                                     
                                     return (
                                         <tr key={day} className="hover:bg-white/[0.02] transition-colors">
-                                            <td className="p-4 text-left font-black flex flex-col justify-center leading-none">
-                                                <span className="uppercase text-purple-400 tracking-wider text-[11px]">{day.substring(0, 3)}</span>
-                                                <span className="text-[8px] text-white/30 font-semibold font-mono mt-1">{dateStr}</span>
+                                            <td className={cn("text-left font-black leading-none", tableStyles.cellPadding)}>
+                                                <span className={cn("uppercase text-purple-400 tracking-wider block", tableStyles.dayTitle)}>{day.substring(0, 3)}</span>
+                                                <span className={cn("text-white/30 font-semibold font-mono mt-1 block", tableStyles.daySub)}>{dateStr}</span>
                                             </td>
                                             
                                             {PERIODS.map(i => {
@@ -431,8 +512,8 @@ export default function TeacherTimetablePage() {
                                                 
                                                 if (!slot) {
                                                     return (
-                                                        <td key={i} className="p-3 border-l border-white/5 text-center text-white/20 font-black text-sm">
-                                                            -
+                                                        <td key={i} className={cn("border-l border-white/5 text-center text-white/20 font-black", tableStyles.cellPadding)}>
+                                                            <span className={tableStyles.cellText}>-</span>
                                                         </td>
                                                     );
                                                 }
@@ -443,13 +524,14 @@ export default function TeacherTimetablePage() {
                                                 const subjectCode = getSubjectCode(subjectName);
 
                                                 return (
-                                                    <td key={i} className="p-2 border-l border-white/5 text-center">
+                                                    <td key={i} className={cn("border-l border-white/5 text-center", tableStyles.cellPadding)}>
                                                         <div className={cn(
-                                                            "p-2 rounded-xl text-[10px] font-black tracking-tight flex flex-col justify-center min-h-[48px] max-w-[90px] mx-auto",
+                                                            "text-[10px] font-black tracking-tight flex flex-col justify-center mx-auto w-full",
+                                                            tableStyles.slotClass,
                                                             getSubjectStyle(subjectName)
                                                         )}>
-                                                            <span className="text-white truncate block">{subjectCode}</span>
-                                                            <span className="opacity-75 truncate text-[8px] mt-0.5 block">({classId})</span>
+                                                            <span className={cn("text-white truncate block w-full", tableStyles.cellText)}>{subjectCode}</span>
+                                                            <span className={cn("opacity-75 truncate block mt-0.5 w-full", tableStyles.cellSub)}>({classId})</span>
                                                         </div>
                                                     </td>
                                                 );
@@ -460,6 +542,7 @@ export default function TeacherTimetablePage() {
                             </tbody>
                         </table>
                     </div>
+
 
                     {/* Alert note at the bottom */}
                     <div className="flex items-center gap-2 text-[10px] text-cyan-400/80 font-bold pl-1 pt-2">
