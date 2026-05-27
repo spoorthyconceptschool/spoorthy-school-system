@@ -74,15 +74,7 @@ export default function TeacherNotificationsPage() {
             });
             unsubscribes.push(unsubPersonal);
 
-            // 2. Global Faculty Notifications
-            const qAllFaculty = query(collection(db, "notifications"), where("target", "in", ["ALL", "ALL_FACULTY"]), limit(50));
-            const unsubAllFaculty = onSnapshot(qAllFaculty, (snap) => {
-                if (!isMounted) return;
-                updateNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
-            });
-            unsubscribes.push(unsubAllFaculty);
-
-            // 3. School ID Personal Notifications
+            // 2. School ID Personal and Global Faculty Notifications
             try {
                 const tQuery = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
                 const tSnap = await getDocs(tQuery);
@@ -92,6 +84,20 @@ export default function TeacherNotificationsPage() {
                     const teacherData = tSnap.docs[0].data();
                     const schoolId = teacherData.schoolId || tSnap.docs[0].id;
                     if (schoolId) {
+                        // A. Global Faculty Notifications (filtered by schoolId)
+                        const qAllFaculty = query(
+                            collection(db, "notifications"), 
+                            where("schoolId", "==", schoolId),
+                            where("target", "in", ["ALL", "ALL_FACULTY"]), 
+                            limit(50)
+                        );
+                        const unsubAllFaculty = onSnapshot(qAllFaculty, (snap) => {
+                            if (!isMounted) return;
+                            updateNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
+                        });
+                        unsubscribes.push(unsubAllFaculty);
+
+                        // B. School personal notifications
                         const qSchool = query(collection(db, "notifications"), where("userId", "==", schoolId), limit(50));
                         const unsubSchool = onSnapshot(qSchool, (snap) => {
                             if (!isMounted) return;

@@ -8,14 +8,14 @@ import { getAnalytics, Analytics } from "firebase/analytics";
 
 // Your web app's Firebase configuration
 const firebaseConfig = {
-    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN,
-    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET,
-    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID,
-    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-    measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID,
-    databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL
+    apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY || "AIzaSyBzMWTDIaP9R7C1GGbNg613ZGV48T1fmeQ",
+    authDomain: process.env.NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN || "spoorthy-16292.firebaseapp.com",
+    projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "spoorthy-16292",
+    storageBucket: process.env.NEXT_PUBLIC_FIREBASE_STORAGE_BUCKET || "spoorthy-16292.firebasestorage.app",
+    messagingSenderId: process.env.NEXT_PUBLIC_FIREBASE_MESSAGING_SENDER_ID || "248869775868",
+    appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID || "1:248869775868:web:96492410eb8d69284aea79",
+    measurementId: process.env.NEXT_PUBLIC_FIREBASE_MEASUREMENT_ID || "G-68FDGMHRKP",
+    databaseURL: process.env.NEXT_PUBLIC_FIREBASE_DATABASE_URL || "https://spoorthy-16292-default-rtdb.firebaseio.com"
 };
 
 // Initialize Firebase singleton

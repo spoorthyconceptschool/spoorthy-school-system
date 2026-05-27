@@ -17,6 +17,21 @@ export default function StudentDashboard() {
     // Segment tab control state for mobile view
     const [activeTab, setActiveTab] = useState<'notices' | 'homework'>('notices');
 
+    const formatToDDMMYY = (dateVal: any) => {
+        if (!dateVal) return "";
+        let d: Date;
+        if (typeof dateVal === 'object' && dateVal.seconds !== undefined) {
+            d = new Date(dateVal.seconds * 1000);
+        } else {
+            d = new Date(dateVal);
+        }
+        if (isNaN(d.getTime())) return "";
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = String(d.getFullYear()).slice(-2);
+        return `${day}-${month}-${year}`;
+    };
+
     const formatTimestamp = (timestamp: any) => {
         if (!timestamp) return "";
         const date = new Date(timestamp.seconds * 1000);
@@ -26,7 +41,7 @@ export default function StudentDashboard() {
         if (diff < 60 * 1000) return "Just now";
         if (diff < 60 * 60 * 1000) return `${Math.floor(diff / (60 * 1000))} min ago`;
         if (diff < 24 * 60 * 60 * 1000) return `${Math.floor(diff / (60 * 60 * 1000))} hours ago`;
-        return date.toLocaleDateString("en-US", { month: "short", day: "numeric" });
+        return formatToDDMMYY(date);
     };
 
     const getNoticeStyles = (type: string) => {
@@ -74,7 +89,7 @@ export default function StudentDashboard() {
         }
     };
 
-    if (loading) {
+    if (loading && !profile) {
         return (
             <div className="h-[60vh] w-full flex flex-col items-center justify-center gap-4 text-[#64FFDA]">
                 <Loader2 className="w-10 h-10 animate-spin" />
@@ -318,10 +333,10 @@ export default function StudentDashboard() {
                                                 <div className="flex items-center justify-between pt-2 border-t border-white/5 text-[9px] text-[#8892B0]/50 font-bold">
                                                     <span className="truncate">Teacher: {hw.teacherName || "Subject Faculty"}</span>
                                                     {hw.dueDate && (
-                                                        <span className="text-rose-400/90 font-bold flex items-center gap-0.5 shrink-0">
-                                                            <Clock className="w-3.5 h-3.5" /> Due: {hw.dueDate}
-                                                        </span>
-                                                    )}
+                                                         <span className="text-rose-400/90 font-bold flex items-center gap-0.5 shrink-0">
+                                                             <Clock className="w-3.5 h-3.5" /> Due: {formatToDDMMYY(hw.dueDate)}
+                                                         </span>
+                                                     )}
                                                 </div>
                                             </div>
                                         </div>
@@ -432,11 +447,11 @@ export default function StudentDashboard() {
                                                     </p>
                                                     <div className="flex items-center justify-between pt-1.5 border-t border-white/5 text-[8px] text-[#8892B0]/50 font-bold">
                                                         <span className="truncate">By: {hw.teacherName || "Subject Teacher"}</span>
-                                                        {hw.dueDate && (
-                                                            <span className="text-rose-400/90 font-bold flex items-center gap-0.5">
-                                                                <Clock className="w-2.5 h-2.5" /> Due: {hw.dueDate}
-                                                            </span>
-                                                        )}
+                                                         {hw.dueDate && (
+                                                             <span className="text-rose-400/90 font-bold flex items-center gap-0.5">
+                                                                 <Clock className="w-2.5 h-2.5" /> Due: {formatToDDMMYY(hw.dueDate)}
+                                                             </span>
+                                                         )}
                                                     </div>
                                                 </div>
                                             </div>

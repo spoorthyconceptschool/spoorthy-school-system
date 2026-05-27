@@ -42,7 +42,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
                 name: "Student Dashboard",
                 short_name: "Student",
                 description: "View your classes and homework",
-                url: "/student/dashboard",
+                url: "/student",
                 icons: [{ src: iconUrl, sizes: "192x192" }]
             },
             {

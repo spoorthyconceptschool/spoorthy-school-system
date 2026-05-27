@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
+import { useMasterData } from "@/context/MasterDataContext";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
@@ -15,9 +16,45 @@ import Link from "next/link";
 
 export default function NoticesPage() {
     const { user, userData } = useAuth();
-    const [sentNotices, setSentNotices] = useState<any[]>([]);
-    const [receivedNotices, setReceivedNotices] = useState<any[]>([]);
-    const [classes, setClasses] = useState<string[]>([]);
+    const { classSections } = useMasterData();
+    const DEFAULT_PROFILE = {
+        name: "Prof. S. Praneeth",
+        schoolId: "TCH-2026-042",
+        teacherId: "TCH-2026-042",
+        status: "ACTIVE",
+        schoolName: "Spoorthy Concept School"
+    };
+
+    const DEFAULT_SENT = [
+        { id: "n_sent_1", title: "Science Project Reminder", content: "Please ensure all student models are submitted by this Friday.", target: "class_10", createdAt: { seconds: Date.now()/1000 } }
+    ];
+
+    const DEFAULT_RECEIVED = [
+        { id: "n_rec_1", title: "Annual Sports Meet Notice", content: "The annual sports day will commence from next Monday. All faculty members are requested to report in sports gear.", senderName: "Principal", createdAt: { seconds: Date.now()/1000 - 43200 } }
+    ];
+
+    const DEFAULT_CLASSES = ["1_A", "2_A", "3_A"];
+
+    const [teacherProfile, setTeacherProfile] = useState<any>(() => {
+        if (typeof window === 'undefined') return DEFAULT_PROFILE;
+        const cached = localStorage.getItem("teacher_profile_cache");
+        return cached ? JSON.parse(cached) : DEFAULT_PROFILE;
+    });
+    const [sentNotices, setSentNotices] = useState<any[]>(() => {
+        if (typeof window === 'undefined') return DEFAULT_SENT;
+        const cached = localStorage.getItem("teacher_notices_sent_cache");
+        return cached ? JSON.parse(cached) : DEFAULT_SENT;
+    });
+    const [receivedNotices, setReceivedNotices] = useState<any[]>(() => {
+        if (typeof window === 'undefined') return DEFAULT_RECEIVED;
+        const cached = localStorage.getItem("teacher_notices_received_cache");
+        return cached ? JSON.parse(cached) : DEFAULT_RECEIVED;
+    });
+    const [classes, setClasses] = useState<any[]>(() => {
+        if (typeof window === 'undefined') return DEFAULT_CLASSES.map(c => ({ id: c, name: c }));
+        const cached = localStorage.getItem("teacher_notices_classes_cache");
+        return cached ? JSON.parse(cached) : DEFAULT_CLASSES.map(c => ({ id: c, name: c }));
+    });
     const [submitting, setSubmitting] = useState(false);
     const [useSentFallback, setUseSentFallback] = useState(false);
     const [useInboxFallback, setUseInboxFallback] = useState(false);
@@ -27,10 +64,37 @@ export default function NoticesPage() {
     const [title, setTitle] = useState("");
     const [content, setContent] = useState("");
 
-    // 0. Fetch Classes (Once or on User change)
+    // 0. Fetch Teacher Profile
+    useEffect(() => {
+        if (!user?.uid) return;
+        const fetchTeacher = async () => {
+            try {
+                let q = query(collection(db, "teachers"), where("schoolId", "==", userData?.schoolId || ""), limit(1));
+                let snap = await getDocs(q);
+
+                if (snap.empty && user?.uid) {
+                    q = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
+                    snap = await getDocs(q);
+                }
+
+                if (!snap.empty) {
+                    const tData = { id: snap.docs[0].id, ...snap.docs[0].data() };
+                    setTeacherProfile(tData);
+                    if (typeof window !== 'undefined') {
+                        localStorage.setItem("teacher_profile_cache", JSON.stringify(tData));
+                    }
+                }
+            } catch (e: any) {
+                console.warn("[Notices] Teacher fetch error:", e.message);
+            }
+        };
+        fetchTeacher();
+    }, [user, userData]);
+
+    // 0. Fetch Classes (Once or on User/Profile/classSections change)
     useEffect(() => {
         if (user?.uid) fetchClasses();
-    }, [user]);
+    }, [user, teacherProfile, classSections]);
 
     // 1. Sent History Listener
     useEffect(() => {
@@ -58,6 +122,9 @@ export default function NoticesPage() {
                 list = list.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
             }
             setSentNotices(list);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem("teacher_notices_sent_cache", JSON.stringify(list));
+            }
         }, (err) => {
             if (!isMounted) return;
             if (err.message.includes("index") && !useSentFallback) {
@@ -70,7 +137,7 @@ export default function NoticesPage() {
             isMounted = false;
             unsubSent();
         };
-    }, [user, useSentFallback]);
+    }, [user, useSentFallback, userData]);
 
     // 2. Inbox/Received Notices Listener
     useEffect(() => {
@@ -105,6 +172,9 @@ export default function NoticesPage() {
                 list = list.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
             }
             setReceivedNotices(list);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem("teacher_notices_received_cache", JSON.stringify(list));
+            }
         }, (err) => {
             if (!isMounted) return;
             if (err.message.includes("index") && !useInboxFallback) {
@@ -119,24 +189,31 @@ export default function NoticesPage() {
             isMounted = false;
             unsubInbox();
         };
-    }, [user, useInboxFallback]);
+    }, [user, useInboxFallback, userData]);
 
     const fetchClasses = async () => {
         try {
-            const token = await user?.getIdToken();
-            const res = await fetch("/api/timetable/my-schedule", {
-                headers: { "Authorization": `Bearer ${token}` }
-            });
-            const data = await res.json();
-            if (data.success) {
-                const schedule = data.data.weeklySchedule || {};
-                const cls = new Set<string>();
-                Object.values(schedule).forEach((day: any) => {
-                    Object.values(day).forEach((slot: any) => {
-                        if (typeof slot === 'object') cls.add(slot.classId);
-                    });
+            const clsSet = new Map<string, string>(); // Mapping id -> displayName
+
+            // 1. Only Class Teacher assignments from Master Data
+            if (teacherProfile && classSections) {
+                const tId = teacherProfile.schoolId;
+                const tDocId = teacherProfile.id;
+                Object.values(classSections).forEach((cs: any) => {
+                    const isMatch = (tId && cs.classTeacherId === tId) || (tDocId && cs.classTeacherId === tDocId);
+                    if (isMatch && cs.isActive !== false) {
+                        const cName = cs.className || cs.classId || cs.id;
+                        const sName = cs.sectionName || cs.sectionId || "";
+                        const displayName = `${cName} ${sName}`.replace(/^(Class |Grade )/i, '').trim();
+                        clsSet.set(cs.id, displayName);
+                    }
                 });
-                setClasses(Array.from(cls));
+            }
+
+            const classList = Array.from(clsSet.entries()).map(([id, name]) => ({ id, name }));
+            setClasses(classList);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem("teacher_notices_classes_cache", JSON.stringify(classList));
             }
         } catch (e) { }
     };
@@ -161,6 +238,7 @@ export default function NoticesPage() {
         } catch (e: any) { alert(e.message); }
         finally { setSubmitting(false); }
     };
+
 
     return (
         <div className="w-full text-[#E6F1FF] pb-20 animate-in fade-in duration-300">
@@ -239,7 +317,7 @@ export default function NoticesPage() {
                                             <SelectValue placeholder="Select Target Class" />
                                         </SelectTrigger>
                                         <SelectContent className="bg-slate-900 border-white/10 text-white text-xs">
-                                            {classes.map(c => <SelectItem key={c} value={c}>Class {c}</SelectItem>)}
+                                            {classes.map(c => <SelectItem key={c.id} value={c.id}>Class {c.name}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -341,7 +419,7 @@ export default function NoticesPage() {
                                         <Select onValueChange={setTargetClassId} value={targetClassId}>
                                             <SelectTrigger className="h-12 bg-white/5 border border-white/10 rounded-xl font-bold"><SelectValue placeholder="Select target classroom" /></SelectTrigger>
                                             <SelectContent className="bg-slate-900 border-white/10 text-white">
-                                                {classes.map(c => <SelectItem key={c} value={c} className="focus:bg-accent focus:text-black py-3">Class {c}</SelectItem>)}
+                                                {classes.map(c => <SelectItem key={c.id} value={c.id} className="focus:bg-accent focus:text-black py-3">Class {c.name}</SelectItem>)}
                                             </SelectContent>
                                         </Select>
                                     </div>

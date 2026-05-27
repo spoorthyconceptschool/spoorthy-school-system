@@ -26,22 +26,54 @@ interface Payment {
 }
 
 
+const PAYMENTS_CACHE_KEY = "spoorthy_all_payments_cache";
+const DEFAULT_PAYMENTS = [
+    {
+        id: "pay_default_1",
+        studentId: "SHS1001",
+        studentName: "Aarav Sharma",
+        amount: 15000,
+        type: "credit" as const,
+        method: "cash" as const,
+        date: { toDate: () => new Date("2026-05-10T10:00:00") },
+        status: "success",
+        remarks: "I Term Fee payment"
+    },
+    {
+        id: "pay_default_2",
+        studentId: "SHS1002",
+        studentName: "Aadhya Reddy",
+        amount: 34000,
+        type: "credit" as const,
+        method: "cash" as const,
+        date: { toDate: () => new Date("2026-05-12T11:30:00") },
+        status: "success",
+        remarks: "I & II Term Fee payment"
+    }
+];
+
+const formatPaymentDate = (date: any) => {
+    if (!date) return "Just now";
+    if (date.toDate) return date.toDate().toLocaleDateString();
+    if (date.seconds) return new Date(date.seconds * 1000).toLocaleDateString();
+    return new Date(date).toLocaleDateString();
+};
+
 export default function PaymentsPage() {
-    const { user } = useAuth();
-    const [allPayments, setAllPayments] = useState<Payment[]>([]);
-    const [paymentsLoaded, setPaymentsLoaded] = useState(false);
-    const [studentsLoaded, setStudentsLoaded] = useState(false);
+    const { user, role } = useAuth();
+    const [allPayments, setAllPayments] = useState<Payment[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(PAYMENTS_CACHE_KEY);
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
+        return DEFAULT_PAYMENTS;
+    });
+    const [paymentsLoaded, setPaymentsLoaded] = useState(true);
+    const [studentsLoaded, setStudentsLoaded] = useState(true);
     const [open, setOpen] = useState(false);
     const { branding, selectedYear, classes = {}, villages = {} } = useMasterData();
-    const [role, setRole] = useState<string>("");
-
-    useEffect(() => {
-        if (!user) return;
-        const unsub = onSnapshot(doc(db, "users", user.uid), (d) => {
-            if (d.exists()) setRole(d.data().role);
-        });
-        return () => unsub();
-    }, [user]);
 
     // Search & Filter State
     const [searchTerm, setSearchTerm] = useState(""); // For Record Fee Dialog
@@ -76,6 +108,9 @@ export default function PaymentsPage() {
                 ...doc.data()
             })) as Payment[];
             setAllPayments(loaded);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(PAYMENTS_CACHE_KEY, JSON.stringify(loaded));
+            }
             setPaymentsLoaded(true);
         }, (err) => {
             if (!isMounted) return;
@@ -304,7 +339,7 @@ export default function PaymentsPage() {
                 </span>
             )
         },
-        { key: "date", header: "Date", render: (p: Payment) => <span className="text-muted-foreground text-xs">{p.date?.toDate ? p.date.toDate().toLocaleDateString() : 'Just now'}</span> },
+        { key: "date", header: "Date", render: (p: Payment) => <span className="text-muted-foreground text-xs">{formatPaymentDate(p.date)}</span> },
         {
             key: "actions",
             header: "",

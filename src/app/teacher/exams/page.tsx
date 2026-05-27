@@ -14,8 +14,8 @@ import { useMasterData } from "@/context/MasterDataContext";
 export default function TeacherExamsPage() {
     const { user } = useAuth();
     const { subjectTeachers, classSections, selectedYear } = useMasterData();
-    const [exams, setExams] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [exams, setExams] = useState<any[]>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_exams_cache") || "[]") : []);
+    const [loading, setLoading] = useState(() => typeof window !== 'undefined' ? !localStorage.getItem("teacher_exams_cache") : true);
 
     useEffect(() => {
         if (!user?.uid) return;
@@ -88,6 +88,9 @@ export default function TeacherExamsPage() {
                 });
 
                 setExams(validExams);
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem("teacher_exams_cache", JSON.stringify(validExams));
+                }
             } catch (e: any) {
                 console.warn("[Exams] Error fetching exams:", e.message);
             } finally {

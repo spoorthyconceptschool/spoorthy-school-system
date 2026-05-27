@@ -63,7 +63,7 @@ export function TopBar() {
         >
             <div className="flex items-center gap-2 shrink-0">
                 <MobileSidebar />
-                <div className="lg:hidden flex items-center gap-2 shrink-0">
+                <div className="md:hidden flex items-center gap-2 shrink-0">
                     <div className="w-8 h-8 rounded-lg bg-transparent flex items-center justify-center border border-white/20 overflow-hidden shrink-0 shadow-md">
                         {!imageError ? (
                             <img
@@ -77,7 +77,7 @@ export function TopBar() {
                         )}
                     </div>
                     {/* Hide name on tiny/medium screens to make room for Search and dev tools */}
-                    <span className="font-display font-black text-white text-[10px] xs:text-sm tracking-tight truncate max-w-[80px] sm:max-w-[150px] hidden lg:block">
+                    <span className="font-display font-black text-white text-[10px] xs:text-sm tracking-tight truncate max-w-[80px] sm:max-w-[150px] hidden xs:block">
                         {branding?.schoolName || "Spoorthy School"}
                     </span>
                 </div>
@@ -97,7 +97,7 @@ export function TopBar() {
                         <DropdownMenuTrigger asChild>
                             <Button variant="outline" size="sm" className={cn(
                                 "h-8 md:h-9 gap-1 rounded-full border-[#64FFDA]/20 px-2 md:px-4 bg-[#0A192F]/40 transition-all",
-                                academicYears[selectedYear]?.active ? "text-[#64FFDA]/80 hover:bg-[#64FFDA]/10" : "text-amber-400 border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20"
+                                (academicYears || {})[selectedYear]?.active ? "text-[#64FFDA]/80 hover:bg-[#64FFDA]/10" : "text-amber-400 border-amber-500/30 bg-amber-500/10 hover:bg-amber-500/20"
                             )}>
                                 <CalendarClock size={14} className="shrink-0 md:size-4" />
                                 <span className="text-[9px] md:text-xs font-bold font-mono whitespace-nowrap hidden xs:inline">{selectedYear}</span>

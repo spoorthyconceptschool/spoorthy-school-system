@@ -6,11 +6,13 @@ import { doc, getDoc, collection, query, where, getDocs } from "firebase/firesto
 import { db } from "@/lib/firebase";
 import { useMasterData } from "@/context/MasterDataContext";
 import { Button } from "@/components/ui/button";
-import { Loader2, Printer, AlertTriangle } from "lucide-react";
+import { Loader2, Printer, AlertTriangle, ChevronLeft } from "lucide-react";
+import { useRouter } from "next/navigation";
 
 export default function StudentHallTicketPage({ params }: { params: Promise<{ id: string }> }) {
     const { id: examId } = use(params);
     const { user } = useAuth();
+    const router = useRouter();
     const { classes, subjects, branding } = useMasterData();
 
     const [loading, setLoading] = useState(true);
@@ -148,7 +150,7 @@ export default function StudentHallTicketPage({ params }: { params: Promise<{ id
                 <p className="text-gray-500 mt-2 max-w-md">
                     {denialReason || "Hall Ticket access is restricted due to pending fee dues. Please clear your outstanding balance to download your hall ticket."}
                 </p>
-                <Button className="mt-6" variant="outline" onClick={() => window.close()}>Close Window</Button>
+                <Button className="mt-6" variant="outline" onClick={() => router.push("/student/exams")}>Back to Exams</Button>
             </div>
         );
     }
@@ -162,11 +164,20 @@ export default function StudentHallTicketPage({ params }: { params: Promise<{ id
         <div className="bg-gray-100 min-h-screen py-4 md:py-8 print:bg-white print:p-0 font-sans">
             <div className="max-w-5xl mx-auto px-0 md:px-4">
                 <div className="print:hidden p-4 border-b flex flex-col md:flex-row justify-between items-center bg-white rounded-t-xl gap-4 sticky top-0 z-50 shadow-sm mx-4 md:mx-0">
-                    <div className="text-center md:text-left">
-                        <div className="font-bold text-gray-800 text-lg md:text-xl">Hall Ticket Preview</div>
-                        <p className="text-[10px] uppercase font-black tracking-widest text-blue-600/60 md:hidden mt-0.5">Swipe left/right to view full ticket</p>
+                    <div className="flex items-center gap-4 text-center md:text-left w-full md:w-auto">
+                        <Button 
+                            variant="outline" 
+                            onClick={() => router.push("/student/exams")}
+                            className="border-slate-200 hover:bg-slate-50 text-slate-700 gap-2 rounded-xl shrink-0"
+                        >
+                            <ChevronLeft className="w-4 h-4" /> Back
+                        </Button>
+                        <div>
+                            <div className="font-bold text-gray-800 text-lg md:text-xl">Hall Ticket Preview</div>
+                            <p className="text-[10px] uppercase font-black tracking-widest text-blue-600/60 md:hidden mt-0.5">Swipe left/right to view full ticket</p>
+                        </div>
                     </div>
-                    <Button onClick={() => window.print()} className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20 font-bold px-8 h-11">
+                    <Button onClick={() => window.print()} className="w-full md:w-auto bg-blue-600 hover:bg-blue-700 text-white shadow-lg shadow-blue-500/20 font-bold px-8 h-11 shrink-0">
                         <Printer className="mr-2 h-5 w-5" /> PRINT NOW
                     </Button>
                 </div>
@@ -267,9 +278,13 @@ export default function StudentHallTicketPage({ params }: { params: Promise<{ id
                                             {schedule.map((slot: any, idx: number) => {
                                                 const dateObj = new Date(slot.date);
                                                 const dayName = dateObj.toLocaleDateString('en-US', { weekday: 'long' });
+                                                const day = String(dateObj.getDate()).padStart(2, '0');
+                                                const month = String(dateObj.getMonth() + 1).padStart(2, '0');
+                                                const year = String(dateObj.getFullYear()).slice(-2);
+                                                const formattedDate = `${day}-${month}-${year}`;
                                                 return (
                                                     <tr key={slot.subId} className={idx % 2 === 0 ? "bg-white" : "bg-slate-50/50"}>
-                                                        <td className="p-3 border-r border-slate-100 text-center font-black text-sm text-slate-900">{dateObj.toLocaleDateString()}</td>
+                                                        <td className="p-3 border-r border-slate-100 text-center font-black text-sm text-slate-900">{formattedDate}</td>
                                                         <td className="p-3 border-r border-slate-100 text-center uppercase text-[9px] font-black text-slate-500">{dayName}</td>
                                                         <td className="p-3 border-r border-slate-100 text-center font-bold text-xs text-slate-700">{slot.startTime} - {slot.endTime}</td>
                                                         <td className="p-3 pl-6 border-r border-slate-100">

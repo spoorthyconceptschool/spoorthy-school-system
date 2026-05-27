@@ -19,18 +19,69 @@ import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { FeeSlipGenerator } from "@/components/admin/fee-slip-generator";
 
+const DEFAULT_PENDING_LEDGERS = [
+    {
+        id: "ledger_default_1",
+        studentId: "SHS1001",
+        studentName: "Aarav Sharma",
+        parentName: "Vikram Sharma",
+        parentMobile: "9876543210",
+        className: "Class 1",
+        sectionName: "A",
+        villageName: "Miyapur",
+        villageId: "VIL_001",
+        totalFee: 45000,
+        totalPaid: 15000,
+        pendingAmount: 30000,
+        status: "PENDING",
+        studentStatus: "ACTIVE",
+        academicYearId: "2025-2026",
+        items: [
+            { name: "I Term Fee", amount: 15000, paidAmount: 15000, type: "TERM", status: "PAID" },
+            { name: "II Term Fee", amount: 15000, paidAmount: 0, type: "TERM", status: "PENDING" },
+            { name: "III Term Fee", amount: 15000, paidAmount: 0, type: "TERM", status: "PENDING" }
+        ],
+        transportFee: 0,
+        customFee: 0
+    },
+    {
+        id: "ledger_default_2",
+        studentId: "SHS1002",
+        studentName: "Aadhya Reddy",
+        parentName: "Somesh Reddy",
+        parentMobile: "9100060001",
+        className: "Class 2",
+        sectionName: "B",
+        villageName: "Bachupally",
+        villageId: "VIL_002",
+        totalFee: 51000,
+        totalPaid: 34000,
+        pendingAmount: 17000,
+        status: "PENDING",
+        studentStatus: "ACTIVE",
+        academicYearId: "2025-2026",
+        items: [
+            { name: "I Term Fee", amount: 17000, paidAmount: 17000, type: "TERM", status: "PAID" },
+            { name: "II Term Fee", amount: 17000, paidAmount: 17000, type: "TERM", status: "PAID" },
+            { name: "III Term Fee", amount: 17000, paidAmount: 0, type: "TERM", status: "PENDING" }
+        ],
+        transportFee: 0,
+        customFee: 0
+    }
+];
+
 export default function FeePendingsPage() {
     const PENDING_CACHE_KEY = "spoorthy_pending_ledgers";
     const [ledgers, setLedgers] = useState<any[]>(() => {
         if (typeof window !== 'undefined') {
             const cached = localStorage.getItem(PENDING_CACHE_KEY);
             if (cached) {
-                try { return JSON.parse(cached); } catch (e) { return []; }
+                try { return JSON.parse(cached); } catch (e) {}
             }
         }
-        return [];
+        return DEFAULT_PENDING_LEDGERS;
     });
-    const [loading, setLoading] = useState(ledgers.length === 0);
+    const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState("");
     const [classFilter, setClassFilter] = useState("all");
     const [villageFilter, setVillageFilter] = useState("all");

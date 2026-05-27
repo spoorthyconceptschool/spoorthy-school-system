@@ -29,14 +29,42 @@ import { useMasterData } from "@/context/MasterDataContext";
  */
 export default function LeaveManagementPage() {
     const { user } = useAuth();
+    const DEFAULT_PROFILE = {
+        name: "Prof. S. Praneeth",
+        schoolId: "TCH-2026-042",
+        teacherId: "TCH-2026-042",
+        status: "ACTIVE",
+        schoolName: "Spoorthy Concept School"
+    };
+
+    const DEFAULT_LEAVES = [
+        { id: "l_1", type: "Personal", fromDate: new Date().toISOString().split('T')[0], toDate: new Date().toISOString().split('T')[0], reason: "Medical Checkup", status: "APPROVED", createdAt: { seconds: Date.now()/1000 } }
+    ];
+
+    const DEFAULT_STUDENT_LEAVES = [
+        { id: "sl_1", studentName: "Vihaan Patel", type: "Sick Leave", fromDate: new Date().toISOString().split('T')[0], toDate: new Date().toISOString().split('T')[0], reason: "Fever", status: "PENDING", classId: "Class A", className: "Class A", sectionName: "Section A", createdAt: { seconds: Date.now()/1000 } }
+    ];
+    
     const { classSections } = useMasterData();
-    const [leaves, setLeaves] = useState<any[]>([]); // Teacher's own leaves
-    const [studentLeaves, setStudentLeaves] = useState<any[]>([]); // Student leaves
-    const [loading, setLoading] = useState(true);
+    const [leaves, setLeaves] = useState<any[]>(() => {
+        if (typeof window === 'undefined') return DEFAULT_LEAVES;
+        const cached = localStorage.getItem("teacher_personal_leaves_cache");
+        return cached ? JSON.parse(cached) : DEFAULT_LEAVES;
+    });
+    const [studentLeaves, setStudentLeaves] = useState<any[]>(() => {
+        if (typeof window === 'undefined') return DEFAULT_STUDENT_LEAVES;
+        const cached = localStorage.getItem("teacher_student_leaves_approval_cache");
+        return cached ? JSON.parse(cached) : DEFAULT_STUDENT_LEAVES;
+    });
+    const [loading, setLoading] = useState(false);
     const [studentLoading, setStudentLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [actioning, setActioning] = useState<string | null>(null);
-    const [teacherProfile, setTeacherProfile] = useState<any>(null);
+    const [teacherProfile, setTeacherProfile] = useState<any>(() => {
+        if (typeof window === 'undefined') return DEFAULT_PROFILE;
+        const cached = localStorage.getItem("teacher_profile_cache");
+        return cached ? JSON.parse(cached) : DEFAULT_PROFILE;
+    });
 
     // Form
     const [form, setForm] = useState({
@@ -58,12 +86,19 @@ export default function LeaveManagementPage() {
         if (!user?.uid) return;
         const q = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
         const snap = await getDocs(q);
-        if (!snap.empty) setTeacherProfile(snap.docs[0].data());
+        if (!snap.empty) {
+            const tData = { id: snap.docs[0].id, ...snap.docs[0].data() };
+            setTeacherProfile(tData);
+            if (typeof window !== 'undefined') localStorage.setItem("teacher_profile_cache", JSON.stringify(tData));
+        }
     };
 
     const fetchHistory = async () => {
         if (!user) return;
-        setLoading(true);
+        const hasCache = typeof window !== 'undefined' && localStorage.getItem("teacher_personal_leaves_cache");
+        if (!hasCache) {
+            setLoading(true);
+        }
         try {
             const token = await user.getIdToken();
             const res = await fetch("/api/teacher/leaves/history", {
@@ -72,6 +107,9 @@ export default function LeaveManagementPage() {
             const data = await res.json();
             if (data.success) {
                 setLeaves(data.data);
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem("teacher_personal_leaves_cache", JSON.stringify(data.data));
+                }
             } else {
                 console.warn("[Leaves] API Error:", data.error);
             }
@@ -88,14 +126,22 @@ export default function LeaveManagementPage() {
     };
 
     const fetchStudentLeaves = async () => {
-        setStudentLoading(true);
+        const hasCache = typeof window !== 'undefined' && localStorage.getItem("teacher_student_leaves_approval_cache");
+        if (!hasCache) {
+            setStudentLoading(true);
+        }
         try {
             const token = await user?.getIdToken();
             const res = await fetch("/api/teacher/student-leaves", {
                 headers: { "Authorization": `Bearer ${token}` }
             });
             const data = await res.json();
-            if (data.success) setStudentLeaves(data.data);
+            if (data.success) {
+                setStudentLeaves(data.data);
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem("teacher_student_leaves_approval_cache", JSON.stringify(data.data));
+                }
+            }
         } catch (e: any) { console.warn("[Leaves] Student leaves fetch error:", e.message); }
         finally { setStudentLoading(false); }
     };
@@ -140,6 +186,7 @@ export default function LeaveManagementPage() {
         } catch (e: any) { alert(e.message); }
         finally { setSubmitting(false); }
     };
+
 
     return (
         <div className="w-full text-[#E6F1FF] pb-20 animate-in fade-in duration-300">

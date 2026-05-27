@@ -20,10 +20,36 @@ import { AdminChangePasswordModal } from "./admin-change-password-modal";
 import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/lib/toast-store";
 
+const SYSTEM_USERS_CACHE_KEY = "spoorthy_system_users_cache";
+const DEFAULT_SYSTEM_USERS = [
+    {
+        id: "usr_admin_default",
+        name: "Principal Admin",
+        email: "admin@spoorthyschool.com",
+        role: "ADMIN",
+        status: "active"
+    },
+    {
+        id: "usr_mgr_default",
+        name: "School Manager",
+        email: "manager@spoorthyschool.com",
+        role: "MANAGER",
+        status: "active"
+    }
+];
+
 export function SystemUsersManager() {
     const { user: currentUser } = useAuth();
-    const [users, setUsers] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [users, setUsers] = useState<any[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(SYSTEM_USERS_CACHE_KEY);
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
+        return DEFAULT_SYSTEM_USERS;
+    });
+    const [loading, setLoading] = useState(false);
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
 
     // Action State
@@ -37,6 +63,12 @@ export function SystemUsersManager() {
                 .map(d => ({ id: d.id, ...d.data() }))
                 .filter((u: any) => ["ADMIN", "MANAGER", "TIMETABLE_EDITOR"].includes(u.role));
             setUsers(systemUsers);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(SYSTEM_USERS_CACHE_KEY, JSON.stringify(systemUsers));
+            }
+            setLoading(false);
+        }, (err) => {
+            console.error("System Users Sync Error:", err);
             setLoading(false);
         });
 

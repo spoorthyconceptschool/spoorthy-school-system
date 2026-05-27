@@ -8,25 +8,22 @@ import { Card, CardContent } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 
 export default function HolidaysPage() {
-    const [holidays, setHolidays] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [holidays, setHolidays] = useState<any[]>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_holidays_page_cache") || "[]") : []);
 
     useEffect(() => {
         const fetchHolidays = async () => {
             try {
                 const q = query(collection(db, "notices"), where("type", "==", "HOLIDAY"));
                 const snap = await getDocs(q);
-                setHolidays(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
+                setHolidays(list);
+                if (typeof window !== 'undefined') localStorage.setItem("teacher_holidays_page_cache", JSON.stringify(list));
             } catch (error: any) {
                 console.warn("[Holidays] error fetching holidays:", error.message);
-            } finally {
-                setLoading(false);
             }
         };
         fetchHolidays();
     }, []);
-
-    if (loading) return <div className="flex justify-center p-20"><Loader2 className="w-8 h-8 animate-spin text-emerald-400" /></div>;
 
     return (
         <div className="w-full text-[#E6F1FF] pb-20 animate-in fade-in duration-300">

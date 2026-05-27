@@ -13,16 +13,31 @@ export default function StudentHolidaysPage() {
 
     const holidays = notices.filter((n: any) => n.type === "HOLIDAY");
 
+    const formatDateToDDMMYY = (dateObj: any) => {
+        if (!dateObj) return "";
+        let d: Date;
+        if (typeof dateObj === 'object' && dateObj.seconds !== undefined) {
+            d = new Date(dateObj.seconds * 1000);
+        } else {
+            d = new Date(dateObj);
+        }
+        if (isNaN(d.getTime())) return "";
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = String(d.getFullYear()).slice(-2);
+        return `${day}-${month}-${year}`;
+    };
+
     const formatHolidayDate = (h: any) => {
         if (h.startDate) {
-            const start = new Date(h.startDate.seconds * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+            const start = formatDateToDDMMYY(h.startDate);
             if (h.endDate && h.startDate.seconds !== h.endDate.seconds) {
-                const end = new Date(h.endDate.seconds * 1000).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+                const end = formatDateToDDMMYY(h.endDate);
                 return `${start} - ${end}`;
             }
             return start;
         }
-        return new Date(h.createdAt?.seconds * 1000 || Date.now()).toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+        return formatDateToDDMMYY(h.createdAt || Date.now());
     };
 
     const getDetailedDateBadge = (h: any) => {
@@ -33,7 +48,7 @@ export default function StudentHolidaysPage() {
         return { day, month, weekday };
     };
 
-    if (loading) {
+    if (loading && holidays.length === 0) {
         return (
             <div className="flex h-[50vh] items-center justify-center">
                 <Loader2 className="w-8 h-8 animate-spin text-amber-500" />

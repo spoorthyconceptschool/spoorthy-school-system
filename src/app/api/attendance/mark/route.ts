@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { withEnterpriseGuard } from "@/lib/enterprise/auth-middleware";
 import { EnterpriseAttendanceService } from "@/lib/services/enterprise/attendance-service";
-import { adminDb } from "@/lib/firebase-admin";
+import { adminDb, adminRtdb } from "@/lib/firebase-admin";
 
 /**
  * Enterprise Attendance Modification Rules:
@@ -30,25 +30,37 @@ export async function POST(req: NextRequest) {
                 const tProfile = teacherSnap.docs[0].data();
                 const tId = tProfile.schoolId || teacherSnap.docs[0].id;
 
-                // 2. Fetch Master Data to verify Class Teacher assignment
-                const configSnap = await adminDb.collection("config").doc("master_data").get();
-                if (configSnap.exists) {
-                    const md = configSnap.data();
-                    const classSections = md?.class_sections || {};
-                    let isClassTeacher = false;
+                // 2. Fetch Master Data from Realtime Database to verify Class Teacher or Subject Teacher assignment
+                const [classSectionsSnap, subjectTeachersSnap] = await Promise.all([
+                    adminRtdb.ref("master/classSections").once("value"),
+                    adminRtdb.ref("master/subjectTeachers").once("value")
+                ]);
 
-                    Object.values(classSections).forEach((cs: any) => {
-                        if (cs.classId === classId && cs.sectionId === sectionId && cs.classTeacherId === tId && (cs.active || cs.isActive)) {
-                            isClassTeacher = true;
-                        }
-                    });
+                const classSections = classSectionsSnap.val() || {};
+                const subjectTeachers = subjectTeachersSnap.val() || {};
+                const classKey = `${classId}_${sectionId}`;
 
-                    if (!isClassTeacher) {
-                        return NextResponse.json({
-                            success: false,
-                            error: "Business Rule Violation: Only assigned Class Teachers can submit attendance for this class."
-                        }, { status: 403 });
+                let isClassTeacher = false;
+                Object.values(classSections).forEach((cs: any) => {
+                    if (cs.classId === classId && cs.sectionId === sectionId && cs.classTeacherId === tId && (cs.active !== false && cs.isActive !== false)) {
+                        isClassTeacher = true;
                     }
+                });
+
+                let isSubjectTeacher = false;
+                const subjectsObj = subjectTeachers[classKey] || {};
+                if (typeof subjectsObj === 'object' && subjectsObj !== null) {
+                    const teacherIds = Object.values(subjectsObj);
+                    if (tId && teacherIds.includes(tId)) {
+                        isSubjectTeacher = true;
+                    }
+                }
+
+                if (!isClassTeacher && !isSubjectTeacher) {
+                    return NextResponse.json({
+                        success: false,
+                        error: "Business Rule Violation: Only assigned Class Teachers or Subject Teachers for this class can submit attendance."
+                    }, { status: 403 });
                 }
             }
             // --- END VALIDATION ---
@@ -57,7 +69,17 @@ export async function POST(req: NextRequest) {
             let actorSchoolId = "global";
             const userSnap = await adminDb.collection("users").doc(user.uid).get();
             if (userSnap.exists) {
-                actorSchoolId = userSnap.data()?.schoolId || "global";
+                const uData = userSnap.data();
+                // A teacher's schoolId field in the users collection holds their teacher ID (e.g. "TCH100").
+                // A student's schoolId field in the users collection holds their student ID (e.g. "SHS1001").
+                // For multi-tenant partitioning, we only want to partition by schoolId if it is a real school/branch partition,
+                // otherwise we use "global". In this system, teachers and students are within the same single-school workspace,
+                // so we use "global" for both teachers and students.
+                if (uData?.role === "TEACHER" || uData?.role === "STUDENT") {
+                    actorSchoolId = "global";
+                } else {
+                    actorSchoolId = uData?.schoolId || "global";
+                }
             }
 
             // Route all logic to our enterprise service

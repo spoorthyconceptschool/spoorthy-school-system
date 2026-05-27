@@ -15,6 +15,21 @@ export default function StudentTimetablePage() {
     const { subjects, classes, sections } = useMasterData();
     const { profile, schedule, substitutions, teacherMap, notices, loading } = useStudentData();
     
+    const formatToDDMMYY = (dateVal: any) => {
+        if (!dateVal) return "";
+        let d: Date;
+        if (typeof dateVal === 'object' && dateVal.seconds !== undefined) {
+            d = new Date(dateVal.seconds * 1000);
+        } else {
+            d = new Date(dateVal);
+        }
+        if (isNaN(d.getTime())) return "";
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = String(d.getFullYear()).slice(-2);
+        return `${day}-${month}-${year}`;
+    };
+
     const [activeTab, setActiveTab] = useState<'today' | 'weekly'>('today');
     const [selectedWeeklyDay, setSelectedWeeklyDay] = useState<string>("MONDAY");
     const [todayDayName, setTodayDayName] = useState<string>("MONDAY");
@@ -98,7 +113,7 @@ export default function StudentTimetablePage() {
         const isHoliday = isDateHoliday(targetDate);
         const dateKey = `${targetDate.getFullYear()}-${String(targetDate.getMonth() + 1).padStart(2, '0')}-${String(targetDate.getDate()).padStart(2, '0')}`;
 
-        if (isHoliday) return { slots: [], isHoliday: true, dateLabel: targetDate.toLocaleDateString([], { month: 'short', day: 'numeric' }), dateKey };
+        if (isHoliday) return { slots: [], isHoliday: true, dateLabel: formatToDDMMYY(targetDate), dateKey };
 
         const daySchedule = schedule?.[dayName] || {};
         const slots = [];
@@ -115,12 +130,12 @@ export default function StudentTimetablePage() {
             });
         }
 
-        return { slots, isHoliday: false, dateLabel: targetDate.toLocaleDateString([], { month: 'short', day: 'numeric' }), dateKey };
+        return { slots, isHoliday: false, dateLabel: formatToDDMMYY(targetDate), dateKey };
     };
 
     const weeklyDayData = getWeeklyScheduleForDay(selectedWeeklyDay);
 
-    if (loading) {
+    if (loading && !schedule) {
         return (
             <div className="flex h-[50vh] items-center justify-center">
                 <Loader2 className="w-8 h-8 animate-spin text-amber-500" />
@@ -502,7 +517,7 @@ export default function StudentTimetablePage() {
                                             Today ({todayData.dayName.substring(0, 3)})
                                         </CardTitle>
                                         <span className="text-[9px] font-mono text-neutral-400 font-bold bg-white/5 px-2 py-0.5 rounded">
-                                            {todayData.dateKey ? new Date(todayData.dateKey).toLocaleDateString([], {month: 'short', day: 'numeric'}) : ''}
+                                            {todayData.dateKey ? formatToDDMMYY(todayData.dateKey) : ''}
                                         </span>
                                     </CardHeader>
                                     <CardContent className="px-3 pb-3 flex-1 flex flex-col overflow-hidden">

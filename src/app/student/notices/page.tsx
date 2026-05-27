@@ -19,6 +19,21 @@ export default function StudentNoticesPage() {
         }
     }, [notices, selectedNoticeId]);
 
+    const formatDateToDDMMYY = (dateVal: any) => {
+        if (!dateVal) return "";
+        let d: Date;
+        if (typeof dateVal === 'object' && dateVal.seconds !== undefined) {
+            d = new Date(dateVal.seconds * 1000);
+        } else {
+            d = new Date(dateVal);
+        }
+        if (isNaN(d.getTime())) return "";
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = String(d.getFullYear()).slice(-2);
+        return `${day}-${month}-${year}`;
+    };
+
     const formatTimestamp = (timestamp: any) => {
         if (!timestamp) return '';
         const date = new Date(timestamp.seconds * 1000);
@@ -28,7 +43,7 @@ export default function StudentNoticesPage() {
         if (diff < 60 * 1000) return 'Just now';
         if (diff < 60 * 60 * 1000) return `${Math.floor(diff / (60 * 1000))} min ago`;
         if (diff < 24 * 60 * 60 * 1000) return `${Math.floor(diff / (60 * 60 * 1000))} hours ago`;
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        return formatDateToDDMMYY(date);
     };
 
     const getNoticeStyles = (type: string) => {
@@ -258,7 +273,10 @@ export default function StudentNoticesPage() {
                 <div className="absolute bottom-[-5%] right-[-5%] w-[40%] h-[30%] bg-purple-500/10 rounded-full blur-[80px] pointer-events-none" />
 
                 {/* Title / Header */}
-                <div className="flex items-center justify-between px-1 shrink-0 mt-2">
+                <div className="flex items-center gap-3 px-1 shrink-0 mt-2">
+                    <Link href="/student" className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/80 hover:bg-white/10 transition-all shadow shrink-0">
+                        <ArrowLeft className="w-4 h-4" />
+                    </Link>
                     <div className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shadow-[0_0_15px_rgba(59,130,246,0.1)]">
                             <Bell className="w-4 h-4 text-[#64FFDA]" />
@@ -268,9 +286,6 @@ export default function StudentNoticesPage() {
                             <p className="text-[10px] text-neutral-400">Official announcements and updates.</p>
                         </div>
                     </div>
-                    <Link href="/student" className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/80 hover:bg-white/10 transition-all shadow">
-                        <ArrowLeft className="w-4 h-4" />
-                    </Link>
                 </div>
 
                 {/* Mobile Notices Scroll Feed */}
@@ -317,13 +332,13 @@ export default function StudentNoticesPage() {
                                                     <CalendarIcon className="w-2.5 h-2.5" />
                                                     <span>{formatTimestamp(n.createdAt)}</span>
                                                     {n.type === "HOLIDAY" && n.startDate && (
-                                                        <>
-                                                            <span className="w-1 h-1 rounded-full bg-neutral-600" />
-                                                            <span className="text-amber-400">
-                                                                {new Date(n.startDate.seconds * 1000).toLocaleDateString()}
-                                                            </span>
-                                                        </>
-                                                    )}
+                                                         <>
+                                                             <span className="w-1 h-1 rounded-full bg-neutral-600" />
+                                                             <span className="text-amber-400">
+                                                                 {formatDateToDDMMYY(n.startDate)}
+                                                             </span>
+                                                         </>
+                                                     )}
                                                 </div>
                                             </div>
                                         </div>
@@ -352,14 +367,7 @@ export default function StudentNoticesPage() {
                     )}
                 </div>
 
-                {/* Back to Home Button Footer */}
-                <div className="shrink-0 pt-1 shrink-0">
-                    <Link href="/student" className="block">
-                        <button className="w-full bg-white/5 border border-white/10 hover:bg-white/10 text-white font-extrabold text-xs h-10 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-inner mb-2">
-                            <ArrowLeft className="w-3.5 h-3.5" /> Back to Dashboard
-                        </button>
-                    </Link>
-                </div>
+
             </div>
         </div>
     );

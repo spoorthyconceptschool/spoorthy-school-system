@@ -75,7 +75,12 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
         return [];
     });
 
-    const [notices, setNotices] = useState<any[]>([]);
+    const [notices, setNotices] = useState<any[]>(() => {
+        if (typeof window !== "undefined") {
+            try { return JSON.parse(localStorage.getItem("student_notices_cache") || "[]"); } catch (e) { return []; }
+        }
+        return [];
+    });
     
     const [attendanceMap, setAttendanceMap] = useState<Record<string, "P" | "A">>(() => {
         if (typeof window !== "undefined") {
@@ -91,12 +96,48 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
         return { total: 0, present: 0, absent: 0, percentage: 0 };
     });
 
-    const [schedule, setSchedule] = useState<any>(null);
-    const [substitutions, setSubstitutions] = useState<any[]>([]);
-    const [teacherMap, setTeacherMap] = useState<Record<string, string>>({});
-    const [leaves, setLeaves] = useState<any[]>([]);
-    const [exams, setExams] = useState<any[]>([]);
-    const [classSyllabi, setClassSyllabi] = useState<any[]>([]);
+    const [schedule, setSchedule] = useState<any>(() => {
+        if (typeof window !== "undefined") {
+            try { return JSON.parse(localStorage.getItem("student_schedule_cache") || "null"); } catch (e) { return null; }
+        }
+        return null;
+    });
+
+    const [substitutions, setSubstitutions] = useState<any[]>(() => {
+        if (typeof window !== "undefined") {
+            try { return JSON.parse(localStorage.getItem("student_substitutions_cache") || "[]"); } catch (e) { return []; }
+        }
+        return [];
+    });
+
+    const [teacherMap, setTeacherMap] = useState<Record<string, string>>(() => {
+        if (typeof window !== "undefined") {
+            try { return JSON.parse(localStorage.getItem("student_teacher_map_cache") || "{}"); } catch (e) { return {}; }
+        }
+        return {};
+    });
+
+    const [leaves, setLeaves] = useState<any[]>(() => {
+        if (typeof window !== "undefined") {
+            try { return JSON.parse(localStorage.getItem("student_leaves_cache") || "[]"); } catch (e) { return []; }
+        }
+        return [];
+    });
+
+    const [exams, setExams] = useState<any[]>(() => {
+        if (typeof window !== "undefined") {
+            try { return JSON.parse(localStorage.getItem("student_exams_cache") || "[]"); } catch (e) { return []; }
+        }
+        return [];
+    });
+
+    const [classSyllabi, setClassSyllabi] = useState<any[]>(() => {
+        if (typeof window !== "undefined") {
+            try { return JSON.parse(localStorage.getItem("student_syllabi_cache") || "[]"); } catch (e) { return []; }
+        }
+        return [];
+    });
+
     const [loading, setLoading] = useState(true);
 
     // Dynamic refetch helper for Leaves
@@ -109,7 +150,11 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
             });
             const data = await res.json();
             if (data.success) {
-                setLeaves(data.data || []);
+                const list = data.data || [];
+                setLeaves(list);
+                if (typeof window !== "undefined") {
+                    localStorage.setItem("student_leaves_cache", JSON.stringify(list));
+                }
             }
         } catch (e) {
             console.error("[StudentCache] Error refreshing leaves:", e);
@@ -145,13 +190,21 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
                         processProfileData({ id: qSnap.docs[0].id, ...qSnap.docs[0].data() });
                     } else {
                         console.warn("[StudentCache] Profile not found in uid fallback either.");
+                        setLoading(false);
                     }
-                }, (err) => console.error("[StudentCache] Fallback profile listen error:", err));
+                }, (err) => {
+                    console.error("[StudentCache] Fallback profile listen error:", err);
+                    setLoading(false);
+                });
                 
                 return () => unsubQuery();
+            } else {
+                console.warn("[StudentCache] Profile not found and no uid fallback.");
+                setLoading(false);
             }
         }, (err) => {
             console.error("[StudentCache] Primary profile listen error:", err);
+            setLoading(false);
         });
 
         return () => {
@@ -255,6 +308,9 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
                     return true;
                 });
             setNotices(list);
+            if (typeof window !== "undefined") {
+                localStorage.setItem("student_notices_cache", JSON.stringify(list));
+            }
         }, (err) => {
             // Index fallback
             const noticeQFallback = query(
@@ -271,6 +327,9 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
                     });
                 list = list.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
                 setNotices(list);
+                if (typeof window !== "undefined") {
+                    localStorage.setItem("student_notices_cache", JSON.stringify(list));
+                }
             });
         });
 
@@ -325,8 +384,14 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
                     });
                     const tData = await tRes.json();
                     if (tData.success) {
-                        setSchedule(tData.data.weeklySchedule || {});
-                        setSubstitutions(tData.data.substitutions || []);
+                        const sched = tData.data.weeklySchedule || {};
+                        const subs = tData.data.substitutions || [];
+                        setSchedule(sched);
+                        setSubstitutions(subs);
+                        if (typeof window !== "undefined") {
+                            localStorage.setItem("student_schedule_cache", JSON.stringify(sched));
+                            localStorage.setItem("student_substitutions_cache", JSON.stringify(subs));
+                        }
                     }
                 } catch (err) {
                     console.error("[StudentCache] Timetable fetch failed:", err);
@@ -347,6 +412,9 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
                         tMap[d.id] = data.name;
                     });
                     setTeacherMap(tMap);
+                    if (typeof window !== "undefined") {
+                        localStorage.setItem("student_teacher_map_cache", JSON.stringify(tMap));
+                    }
                 } catch (err) {
                     console.error("[StudentCache] Teachers fetch failed:", err);
                 }
@@ -358,7 +426,11 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
                     });
                     const lData = await lRes.json();
                     if (lData.success) {
-                        setLeaves(lData.data || []);
+                        const list = lData.data || [];
+                        setLeaves(list);
+                        if (typeof window !== "undefined") {
+                            localStorage.setItem("student_leaves_cache", JSON.stringify(list));
+                        }
                     }
                 } catch (err) {
                     console.error("[StudentCache] Leaves fetch failed:", err);
@@ -376,6 +448,9 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
                             return dateB - dateA;
                         });
                     setExams(allExams);
+                    if (typeof window !== "undefined") {
+                        localStorage.setItem("student_exams_cache", JSON.stringify(allExams));
+                    }
                 } catch (err) {
                     console.error("[StudentCache] Exams fetch failed:", err);
                 }
@@ -385,7 +460,11 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
                     const sylSnap = await getDocs(
                         query(collection(db, "exam_syllabus"), where("classId", "==", classId))
                     );
-                    setClassSyllabi(sylSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+                    const classSyllabiList = sylSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    setClassSyllabi(classSyllabiList);
+                    if (typeof window !== "undefined") {
+                        localStorage.setItem("student_syllabi_cache", JSON.stringify(classSyllabiList));
+                    }
                 } catch (err) {
                     console.error("[StudentCache] Syllabi fetch failed:", err);
                 }

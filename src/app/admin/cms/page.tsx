@@ -13,22 +13,47 @@ import { Loader2, Save, Upload, ImagePlus, CheckCircle, X, Plus } from "lucide-r
 import { uploadImageFromUrl, uploadFile } from "@/lib/image-pipeline";
 import { useAuth } from "@/context/AuthContext";
 
+const CMS_CACHE_KEY = "spoorthy_cms_cache";
+const DEFAULT_CMS_DATA = {
+    hero: {
+        title: "Welcome to Spoorthy Concept School",
+        subtitle: "Nurturing Minds, Shaping Futures with Academic Excellence",
+        videoUrl: "",
+        tourVideoUrl: ""
+    },
+    leadership: {
+        chairman: { name: "Sri M. Venkat Reddy", title: "Chairman & Founder", photo: "" },
+        principal: { name: "Mrs. S. Anitha", title: "Principal", photo: "" }
+    },
+    facilities: {
+        digital_classrooms: { title: "Digital Classrooms", desc: "Interactive smart boards with immersive content.", order: 1, image: "", isPublished: true },
+        professional_teachers: { title: "Professional Teachers", desc: "Highly qualified faculty dedicated to student growth.", order: 2, image: "", isPublished: true },
+        spoken_english: { title: "Spoken English", desc: "Special emphasis on communication and confidence.", order: 3, image: "", isPublished: true }
+    },
+    why: [
+        "A holistic learning environment with modern pedagogy.",
+        "A robust sports curriculum focusing on physical fitness.",
+        "Individual attention given to every child.",
+        "Spacious science labs and library facilities."
+    ],
+    gallery: []
+};
+
 export default function CMSPage() {
     const { user } = useAuth();
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(false);
     const [isPublishing, setIsPublishing] = useState(false);
     const [isUploading, setIsUploading] = useState(false);
 
     // Data State
-    const [data, setData] = useState<any>({
-        hero: { title: "", subtitle: "", videoUrl: "" },
-        leadership: {
-            chairman: { name: "", title: "", photo: "" },
-            principal: { name: "", title: "", photo: "" }
-        },
-        facilities: {},
-        why: [], // Array of strings
-        gallery: [] // Array of strings
+    const [data, setData] = useState<any>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(CMS_CACHE_KEY);
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
+        return DEFAULT_CMS_DATA;
     });
 
     useEffect(() => {
@@ -38,22 +63,19 @@ export default function CMSPage() {
 
                 setData((prev: any) => {
                     // Check if anything has been modified locally
-                    // We compare current state with the incoming value
-                    // If we are already 'dirty' or 'uploading', skip the sync
                     if (isPublishing || isUploading) return prev;
 
-                    // If the local state is still the default/empty state, allow sync
-                    const isInitial = !prev.hero.title && !prev.hero.videoUrl && Object.keys(prev.facilities).length === 0;
-                    if (isInitial) {
-                        return {
-                            ...val,
-                            facilities: val.facilities || {},
-                            why: val.why || [],
-                            gallery: val.gallery ? (Array.isArray(val.gallery) ? val.gallery : Object.values(val.gallery)) : []
-                        };
-                    }
+                    const nextData = {
+                        ...val,
+                        facilities: val.facilities || {},
+                        why: val.why || [],
+                        gallery: val.gallery ? (Array.isArray(val.gallery) ? val.gallery : Object.values(val.gallery)) : []
+                    };
 
-                    return prev;
+                    if (typeof window !== 'undefined') {
+                        localStorage.setItem(CMS_CACHE_KEY, JSON.stringify(nextData));
+                    }
+                    return nextData;
                 });
             }
             setLoading(false);

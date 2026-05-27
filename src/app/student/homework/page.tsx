@@ -33,36 +33,31 @@ export default function StudentHomeworkPage() {
     // Format helper for classic diary date
     const formatDiaryDate = (dateStr: string) => {
         if (!dateStr) return "N / A";
-        const dateObj = new Date(dateStr);
+        const dateObj = new Date(dateStr.includes('-') ? dateStr.replace(/-/g, '/') : dateStr);
         if (isNaN(dateObj.getTime())) return dateStr;
         const dd = String(dateObj.getDate()).padStart(2, '0');
         const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
         const yy = String(dateObj.getFullYear()).slice(-2);
-        return `${dd} . ${mm} . ${yy}`;
+        return `${dd}-${mm}-${yy}`;
     };
 
     // Unique dates sorting
     const getUniqueHomeworkDates = () => {
         const dates = new Set<string>();
         homework.forEach(hw => {
-            if (hw.createdAt) {
-                const d = new Date(hw.createdAt.seconds * 1000).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit'
-                });
+            let d = hw.date;
+            if (!d && hw.createdAt) {
+                d = new Date(hw.createdAt.seconds * 1000).toLocaleDateString('en-CA');
+            }
+            if (d) {
                 dates.add(d);
             }
         });
-        return Array.from(dates).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
+        return Array.from(dates).sort((a, b) => new Date(b.replace(/-/g, '/')).getTime() - new Date(a.replace(/-/g, '/')).getTime());
     };
 
     const uniqueDates = getUniqueHomeworkDates();
-    const todayStr = new Date().toLocaleDateString('en-US', {
-        year: 'numeric',
-        month: '2-digit',
-        day: '2-digit'
-    });
+    const todayStr = new Date().toLocaleDateString('en-CA');
 
     useEffect(() => {
         if (uniqueDates.length > 0 && !selectedDate) {
@@ -95,15 +90,12 @@ export default function StudentHomeworkPage() {
     const getHomeworkForSelectedDate = () => {
         const map: Record<string, any> = {};
         homework.forEach(hw => {
-            if (hw.createdAt) {
-                const d = new Date(hw.createdAt.seconds * 1000).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit'
-                });
-                if (d === selectedDate) {
-                    map[hw.subjectId] = hw;
-                }
+            let d = hw.date;
+            if (!d && hw.createdAt) {
+                d = new Date(hw.createdAt.seconds * 1000).toLocaleDateString('en-CA');
+            }
+            if (d === selectedDate) {
+                map[hw.subjectId] = hw;
             }
         });
         return map;
@@ -212,7 +204,7 @@ export default function StudentHomeworkPage() {
                     <div className="flex items-center gap-2 bg-[#112240]/60 border border-white/10 px-4 py-2 rounded-xl shadow-lg">
                         <CalendarIcon className="w-4 h-4 text-amber-400" />
                         <span className="text-xs font-black text-white/90">
-                            {new Date(selectedDate || Date.now()).toLocaleDateString('en-US', { day: 'numeric', month: 'long', year: 'numeric' })}
+                            {formatDiaryDate(selectedDate || new Date().toISOString())}
                         </span>
                     </div>
                 </div>
@@ -367,7 +359,7 @@ export default function StudentHomeworkPage() {
                                                                         </div>
                                                                         {hw.dueDate && (
                                                                             <div className="text-[9px] font-black font-mono text-red-500 flex items-center uppercase tracking-wider select-none mt-1">
-                                                                                <Clock className="w-3.5 h-3.5 mr-1" /> Due Date: {hw.dueDate}
+                                                                                <Clock className="w-3.5 h-3.5 mr-1" /> Due Date: {formatDiaryDate(hw.dueDate)}
                                                                             </div>
                                                                         )}
                                                                     </div>
@@ -423,7 +415,7 @@ export default function StudentHomeworkPage() {
                     <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2.5 py-1 rounded-xl shadow-inner">
                         <CalendarIcon className="w-3 h-3 text-amber-400" />
                         <span className="text-[9px] font-bold text-white/90">
-                            {new Date(selectedDate || Date.now()).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
+                            {formatDiaryDate(selectedDate || new Date().toISOString())}
                         </span>
                     </div>
                 </div>
@@ -562,7 +554,7 @@ export default function StudentHomeworkPage() {
                                                                             </div>
                                                                             {hw.dueDate && (
                                                                                 <div className="text-[7.5px] font-bold font-mono text-red-500 flex items-center uppercase tracking-tighter mt-0.5">
-                                                                                    <Clock className="w-2 h-2 mr-0.5" /> Due: {hw.dueDate}
+                                                                                    <Clock className="w-2 h-2 mr-0.5" /> Due: {formatDiaryDate(hw.dueDate)}
                                                                                 </div>
                                                                             )}
                                                                         </div>

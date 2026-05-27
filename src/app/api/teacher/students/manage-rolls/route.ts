@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server';
-import { adminAuth, adminDb, Timestamp } from '@/lib/firebase-admin';
+import { adminAuth, adminDb, adminRtdb, Timestamp } from '@/lib/firebase-admin';
 
 export async function POST(request: Request) {
     try {
@@ -39,21 +39,16 @@ export async function POST(request: Request) {
                 const tProfile = teacherSnap.docs[0].data();
                 const tId = tProfile.schoolId || teacherSnap.docs[0].id;
 
-                // Checking both the dedicated collection AND config/master_data for redundancy
-                const key = `${classId}_${sectionId}`;
-                const csDoc = await adminDb.collection("master_class_sections").doc(key).get();
-                if (csDoc.exists && csDoc.data()?.classTeacherId === tId) {
-                    isAuthorized = true;
-                } else {
-                    const configSnap = await adminDb.collection("config").doc("master_data").get();
-                    if (configSnap.exists) {
-                        const classSections = configSnap.data()?.class_sections || {};
-                        Object.values(classSections).forEach((cs: any) => {
-                            if (cs.classId === classId && cs.sectionId === sectionId && cs.classTeacherId === tId && (cs.active || cs.isActive)) {
-                                isAuthorized = true;
-                            }
-                        });
-                    }
+                // Checking Realtime Database `master/classSections`
+                const rtdbSnap = await adminRtdb.ref('master/classSections').once('value');
+                if (rtdbSnap.exists()) {
+                    const classSections = rtdbSnap.val() || {};
+                    Object.values(classSections).forEach((cs: any) => {
+                        const isMatch = (tId && cs.classTeacherId === tId) || (teacherSnap.docs[0].id && cs.classTeacherId === teacherSnap.docs[0].id);
+                        if (cs.classId === classId && cs.sectionId === sectionId && isMatch && cs.isActive !== false) {
+                            isAuthorized = true;
+                        }
+                    });
                 }
             }
         }

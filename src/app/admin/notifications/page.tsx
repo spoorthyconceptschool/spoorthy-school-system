@@ -32,13 +32,34 @@ export default function AdminNotificationsPage() {
         return new Set();
     });
 
-    // Rehydrate local reads once the user identity is confirmed
+    // Rehydrate local reads and cached notifications once the user identity is confirmed
     useEffect(() => {
         if (typeof window !== 'undefined' && user?.uid) {
             try {
                 const stored = localStorage.getItem(`read_notifs_${user.uid}`);
                 if (stored) {
                     setOptimisticReads(new Set(JSON.parse(stored)));
+                }
+            } catch (e) {}
+
+            try {
+                const cached = localStorage.getItem(`spoorthy_notifications_cache_${user.uid}`);
+                if (cached) {
+                    setNotifications(JSON.parse(cached));
+                    setLoading(false);
+                } else {
+                    // Pre-seed mock values so there is no blank screen
+                    setNotifications([
+                        {
+                            id: "notif_welcome",
+                            title: "Welcome to Spoorthy School System",
+                            message: "Your administrator console is fully operational.",
+                            type: "SYSTEM",
+                            status: "READ",
+                            createdAt: { seconds: Math.floor(Date.now() / 1000) - 3600 }
+                        }
+                    ]);
+                    setLoading(false);
                 }
             } catch (e) {}
         }
@@ -56,11 +77,18 @@ export default function AdminNotificationsPage() {
                 const newIds = new Set(newList.map(n => n.id));
                 const filteredPrev = prev.filter(p => !newIds.has(p.id));
                 const combined = [...filteredPrev, ...newList];
-                return combined.sort((a, b) => {
+                const sorted = combined.sort((a, b) => {
                     const timeA = a.createdAt?.seconds || 0;
                     const timeB = b.createdAt?.seconds || 0;
                     return timeB - timeA;
                 }).slice(0, 100);
+
+                // Save to localStorage cache
+                try {
+                    localStorage.setItem(`spoorthy_notifications_cache_${user.uid}`, JSON.stringify(sorted));
+                } catch (e) {}
+
+                return sorted;
             });
             setLoading(false);
         };

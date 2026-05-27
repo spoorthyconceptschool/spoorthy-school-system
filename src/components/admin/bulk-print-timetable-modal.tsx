@@ -86,8 +86,8 @@ export function BulkPrintTimetableModal() {
                     
                     // Actually, let's use the IDs stored in the document if they exist, or the ones from the split
                     const data = docSnap.data();
-                    const classInfo = classesData[data.classId || id.split('_')[0]]; 
-                    const sectionInfo = sectionsData[data.sectionId || id.split('_')[1]];
+                    const classInfo = classesData[data.classId || cId]; 
+                    const sectionInfo = sectionsData[data.sectionId || sId];
                     printData.push({
                         className: classInfo?.name || "Unknown Class",
                         sectionName: sectionInfo?.name || "Unknown Section",

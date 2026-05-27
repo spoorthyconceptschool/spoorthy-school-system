@@ -10,7 +10,7 @@ export async function POST(req: Request) {
 
         // Body Parsings
         const body = await req.json();
-        const { name, mobile, age, address, salary, qualifications, subjects, classTeacherOf } = body;
+        const { name, mobile, age, address, salary, qualifications, subjects, classTeacherOf, classTeacherOfList, subjectAssignments } = body;
 
         if (!name || !mobile || mobile.length !== 10) {
             return NextResponse.json({ error: "Invalid Data: Name and 10-digit mobile required." }, { status: 400 });
@@ -62,7 +62,8 @@ export async function POST(req: Request) {
                 qualifications,
                 status: "ACTIVE",
                 subjects: subjects || [],
-                classTeacherOf: classTeacherOf || null,
+                classTeacherOf: classTeacherOf || (classTeacherOfList?.[0] || null),
+                classTeacherOfList: classTeacherOfList || (classTeacherOf ? [classTeacherOf] : []),
                 createdAt: Timestamp.now(),
                 recoveryPassword: mobile
             });
@@ -111,15 +112,33 @@ export async function POST(req: Request) {
         }));
 
         // 2. RTDB Sync
-        if (classTeacherOf?.classId && classTeacherOf?.sectionId) {
-            const { adminRtdb } = require("@/lib/firebase-admin");
-            const csKey = `${classTeacherOf.classId}_${classTeacherOf.sectionId}`;
-            backgroundTasks.push(adminRtdb.ref(`master/classSections/${csKey}`).update({
-                classId: classTeacherOf.classId,
-                sectionId: classTeacherOf.sectionId,
-                classTeacherId: result.teacherId,
-                active: true
-            }));
+        const { adminRtdb } = require("@/lib/firebase-admin");
+        
+        // Sync class teacher roles list
+        const activeClassTeacherList = classTeacherOfList || (classTeacherOf ? [classTeacherOf] : []);
+        activeClassTeacherList.forEach((ctRole: any) => {
+            if (ctRole?.classId && ctRole?.sectionId) {
+                const csKey = `${ctRole.classId}_${ctRole.sectionId}`;
+                backgroundTasks.push(adminRtdb.ref(`master/classSections/${csKey}`).update({
+                    classId: ctRole.classId,
+                    sectionId: ctRole.sectionId,
+                    classTeacherId: result.teacherId,
+                    classTeacherName: name,
+                    active: true
+                }));
+            }
+        });
+
+        // Sync subject assignments list
+        if (Array.isArray(subjectAssignments)) {
+            subjectAssignments.forEach((assign: any) => {
+                if (assign?.classId && assign?.sectionId && assign?.subId) {
+                    const csKey = `${assign.classId}_${assign.sectionId}`;
+                    backgroundTasks.push(adminRtdb.ref(`master/subjectTeachers/${csKey}`).update({
+                        [assign.subId]: result.teacherId
+                    }));
+                }
+            });
         }
 
         // 3. Notifications

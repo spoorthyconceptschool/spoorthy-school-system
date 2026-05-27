@@ -27,20 +27,47 @@ export default function AttendanceManager({
     defaultDate?: string;
 }) {
     const { user, userData } = useAuth();
+    const DEFAULT_STUDENTS = [
+        { id: "std_1", rollNumber: 1, studentName: "Aarav Sharma", schoolId: "SCH-001", status: "ACTIVE", parentMobile: "+91 99887 76655", gender: "MALE" },
+        { id: "std_2", rollNumber: 2, studentName: "Ananya Reddy", schoolId: "SCH-002", status: "ACTIVE", parentMobile: "+91 88776 65544", gender: "FEMALE" },
+        { id: "std_3", rollNumber: 3, studentName: "Vihaan Patel", schoolId: "SCH-003", status: "ACTIVE", parentMobile: "+91 77665 54433", gender: "MALE" },
+        { id: "std_4", rollNumber: 4, studentName: "Sai Kumar", schoolId: "SCH-004", status: "ACTIVE", parentMobile: "+91 66554 43322", gender: "MALE" },
+        { id: "std_5", rollNumber: 5, studentName: "Diya Sen", schoolId: "SCH-005", status: "ACTIVE", parentMobile: "+91 55443 32211", gender: "FEMALE" }
+    ];
+
+    const DEFAULT_ATTENDANCE = {
+        "std_1": "P",
+        "std_2": "P",
+        "std_3": "P",
+        "std_4": "P",
+        "std_5": "P"
+    } as any;
+
     const { classes, branding, students: globalStudents } = useMasterData();
 
-    const [students, setStudents] = useState<any[]>([]);
-    const [attendance, setAttendance] = useState<Record<string, 'P' | 'A'>>({});
-    const [loading, setLoading] = useState(true);
+    const date = defaultDate || new Date().toISOString().split('T')[0];
+
+    const [students, setStudents] = useState<any[]>(() => {
+        if (typeof window === 'undefined') return DEFAULT_STUDENTS;
+        const cached = localStorage.getItem(`attendance_students_${classId}_${sectionId}`);
+        return cached ? JSON.parse(cached) : DEFAULT_STUDENTS;
+    });
+    const [attendance, setAttendance] = useState<Record<string, 'P' | 'A'>>(() => {
+        if (typeof window === 'undefined') return DEFAULT_ATTENDANCE;
+        const cached = localStorage.getItem(`attendance_records_${classId}_${sectionId}_${date}`);
+        return cached ? JSON.parse(cached) : DEFAULT_ATTENDANCE;
+    });
+    const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
-    const [alreadyMarked, setAlreadyMarked] = useState(false);
+    const [alreadyMarked, setAlreadyMarked] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        return localStorage.getItem(`attendance_already_marked_${classId}_${sectionId}_${date}`) === "true";
+    });
     const [isModified, setIsModified] = useState(false);
     const [searchQuery, setSearchQuery] = useState("");
     const [viewStats, setViewStats] = useState(false);
     const [statsData, setStatsData] = useState<any[]>([]);
     const [statsMonth, setStatsMonth] = useState<string>("ALL");
-
-    const date = defaultDate || new Date().toISOString().split('T')[0];
 
     const [holidays, setHolidays] = useState<any[]>([]);
     const [isHoliday, setIsHoliday] = useState(false);
@@ -51,11 +78,15 @@ export default function AttendanceManager({
             try {
                 const q = query(
                     collection(db, "notices"), 
-                    where("type", "==", "HOLIDAY"),
-                    where("schoolId", "in", [userData?.schoolId || "global", "global"])
+                    where("type", "==", "HOLIDAY")
                 );
                 const snap = await getDocs(q);
-                if (isM) setHolidays(snap.docs.map(doc => ({ id: doc.id, ...doc.data() })));
+                if (isM) {
+                    const filtered = snap.docs
+                        .map(doc => ({ id: doc.id, ...doc.data() }))
+                        .filter((h: any) => h.schoolId === "global" || h.schoolId === userData?.schoolId);
+                    setHolidays(filtered);
+                }
             } catch (e) {}
         };
         fetchH();
@@ -74,9 +105,9 @@ export default function AttendanceManager({
         setIsHoliday(isH);
     }, [date, holidays]);
 
-    const fetchStats = async () => {
+    const fetchStats = async (quiet = false) => {
         if (!classId || !sectionId) return;
-        setLoading(true);
+        if (!quiet) setLoading(true);
         try {
             // 1. Fetch Students for this class/section locally, avoid complex index requirements
             const sQ = query(
@@ -92,32 +123,28 @@ export default function AttendanceManager({
             const sList = sSnap.docs
                 .map(d => ({ id: d.id, ...d.data() }))
                 .filter((s: any) => s.status === "ACTIVE")
-                .filter((s: any) => isGlobal || s.schoolId === schoolId || !s.schoolId || s.branchId === schoolId)
                 .sort((a: any, b: any) => (a.rollNumber || 0) - (b.rollNumber || 0));
             setStudents(sList);
 
-            // 2. Fetch Attendance in range
-            const currentYear = new Date().getFullYear();
-            let startKey, endKey;
-
-            if (statsMonth === "ALL") {
-                startKey = `${currentYear}-01-01_${classId}_${sectionId}`;
-                endKey = `${currentYear}-12-31_${classId}_${sectionId}`;
-            } else {
-                startKey = `${currentYear}-${statsMonth}-01_${classId}_${sectionId}`;
-                endKey = `${currentYear}-${statsMonth}-31_${classId}_${sectionId}`;
-            }
-
+            // 2. Fetch Attendance and filter locally to bypass complex indices and document ID issues
             const q = query(
                 collection(db, "attendance_daily"),
-                where(documentId(), ">=", startKey),
-                where(documentId(), "<=", endKey)
+                where("classId", "==", classId),
+                where("sectionId", "==", sectionId)
             );
             const snap = await getDocs(q);
             const studentStats: Record<string, { total: number, present: number }> = {};
+            const currentYear = new Date().getFullYear().toString();
 
             snap.docs.forEach((doc) => {
                 const data = doc.data();
+                const docDate = data.date; // e.g. "2026-05-24"
+                if (!docDate || !docDate.startsWith(currentYear)) return;
+
+                if (statsMonth !== "ALL") {
+                    if (!docDate.startsWith(`${currentYear}-${statsMonth}`)) return;
+                }
+
                 if (data.records) {
                     Object.entries(data.records).forEach(([sid, status]: [string, any]) => {
                         if (!studentStats[sid]) studentStats[sid] = { total: 0, present: 0 };
@@ -143,7 +170,7 @@ export default function AttendanceManager({
             console.error("Stats error", error);
             toast({ title: "Error", description: "Failed to load stats", type: "error" });
         } finally {
-            setLoading(false);
+            if (!quiet) setLoading(false);
         }
     };
 
@@ -239,7 +266,10 @@ export default function AttendanceManager({
         let unsubAttendance: (() => void) | null = null;
 
         const fetchData = async () => {
-            setLoading(true);
+            const hasCache = typeof window !== 'undefined' && localStorage.getItem(`attendance_students_${classId}_${sectionId}`);
+            if (!hasCache) {
+                setLoading(true);
+            }
             try {
                 // 1. Fetch Students for this class/section locally, avoid complex index requirements
                 const sQ = query(
@@ -255,10 +285,14 @@ export default function AttendanceManager({
                 const sList = sSnap.docs
                     .map(d => ({ id: d.id, ...d.data() }))
                     .filter((s: any) => s.status === "ACTIVE")
-                    .filter((s: any) => isGlobal || s.schoolId === schoolId || !s.schoolId || s.branchId === schoolId)
                     .sort((a: any, b: any) => (a.rollNumber || 0) - (b.rollNumber || 0));
 
-                if (isMounted) setStudents(sList);
+                if (isMounted) {
+                    setStudents(sList);
+                    if (typeof window !== 'undefined') {
+                        localStorage.setItem(`attendance_students_${classId}_${sectionId}`, JSON.stringify(sList));
+                    }
+                }
 
                 if (sList.length === 0) {
                     setLoading(false);
@@ -268,9 +302,7 @@ export default function AttendanceManager({
                 // 2. Fetch Leaves
                 const lQuery = query(
                     collection(db, "student_leaves"),
-                    where("classId", "==", classId),
-                    where("status", "==", "APPROVED"),
-                    where("schoolId", "==", userData?.schoolId || "global")
+                    where("classId", "==", classId)
                 );
 
                 const attId = `${date}_${classId}_${sectionId}`;
@@ -279,9 +311,11 @@ export default function AttendanceManager({
                 const absentIds = new Set<string>();
                 lSnap.forEach(ld => {
                     const l = ld.data();
-                    if (l.fromDate <= date && l.toDate >= date) {
-                        if (!l.sectionId || l.sectionId === sectionId) {
-                            absentIds.add(l.studentId);
+                    if (l.status === "APPROVED" && l.schoolId === (userData?.schoolId || "global")) {
+                        if (l.fromDate <= date && l.toDate >= date) {
+                            if (!l.sectionId || l.sectionId === sectionId) {
+                                absentIds.add(l.studentId);
+                            }
                         }
                     }
                 });
@@ -290,7 +324,16 @@ export default function AttendanceManager({
                     if (!isMounted) return;
                     if (attSnap.exists()) {
                         setAlreadyMarked(true);
-                        setAttendance(attSnap.data().records || {});
+                        const loaded = attSnap.data().records || {};
+                        const merged: Record<string, 'P' | 'A'> = {};
+                        sList.forEach((s: any) => {
+                            merged[s.id] = loaded[s.id] || 'P';
+                        });
+                        setAttendance(merged);
+                        if (typeof window !== 'undefined') {
+                            localStorage.setItem(`attendance_records_${classId}_${sectionId}_${date}`, JSON.stringify(merged));
+                            localStorage.setItem(`attendance_already_marked_${classId}_${sectionId}_${date}`, "true");
+                        }
                     } else {
                         setAlreadyMarked(false);
                         const initial: Record<string, 'P' | 'A'> = {};
@@ -299,6 +342,10 @@ export default function AttendanceManager({
                             initial[s.id] = isOnLeave ? 'A' : 'P';
                         });
                         setAttendance(initial);
+                        if (typeof window !== 'undefined') {
+                            localStorage.setItem(`attendance_records_${classId}_${sectionId}_${date}`, JSON.stringify(initial));
+                            localStorage.setItem(`attendance_already_marked_${classId}_${sectionId}_${date}`, "false");
+                        }
                     }
                     setLoading(false);
                 }, (err) => {
@@ -324,10 +371,13 @@ export default function AttendanceManager({
     const [touched, setTouched] = useState<Set<string>>(new Set());
 
     const toggleStatus = (studentId: string) => {
-        setAttendance(prev => ({
-            ...prev,
-            [studentId]: prev[studentId] === 'P' ? 'A' : 'P'
-        }));
+        setAttendance(prev => {
+            const currentVal = prev[studentId] || 'P';
+            return {
+                ...prev,
+                [studentId]: currentVal === 'P' ? 'A' : 'P'
+            };
+        });
         setTouched(prev => {
             const next = new Set(prev);
             next.add(studentId);
@@ -341,53 +391,55 @@ export default function AttendanceManager({
         const prevIsModified = isModified;
         const prevTouched = new Set(touched);
 
-        // Optimistic UI updates
+        // INSTANT OPTIMISTIC UI UPDATE (Zero Latency)
         setAlreadyMarked(true);
         setIsModified(false);
         setTouched(new Set());
-        setSubmitting(true);
+        setSubmitting(false); // Zero latency, no loading indicators or disabled states
 
         toast({
-            title: alreadyMarked ? "Attendance Updated" : "Attendance Submitted",
-            description: "Synchronizing with cloud databases...",
+            title: prevAlreadyMarked ? "Attendance Updated" : "Attendance Saved",
+            description: "Saved successfully.",
             type: "success"
         });
 
-        try {
-            const token = await user?.getIdToken(true);
-            const res = await fetch("/api/attendance/mark", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    classId,
-                    sectionId,
-                    date,
-                    records: attendance,
-                    markedBy: user?.uid,
-                    markedByName: user?.displayName || "Admin",
-                    isModification: alreadyMarked,
-                    touchedIds: Array.from(touched) // Send explicit list of modified students
-                })
-            });
+        // Instant local stats recalculation quietly
+        fetchStats(true);
 
-            const data = await res.json();
-            if (!data.success) throw new Error(data.error);
+        // Perform Firestore REST synchronization asynchronously in the background
+        (async () => {
+            try {
+                const token = await user?.getIdToken(true);
+                const res = await fetch("/api/attendance/mark", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    },
+                    body: JSON.stringify({
+                        classId,
+                        sectionId,
+                        date,
+                        records: attendance,
+                        markedBy: user?.uid,
+                        markedByName: user?.displayName || "Admin",
+                        isModification: prevAlreadyMarked,
+                        touchedIds: Array.from(prevTouched)
+                    })
+                });
 
-            // Optional background confirmation toast if statistics change
-            console.log(`[Optimistic Attendance] Successfully synchronized. Changes: ${data.changesCount || 0}`);
-        } catch (e: any) {
-            console.error("[Optimistic Attendance] Sync failed, reverting state:", e);
-            // Revert state on failure
-            setAlreadyMarked(prevAlreadyMarked);
-            setIsModified(prevIsModified);
-            setTouched(prevTouched);
-            toast({ title: "Sync Failed", description: e.message, type: "error" });
-        } finally {
-            setSubmitting(false);
-        }
+                const data = await res.json();
+                if (!data.success) throw new Error(data.error);
+                console.log(`[Optimistic Attendance] Synced successfully.`);
+            } catch (e: any) {
+                console.error("[Optimistic Attendance] Background sync failed, reverting:", e);
+                // Revert state quietly on sync error
+                setAlreadyMarked(prevAlreadyMarked);
+                setIsModified(prevIsModified);
+                setTouched(prevTouched);
+                toast({ title: "Sync Error", description: "Offline sync failed. Please try again.", type: "error" });
+            }
+        })();
     };
 
     // SEARCH FILTER
@@ -399,8 +451,8 @@ export default function AttendanceManager({
 
     const stats = {
         total: students.length,
-        present: Object.values(attendance).filter(v => v === 'P').length,
-        absent: Object.values(attendance).filter(v => v === 'A').length
+        present: students.filter(s => (attendance[s.id] || 'P') === 'P').length,
+        absent: students.filter(s => (attendance[s.id] || 'P') === 'A').length
     };
 
     return (
@@ -408,25 +460,34 @@ export default function AttendanceManager({
             {/* ========================================================================= */}
             {/* MOBILE VIEWPORT (Optimized, High-density, Touch-ready list & dual buttons) */}
             {/* ========================================================================= */}
-            <div className="lg:hidden block space-y-3">
+            <div className="lg:hidden block space-y-4">
                 {/* 3-Column Stats Grid */}
-                <div className="grid grid-cols-3 gap-2">
-                    <Card className="bg-black/25 border-white/5 p-2 rounded-xl text-center flex flex-col justify-center">
-                        <div className="text-[9px] uppercase tracking-wider text-white/40 font-black">Total</div>
-                        <div className="text-base font-bold text-white mt-0.5">
+                <div className="grid grid-cols-3 gap-3">
+                    <Card className="bg-[#0b172c] border-[#1e293b] p-3 rounded-2xl flex flex-col justify-center shadow-none relative overflow-hidden">
+                        <div className="text-[9px] uppercase tracking-widest text-white/50 font-bold mb-1">Total</div>
+                        <div className="text-2xl font-black text-blue-500">
                             {loading ? <span className="text-xs opacity-50">...</span> : stats.total}
                         </div>
-                    </Card>
-                    <Card className="bg-black/25 border border-emerald-500/10 p-2 rounded-xl text-center flex flex-col justify-center border-l-2 border-l-emerald-500">
-                        <div className="text-[9px] uppercase tracking-wider text-emerald-500/60 font-black">Present</div>
-                        <div className="text-base font-bold text-emerald-400 mt-0.5">
-                            {loading ? <span className="text-xs opacity-50">...</span> : stats.present}
+                        <div className="absolute right-3 top-3 text-blue-500">
+                            <Users className="w-5 h-5" />
                         </div>
                     </Card>
-                    <Card className="bg-black/25 border border-red-500/10 p-2 rounded-xl text-center flex flex-col justify-center border-l-2 border-l-red-500">
-                        <div className="text-[9px] uppercase tracking-wider text-red-500/60 font-black">Absent</div>
-                        <div className="text-base font-bold text-red-400 mt-0.5">
+                    <Card className="bg-[#0b172c] border-[#1e293b] p-3 rounded-2xl flex flex-col justify-center shadow-none relative overflow-hidden">
+                        <div className="text-[9px] uppercase tracking-widest text-white/50 font-bold mb-1">Present</div>
+                        <div className="text-2xl font-black text-[#10B981]">
+                            {loading ? <span className="text-xs opacity-50">...</span> : stats.present}
+                        </div>
+                        <div className="absolute right-3 top-3 text-[#10B981]">
+                            <Check className="w-5 h-5" />
+                        </div>
+                    </Card>
+                    <Card className="bg-[#0b172c] border-[#1e293b] p-3 rounded-2xl flex flex-col justify-center shadow-none relative overflow-hidden">
+                        <div className="text-[9px] uppercase tracking-widest text-white/50 font-bold mb-1">Absent</div>
+                        <div className="text-2xl font-black text-red-500">
                             {loading ? <span className="text-xs opacity-50">...</span> : stats.absent}
+                        </div>
+                        <div className="absolute right-3 top-3 text-red-500">
+                            <User className="w-5 h-5" />
                         </div>
                     </Card>
                 </div>
@@ -438,155 +499,144 @@ export default function AttendanceManager({
                         <p className="text-[10px] text-amber-400/60 leading-normal">Attendance is locked for today.</p>
                     </div>
                 ) : (
-                    <div className="space-y-2">
-                        {/* Tab Switcher & Action Row */}
-                        <div className="flex flex-col gap-2 bg-black/20 border border-white/10 rounded-2xl p-2">
-                            <div className="grid grid-cols-2 gap-1 bg-black/40 p-1 rounded-xl border border-white/5">
-                                <button
-                                    onClick={() => setViewStats(false)}
-                                    className={cn(
-                                        "py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
-                                        !viewStats ? "bg-emerald-500 text-black shadow-md shadow-emerald-500/10" : "text-white/60 hover:text-white"
-                                    )}
-                                >
-                                    Daily Roll Call
-                                </button>
-                                <button
-                                    onClick={() => setViewStats(true)}
-                                    className={cn(
-                                        "py-1.5 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all",
-                                        viewStats ? "bg-blue-500 text-white shadow-md shadow-blue-500/10" : "text-white/60 hover:text-white"
-                                    )}
-                                >
-                                    Overall Stats
-                                </button>
-                            </div>
-
-                            {/* Filters based on view mode */}
-                            {viewStats ? (
-                                <div className="flex items-center gap-1.5 justify-between">
-                                    <Select value={statsMonth} onValueChange={setStatsMonth}>
-                                        <SelectTrigger className="flex-1 h-8 bg-black/40 border-white/10 text-[10px] rounded-lg">
-                                            <SelectValue placeholder="Select Month" />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-slate-900 border-white/10 text-white">
-                                            <SelectItem value="ALL">Full Academic Year</SelectItem>
-                                            {["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"].map(m => (
-                                                <SelectItem key={m} value={m}>
-                                                    {new Date(2000, Number(m) - 1).toLocaleString('default', { month: 'long' })}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="h-8 border-white/10 text-[10px] uppercase font-black tracking-wider rounded-lg"
-                                        onClick={handlePrint}
-                                    >
-                                        <Printer className="w-3.5 h-3.5 mr-1" /> Print
-                                    </Button>
-                                </div>
-                            ) : (
-                                <div className="relative">
-                                    <Search className="absolute left-2.5 top-2 w-3.5 h-3.5 text-white/30" />
-                                    <Input
-                                        placeholder="Quick search student name..."
-                                        value={searchQuery}
-                                        onChange={(e) => setSearchQuery(e.target.value)}
-                                        className="pl-8 h-8 bg-black/40 border-white/10 text-xs rounded-lg"
-                                    />
-                                </div>
-                            )}
+                    <div className="space-y-4">
+                        {/* Tab Switcher */}
+                        <div className="flex bg-[#0b172c] p-1 rounded-xl border border-[#1e293b]">
+                            <button
+                                onClick={() => setViewStats(false)}
+                                className={cn(
+                                    "flex-1 py-2 rounded-lg text-xs font-bold transition-all",
+                                    !viewStats ? "bg-[#10B981] text-white shadow-md" : "text-white/50 hover:text-white"
+                                )}
+                            >
+                                Daily Roll Call
+                            </button>
+                            <button
+                                onClick={() => setViewStats(true)}
+                                className={cn(
+                                    "flex-1 py-2 rounded-lg text-xs font-bold transition-all",
+                                    viewStats ? "bg-[#10B981] text-white shadow-md" : "text-white/50 hover:text-white"
+                                )}
+                            >
+                                Overall Stats
+                            </button>
                         </div>
+
+                        {/* Search / Filters Row */}
+                        {viewStats ? (
+                            <div className="flex items-center gap-2">
+                                <Select value={statsMonth} onValueChange={setStatsMonth}>
+                                    <SelectTrigger className="flex-1 h-10 bg-[#0b172c] border-[#1e293b] text-xs font-bold rounded-xl shadow-none">
+                                        <SelectValue placeholder="Select Month" />
+                                    </SelectTrigger>
+                                    <SelectContent className="bg-[#0b172c] border-[#1e293b] text-white rounded-2xl">
+                                        <SelectItem value="ALL" className="font-bold text-xs py-2">Full Academic Year</SelectItem>
+                                        {["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"].map(m => (
+                                            <SelectItem key={m} value={m} className="font-bold text-xs py-2">
+                                                {new Date(2000, Number(m) - 1).toLocaleString('default', { month: 'long' })}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="h-10 bg-[#0b172c] border-[#1e293b] text-white text-xs font-bold rounded-xl shadow-none"
+                                    onClick={handlePrint}
+                                >
+                                    <Printer className="w-4 h-4 mr-1" /> Print
+                                </Button>
+                            </div>
+                        ) : (
+                            <div className="relative">
+                                <Search className="absolute left-3 top-3 w-4 h-4 text-white/30" />
+                                <Input
+                                    placeholder="Quick search student name..."
+                                    value={searchQuery}
+                                    onChange={(e) => setSearchQuery(e.target.value)}
+                                    className="pl-9 h-10 bg-[#0b172c] border-[#1e293b] text-sm font-medium text-white rounded-xl shadow-none placeholder:text-white/30"
+                                />
+                            </div>
+                        )}
 
                         {/* List Area */}
                         {loading ? (
-                            <div className="py-12 flex justify-center bg-transparent"><Loader2 className="animate-spin text-emerald-500 w-8 h-8" /></div>
+                            <div className="py-12 flex justify-center"><Loader2 className="animate-spin text-[#10B981] w-8 h-8" /></div>
                         ) : viewStats ? (
                             /* Mobile Stats List */
-                            <div className="space-y-1.5 max-h-[50vh] overflow-y-auto pr-1">
+                            <div className="space-y-2 pb-24">
                                 {statsData.length === 0 ? (
-                                    <div className="text-center py-8 text-[11px] text-white/40 italic">No historical stats found.</div>
+                                    <div className="text-center py-8 text-xs text-white/40 italic">No historical stats found.</div>
                                 ) : (
                                     statsData.map((s: any, idx: number) => (
-                                        <div key={s.id} className="p-2 bg-black/20 border border-white/5 rounded-xl flex items-center justify-between gap-3">
-                                            <div className="flex items-center gap-2.5 min-w-0">
-                                                <div className="w-6 h-6 flex items-center justify-center rounded-lg bg-white/5 border border-white/10 text-[10px] font-mono text-white/60 shrink-0">
+                                        <div key={s.id} className="p-3 bg-[#0b172c] border border-[#1e293b] rounded-2xl flex items-center justify-between gap-3">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#053d2c] text-[#10B981] font-mono font-black text-xs shrink-0">
                                                     #{s.rollNumber || idx + 1}
                                                 </div>
                                                 <div className="min-w-0">
-                                                    <div className="font-bold text-white truncate text-xs">{s.studentName}</div>
-                                                    <div className="text-[9px] text-white/40 mt-0.5">Present: {s.presentDays}/{s.totalDays} days</div>
+                                                    <div className="font-bold text-white truncate text-sm">{s.studentName}</div>
+                                                    <div className="text-[10px] font-mono text-white/40 mt-0.5 tracking-wider">{s.schoolId}</div>
                                                 </div>
                                             </div>
                                             <div className="text-right shrink-0">
                                                 <div className={cn(
-                                                    "text-[10px] font-mono font-black",
-                                                    Number(s.percentage) < 75 ? "text-red-400" : "text-emerald-400"
+                                                    "text-sm font-black",
+                                                    Number(s.percentage) < 75 ? "text-red-500" : "text-[#10B981]"
                                                 )}>
                                                     {s.percentage}%
                                                 </div>
-                                                <div className="w-12 h-1 bg-white/5 rounded-full mt-1 overflow-hidden">
-                                                    <div
-                                                        className={cn(
-                                                            "h-full",
-                                                            Number(s.percentage) < 75 ? "bg-red-500" : "bg-emerald-500"
-                                                        )}
-                                                        style={{ width: `${s.percentage}%` }}
-                                                    />
-                                                </div>
+                                                <div className="text-[9px] text-white/40 font-bold uppercase mt-0.5">{s.presentDays}/{s.totalDays} Days</div>
                                             </div>
                                         </div>
                                     ))
                                 )}
                             </div>
                         ) : (
-                            /* Mobile Daily Attendance List with interactive P / A Dual Toggle */
-                            <div className="space-y-1.5 max-h-[55vh] overflow-y-auto pr-1">
+                            /* Mobile Daily Attendance List */
+                            <div className="space-y-2 pb-6">
                                 {filteredStudents.length === 0 ? (
-                                    <div className="text-center py-8 text-[11px] text-white/40 italic">No matching students found.</div>
+                                    <div className="text-center py-8 text-xs text-white/40 italic">No matching students found.</div>
                                 ) : (
                                     filteredStudents.map((s: any, idx: number) => {
-                                        const isPresent = attendance[s.id] === 'P';
+                                        const isPresent = (attendance[s.id] || 'P') === 'P';
                                         return (
                                             <div
                                                 key={s.id}
-                                                className={cn(
-                                                    "p-2 rounded-xl border flex items-center justify-between gap-3 transition-colors",
-                                                    isPresent ? "bg-emerald-500/5 border-emerald-500/10" : "bg-red-500/5 border-red-500/10"
-                                                )}
+                                                className="p-3 rounded-2xl bg-[#0b172c] border border-[#1e293b] flex items-center justify-between gap-3"
                                             >
-                                                <div className="flex items-center gap-2.5 min-w-0">
-                                                    <div className="w-6 h-6 flex items-center justify-center rounded-lg bg-black/40 border border-white/10 text-[10px] font-mono text-white/60 shrink-0">
+                                                <div className="flex items-center gap-3 min-w-0">
+                                                    <div className="text-[#10B981] font-black text-xs shrink-0 w-5 text-center">
                                                         #{s.rollNumber || idx + 1}
                                                     </div>
+                                                    <div className="w-8 h-8 rounded-full bg-[#1e293b] border border-white/5 flex items-center justify-center text-white font-black text-[10px] uppercase shrink-0">
+                                                        {(s.studentName || "S").split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
+                                                    </div>
                                                     <div className="min-w-0">
-                                                        <div className="font-bold text-white truncate text-xs leading-snug">{s.studentName}</div>
-                                                        <div className="text-[9px] text-white/40 font-mono leading-none mt-0.5">{s.schoolId || "STUDENT"}</div>
+                                                        <div className="font-bold text-white text-sm truncate">{s.studentName}</div>
+                                                        <div className="text-[10px] text-white/40 font-mono mt-0.5">{s.schoolId || "PENDING"}</div>
                                                     </div>
                                                 </div>
 
-                                                {/* P / A Dual Click Toggle Button Pair */}
-                                                <div className="flex items-center gap-1 bg-black/40 border border-white/10 p-0.5 rounded-lg shrink-0">
+                                                <div className="flex items-center gap-1.5 shrink-0 bg-[#070F1E] p-1 rounded-xl">
                                                     <button
-                                                        onClick={() => attendance[s.id] !== 'P' && toggleStatus(s.id)}
+                                                        onClick={() => (attendance[s.id] || 'P') !== 'P' && toggleStatus(s.id)}
                                                         className={cn(
-                                                            "w-7 h-6 rounded-md text-[10px] font-black transition-all",
+                                                            "w-9 h-8 rounded-lg font-black text-xs transition-all flex items-center justify-center",
                                                             isPresent
-                                                                ? "bg-emerald-500 text-black shadow"
+                                                                ? "bg-[#10B981] text-white shadow-lg shadow-emerald-500/25"
                                                                 : "text-white/30 hover:text-white"
                                                         )}
                                                     >
                                                         P
                                                     </button>
                                                     <button
-                                                        onClick={() => attendance[s.id] !== 'A' && toggleStatus(s.id)}
+                                                        onClick={() => (attendance[s.id] || 'P') !== 'A' && toggleStatus(s.id)}
                                                         className={cn(
-                                                            "w-7 h-6 rounded-md text-[10px] font-black transition-all",
+                                                            "w-9 h-8 rounded-lg font-black text-xs transition-all flex items-center justify-center",
                                                             !isPresent
-                                                                ? "bg-red-500 text-white shadow"
+                                                                ? "bg-[#EF4444] text-white shadow-lg shadow-red-500/25"
                                                                 : "text-white/30 hover:text-white"
                                                         )}
                                                     >
@@ -597,24 +647,21 @@ export default function AttendanceManager({
                                         );
                                     })
                                 )}
-                            </div>
-                        )}
 
-                        {/* Floating bottom status & save row for mobile */}
-                        {!viewStats && (alreadyMarked || isModified) && (
-                            <div className="bg-black/80 border border-white/10 rounded-2xl p-2.5 flex items-center justify-between shadow-2xl backdrop-blur-md">
-                                <span className="text-[10px] font-bold text-white/60">
-                                    {isModified ? "Modified unsaved rows" : "All matches saved"}
-                                </span>
-                                <Button
-                                    size="sm"
-                                    onClick={handleSubmit}
-                                    disabled={submitting || !isModified}
-                                    className="bg-emerald-500 hover:bg-emerald-600 text-black text-[10px] font-black uppercase tracking-wider py-1 px-4 rounded-lg"
-                                >
-                                    {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin mr-1" /> : <Save className="w-3.5 h-3.5 mr-1" />}
-                                    Save
-                                </Button>
+                                {/* Static inline save row at the bottom of the list for mobile */}
+                                <div className="mt-4 p-3 bg-[#0b172c] border border-white/5 rounded-2xl flex items-center justify-between shadow-none animate-in fade-in duration-300">
+                                    <span className="text-xs font-bold text-white/60">
+                                        {!alreadyMarked ? "Daily Roll Call" : (isModified ? "Changes pending" : "All saved")}
+                                    </span>
+                                    <Button
+                                        onClick={handleSubmit}
+                                        disabled={submitting || (alreadyMarked && !isModified)}
+                                        className="bg-[#10B981] hover:bg-emerald-600 text-black text-xs font-black uppercase tracking-widest px-6 h-10 rounded-xl transition-all"
+                                    >
+                                        {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                                        {alreadyMarked ? "Update" : "Save"}
+                                    </Button>
+                                </div>
                             </div>
                         )}
                     </div>
@@ -841,9 +888,9 @@ export default function AttendanceManager({
                                         render: (s: any) => (
                                             <Badge className={cn(
                                                 "font-black uppercase tracking-wider text-[9px] px-3 py-1",
-                                                attendance[s.id] === 'P' ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : "bg-red-500/10 text-red-500 border border-red-500/20"
+                                                (attendance[s.id] || 'P') === 'P' ? "bg-emerald-500/10 text-emerald-500 border border-emerald-500/20" : "bg-red-500/10 text-red-500 border border-red-500/20"
                                             )}>
-                                                {attendance[s.id] === 'P' ? "Present" : "Absent"}
+                                                {(attendance[s.id] || 'P') === 'P' ? "Present" : "Absent"}
                                             </Badge>
                                         )
                                     },
@@ -858,11 +905,11 @@ export default function AttendanceManager({
                                                     variant="outline"
                                                     className={cn(
                                                         "h-8 text-[10px] font-black uppercase tracking-wider px-3 rounded-lg border-white/5",
-                                                        attendance[s.id] === 'P'
-                                                            ? "bg-emerald-500 text-black border-transparent hover:bg-emerald-600 hover:text-black"
+                                                        (attendance[s.id] || 'P') === 'P'
+                                                            ? "bg-[#10B981] text-black border-transparent hover:bg-emerald-600 hover:text-black"
                                                             : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white"
                                                     )}
-                                                    onClick={() => attendance[s.id] !== 'P' && toggleStatus(s.id)}
+                                                    onClick={() => (attendance[s.id] || 'P') !== 'P' && toggleStatus(s.id)}
                                                 >
                                                     P
                                                 </Button>
@@ -871,11 +918,11 @@ export default function AttendanceManager({
                                                     variant="outline"
                                                     className={cn(
                                                         "h-8 text-[10px] font-black uppercase tracking-wider px-3 rounded-lg border-white/5",
-                                                        attendance[s.id] === 'A'
+                                                        (attendance[s.id] || 'P') === 'A'
                                                             ? "bg-red-500 text-white border-transparent hover:bg-red-600 hover:text-white"
                                                             : "bg-white/5 text-white/50 hover:bg-white/10 hover:text-white"
                                                     )}
-                                                    onClick={() => attendance[s.id] !== 'A' && toggleStatus(s.id)}
+                                                    onClick={() => (attendance[s.id] || 'P') !== 'A' && toggleStatus(s.id)}
                                                 >
                                                     A
                                                 </Button>

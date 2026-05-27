@@ -94,7 +94,7 @@ export default function StudentLeavesPage() {
         { name: "Personal Leave", typeKey: "PERSONAL", days: 5, totalDays: 5, icon: User, color: "text-blue-400 bg-blue-500/10 border-blue-500/20", barColor: "bg-blue-500" },
     ];
 
-    if (loading) {
+    if (loading && leaves.length === 0) {
         return (
             <div className="flex h-[50vh] items-center justify-center">
                 <Loader2 className="w-8 h-8 animate-spin text-blue-500" />

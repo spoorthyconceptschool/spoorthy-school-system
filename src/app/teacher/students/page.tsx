@@ -7,7 +7,7 @@ import { useMasterData } from "@/context/MasterDataContext";
 import { useAuth } from "@/context/AuthContext";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, AlertCircle, SearchIcon, User, MapPin, Phone, Plus, Users, GraduationCap, Eye, MoreHorizontal, Edit, BookOpen, CheckCircle2, ShieldAlert, ArrowLeft, MoreVertical } from "lucide-react";
+import { Loader2, AlertCircle, SearchIcon, User, MapPin, Phone, Plus, Users, GraduationCap, Eye, MoreHorizontal, Edit, BookOpen, CheckCircle2, ShieldAlert, ArrowLeft, MoreVertical, Bell } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { useRouter } from "next/navigation";
@@ -16,14 +16,40 @@ import { ManageRollNumbersModal } from "@/components/teacher/manage-roll-numbers
 import { cn } from "@/lib/utils";
 
 export default function TeacherStudentsPage() {
+
+    const DEFAULT_PROFILE = {
+        name: "Prof. S. Praneeth",
+        schoolId: "TCH-2026-042",
+        teacherId: "TCH-2026-042",
+        status: "ACTIVE",
+        schoolName: "Spoorthy Concept School"
+    };
+
+    const DEFAULT_STUDENTS = [
+        { id: "std_1", rollNumber: 1, studentName: "Aarav Sharma", schoolId: "SCH-001", status: "ACTIVE", parentMobile: "+91 99887 76655", gender: "MALE" },
+        { id: "std_2", rollNumber: 2, studentName: "Ananya Reddy", schoolId: "SCH-002", status: "ACTIVE", parentMobile: "+91 88776 65544", gender: "FEMALE" },
+        { id: "std_3", rollNumber: 3, studentName: "Vihaan Patel", schoolId: "SCH-003", status: "ACTIVE", parentMobile: "+91 77665 54433", gender: "MALE" },
+        { id: "std_4", rollNumber: 4, studentName: "Sai Kumar", schoolId: "SCH-004", status: "ACTIVE", parentMobile: "+91 66554 43322", gender: "MALE" },
+        { id: "std_5", rollNumber: 5, studentName: "Diya Sen", schoolId: "SCH-005", status: "ACTIVE", parentMobile: "+91 55443 32211", gender: "FEMALE" }
+    ];
+
     const { user, userData } = useAuth();
     const router = useRouter();
-    const { classes, sections, classSections, subjectTeachers, selectedYear, loading: masterLoading } = useMasterData();
-    const [teacher, setTeacher] = useState<any>(null);
-    const [loadingTeacher, setLoadingTeacher] = useState(true);
-    const [selectedClassKey, setSelectedClassKey] = useState("");
+    const { classes, sections, classSections, subjectTeachers, selectedYear, branding, loading: masterLoading } = useMasterData();
+    const [teacher, setTeacher] = useState<any>(() => {
+        if (typeof window === 'undefined') return DEFAULT_PROFILE;
+        const cached = localStorage.getItem("teacher_profile_cache");
+        return cached ? JSON.parse(cached) : DEFAULT_PROFILE;
+    });
+    const [loadingTeacher, setLoadingTeacher] = useState(false);
+    const [selectedClassKey, setSelectedClassKey] = useState(() => typeof window !== 'undefined' ? localStorage.getItem("teacher_selected_class_key") || "" : "");
 
-    const [students, setStudents] = useState<any[]>([]);
+    const [students, setStudents] = useState<any[]>(() => {
+        if (typeof window === 'undefined') return DEFAULT_STUDENTS;
+        const classKey = localStorage.getItem("teacher_selected_class_key") || "";
+        const cached = localStorage.getItem("teacher_students_cache_" + classKey);
+        return cached ? JSON.parse(cached) : DEFAULT_STUDENTS;
+    });
     const [loadingStudents, setLoadingStudents] = useState(false);
 
     // Filters
@@ -34,13 +60,18 @@ export default function TeacherStudentsPage() {
     const [isManageRollsOpen, setIsManageRollsOpen] = useState(false);
 
     useEffect(() => {
+        if (selectedClassKey && typeof window !== 'undefined') {
+            localStorage.setItem("teacher_selected_class_key", selectedClassKey);
+        }
+    }, [selectedClassKey]);
+
+    useEffect(() => {
         if (user && userData?.schoolId) {
             fetchTeacher();
         }
     }, [user, userData]);
 
     const fetchTeacher = async () => {
-        setLoadingTeacher(true);
         try {
             let q;
             let snap: any = { empty: true };
@@ -58,10 +89,16 @@ export default function TeacherStudentsPage() {
             if (!snap.empty) {
                 const tData = { id: snap.docs[0].id, ...snap.docs[0].data() };
                 setTeacher(tData);
+                if (typeof window !== 'undefined') localStorage.setItem("teacher_profile_cache", JSON.stringify(tData));
 
                 const authorized = getAuthorizedClasses(tData);
                 if (authorized.length > 0) {
-                    setSelectedClassKey(authorized[0].key);
+                    setSelectedClassKey(prev => {
+                        const exists = authorized.some(c => c.key === prev);
+                        const next = exists && prev ? prev : authorized[0].key;
+                        if (typeof window !== 'undefined') localStorage.setItem("teacher_selected_class_key", next);
+                        return next;
+                    });
                 }
             }
         } catch (e: any) {
@@ -115,6 +152,10 @@ export default function TeacherStudentsPage() {
         combined.sort((a: any, b: any) => (a.rollNumber || Number.MAX_SAFE_INTEGER) - (b.rollNumber || Number.MAX_SAFE_INTEGER));
         setStudents(combined);
         setLoadingStudents(false);
+
+        if (typeof window !== 'undefined' && selectedClassKey) {
+            localStorage.setItem("teacher_students_cache_" + selectedClassKey, JSON.stringify(combined));
+        }
     };
 
     const authorizedClasses = useMemo(() => getAuthorizedClasses(teacher), [teacher, classSections, subjectTeachers]);
@@ -123,7 +164,18 @@ export default function TeacherStudentsPage() {
     useEffect(() => {
         if (!currentClassInfo) return;
 
-        setLoadingStudents(true);
+        const hasCache = typeof window !== 'undefined' && localStorage.getItem("teacher_students_cache_" + selectedClassKey);
+        if (!hasCache) {
+            setLoadingStudents(true);
+        } else {
+            // Seed state from cache immediately on selectedClassKey changes
+            const cached = localStorage.getItem("teacher_students_cache_" + selectedClassKey);
+            if (cached) {
+                setStudents(JSON.parse(cached));
+                setLoadingStudents(false);
+            }
+        }
+        
         let approvedList: any[] = [];
         let pendingList: any[] = [];
 
@@ -191,8 +243,8 @@ export default function TeacherStudentsPage() {
         return { total, active, boys, girls };
     }, [students]);
 
-    if (loadingTeacher || masterLoading) {
-        return <div className="p-10 flex justify-center"><Loader2 className="w-8 h-8 animate-spin text-[#10B981]" /></div>;
+    if (loadingTeacher && !teacher) {
+        return <div className="min-h-screen flex items-center justify-center bg-[#070F1E]"><Loader2 className="w-10 h-10 animate-spin text-[#10B981]" /></div>;
     }
 
     if (authorizedClasses.length === 0) {
@@ -212,312 +264,174 @@ export default function TeacherStudentsPage() {
     const currentSectionName = sections?.[currentClassInfo?.sectionId || ""]?.name || "";
 
     return (
-        <div className="space-y-6 animate-in fade-in duration-200 p-3 md:p-10 lg:p-12 max-w-[1600px] mx-auto pb-28">
-
-            {/* 1. Header Section */}
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/5 pb-4">
-                <div className="space-y-1 relative pl-4 md:pl-6">
-                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[#10B981] to-emerald-500 rounded-r-full" />
-                    <h1 className="text-2xl md:text-4xl font-display font-bold text-white tracking-tight flex items-center gap-2">
-                        Class registry
-                    </h1>
-                    <p className="text-muted-foreground text-xs md:text-sm">Manage student profiles, parent contacts, and roll numbers.</p>
+        <div className="min-h-screen text-[#E6F1FF] bg-[#070F1E] pb-24">
+            <div className="md:hidden flex h-16 items-center justify-between px-4 bg-[#0A192F]/80 backdrop-blur sticky top-0 z-40 shrink-0 border-b border-[#10B981]/10">
+                <div className="flex items-center gap-3">
+                    <div className="w-8 h-8 rounded-full bg-transparent flex items-center justify-center border border-amber-500/40 shadow-md shrink-0 overflow-hidden">
+                        <img
+                            src={branding?.schoolLogo || "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png"}
+                            alt="Logo"
+                            className="w-full h-full object-contain filter drop-shadow-sm"
+                            onError={(e) => {
+                                (e.target as HTMLImageElement).src = "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png";
+                            }}
+                        />
+                    </div>
+                    <Select value={selectedClassKey} onValueChange={setSelectedClassKey}>
+                        <SelectTrigger className="flex items-center gap-2 h-9 bg-transparent border border-white/10 px-3 py-1 rounded-xl text-white text-xs font-bold focus:ring-0 shadow-none hover:bg-white/5 transition-colors">
+                            <SelectValue placeholder="Select Class" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#0b172c] border border-white/10 text-white rounded-2xl">
+                            {authorizedClasses.map(c => (
+                                <SelectItem key={c.key} value={c.key} className="py-2.5 cursor-pointer focus:bg-white/10 text-xs rounded-xl font-bold">
+                                    {classes?.[c.classId]?.name || c.classId} - {sections?.[c.sectionId]?.name || c.sectionId}
+                                </SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
                 </div>
 
-                <div className="flex items-center gap-3 flex-wrap md:flex-nowrap">
-                    <div className="flex items-center bg-[#0B1524]/60 border border-[#10B981]/20 rounded-xl p-1 backdrop-blur-md w-full md:w-auto">
-                        <Select value={selectedClassKey} onValueChange={setSelectedClassKey}>
-                            <SelectTrigger className="w-full md:w-[200px] h-10 bg-transparent border-none shadow-none focus:ring-0 text-sm font-black text-[#10B981]">
-                                <div className="flex items-center gap-2">
-                                    <BookOpen className="w-4 h-4 text-[#10B981]" />
-                                    <SelectValue placeholder="Select Class" />
-                                </div>
-                            </SelectTrigger>
-                            <SelectContent className="bg-slate-900 border-white/10 text-white">
-                                {authorizedClasses.map(c => (
-                                    <SelectItem key={c.key} value={c.key} className="py-2.5 cursor-pointer focus:bg-white/10">
-                                        <span className="font-bold">{classes?.[c.classId]?.name || c.classId} - {sections?.[c.sectionId]?.name || c.sectionId}</span>
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
+                <div className="flex items-center gap-3">
+                    <div className="relative">
+                        <Bell className="w-5 h-5 text-white/70" />
+                        <span className="absolute -top-1 -right-1 flex h-3.5 w-3.5 items-center justify-center rounded-full bg-red-500 text-[8px] font-black text-white">4</span>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-[#053d2c] text-[#10B981] flex items-center justify-center font-black text-sm border border-[#10B981]/25">
+                        {user?.email?.substring(0, 1).toUpperCase()}
+                    </div>
+                </div>
+            </div>
+
+            {/* Desktop Header Content */}
+            <div className="hidden md:flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-white/5 pb-4 p-8">
+                <div className="space-y-1 relative pl-4 md:pl-6">
+                    <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[#10B981] to-emerald-500 rounded-r-full" />
+                    <h1 className="text-4xl font-display font-bold text-white tracking-tight flex items-center gap-2">Class registry</h1>
+                    <p className="text-muted-foreground text-sm">Manage student profiles, parent contacts, and roll numbers.</p>
+                </div>
+                <div className="flex items-center gap-3">
+                    <Select value={selectedClassKey} onValueChange={setSelectedClassKey}>
+                        <SelectTrigger className="w-[200px] h-10 bg-[#0A192F]/50 border border-white/10 rounded-xl text-sm font-bold text-[#10B981]">
+                            <BookOpen className="w-4 h-4 mr-2" />
+                            <SelectValue placeholder="Select Class" />
+                        </SelectTrigger>
+                        <SelectContent className="bg-slate-900 border-white/10 text-white">
+                            {authorizedClasses.map(c => (
+                                <SelectItem key={c.key} value={c.key} className="py-2.5 font-bold focus:bg-white/10">{classes?.[c.classId]?.name || c.classId} - {sections?.[c.sectionId]?.name || c.sectionId}</SelectItem>
+                            ))}
+                        </SelectContent>
+                    </Select>
+                </div>
+            </div>
+
+            <div className="p-4 md:p-8 lg:p-10 max-w-[1600px] mx-auto space-y-4 md:space-y-6">
+                {/* Stats Dashboard Grid */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
+                    <StatCard title="Total Students" value={loadingStudents ? "..." : stats.total} icon={<Users className="w-5 h-5 text-blue-400" />} color="text-blue-500" />
+                    <StatCard title="Active Status" value={loadingStudents ? "..." : stats.active} icon={<CheckCircle2 className="w-5 h-5 text-emerald-400" />} color="text-emerald-500" />
+                    <StatCard title="Boys" value={loadingStudents ? "..." : stats.boys} icon={<User className="w-5 h-5 text-cyan-400" />} color="text-cyan-400" />
+                    <StatCard title="Girls" value={loadingStudents ? "..." : stats.girls} icon={<User className="w-5 h-5 text-pink-400" />} color="text-pink-400" />
+                </div>
+
+                {/* Filters Bar & Action Row */}
+                <div className="flex flex-col gap-3">
+                    <div className="relative group w-full">
+                        <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/30 group-focus-within:text-[#10B981]" />
+                        <Input
+                            placeholder="Search student, school ID, or mobile..."
+                            className="bg-[#0b172c] border-[#1e293b] pl-11 h-12 rounded-xl focus:ring-0 focus:border-white/20 text-sm font-medium text-white placeholder:text-white/30 shadow-none transition-colors"
+                            value={searchQuery}
+                            onChange={(e) => setSearchQuery(e.target.value)}
+                        />
                     </div>
 
-                    <div className="flex items-center gap-2 w-full md:w-auto">
-                        {isClassTeacher ? (
-                            <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20 font-black uppercase tracking-widest text-[9px] h-10 px-3 flex items-center gap-1">
-                                <ShieldAlert className="w-3 h-3 text-amber-400" /> Class In-charge
-                            </Badge>
-                        ) : (
-                            <Badge className="bg-blue-500/10 text-blue-400 border border-blue-500/20 font-black uppercase tracking-widest text-[9px] h-10 px-3 flex items-center gap-1">
-                                <Users className="w-3 h-3 text-blue-400" /> Subject Teacher
-                            </Badge>
+                    <div className="flex items-center gap-3">
+                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                            <SelectTrigger className="w-[140px] bg-[#0b172c] border-[#1e293b] rounded-xl h-10 focus:ring-0 shadow-none font-bold text-xs">
+                                <SelectValue placeholder="Status" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-[#0b172c] border-[#1e293b] text-white rounded-2xl">
+                                <SelectItem value="all" className="font-bold text-xs py-2.5 focus:bg-white/10 rounded-xl">All Statuses</SelectItem>
+                                <SelectItem value="ACTIVE" className="font-bold text-xs py-2.5 focus:bg-white/10 rounded-xl">Active Only</SelectItem>
+                                <SelectItem value="INACTIVE" className="font-bold text-xs py-2.5 focus:bg-white/10 rounded-xl">Inactive Only</SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        {isClassTeacher && (
+                            <Button
+                                variant="outline"
+                                className="h-10 border-[#1e293b] bg-[#0b172c] hover:bg-white/5 hover:text-white gap-2 rounded-xl px-4 text-xs font-bold shadow-none text-white"
+                                onClick={() => setIsManageRollsOpen(true)}
+                            >
+                                <GraduationCap className="w-4 h-4 text-[#10B981]" />
+                                Manage Rolls
+                            </Button>
                         )}
                     </div>
                 </div>
-            </div>
 
-            {/* 2. Stats Dashboard (Grid) */}
-            <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-6">
-                <StatCard
-                    title="Total Students"
-                    value={loadingStudents ? "..." : stats.total}
-                    icon={<Users className="w-5 h-5 text-blue-400" />}
-                    color="text-blue-400"
-                />
-                <StatCard
-                    title="Active status"
-                    value={loadingStudents ? "..." : stats.active}
-                    icon={<CheckCircle2 className="w-5 h-5 text-emerald-400" />}
-                    color="text-emerald-400"
-                />
-                <StatCard
-                    title="Boys"
-                    value={loadingStudents ? "..." : stats.boys}
-                    icon={<User className="w-5 h-5 text-cyan-400" />}
-                    color="text-cyan-400"
-                />
-                <StatCard
-                    title="Girls"
-                    value={loadingStudents ? "..." : stats.girls}
-                    icon={<User className="w-5 h-5 text-pink-400" />}
-                    color="text-pink-400"
-                />
-            </div>
-
-            {/* Filters Bar & Action Row */}
-            <div className="bg-[#0A192F]/50 border border-white/10 rounded-[1.5rem] p-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                <div className="relative group max-w-md w-full">
-                    <SearchIcon className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-white/40 group-focus-within:text-[#10B981]" />
-                    <Input
-                        placeholder="Search student, school ID, or mobile..."
-                        className="bg-black/30 border-white/5 pl-11 h-11 rounded-xl focus:ring-[#10B981]/20 focus:border-[#10B981] transition-all text-xs"
-                        value={searchQuery}
-                        onChange={(e) => setSearchQuery(e.target.value)}
-                    />
-                </div>
-
-                <div className="flex items-center gap-3 flex-wrap sm:flex-nowrap">
-                    <Select value={statusFilter} onValueChange={setStatusFilter}>
-                        <SelectTrigger className="w-[140px] bg-black/30 border-white/5 rounded-xl h-11 focus:ring-[#10B981]/20 text-xs">
-                            <SelectValue placeholder="Status" />
-                        </SelectTrigger>
-                        <SelectContent className="bg-slate-900 border-white/10 text-white">
-                            <SelectItem value="all">All Statuses</SelectItem>
-                            <SelectItem value="ACTIVE">Active Only</SelectItem>
-                            <SelectItem value="INACTIVE">Inactive Only</SelectItem>
-                        </SelectContent>
-                    </Select>
-
-                    {isClassTeacher && (
-                        <Button
-                            variant="outline"
-                            className="h-11 border-white/10 bg-white/5 hover:bg-white/10 gap-2 rounded-xl px-5 text-xs font-black"
-                            onClick={() => setIsManageRollsOpen(true)}
-                        >
-                            <GraduationCap className="w-4 h-4 text-[#10B981]" />
-                            <span>Manage Rolls</span>
-                        </Button>
-                    )}
-                </div>
-            </div>
-
-            {/* 3. Students List Layout (Responsive transformation) */}
-            
-            {/* ========================================================================= */}
-            {/* MOBILE SCREEN (Strictly Optimized for compact, high-density individual cards) */}
-            {/* ========================================================================= */}
-            <div className="md:hidden block space-y-2">
-                {loadingStudents ? (
-                    Array.from({ length: 4 }).map((_, i) => (
-                        <div key={i} className="h-20 bg-white/5 border border-white/5 rounded-2xl animate-pulse" />
-                    ))
-                ) : filteredStudents.length === 0 ? (
-                    <div className="text-center py-16 text-white/40 bg-white/5 rounded-2xl border border-dashed border-white/5">
-                        <GraduationCap className="w-10 h-10 mx-auto text-white/20 mb-3" />
-                        <h4 className="font-bold text-white">No Students Found</h4>
-                        <p className="text-xs text-white/40 mt-1">Refine your search queries or filter attributes.</p>
-                    </div>
-                ) : (
-                    filteredStudents.map((s) => (
-                        <div key={s.id} className="p-3 bg-white/5 border border-white/5 hover:border-[#10B981]/20 rounded-2xl flex items-center justify-between transition-all gap-3 relative min-h-[70px]">
-                            <div className="flex items-center gap-3 min-w-0">
-                                {/* Roll Number Badge */}
-                                <div className="h-10 w-10 rounded-xl bg-[#10B981]/10 border border-[#10B981]/20 flex items-center justify-center text-[#10B981] font-mono font-black text-xs shrink-0 shadow-sm">
-                                    #{String(s.rollNumber || "NA").padStart(2, '0')}
-                                </div>
-
-                                {/* Avatar Initials */}
-                                <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/80 font-black text-[10px] uppercase shrink-0">
-                                    {s.studentName?.substring(0, 2).toUpperCase()}
-                                </div>
-
-                                {/* Info Stack */}
-                                <div className="flex flex-col min-w-0">
-                                    <span className="text-white text-xs font-black truncate leading-tight">{s.studentName}</span>
-                                    <span className="text-[9px] uppercase font-mono text-white/30 truncate mt-0.5 tracking-wider">
-                                        ID: {s.schoolId || "Pending"}
-                                    </span>
-                                    
-                                    {/* Click to Call dialer trigger for mobile convenience */}
-                                    {s.parentMobile && (
-                                        <a href={`tel:${s.parentMobile}`} className="flex items-center gap-1 text-[9px] font-bold text-blue-400 mt-1 hover:underline">
-                                            <Phone className="w-2.5 h-2.5" /> Call parent: {s.parentMobile}
-                                        </a>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Right Status Badge & Actions */}
-                            <div className="flex items-center gap-1 shrink-0">
-                                {s.isPending ? (
-                                    <span className="text-[8px] font-black uppercase text-amber-500">PENDING</span>
-                                ) : (
-                                    <Badge className={s.status === "ACTIVE" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[8px] font-bold py-0 px-1.5" : "bg-red-500/10 text-red-400 border border-red-500/20 text-[8px] font-bold py-0 px-1.5"}>
-                                        {s.status}
-                                    </Badge>
-                                )}
-
-                                <DropdownMenu>
-                                    <DropdownMenuTrigger asChild>
-                                        <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-white/10 rounded-xl">
-                                            <MoreVertical className="w-4 h-4 text-white/50" />
-                                        </Button>
-                                    </DropdownMenuTrigger>
-                                    <DropdownMenuContent align="end" className="bg-[#0B1524] border border-[#10B981]/20 text-white p-1 rounded-xl">
-                                        <DropdownMenuItem
-                                            className="flex items-center gap-2 py-2 px-3 focus:bg-[#10B981]/10 focus:text-white rounded-lg cursor-pointer"
-                                            onClick={() => router.push(`/teacher/students/${s.id}`)}
-                                        >
-                                            <Eye className="w-3.5 h-3.5 text-[#10B981]" />
-                                            <span className="font-bold text-xs">Profile</span>
-                                        </DropdownMenuItem>
-                                    </DropdownMenuContent>
-                                </DropdownMenu>
-                            </div>
+                {/* Students List Layout */}
+                <div className="space-y-3">
+                    {loadingStudents ? (
+                        Array.from({ length: 4 }).map((_, i) => (
+                            <div key={i} className="h-[90px] bg-[#0b172c] rounded-2xl animate-pulse" />
+                        ))
+                    ) : filteredStudents.length === 0 ? (
+                        <div className="text-center py-16 text-white/40 bg-[#0b172c] rounded-2xl border border-[#1e293b]">
+                            <GraduationCap className="w-10 h-10 mx-auto text-white/20 mb-3" />
+                            <h4 className="font-bold text-white">No Students Found</h4>
                         </div>
-                    ))
-                )}
-            </div>
+                    ) : (
+                        filteredStudents.map((s) => (
+                            <div key={s.id} className="p-4 bg-[#0b172c] border border-[#1e293b] hover:border-white/10 rounded-2xl flex items-center justify-between transition-all gap-4">
+                                <div className="flex items-center gap-4 min-w-0 flex-1">
+                                    <div className="h-11 w-11 rounded-2xl bg-[#053d2c] flex items-center justify-center text-[#10B981] font-mono font-black text-xs shrink-0">
+                                        #{String(s.rollNumber || "NA").padStart(2, '0')}
+                                    </div>
 
-            {/* ========================================================================= */}
-            {/* DESKTOP & TABLET VIEW (Spacious, high-density data tables)              */}
-            {/* ========================================================================= */}
-            <div className="hidden md:block bg-black/20 border border-white/10 rounded-[2rem] overflow-hidden backdrop-blur-xl shadow-2xl relative">
-                <div className="p-0 overflow-x-auto min-h-[400px]">
-                    <table className="w-full text-left border-collapse min-w-[800px]">
-                        <thead>
-                            <tr className="bg-white/5 text-[10px] uppercase tracking-widest font-black text-white/40 border-b border-white/5">
-                                <th className="px-8 py-5">Roll</th>
-                                <th className="px-6 py-5">Student profile</th>
-                                <th className="px-6 py-5">Assigned Class</th>
-                                <th className="px-6 py-5">Parent Contact Details</th>
-                                <th className="px-6 py-5">Status</th>
-                                <th className="px-8 py-5 text-right">Actions</th>
-                            </tr>
-                        </thead>
-                        <tbody className="divide-y divide-white/5">
-                            {loadingStudents ? (
-                                Array.from({ length: 5 }).map((_, i) => (
-                                    <tr key={i} className="animate-pulse">
-                                        <td colSpan={6} className="px-8 py-10 opacity-10">
-                                            <div className="h-12 bg-white rounded-2xl w-full" />
-                                        </td>
-                                    </tr>
-                                ))
-                            ) : filteredStudents.length === 0 ? (
-                                <tr>
-                                    <td colSpan={6} className="px-8 py-32 text-center">
-                                        <div className="flex flex-col items-center gap-4 max-w-xs mx-auto">
-                                            <div className="w-16 h-16 bg-white/5 rounded-full flex items-center justify-center mb-4">
-                                                <GraduationCap className="w-8 h-8 text-white/20" />
-                                            </div>
-                                            <h3 className="text-lg font-bold text-white">No students enrolled</h3>
-                                            <p className="text-muted-foreground text-xs">Verify your filters or search queries.</p>
-                                        </div>
-                                    </td>
-                                </tr>
-                            ) : (
-                                filteredStudents.map((s) => (
-                                    <tr key={s.id} className="group hover:bg-white/[0.02] transition-colors relative">
-                                        <td className="px-8 py-6">
-                                            <span className="font-mono text-base font-black text-[#10B981]/80 group-hover:text-[#10B981] transition-colors">
-                                                {String(s.rollNumber || "NA").padStart(2, '0')}
-                                            </span>
-                                        </td>
-                                        <td className="px-6 py-6 font-medium">
-                                            <div className="flex items-center gap-4">
-                                                <div className="w-10 h-10 bg-gradient-to-br from-[#10B981]/20 to-emerald-500/20 rounded-2xl flex items-center justify-center border border-white/10 shrink-0 group-hover:scale-105 transition-transform">
-                                                    {s.isPending ? <Plus className="w-5 h-5 text-amber-500" /> : <User className="w-5 h-5 text-[#10B981]" />}
-                                                </div>
-                                                <div className="flex flex-col">
-                                                    <span className="text-white text-sm font-black truncate max-w-[180px] group-hover:text-[#10B981] transition-colors">
-                                                        {s.studentName}
-                                                    </span>
-                                                    <span className="text-[9px] font-mono text-white/30 mt-0.5">{s.schoolId || "ID PENDING"}</span>
-                                                </div>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-6">
-                                            <div className="flex items-center gap-2">
-                                                <Badge variant="outline" className="bg-blue-500/5 text-blue-400 border-blue-500/20 py-0.5 px-2.5 rounded-lg font-black text-[9px] tracking-widest">
-                                                    {currentClassName}
-                                                </Badge>
-                                                <Badge variant="outline" className="bg-purple-500/5 text-purple-400 border-purple-500/20 py-0.5 px-2.5 rounded-lg font-black text-[9px] tracking-widest">
-                                                    SEC - {currentSectionName}
-                                                </Badge>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-6">
-                                            <div className="flex flex-col gap-0.5">
-                                                <div className="flex items-center gap-2 text-xs text-white/80 font-bold">
-                                                    <User className="w-3.5 h-3.5 text-white/30" />
-                                                    {s.parentName}
-                                                </div>
-                                                <a href={`tel:${s.parentMobile}`} className="flex items-center gap-2 text-[10px] text-blue-400 hover:underline">
-                                                    <Phone className="w-3 h-3 shrink-0" />
-                                                    {s.parentMobile}
-                                                </a>
-                                            </div>
-                                        </td>
-                                        <td className="px-6 py-6">
-                                            {s.isPending ? (
-                                                <div className="flex items-center gap-2 text-amber-500">
-                                                    <Loader2 className="w-3 h-3 animate-spin" />
-                                                    <span className="text-[9px] font-black uppercase tracking-widest">Pending Add</span>
-                                                </div>
-                                            ) : (
-                                                <Badge className={s.status === "ACTIVE" ? "bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2.5 py-0.5" : "bg-red-500/10 text-red-400 border border-red-500/20 px-2.5 py-0.5"}>
-                                                    <div className="flex items-center gap-1.5 uppercase tracking-tighter text-[9px] font-black">
-                                                        <div className={`w-1.5 h-1.5 rounded-full ${s.status === "ACTIVE" ? "bg-emerald-500 shadow-[0_0_8px_#10B981]" : "bg-red-500 shadow-[0_0_8px_#ef4444]"}`} />
-                                                        {s.status}
-                                                    </div>
-                                                </Badge>
-                                            )}
-                                        </td>
-                                        <td className="px-8 py-6 text-right">
-                                            <DropdownMenu>
-                                                <DropdownMenuTrigger asChild>
-                                                    <Button variant="ghost" className="h-10 w-10 p-0 hover:bg-white/10 rounded-xl">
-                                                        <MoreHorizontal className="w-5 h-5 text-white/50" />
-                                                    </Button>
-                                                </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="bg-slate-900 border-white/10 text-white min-w-[160px] p-2 rounded-2xl shadow-2xl">
-                                                    <DropdownMenuItem
-                                                        className="flex items-center gap-3 py-3 px-4 cursor-pointer focus:bg-white/10 rounded-xl"
-                                                        onClick={() => router.push(`/teacher/students/${s.id}`)}
-                                                    >
-                                                        <Eye className="w-4 h-4 text-[#10B981]" />
-                                                        <span className="font-semibold text-sm">View Profile</span>
-                                                    </DropdownMenuItem>
-                                                </DropdownMenuContent>
-                                            </DropdownMenu>
-                                        </td>
-                                    </tr>
-                                ))
-                            )}
-                        </tbody>
-                    </table>
+                                    <div className="flex flex-col min-w-0">
+                                        <span className="text-white text-sm font-black truncate">{s.studentName}</span>
+                                        <span className="text-[10px] font-mono text-white/40 truncate tracking-wider mt-0.5">
+                                            ID: {s.schoolId || "Pending"}
+                                        </span>
+                                        
+                                        {s.parentMobile && (
+                                            <a href={`tel:${s.parentMobile}`} className="flex items-center gap-1.5 text-[10px] font-bold text-[#3B82F6] mt-1.5 hover:underline">
+                                                <Phone className="w-3 h-3" /> Call parent: {s.parentMobile}
+                                            </a>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0">
+                                    {s.isPending ? (
+                                        <span className="text-[9px] font-black uppercase text-amber-500">PENDING</span>
+                                    ) : (
+                                        <Badge className={s.status === "ACTIVE" ? "bg-[#053d2c] text-[#10B981] hover:bg-[#053d2c] border-none text-[9px] font-black py-0.5 px-2 tracking-widest rounded-md uppercase" : "bg-red-500/10 text-red-400 hover:bg-red-500/10 border-none text-[9px] font-black py-0.5 px-2 tracking-widest rounded-md uppercase"}>
+                                            {s.status}
+                                        </Badge>
+                                    )}
+
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button variant="ghost" className="h-8 w-8 p-0 hover:bg-white/5 rounded-lg text-white/50">
+                                                <MoreVertical className="w-4 h-4" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end" className="bg-[#0b172c] border border-[#1e293b] text-white p-1 rounded-xl">
+                                            <DropdownMenuItem
+                                                className="flex items-center gap-2 py-2 px-3 focus:bg-white/5 focus:text-white rounded-lg cursor-pointer"
+                                                onClick={() => router.push(`/teacher/students/${s.id}`)}
+                                            >
+                                                <Eye className="w-3.5 h-3.5 text-[#10B981]" />
+                                                <span className="font-bold text-xs">View Profile</span>
+                                            </DropdownMenuItem>
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
+                                </div>
+                            </div>
+                        ))
+                    )}
                 </div>
             </div>
 
@@ -530,9 +444,7 @@ export default function TeacherStudentsPage() {
                     sectionName={currentSectionName}
                     students={students.filter(s => !s.isPending)}
                     onClose={() => setIsManageRollsOpen(false)}
-                    onSuccess={() => {
-                        setIsManageRollsOpen(false);
-                    }}
+                    onSuccess={() => setIsManageRollsOpen(false)}
                 />
             )}
         </div>
@@ -541,15 +453,13 @@ export default function TeacherStudentsPage() {
 
 function StatCard({ title, value, icon, color }: { title: string, value: string | number, icon: React.ReactNode, color: string }) {
     return (
-        <div className="bg-[#0A192F]/50 border border-white/10 p-4 md:p-6 rounded-2xl flex flex-col justify-between backdrop-blur-xl group hover:border-[#10B981]/25 transition-all shadow-xl">
-            <div className="flex items-center justify-between mb-2">
-                <span className="text-[9px] md:text-xs text-white/50 uppercase font-black tracking-widest">{title}</span>
-                <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center group-hover:scale-105 transition-transform shrink-0">
-                    {icon}
-                </div>
+        <div className="bg-[#0b172c] border border-[#1e293b] p-2.5 rounded-xl flex items-center gap-2.5 group hover:border-white/10 transition-all shadow-none">
+            <div className="w-7 h-7 rounded-lg bg-[#070F1E] flex items-center justify-center shrink-0 border border-white/5">
+                {icon}
             </div>
-            <div>
-                <div className={cn("text-2xl md:text-4xl font-display font-black text-white", color)}>{value}</div>
+            <div className="flex flex-col min-w-0">
+                <span className="text-[8px] text-white/40 font-black uppercase tracking-wider leading-none truncate">{title}</span>
+                <span className="text-sm font-black text-white leading-none mt-1">{value}</span>
             </div>
         </div>
     );

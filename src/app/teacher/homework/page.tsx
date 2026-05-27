@@ -8,7 +8,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import Link from "next/link";
-import { Loader2, Plus, Trash2, ArrowLeft, Send, History, CheckCircle2, Bookmark, Users, Calendar } from "lucide-react";
+import { Loader2, Plus, Trash2, ArrowLeft, Send, History, CheckCircle2, Bookmark, Users, Calendar, ChevronLeft, ChevronRight } from "lucide-react";
 import { collection, query, where, onSnapshot, orderBy, limit, doc, deleteDoc, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useMasterData } from "@/context/MasterDataContext";
@@ -17,10 +17,27 @@ import { cn } from "@/lib/utils";
 
 export default function TeacherHomeworkPage() {
     const { user } = useAuth();
+    const DEFAULT_HOMEWORK = [
+        { id: "hw_1", subjectId: "math", title: "Algebra Practice", description: "Solve exercises on page 24-25 in the textbook.", dueDate: new Date(Date.now() + 86400000).toISOString().split('T')[0], createdAt: { seconds: Date.now()/1000 }, classId: "Class A", sectionId: "Section A", className: "Class A", sectionName: "Section A" },
+        { id: "hw_2", subjectId: "sci", title: "Solar System Model", description: "Create a 3D model of the solar system using foam balls.", dueDate: new Date(Date.now() + 172800000).toISOString().split('T')[0], createdAt: { seconds: Date.now()/1000 - 86400 }, classId: "Class A", sectionId: "Section A", className: "Class A", sectionName: "Section A" }
+    ];
+
     const { subjects, classes, sections, classSections, subjectTeachers } = useMasterData();
-    const [homeworkHistory, setHomeworkHistory] = useState<any[]>([]);
+    const [homeworkHistory, setHomeworkHistory] = useState<any[]>(() => {
+        if (typeof window === 'undefined') return DEFAULT_HOMEWORK;
+        const cached = localStorage.getItem("teacher_homework_history_cache");
+        return cached ? JSON.parse(cached) : DEFAULT_HOMEWORK;
+    });
     const [loading, setLoading] = useState(false);
-    const [teacherId, setTeacherId] = useState<string | null>(null);
+    const [teacherId, setTeacherId] = useState<string | null>(() => {
+        if (typeof window === 'undefined') return "TCH-2026-042";
+        const profile = localStorage.getItem("teacher_profile_cache");
+        if (profile) {
+            const p = JSON.parse(profile);
+            return p.schoolId || p.id;
+        }
+        return "TCH-2026-042";
+    });
     const [useFallback, setUseFallback] = useState(false);
 
     // Form State
@@ -28,6 +45,33 @@ export default function TeacherHomeworkPage() {
     const [targetSectionId, setTargetSectionId] = useState("");
     const [dueDate, setDueDate] = useState("");
     const [homeworkInputs, setHomeworkInputs] = useState<Record<string, string>>({});
+    
+    // Diary Date State
+    const [selectedDate, setSelectedDate] = useState<string>(() => new Date().toLocaleDateString('en-CA'));
+    const [animationDirection, setAnimationDirection] = useState<'prev' | 'next'>('next');
+    const [animating, setAnimating] = useState(false);
+
+    const navigatePage = (direction: 'prev' | 'next') => {
+        if (animating) return;
+        const current = new Date(selectedDate);
+        current.setDate(current.getDate() + (direction === 'next' ? 1 : -1));
+        const nextDate = current.toLocaleDateString('en-CA');
+        
+        setAnimationDirection(direction);
+        setAnimating(true);
+        setSelectedDate(nextDate);
+        setTimeout(() => setAnimating(false), 300);
+    };
+
+    const formatDiaryDate = (dateStr: string) => {
+        if (!dateStr) return "N / A";
+        const dateObj = new Date(dateStr);
+        if (isNaN(dateObj.getTime())) return dateStr;
+        const dd = String(dateObj.getDate()).padStart(2, '0');
+        const mm = String(dateObj.getMonth() + 1).padStart(2, '0');
+        const yy = String(dateObj.getFullYear()).slice(-2);
+        return `${dd}-${mm}-${yy}`;
+    };
 
     // 1. Resolve Teacher ID
     useEffect(() => {
@@ -36,7 +80,11 @@ export default function TeacherHomeworkPage() {
             const q = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
             const snap = await getDocs(q);
             if (!snap.empty) {
-                setTeacherId(snap.docs[0].data().schoolId || snap.docs[0].id);
+                const tId = snap.docs[0].data().schoolId || snap.docs[0].id;
+                setTeacherId(tId);
+                // Also update full profile cache
+                const tData = { id: snap.docs[0].id, ...snap.docs[0].data() };
+                if (typeof window !== 'undefined') localStorage.setItem("teacher_profile_cache", JSON.stringify(tData));
             }
         };
         fetchTeacher();
@@ -58,6 +106,9 @@ export default function TeacherHomeworkPage() {
                 list = [...list].sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
             }
             setHomeworkHistory(list);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem("teacher_homework_history_cache", JSON.stringify(list));
+            }
         }, (err) => {
             if (!isMounted) return;
             if (err.message.includes('index') && !useFallback) {
@@ -79,10 +130,10 @@ export default function TeacherHomeworkPage() {
         Object.keys(subjectTeachers).forEach(key => {
             const subjectsObj = subjectTeachers[key];
             if (Object.values(subjectsObj).includes(teacherId)) {
-                // BUG FIX: Don't split by underscore
                 const cs = classSections[key];
-                const cId = cs?.classId || key.split('_')[0];
-                const sId = cs?.sectionId || key.split('_')[1];
+                const parts = key.split('_');
+                const cId = cs?.classId || (parts.length >= 4 ? `${parts[0]}_${parts[1]}` : parts[0]);
+                const sId = cs?.sectionId || (parts.length >= 4 ? `${parts[2]}_${parts[3]}` : parts[1]);
                 set.set(key, { classId: cId, sectionId: sId, key });
             }
         });
@@ -111,7 +162,11 @@ export default function TeacherHomeworkPage() {
         }
 
         setLoading(true);
-        const [cId, sId] = targetClassId.split('_');
+        
+        const selectedClass = getAuthorizedClasses().find(c => c.key === targetClassId);
+        const parts = targetClassId.split('_');
+        const cId = selectedClass?.classId || (parts.length >= 4 ? `${parts[0]}_${parts[1]}` : parts[0]);
+        const sId = selectedClass?.sectionId || (parts.length >= 4 ? `${parts[2]}_${parts[3]}` : parts[1]);
 
         try {
             let successCount = 0;
@@ -128,7 +183,8 @@ export default function TeacherHomeworkPage() {
                         subjectId: sid,
                         title: `${subjects[sid]?.name || "Homework"} Task`,
                         description: desc,
-                        dueDate
+                        dueDate,
+                        date: selectedDate
                     })
                 });
                 const data = await res.json();
@@ -164,8 +220,13 @@ export default function TeacherHomeworkPage() {
 
     const authorized = getAuthorizedClasses();
 
+    const activeHistory = homeworkHistory.filter(hw => {
+        const hwDate = hw.date || (hw.createdAt ? new Date(hw.createdAt.seconds * 1000).toISOString().split('T')[0] : null);
+        return hwDate === selectedDate;
+    });
+
     return (
-        <div className="w-full text-[#E6F1FF] animate-in fade-in duration-500 pb-20">
+        <div className="w-full text-[#E6F1FF] animate-in fade-in duration-300 pb-20">
             {/* ========================================================================= */}
             {/* MOBILE VIEWPORT (High-density, single-viewport compact homework layouts)  */}
             {/* ========================================================================= */}
@@ -184,6 +245,40 @@ export default function TeacherHomeworkPage() {
                         <div className="w-1.5 h-1.5 rounded-full bg-emerald-500 animate-pulse" />
                         <span className="text-[8px] font-black uppercase tracking-wider text-emerald-500/80">Active Sync</span>
                     </div>
+                </div>
+
+                {/* Mobile Date Navigator */}
+                <div className="flex items-center justify-between bg-black/40 border border-white/10 p-2 rounded-xl gap-2">
+                    <Button
+                        size="icon"
+                        variant="ghost"
+                        className="w-8 h-8 rounded-lg text-emerald-400 hover:bg-emerald-500/10"
+                        onClick={() => navigatePage('prev')}
+                    >
+                        <ChevronLeft className="w-4 h-4" />
+                    </Button>
+                    
+                    <div className="flex-1 relative flex items-center justify-center bg-white/5 border border-white/10 rounded-lg px-2 py-1">
+                        <Input
+                            type="date"
+                            value={selectedDate}
+                            onChange={(e) => setSelectedDate(e.target.value)}
+                            className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                        />
+                        <div className="flex items-center gap-1.5 text-xs font-bold text-white pointer-events-none">
+                            <Calendar className="w-3.5 h-3.5 text-emerald-400" />
+                            <span>{formatDiaryDate(selectedDate)}</span>
+                        </div>
+                    </div>
+
+                    <Button
+                        size="icon"
+                        variant="ghost"
+                        className="w-8 h-8 rounded-lg text-emerald-400 hover:bg-emerald-500/10"
+                        onClick={() => navigatePage('next')}
+                    >
+                        <ChevronRight className="w-4 h-4" />
+                    </Button>
                 </div>
 
                 {/* Switcher Tab header on Mobile */}
@@ -281,20 +376,20 @@ export default function TeacherHomeworkPage() {
                             <History className="w-4 h-4 text-emerald-400" />
                             <h2 className="text-xs font-black uppercase tracking-wider text-white">Broadcast History</h2>
                         </div>
-                        <Badge className="bg-white/5 border-white/10 text-[8px] text-white/40 uppercase tracking-widest font-black">History (10)</Badge>
+                        <Badge className="bg-white/5 border-white/10 text-[8px] text-white/40 uppercase tracking-widest font-black">History ({activeHistory.length})</Badge>
                     </div>
 
-                    {homeworkHistory.length === 0 ? (
+                    {activeHistory.length === 0 ? (
                         <div className="py-12 text-center text-white/40 bg-white/5 rounded-2xl border border-dashed border-white/10 flex flex-col items-center justify-center gap-2">
                             <History className="w-8 h-8 opacity-10" />
                             <div className="space-y-0.5">
-                                <p className="font-bold text-[10px] uppercase tracking-widest opacity-40">No entries yet</p>
-                                <p className="text-[9px]">Tasks will appear here once broadcasted.</p>
+                                <p className="font-bold text-[10px] uppercase tracking-widest opacity-40">No entries</p>
+                                <p className="text-[9px]">No tasks assigned for this date.</p>
                             </div>
                         </div>
                     ) : (
                         <div className="space-y-2">
-                            {homeworkHistory.map(hw => (
+                            {activeHistory.map(hw => (
                                 <div key={hw.id} className="relative bg-black/20 border border-white/5 rounded-xl p-3.5 space-y-2.5 overflow-hidden">
                                     <div className="flex justify-between items-start">
                                         <div className="flex flex-wrap gap-1">
@@ -349,10 +444,47 @@ export default function TeacherHomeworkPage() {
                             Homework Portal
                         </h1>
                     </div>
-                    <div className="flex items-center gap-4 bg-white/5 border border-white/10 px-6 py-3 rounded-2xl backdrop-blur-md shadow-inner">
-                        <div className="flex items-center gap-2">
-                            <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                            <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500/80">Cloud Sync: Active</span>
+                    
+                    <div className="flex flex-wrap items-center gap-4">
+                        {/* Elegant Date Navigator */}
+                        <div className="flex items-center bg-white/5 border border-white/10 p-1.5 rounded-2xl backdrop-blur-md shadow-inner gap-2">
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                className="w-10 h-10 rounded-xl text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
+                                onClick={() => navigatePage('prev')}
+                            >
+                                <ChevronLeft className="w-5 h-5" />
+                            </Button>
+                            
+                            <div className="relative flex items-center justify-center bg-white/5 border border-white/10 hover:bg-white/10 transition-all rounded-xl px-4 py-2 min-w-[160px] cursor-pointer">
+                                <Input
+                                    type="date"
+                                    value={selectedDate}
+                                    onChange={(e) => setSelectedDate(e.target.value)}
+                                    className="absolute inset-0 opacity-0 cursor-pointer w-full h-full"
+                                />
+                                <div className="flex items-center gap-2.5 text-sm font-bold text-white pointer-events-none">
+                                    <Calendar className="w-4 h-4 text-emerald-400" />
+                                    <span>{formatDiaryDate(selectedDate)}</span>
+                                </div>
+                            </div>
+
+                            <Button
+                                size="icon"
+                                variant="ghost"
+                                className="w-10 h-10 rounded-xl text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300"
+                                onClick={() => navigatePage('next')}
+                            >
+                                <ChevronRight className="w-5 h-5" />
+                            </Button>
+                        </div>
+
+                        <div className="hidden sm:flex items-center gap-4 bg-white/5 border border-white/10 px-6 py-4 rounded-2xl backdrop-blur-md shadow-inner">
+                            <div className="flex items-center gap-2">
+                                <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                                <span className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-500/80">Cloud Sync: Active</span>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -447,19 +579,19 @@ export default function TeacherHomeworkPage() {
                             <History className="w-5 h-5 text-emerald-400" />
                             <h2 className="text-2xl font-display font-bold italic text-white">Broadcast History</h2>
                             <div className="flex-1 h-px bg-white/5" />
-                            <Badge className="bg-white/5 border border-white/10 text-[10px] text-white/40 uppercase tracking-widest font-black px-3 py-1">Latest 10 Entries</Badge>
+                            <Badge className="bg-white/5 border border-white/10 text-[10px] text-white/40 uppercase tracking-widest font-black px-3 py-1">Selected Date ({activeHistory.length})</Badge>
                         </div>
 
-                        {homeworkHistory.length === 0 ? (
+                        {activeHistory.length === 0 ? (
                             <div className="md:col-span-2 py-32 text-center text-muted-foreground bg-white/5 rounded-[40px] border border-dashed border-white/10 backdrop-blur-sm flex flex-col items-center justify-center gap-4">
                                 <History className="w-12 h-12 opacity-10" />
                                 <div className="space-y-1">
                                     <p className="font-black uppercase tracking-widest text-xs opacity-40">No records found</p>
-                                    <p className="text-[10px]">Start by assigning homework to your classes.</p>
+                                    <p className="text-[10px]">No homework recorded for this date.</p>
                                 </div>
                             </div>
                         ) : (
-                            homeworkHistory.map(hw => (
+                            activeHistory.map(hw => (
                                 <div key={hw.id} className="group relative bg-black/40 border border-white/10 rounded-[2rem] p-6 hover:bg-white/5 transition-all backdrop-blur-md overflow-hidden flex flex-col justify-between">
                                     <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-3xl -mr-16 -mt-16 group-hover:bg-emerald-500/10 transition-colors" />
 

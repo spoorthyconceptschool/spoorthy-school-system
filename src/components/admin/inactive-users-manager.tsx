@@ -11,32 +11,84 @@ import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast-store";
 
+const INACTIVE_STUDENTS_CACHE_KEY = "spoorthy_inactive_students_cache";
+const INACTIVE_TEACHERS_CACHE_KEY = "spoorthy_inactive_teachers_cache";
+const DEFAULT_INACTIVE_STUDENTS = [
+    {
+        id: "STD-INACTIVE-01",
+        studentName: "Kalyan Varma",
+        schoolId: "SPO-2026-090",
+        collection: "students",
+        status: "INACTIVE",
+        className: "Class 5",
+        sectionName: "A"
+    }
+];
+const DEFAULT_INACTIVE_TEACHERS = [
+    {
+        id: "TCH-INACTIVE-01",
+        name: "Ramesh Sharma",
+        schoolId: "TCH-2026-003",
+        collection: "teachers",
+        status: "INACTIVE"
+    }
+];
+
 export function InactiveUsersManager() {
     const [search, setSearch] = useState("");
-    const [students, setStudents] = useState<any[]>([]);
-    const [teachers, setTeachers] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [students, setStudents] = useState<any[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(INACTIVE_STUDENTS_CACHE_KEY);
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
+        return DEFAULT_INACTIVE_STUDENTS;
+    });
+    const [teachers, setTeachers] = useState<any[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(INACTIVE_TEACHERS_CACHE_KEY);
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
+        return DEFAULT_INACTIVE_TEACHERS;
+    });
+    const [loading, setLoading] = useState(false);
     const [restoringId, setRestoringId] = useState<string | null>(null);
 
     useEffect(() => {
-        setLoading(true);
         // Sync Inactive Students
         const qStudents = query(collection(db, "students"), where("status", "==", "INACTIVE"));
         const unsubStudents = onSnapshot(qStudents, (snap) => {
-            setStudents(snap.docs.map(d => ({ id: d.id, collection: "students", ...d.data() })));
+            const list = snap.docs.map(d => ({ id: d.id, collection: "students", ...d.data() }));
+            setStudents(list);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(INACTIVE_STUDENTS_CACHE_KEY, JSON.stringify(list));
+            }
+            setLoading(false);
+        }, (err) => {
+            console.error("Inactive Students Sync Error:", err);
+            setLoading(false);
         });
 
         // Sync Inactive Teachers
         const qTeachers = query(collection(db, "teachers"), where("status", "==", "INACTIVE"));
         const unsubTeachers = onSnapshot(qTeachers, (snap) => {
-            setTeachers(snap.docs.map(d => ({ id: d.id, collection: "teachers", ...d.data() })));
+            const list = snap.docs.map(d => ({ id: d.id, collection: "teachers", ...d.data() }));
+            setTeachers(list);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(INACTIVE_TEACHERS_CACHE_KEY, JSON.stringify(list));
+            }
+            setLoading(false);
+        }, (err) => {
+            console.error("Inactive Teachers Sync Error:", err);
+            setLoading(false);
         });
 
-        const timer = setTimeout(() => setLoading(false), 1000);
         return () => {
             unsubStudents();
             unsubTeachers();
-            clearTimeout(timer);
         };
     }, []);
 

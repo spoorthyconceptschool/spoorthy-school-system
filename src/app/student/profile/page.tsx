@@ -19,7 +19,7 @@ export default function StudentProfilePage() {
     // Mobile tabs switcher state
     const [activeTab, setActiveTab] = useState<'academic' | 'contact'>('academic');
 
-    if (loading) {
+    if (loading && (!profile || !profile.id)) {
         return (
             <div className="flex h-[50vh] items-center justify-center">
                 <Loader2 className="w-8 h-8 animate-spin text-blue-500" />

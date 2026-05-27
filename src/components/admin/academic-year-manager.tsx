@@ -27,10 +27,24 @@ interface AcademicYear {
     } | null;
 }
 
+const ACADEMIC_YEARS_CACHE_KEY = "spoorthy_academic_years_cache";
+const DEFAULT_ACADEMIC_YEARS = [
+    { year: "2025-2026", isActive: true, startDate: "2025-06-01", endDate: "2026-04-30", isUpcoming: false, stats: null },
+    { year: "2026-2027", isActive: false, startDate: null, endDate: null, isUpcoming: true, stats: null }
+];
+
 export function AcademicYearManager() {
     const { user } = useAuth();
-    const [years, setYears] = useState<AcademicYear[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [years, setYears] = useState<AcademicYear[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(ACADEMIC_YEARS_CACHE_KEY);
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
+        return DEFAULT_ACADEMIC_YEARS;
+    });
+    const [loading, setLoading] = useState(false);
 
     // Transition State
     const [isTransitionModalOpen, setIsTransitionModalOpen] = useState(false);
@@ -58,7 +72,11 @@ export function AcademicYearManager() {
             });
             if (res.ok) {
                 const data = await res.json();
-                setYears(data.years || []);
+                const list = data.years || [];
+                setYears(list);
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem(ACADEMIC_YEARS_CACHE_KEY, JSON.stringify(list));
+                }
             }
         } catch (e) {
             console.error("Failed to fetch years", e);

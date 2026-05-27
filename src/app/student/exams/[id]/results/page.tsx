@@ -92,31 +92,56 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
     const stats = calculateTotal();
     const resultStatus = stats.percentage >= 35 ? "PASSED" : "FAILED";
 
+    const formatToDDMMYY = (dateVal: any) => {
+        if (!dateVal) return "";
+        const d = new Date(dateVal);
+        if (isNaN(d.getTime())) return "";
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = String(d.getFullYear()).slice(-2);
+        return `${day}-${month}-${year}`;
+    };
+
     return (
-        <div className="max-w-4xl mx-auto space-y-8 pb-10 print:max-w-none print:p-0">
-            {/* Header - No Print */}
-            <div className="flex items-center gap-4 print:hidden">
-                <Button variant="ghost" size="icon" onClick={() => router.push("/student/exams")} className="text-[#8892B0] hover:text-[#E6F1FF]">
-                    <ArrowLeft className="w-5 h-5" />
+        <div className="min-h-screen bg-[#0A192F] text-white p-4 md:p-8 select-none">
+            {/* Action Bar (Top) */}
+            <div className="max-w-4xl mx-auto flex items-center justify-between mb-6">
+                <Button 
+                    variant="outline" 
+                    onClick={() => router.back()}
+                    className="border-white/10 hover:bg-white/5 text-white gap-2 rounded-xl"
+                >
+                    <ArrowLeft className="w-4 h-4" /> Back to Exams
                 </Button>
-                <div>
-                    <h1 className="text-2xl font-bold text-[#E6F1FF]">Result Report</h1>
-                    <p className="text-[#8892B0] text-sm">Official Statement of Marks</p>
-                </div>
-                <div className="ml-auto">
-                    <Button onClick={() => window.print()} variant="outline" className="border-[#64FFDA]/30 text-[#64FFDA] hover:bg-[#64FFDA]/10 gap-2">
-                        <Download className="w-4 h-4" /> Print / Download PDF
+                {result && (
+                    <Button 
+                        onClick={() => window.print()}
+                        className="bg-[#64FFDA] text-[#0A192F] hover:bg-[#64FFDA]/80 gap-2 font-bold rounded-xl"
+                    >
+                        <Download className="w-4 h-4" /> Print Results
                     </Button>
-                </div>
+                )}
             </div>
 
-            {/* Report Card */}
-            <div className="bg-white text-black p-8 md:p-12 rounded-lg shadow-xl print:shadow-none print:p-0 relative overflow-hidden">
-                {/* School Header */}
-                <div className="text-center border-b-2 border-black/10 pb-8 mb-8 relative z-10">
-                    <div className="flex flex-col items-center justify-center gap-4 mb-4">
-                        {branding?.schoolLogo && (
-                            <img src={branding.schoolLogo} alt="School Logo" className="h-24 object-contain" />
+            {/* Certificate Style Box */}
+            <div className="max-w-4xl mx-auto bg-white text-black p-6 md:p-12 rounded-3xl shadow-2xl relative overflow-hidden border-4 border-double border-slate-200">
+                {/* Decorative border */}
+                <div className="absolute inset-2 border-2 border-slate-100 rounded-[1.4rem] pointer-events-none" />
+
+                {/* Ribbon decoration top right */}
+                <div className="absolute top-0 right-0 w-32 h-32 bg-[#3B82F6]/5 rounded-bl-full pointer-events-none" />
+
+                {/* Header */}
+                <div className="text-center mb-8 relative z-10">
+                    <div className="flex justify-center items-center gap-4 mb-4">
+                        {branding?.schoolLogo ? (
+                            <img 
+                                src={branding.schoolLogo} 
+                                alt="Logo" 
+                                className="w-16 h-16 object-contain"
+                            />
+                        ) : (
+                            <Trophy className="w-16 h-16 text-yellow-500" />
                         )}
                         <div>
                             <h1 className="text-3xl font-serif font-bold uppercase tracking-wide mb-2">Spoorthy Concept School</h1>
@@ -141,7 +166,7 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
                         <p className="text-black/50 font-bold uppercase text-[10px] tracking-widest mb-1">Examination</p>
                         <h3 className="text-xl font-bold">{exam.name}</h3>
                         <p className="mt-1">{exam.academicYear || "2025-26"}</p>
-                        <p className="text-black/50 mt-1 text-xs">Date: {new Date(exam.startDate).toLocaleDateString()}</p>
+                        <p className="text-black/50 mt-1 text-xs">Date: {formatToDDMMYY(exam.startDate)}</p>
                     </div>
                 </div>
 

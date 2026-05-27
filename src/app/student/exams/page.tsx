@@ -1,26 +1,47 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState } from "react";
 import { useAuth } from "@/context/AuthContext";
-import { collection, getDocs, query, where, doc, getDoc, orderBy, onSnapshot } from "firebase/firestore";
-import { db } from "@/lib/firebase";
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, Calendar, FileText, AlertCircle, CheckCircle, Lock } from "lucide-react";
+import { Loader2, Calendar, FileText, AlertCircle, Lock, Download, Info, Ticket, ChevronDown, ChevronUp } from "lucide-react";
 import Link from "next/link";
 import { useMasterData } from "@/context/MasterDataContext";
-
 import { useStudentData } from "@/context/StudentDataContext";
+import { motion, AnimatePresence } from "framer-motion";
 
 export default function StudentExamsPage() {
     const { user } = useAuth();
-    const { selectedYear } = useMasterData();
+    const { selectedYear, subjects = {} } = useMasterData();
     const { profile: studentProfile, exams: cachedExams, classSyllabi, ledger, loading } = useStudentData();
 
+    // Track which cards are expanded for timetable/syllabus
+    const [expandedExams, setExpandedExams] = useState<Record<string, boolean>>({});
+
+    const toggleExpand = (examId: string) => {
+        setExpandedExams(prev => ({
+            ...prev,
+            [examId]: !prev[examId]
+        }));
+    };
+
     const ledgerItems = ledger?.items || [];
-    const dueAmount = ledgerItems.reduce((sum: number, item: any) => sum + (item.amount - (item.paidAmount || 0)), 0);
-    const feeStatus = dueAmount <= 0 ? "CLEARED" : "PENDING";
+
+    const formatDateStr = (dateVal: any) => {
+        if (!dateVal) return "";
+        let d: Date;
+        if (typeof dateVal === 'object' && dateVal.seconds !== undefined) {
+            d = new Date(dateVal.seconds * 1000);
+        } else {
+            d = new Date(dateVal);
+        }
+        if (isNaN(d.getTime())) return "";
+        const day = String(d.getDate()).padStart(2, '0');
+        const month = String(d.getMonth() + 1).padStart(2, '0');
+        const year = String(d.getFullYear()).slice(-2);
+        return `${day}-${month}-${year}`;
+    };
 
     const exams = cachedExams.filter((e: any) => {
         if (e.status === "DELETED") return false;
@@ -39,10 +60,8 @@ export default function StudentExamsPage() {
     });
 
     const checkHallTicketAccess = (exam: any) => {
-        // Calculate total overall due
         const totalDue = ledgerItems.reduce((sum: number, item: any) => sum + (item.amount - (item.paidAmount || 0)), 0);
 
-        // Check individual override first!
         if (exam.hallTicketOverrides && exam.hallTicketOverrides[studentProfile?.id] === true) {
             return { allowed: true, due: 0, reason: "" };
         }
@@ -99,11 +118,8 @@ export default function StudentExamsPage() {
             const targetTerm = exam.hallTicketTerm || "";
             if (!targetTerm) return { allowed: true, due: 0, reason: "" };
 
-            // Parse target term digit (e.g. "Term 2" -> 2)
             const targetMatch = targetTerm.match(/\d+/);
             const targetDigit = targetMatch ? parseInt(targetMatch[0], 10) : null;
-
-            // Filter term fee items in ledger
             const termItems = ledgerItems.filter((item: any) => item.type === "TERM");
             
             const unpaidMatchingTerms = termItems.filter((item: any) => {
@@ -134,141 +150,281 @@ export default function StudentExamsPage() {
         return { allowed: true, due: 0, reason: "" };
     };
 
-    if (loading) return <div className="flex justify-center p-20 text-[#E6F1FF]"><Loader2 className="animate-spin" /></div>;
+    // Download all allowed hall tickets in one click
+    const handleDownloadAll = () => {
+        const allowedExams = exams.filter(exam => {
+            const access = checkHallTicketAccess(exam);
+            return exam.status === "ACTIVE" && access.allowed;
+        });
 
-    if (!studentProfile) return <div className="p-8 text-center text-[#8892B0]">Student profile not found.</div>;
+        if (allowedExams.length === 0) {
+            alert("No active hall tickets are currently unlocked for download.");
+            return;
+        }
+
+        allowedExams.forEach(exam => {
+            window.open(`/student/exams/${exam.id}/hall-ticket`, "_blank");
+        });
+    };
+
+    if (loading && cachedExams.length === 0) {
+        return (
+            <div className="flex justify-center p-20 text-[#E6F1FF]">
+                <Loader2 className="animate-spin" />
+            </div>
+        );
+    }
+
+    if (!studentProfile) {
+        return <div className="p-8 text-center text-[#8892B0]">Student profile not found.</div>;
+    }
 
     return (
-        <div className="max-w-5xl mx-auto space-y-8 pb-10">
-            <div className="flex justify-between items-center">
-                <div>
-                    <h1 className="text-3xl font-bold text-[#E6F1FF]">My Examinations</h1>
-                    <p className="text-[#8892B0]">View schedules and download examinations/hall tickets.</p>
-                </div>
-                {exams.some(exam => !checkHallTicketAccess(exam).allowed) && (
-                    <div className="bg-red-500/10 border border-red-500/20 px-4 py-2 rounded-lg flex items-center gap-2 text-red-400">
-                        <AlertCircle className="w-5 h-5" />
-                        <div>
-                            <p className="font-bold text-sm">Action Required</p>
-                            <p className="text-xs">Pending fee dues detected. Clear restricted items below to unlock Examinations.</p>
-                        </div>
-                    </div>
-                )}
+        <div className="max-w-4xl mx-auto space-y-6 pb-12 px-4 md:px-0 animate-in fade-in duration-500 select-none">
+            {/* Header Area matching mockup text exactly */}
+            <div className="text-left space-y-1">
+                <h1 className="text-3xl font-extrabold text-[#E6F1FF] tracking-tight">My Examinations</h1>
+                <p className="text-[#8892B0] text-sm md:text-base">View schedules and download examinations/hall tickets.</p>
             </div>
 
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-                {exams.map(exam => (
-                    <Card key={exam.id} className="bg-[#112240] border-[#64FFDA]/10 hover:border-[#64FFDA]/30 transition-all group">
-                        <CardHeader>
-                            <div className="flex justify-between items-start">
-                                <div className="w-12 h-12 rounded-lg bg-[#3B82F6]/10 flex items-center justify-center text-[#3B82F6] group-hover:scale-110 transition-transform">
-                                    <FileText className="w-6 h-6" />
-                                </div>
-                                <Badge variant={exam.status === "ACTIVE" ? "default" : "secondary"} className="bg-[#64FFDA]/10 text-[#64FFDA] border-[#64FFDA]/20">
-                                    {exam.status || "Scheduled"}
-                                </Badge>
-                            </div>
-                            <CardTitle className="text-[#E6F1FF] mt-4 text-xl">{exam.name}</CardTitle>
-                            <CardDescription className="text-[#8892B0] flex items-center gap-2">
-                                <Calendar className="w-4 h-4" />
-                                {new Date(exam.startDate).toLocaleDateString()} - {new Date(exam.endDate).toLocaleDateString()}
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="bg-[#0A192F]/50 rounded p-3 mb-4 border border-white/5">
-                                <p className="text-xs text-[#8892B0] uppercase tracking-wider mb-2">Timetable Overview</p>
-                                <div className="space-y-1">
-                                    {!studentProfile?.classId || !exam.timetables?.[studentProfile.classId] || Object.keys(exam.timetables[studentProfile.classId]).length === 0 ? (
-                                        <div className="text-amber-400/90 text-xs font-bold py-3 flex flex-col items-center gap-1 justify-center bg-amber-500/5 rounded-xl border border-amber-500/10">
-                                            <AlertCircle className="w-4 h-4 text-amber-500" /> Exam timetable not updated
+            {/* Horizontal Cards List */}
+            <div className="space-y-4">
+                {exams.map(exam => {
+                    const access = checkHallTicketAccess(exam);
+                    const isExpanded = !!expandedExams[exam.id];
+                    const isResultsReleased = exam.status === "RESULTS_RELEASED";
+
+                    // Syllabus filter
+                    const examSyllabi = classSyllabi.filter(
+                        (s: any) => s.examId === exam.id && s.content && s.content.trim() !== ""
+                    );
+                    const isSyllabusUpdated = examSyllabi.length > 0;
+
+                    // Timetable mapping
+                    const timetableData = studentProfile?.classId ? exam.timetables?.[studentProfile.classId] : null;
+                    const hasTimetable = timetableData && Object.keys(timetableData).length > 0;
+
+                    return (
+                        <div 
+                            key={exam.id}
+                            onClick={() => toggleExpand(exam.id)}
+                            className="bg-[#112240] border border-white/5 rounded-2xl hover:border-blue-500/20 cursor-pointer transition-all overflow-hidden shadow-lg animate-in fade-in duration-300"
+                        >
+                            {/* Card Main Row (Tap to expand/collapse details) */}
+                            <div 
+                                className="p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-4 select-none"
+                            >
+                                <div className="flex items-center gap-4 flex-1 min-w-0">
+                                    {/* Left Icon Document block */}
+                                    <div className="w-12 h-12 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0 transition-transform hover:scale-105">
+                                        <FileText className="w-6 h-6" />
+                                    </div>
+
+                                    {/* Middle Content */}
+                                    <div className="space-y-1.5 text-left min-w-0 flex-1 pr-0 sm:pr-4">
+                                        <div className="flex items-center gap-2.5 flex-wrap">
+                                            <h3 className="font-bold text-white text-base md:text-lg tracking-tight truncate">
+                                                {exam.name}
+                                            </h3>
+                                            
+                                            {/* Beautiful status badges matching mockup */}
+                                            {isResultsReleased ? (
+                                                <Badge className="bg-teal-500/15 text-teal-400 border border-teal-500/30 text-[9px] px-2.5 py-0.5 rounded-full font-black tracking-wider uppercase">
+                                                    RESULTS_RELEASED
+                                                </Badge>
+                                            ) : (
+                                                <Badge className="bg-emerald-500/15 text-emerald-400 border border-emerald-500/30 text-[9px] px-2.5 py-0.5 rounded-full font-black tracking-wider uppercase">
+                                                    ACTIVE
+                                                </Badge>
+                                            )}
                                         </div>
+
+                                        <div className="flex items-center gap-3 text-[10px] sm:text-xs text-[#8892B0] font-semibold select-none flex-wrap">
+                                            <div className="flex items-center gap-1 shrink-0">
+                                                <Calendar className="w-3.5 h-3.5 text-[#8892B0]" />
+                                                <span>
+                                                    {formatDateStr(exam.startDate)} - {formatDateStr(exam.endDate)}
+                                                </span>
+                                            </div>
+
+                                            {/* Thin vertical line divider */}
+                                            <div className="hidden xs:block h-3.5 w-[1px] bg-white/10" />
+
+                                            {/* Brand blue "VIEW TIMETABLE & SYLLABUS" text toggle */}
+                                            <div className="flex items-center gap-1 font-bold text-blue-400 hover:text-blue-300 transition-colors uppercase tracking-wider text-[10px] shrink-0">
+                                                <span>View Timetable & Syllabus</span>
+                                                {isExpanded ? (
+                                                    <ChevronUp className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                                                ) : (
+                                                    <ChevronDown className="w-3.5 h-3.5 text-blue-400 shrink-0" />
+                                                )}
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Right Side Actions */}
+                                <div className="w-full sm:w-auto flex items-center justify-end sm:justify-start gap-2 pt-2 sm:pt-0 border-t border-white/5 sm:border-t-0" onClick={e => e.stopPropagation()}>
+                                    {isResultsReleased ? (
+                                        <Link href={`/student/exams/${exam.id}/results`} className="w-full sm:w-auto">
+                                            <Button 
+                                                variant="outline" 
+                                                className="w-full sm:w-auto border-emerald-500/40 text-emerald-400 hover:bg-emerald-500/10 hover:text-emerald-300 font-bold px-3 py-1.5 h-9 rounded-xl flex items-center justify-center gap-1.5 text-[11px]"
+                                            >
+                                                <FileText className="w-3.5 h-3.5" /> View Results
+                                            </Button>
+                                        </Link>
                                     ) : (
                                         <>
-                                            {Object.entries(exam.timetables[studentProfile.classId])
-                                                .filter(([_, d]: any) => d.date)
-                                                .slice(0, 3)
-                                                .map(([subId, d]: any) => (
-                                                    <div key={subId} className="flex justify-between text-sm text-[#E6F1FF]">
-                                                        <span>{subId}</span>
-                                                        <span className="text-[#8892B0] text-xs">{d.date}</span>
-                                                    </div>
-                                                ))
-                                            }
-                                            {(Object.keys(exam.timetables[studentProfile.classId]).length > 3) && (
-                                                <div className="text-xs text-[#64FFDA] pt-1 text-center">+ More subjects</div>
+                                            {access.allowed ? (
+                                                <Link href={`/student/exams/${exam.id}/hall-ticket`} className="w-full sm:w-auto">
+                                                    <Button 
+                                                        variant="outline" 
+                                                        className="w-full sm:w-auto border-blue-500/40 text-blue-400 hover:bg-blue-500/10 hover:text-blue-300 font-bold px-3 py-1.5 h-9 rounded-xl flex items-center justify-center gap-1.5 text-[11px]"
+                                                    >
+                                                        <Download className="w-3.5 h-3.5" /> Hall Ticket
+                                                    </Button>
+                                                </Link>
+                                            ) : (
+                                                <div className="w-full sm:w-auto flex flex-col items-stretch sm:items-end gap-1">
+                                                    <Button 
+                                                        disabled 
+                                                        className="w-full sm:w-auto bg-red-500/5 text-red-400/90 border border-red-500/20 cursor-not-allowed font-bold px-3 py-1.5 h-9 rounded-xl flex items-center justify-center gap-1.5 text-[11px]"
+                                                    >
+                                                        <Lock className="w-3.5 h-3.5" /> Locked
+                                                    </Button>
+                                                </div>
                                             )}
                                         </>
                                     )}
                                 </div>
                             </div>
 
-                            <div className="space-y-3">
-                                {exam.status === 'RESULTS_RELEASED' && (
-                                    <Link href={`/student/exams/${exam.id}/results`}>
-                                        <Button className="w-full bg-emerald-600 hover:bg-emerald-700 text-white font-bold shadow-[0_0_15px_-5px_#10B981]">
-                                            <FileText className="w-4 h-4 mr-2" /> View Results / Report Card
-                                        </Button>
-                                    </Link>
+                            {/* Collapsible Details Section (Framer Motion) */}
+                            <AnimatePresence initial={false}>
+                                {isExpanded && (
+                                    <motion.div
+                                        initial={{ height: 0, opacity: 0 }}
+                                        animate={{ height: "auto", opacity: 1 }}
+                                        exit={{ height: 0, opacity: 0 }}
+                                        transition={{ duration: 0.2 }}
+                                    >
+                                        <div 
+                                            onClick={e => e.stopPropagation()}
+                                            className="px-5 pb-5 pt-1 border-t border-white/5 bg-[#0d1d37]/40 space-y-4"
+                                        >
+                                            {/* Display Access Alert if Locked */}
+                                            {!isResultsReleased && !access.allowed && (
+                                                <div className="bg-red-500/10 border border-red-500/20 p-3 rounded-xl flex items-start gap-2.5 text-red-400 text-xs">
+                                                    <AlertCircle className="w-4 h-4 shrink-0 mt-0.5" />
+                                                    <div>
+                                                        <p className="font-bold">Hall Ticket Locked Due to Pending Dues</p>
+                                                        <p className="text-[11px] text-red-400/80 mt-0.5">{access.reason}</p>
+                                                    </div>
+                                                </div>
+                                            )}
+
+                                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                                {/* Left: Timetable */}
+                                                <div className="space-y-2 text-left">
+                                                    <h4 className="text-[11px] font-bold text-blue-400 uppercase tracking-widest">Exam Timetable</h4>
+                                                    {!hasTimetable ? (
+                                                        <div className="p-4 bg-white/[0.02] border border-white/5 rounded-xl text-xs text-[#8892B0] text-center">
+                                                            No timetable uploaded for your class yet.
+                                                        </div>
+                                                    ) : (
+                                                        <div className="bg-[#0A192F]/50 border border-white/5 rounded-xl p-3.5 space-y-2.5 max-h-[220px] overflow-y-auto">
+                                                            {Object.entries(timetableData)
+                                                                .filter(([_, d]: any) => d.date)
+                                                                .map(([subId, d]: any) => (
+                                                                    <div key={subId} className="flex justify-between items-center text-xs pb-2 border-b border-white/5 last:border-0 last:pb-0">
+                                                                        <div className="font-bold text-white truncate pr-2">
+                                                                            {subjects[subId]?.name || subId}
+                                                                        </div>
+                                                                        <div className="text-right shrink-0">
+                                                                            <p className="text-neutral-300 font-medium">{formatDateStr(d.date)}</p>
+                                                                            {d.time && <p className="text-[10px] text-[#8892B0] font-mono mt-0.5">{d.time}</p>}
+                                                                        </div>
+                                                                    </div>
+                                                                ))
+                                                            }
+                                                        </div>
+                                                    )}
+                                                </div>
+
+                                                {/* Right: Syllabus */}
+                                                <div className="space-y-2 text-left flex flex-col">
+                                                    <h4 className="text-[11px] font-bold text-blue-400 uppercase tracking-widest">Exam Syllabus</h4>
+                                                    {!isSyllabusUpdated ? (
+                                                        <div className="flex-1 p-4 bg-white/[0.02] border border-white/5 rounded-xl text-xs text-[#8892B0] text-center flex items-center justify-center">
+                                                            Syllabus not yet updated by the teacher.
+                                                        </div>
+                                                    ) : (
+                                                        <div className="flex-1 bg-[#0A192F]/50 border border-white/5 rounded-xl p-3.5 flex flex-col justify-between gap-3">
+                                                            <div className="text-xs text-neutral-300 line-clamp-4 leading-relaxed whitespace-pre-line">
+                                                                {examSyllabi[0].content}
+                                                            </div>
+                                                            <Link href={`/student/exams/${exam.id}/syllabus`} className="block w-full">
+                                                                <Button variant="outline" className="w-full border-blue-500/20 text-blue-400 hover:bg-blue-500/10 text-xs h-9 rounded-xl">
+                                                                    <FileText className="w-3.5 h-3.5 mr-2" /> View Detailed Syllabus
+                                                                </Button>
+                                                            </Link>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </motion.div>
                                 )}
-
-                                {(() => {
-                                    const examSyllabi = classSyllabi.filter(
-                                        (s: any) => s.examId === exam.id && s.content && s.content.trim() !== ""
-                                    );
-                                    const isSyllabusUpdated = examSyllabi.length > 0;
-
-                                    if (!isSyllabusUpdated) {
-                                        return (
-                                            <div className="space-y-1">
-                                                <Button disabled className="w-full border-amber-500/20 text-amber-500/80 bg-amber-500/5 cursor-not-allowed text-xs font-bold h-10 rounded-lg">
-                                                    <AlertCircle className="w-4 h-4 mr-2 text-amber-500 animate-pulse" /> Syllabus Not Yet Updated
-                                                </Button>
-                                            </div>
-                                        );
-                                    } else {
-                                        return (
-                                            <Link href={`/student/exams/${exam.id}/syllabus`}>
-                                                <Button variant="outline" className="w-full border-[#64FFDA]/30 text-[#64FFDA] hover:bg-[#64FFDA]/10">
-                                                    <FileText className="w-4 h-4 mr-2" /> View Exam Syllabus
-                                                </Button>
-                                            </Link>
-                                        );
-                                    }
-                                })()}
-
-                                {(() => {
-                                    const access = checkHallTicketAccess(exam);
-                                    if (access.allowed) {
-                                        return (
-                                            <Link href={`/student/exams/${exam.id}/hall-ticket`} target="_blank">
-                                                <Button variant="outline" className="w-full border-blue-500/30 text-blue-400 hover:bg-blue-500/10 font-black uppercase tracking-widest text-[10px] h-11 rounded-lg">
-                                                    <CheckCircle className="w-4 h-4 mr-2" /> Download Hall Ticket
-                                                </Button>
-                                            </Link>
-                                        );
-                                    } else {
-                                        return (
-                                            <div className="space-y-1.5 pt-1">
-                                                <Button disabled className="w-full bg-red-500/10 text-red-400/90 border border-red-500/20 cursor-not-allowed font-black uppercase tracking-widest text-[10px] h-11 rounded-lg">
-                                                    <Lock className="w-4 h-4 mr-2" /> Hall Ticket Locked
-                                                </Button>
-                                                <p className="text-[10px] text-red-400/80 text-center font-medium leading-tight px-2">
-                                                    {access.reason}
-                                                </p>
-                                            </div>
-                                        );
-                                    }
-                                })()}
-                            </div>
-                        </CardContent>
-                    </Card>
-                ))}
+                            </AnimatePresence>
+                        </div>
+                    );
+                })}
 
                 {exams.length === 0 && (
                     <div className="col-span-full py-20 text-center border border-dashed border-[#64FFDA]/10 rounded-lg text-[#8892B0]">
                         No exams scheduled for your class ({studentProfile.className}) yet.
                     </div>
                 )}
+            </div>
+
+            {/* Bottom Section Card 1: Timetable and syllabus Info Banner (Matching mockup exactly) */}
+            <div className="bg-[#112240]/30 border border-blue-500/10 p-5 rounded-2xl flex items-start gap-4 text-left shadow-lg">
+                <Info className="w-6 h-6 text-blue-500 shrink-0 mt-0.5" />
+                <div className="space-y-1 min-w-0">
+                    <p className="text-sm font-bold text-white leading-snug">
+                        Timetable and syllabus will be updated by the administration.
+                    </p>
+                    <p className="text-xs text-amber-500 font-bold tracking-tight">
+                        Please check regularly for updates.
+                    </p>
+                </div>
+            </div>
+
+            {/* Bottom Section Card 2: Download All Tickets Banner (Matching mockup exactly) */}
+            <div className="bg-[#112240]/40 border border-white/5 p-4 rounded-2xl flex items-center justify-between gap-4 flex-wrap shadow-lg">
+                <div className="flex items-center gap-3.5 text-left min-w-0">
+                    {/* Blue ticket icon container */}
+                    <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 shrink-0">
+                        <Ticket className="w-5 h-5 text-blue-400" />
+                    </div>
+                    <div>
+                        <h4 className="text-sm font-bold text-white leading-tight">
+                            Download all your hall tickets in one click
+                        </h4>
+                        <p className="text-xs text-[#8892B0] font-medium mt-0.5">
+                            Get all hall tickets in a single PDF file.
+                        </p>
+                    </div>
+                </div>
+
+                {/* Right button action */}
+                <Button 
+                    onClick={handleDownloadAll}
+                    className="bg-blue-600 hover:bg-blue-700 text-white font-bold px-4 py-2.5 h-11 rounded-xl flex items-center gap-2 text-xs shadow-md transition-all shrink-0"
+                >
+                    <Download className="w-4 h-4" /> Download All
+                </Button>
             </div>
         </div>
     );

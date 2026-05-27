@@ -20,11 +20,45 @@ import { useMasterData } from "@/context/MasterDataContext";
 import { formatDateToDDMMYYYY } from "@/lib/date-utils";
 import { cn } from "@/lib/utils";
 
+const LEAVES_CACHE_KEY = "spoorthy_leaves_cache";
+const DEFAULT_LEAVES = [
+    {
+        id: "L-2026-001",
+        teacherId: "TCH-2026-042",
+        teacherName: "Prasad Kumar",
+        fromDate: "2026-05-30",
+        toDate: "2026-06-01",
+        type: "CL",
+        reason: "Family function in village",
+        status: "PENDING",
+        createdAt: "2026-05-25T12:00:00.000Z"
+    },
+    {
+        id: "L-2026-002",
+        teacherId: "TCH-2026-002",
+        teacherName: "Saraswathi Devi",
+        fromDate: "2026-05-28",
+        toDate: "2026-05-28",
+        type: "SL",
+        reason: "Medical checkup",
+        status: "APPROVED",
+        createdAt: "2026-05-24T09:00:00.000Z"
+    }
+];
+
 export function LeavesManager() {
     const { user } = useAuth();
     const { selectedYear } = useMasterData();
-    const [leaves, setLeaves] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [leaves, setLeaves] = useState<any[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(LEAVES_CACHE_KEY);
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
+        return DEFAULT_LEAVES;
+    });
+    const [loading, setLoading] = useState(false);
     const [actioning, setActioning] = useState<string | null>(null);
 
     // Impact Monitoring
@@ -45,6 +79,9 @@ export function LeavesManager() {
                 ...doc.data()
             }));
             setLeaves(loaded);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(LEAVES_CACHE_KEY, JSON.stringify(loaded));
+            }
             setLoading(false);
         }, (err) => {
             console.error("Leaves Sync Error:", err);

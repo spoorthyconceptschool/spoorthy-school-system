@@ -59,7 +59,7 @@ export default function StudentLoginPage() {
             });
 
             // 4. Redirect
-            router.push("/student/dashboard");
+            router.push("/student");
 
         } catch (err: any) {
             console.error("Login Error:", err);

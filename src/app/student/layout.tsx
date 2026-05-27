@@ -18,6 +18,8 @@ import {
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { NotificationCenter } from "@/components/NotificationCenter";
+import { AuthenticatedProvider } from "@/components/providers/AuthenticatedProvider";
+import { StudentDataProvider } from "@/context/StudentDataContext";
 
 const STUDENT_NAV = [
     { label: "Dashboard", icon: LayoutDashboard, href: "/student", exact: true },
@@ -26,25 +28,23 @@ const STUDENT_NAV = [
     { label: "Notices", icon: Bell, href: "/student/notices" },
 
     { label: "Attendance", icon: CalendarCheck, href: "/student/attendance" },
-    { label: "Timetable", icon: Calendar, href: "/student/timetable" },
+    { label: "Time Table", icon: Calendar, href: "/student/timetable" },
     { label: "Leave", icon: FileText, href: "/student/leaves" },
     { label: "Examinations", icon: Ticket, href: "/student/exams" },
     { label: "Holidays", icon: Calendar, href: "/student/holidays" },
     { label: "Profile", icon: User, href: "/student/profile" },
 ];
 
-import { AuthenticatedProvider } from "@/components/providers/AuthenticatedProvider";
-
 function StudentContent({ children }: { children: React.ReactNode }) {
     const { user, userData, loading, signOut } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
-    const [checking, setChecking] = useState(true);
     const [mustChangePassword, setMustChangePassword] = useState(false);
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const { branding } = useMasterData();
     const [imageError, setImageError] = useState(false);
+    const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
     useEffect(() => {
         setImageError(false);
@@ -83,8 +83,6 @@ function StudentContent({ children }: { children: React.ReactNode }) {
                 }
             } catch (e) {
                 console.error("Security check failed", e);
-            } finally {
-                setChecking(false);
             }
         };
 
@@ -99,7 +97,7 @@ function StudentContent({ children }: { children: React.ReactNode }) {
     }, [pathname, mustChangePassword, router]);
 
     // Hard fallback UI if user slips through somehow without data to stop loops dead in their tracks
-    if (!loading && (!user || !userData || !userData.role)) {
+    if (!loading && (!userData || !userData.role)) {
         return (
             <div className="h-screen w-full flex flex-col items-center justify-center bg-[#0A192F] text-white">
                 <p className="text-red-400 mb-4 text-xl font-bold uppercase tracking-widest">Session Invalid</p>
@@ -112,18 +110,17 @@ function StudentContent({ children }: { children: React.ReactNode }) {
     }
 
     // Only block the UI completely if we have NO cached data and are waiting for the network
-    const isAuthenticating = loading;
+    const isAuthenticating = loading && !userData;
     if (isAuthenticating) {
         return <div className="h-screen w-full flex items-center justify-center bg-[#0A192F] text-[#64FFDA]"><Loader2 className="animate-spin" /></div>;
     }
 
-    if (pathname === "/student/change-password") {
+    if (pathname === "/student/change-password" || pathname.includes("/hall-ticket") || pathname.includes("/results")) {
         return <div className="min-h-screen bg-[#0A192F] text-white">{children}</div>;
     }
 
     return (
-        <div className="flex h-screen bg-gradient-to-br from-[#0A192F] via-[#112240] to-[#0A192F] text-[#E6F1FF] font-sans overflow-hidden">
-            {/* Mobile Sidebar Backdrop */}
+        <div className="flex h-screen h-dvh bg-gradient-to-br from-[#0A192F] via-[#112240] to-[#0A192F] text-[#E6F1FF] font-sans overflow-hidden">
             {mobileMenuOpen && (
                 <div
                     className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
@@ -146,7 +143,7 @@ function StudentContent({ children }: { children: React.ReactNode }) {
                         <X size={20} />
                     </button>
                     <div className={cn("flex items-center gap-3 w-full", sidebarCollapsed ? "justify-center" : "")}>
-                        <div className="w-8 h-8 rounded bg-transparent flex items-center justify-center border border-white/20 shadow-md shrink-0 overflow-hidden">
+                        <div className="w-8 h-8 rounded-full bg-transparent flex items-center justify-center border border-amber-500/40 shadow-md shrink-0 overflow-hidden">
                             {!imageError ? (
                                 <img
                                     src={branding?.schoolLogo || "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png"}
@@ -177,6 +174,7 @@ function StudentContent({ children }: { children: React.ReactNode }) {
                             <Link
                                 key={item.href}
                                 href={item.href}
+                                prefetch={true}
                                 onClick={() => setMobileMenuOpen(false)}
                                 className={cn(
                                     "flex items-center gap-3 rounded-md transition-all duration-200 text-sm font-medium border border-transparent",
@@ -221,16 +219,9 @@ function StudentContent({ children }: { children: React.ReactNode }) {
 
             {/* Main Content */}
             <main className="flex-1 flex flex-col relative min-w-0 overflow-hidden">
-                {/* Mobile Header */}
-                <header className="h-16 lg:hidden px-4 border-b border-[#64FFDA]/10 flex items-center justify-between bg-[#0A192F]/80 backdrop-blur sticky top-0 z-40">
-                    <button
-                        onClick={() => setMobileMenuOpen(true)}
-                        className="p-2 hover:bg-white/5 rounded-lg text-white transition-colors"
-                    >
-                        <Menu size={24} />
-                    </button>
-                    <div className="flex items-center gap-2 overflow-hidden mx-2">
-                        <div className="w-7 h-7 rounded bg-transparent flex items-center justify-center border border-white/20 shadow-md shrink-0 overflow-hidden">
+                 <header className="h-16 lg:hidden px-4 border-b border-[#3B82F6]/10 flex items-center justify-between bg-[#0A192F]/80 backdrop-blur sticky top-0 z-40 shrink-0 shadow-md shadow-black/10">
+                    <div className="flex items-center gap-3 flex-1 min-w-0 pr-2">
+                        <div className="w-8 h-8 rounded-full bg-transparent flex items-center justify-center border border-amber-500/40 shadow-md shrink-0 overflow-hidden">
                             {!imageError ? (
                                 <img
                                     src={branding?.schoolLogo || "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png"}
@@ -242,11 +233,11 @@ function StudentContent({ children }: { children: React.ReactNode }) {
                                 <div className="w-full h-full bg-[#3B82F6]/10 flex items-center justify-center text-[#3B82F6] font-bold font-mono text-xs">S</div>
                             )}
                         </div>
-                        <div className="font-bold text-sm md:text-base text-white truncate max-w-[120px] xs:max-w-[160px]">
-                            {branding?.schoolName || "Student Portal"}
-                        </div>
+                        <h2 className="font-bold text-sm text-[#E6F1FF] tracking-tight truncate">
+                            {pathname === '/student/timetable' ? 'Time Table' : (pathname === '/student' ? (branding?.schoolName || "Spoorthy Concept School") : pathname.split('/').pop()?.replace('-', ' ') || "Dashboard")}
+                        </h2>
                     </div>
-                    <div className="flex items-center gap-4 ml-auto">
+                    <div className="flex items-center gap-4 ml-auto shrink-0">
                         <NotificationCenter role="STUDENT" />
                         {/* Profile Dropdown */}
                         <DropdownMenu>
@@ -275,8 +266,17 @@ function StudentContent({ children }: { children: React.ReactNode }) {
                 </header>
 
                 {/* Desktop Header */}
-                <header className="hidden lg:flex h-16 w-full items-center justify-end px-8 border-b border-[#64FFDA]/10 bg-[#0A192F]/50 backdrop-blur sticky top-0 z-40 gap-4">
-                    <NotificationCenter role="STUDENT" />
+                <header className="hidden lg:flex h-16 w-full items-center justify-between px-8 border-b border-[#64FFDA]/10 bg-[#0A192F]/50 backdrop-blur sticky top-0 z-40 gap-4">
+                    <div className="flex items-center gap-3 mr-auto">
+                        {pathname === '/student' && (
+                            <span className="font-display font-black text-sm uppercase tracking-widest text-[#E6F1FF] truncate max-w-[300px]">
+                                {branding?.schoolName || "Spoorthy Concept School"}
+                            </span>
+                        )}
+                    </div>
+                    
+                    <div className="flex items-center gap-4">
+                        <NotificationCenter role="STUDENT" />
 
                     <DropdownMenu>
                         <DropdownMenuTrigger asChild>
@@ -300,17 +300,166 @@ function StudentContent({ children }: { children: React.ReactNode }) {
                             </DropdownMenuItem>
                         </DropdownMenuContent>
                     </DropdownMenu>
+                    </div>
                 </header>
 
-                <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20">
+                <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20 pb-16 lg:pb-0">
                     {children}
                 </div>
+
+                {/* Mobile Bottom Navigation Bar (Visible only on Mobile/Tablet) */}
+                <nav className="fixed bottom-0 left-0 right-0 h-12 h-[calc(48px+env(safe-area-inset-bottom))] pb-0 pb-[env(safe-area-inset-bottom)] bg-[#0A192F] border-t border-[#3B82F6]/20 flex items-center justify-around px-2 z-50 lg:hidden shadow-[0_-5px_15px_rgba(0,0,0,0.5)]">
+                    <Link href="/student" prefetch={true} className={cn(
+                        "flex flex-col items-center justify-center w-16 h-9.5 rounded-xl transition-all",
+                        pathname === "/student" ? "text-[#3B82F6] scale-105" : "text-[#8892B0]"
+                    )}>
+                        <LayoutDashboard size={18} className={cn("transition-transform duration-300", pathname === "/student" && "scale-110")} />
+                        <span className="text-[8.5px] font-bold mt-0.5 tracking-wide">Home</span>
+                    </Link>
+
+                    <Link href="/student/fees" prefetch={true} className={cn(
+                        "flex flex-col items-center justify-center w-16 h-9.5 rounded-xl transition-all",
+                        pathname.startsWith("/student/fees") ? "text-[#3B82F6] scale-105" : "text-[#8892B0]"
+                    )}>
+                        <Wallet size={18} className={cn("transition-transform duration-300", pathname.startsWith("/student/fees") && "scale-110")} />
+                        <span className="text-[8.5px] font-bold mt-0.5 tracking-wide">Fees</span>
+                    </Link>
+
+                    <Link href="/student/homework" prefetch={true} className={cn(
+                        "flex flex-col items-center justify-center w-16 h-9.5 rounded-xl transition-all",
+                        pathname.startsWith("/student/homework") ? "text-[#3B82F6] scale-105" : "text-[#8892B0]"
+                    )}>
+                        <BookOpen size={18} className={cn("transition-transform duration-300", pathname.startsWith("/student/homework") && "scale-110")} />
+                        <span className="text-[8.5px] font-bold mt-0.5 tracking-wide">Homework</span>
+                    </Link>
+
+                    <Link href="/student/exams" prefetch={true} className={cn(
+                        "flex flex-col items-center justify-center w-16 h-9.5 rounded-xl transition-all",
+                        pathname.startsWith("/student/exams") ? "text-[#3B82F6] scale-105" : "text-[#8892B0]"
+                    )}>
+                        <Ticket size={18} className={cn("transition-transform duration-300", pathname.startsWith("/student/exams") && "scale-110")} />
+                        <span className="text-[8.5px] font-bold mt-0.5 tracking-wide">Exams</span>
+                    </Link>
+
+                    <button 
+                        onClick={() => setMobileMoreOpen(true)}
+                        className="flex flex-col items-center justify-center w-16 h-9.5 rounded-xl text-[#8892B0] hover:text-[#E6F1FF] transition-all"
+                    >
+                        <Menu size={18} />
+                        <span className="text-[8.5px] font-bold mt-0.5 tracking-wide">More</span>
+                    </button>
+                </nav>
+
+                {/* Mobile "More" sliding action drawer overlay */}
+                {mobileMoreOpen && (
+                    <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-[100] lg:hidden animate-in fade-in duration-200">
+                        <div className="absolute inset-0" onClick={() => setMobileMoreOpen(false)} />
+                        <div className="absolute bottom-0 left-0 right-0 bg-[#0B1524] border-t border-[#3B82F6]/30 rounded-t-[2.5rem] p-6 pb-10 space-y-6 z-10 animate-in slide-in-from-bottom duration-300 shadow-2xl">
+                            <div className="flex items-center justify-between border-b border-white/5 pb-4">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-8 h-8 rounded-xl bg-[#3B82F6]/20 flex items-center justify-center text-[#3B82F6] font-black text-sm">S</div>
+                                    <h3 className="text-lg font-display font-black text-white uppercase tracking-wider">More Actions</h3>
+                                </div>
+                                <button 
+                                    onClick={() => setMobileMoreOpen(false)} 
+                                    className="w-10 h-10 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/70 hover:bg-white/10 hover:text-white"
+                                >
+                                    <X size={18} />
+                                </button>
+                            </div>
+
+                            <div className="grid grid-cols-3 gap-3">
+                                <Link 
+                                    href="/student/notices" 
+                                    prefetch={true}
+                                    onClick={() => setMobileMoreOpen(false)}
+                                    className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#3B82F6]/20 transition-all text-center group"
+                                >
+                                    <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:scale-105 transition-transform mb-1.5">
+                                        <Bell size={18} />
+                                    </div>
+                                    <span className="text-[10px] font-bold text-white/80">Notices</span>
+                                </Link>
+
+                                <Link 
+                                    href="/student/attendance" 
+                                    prefetch={true}
+                                    onClick={() => setMobileMoreOpen(false)}
+                                    className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#3B82F6]/20 transition-all text-center group"
+                                >
+                                    <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform mb-1.5">
+                                        <CalendarCheck size={18} />
+                                    </div>
+                                    <span className="text-[10px] font-bold text-white/80">Attendance</span>
+                                </Link>
+
+                                <Link 
+                                    href="/student/timetable" 
+                                    prefetch={true}
+                                    onClick={() => setMobileMoreOpen(false)}
+                                    className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#3B82F6]/20 transition-all text-center group"
+                                >
+                                    <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 group-hover:scale-105 transition-transform mb-1.5">
+                                        <Calendar size={18} />
+                                    </div>
+                                    <span className="text-[10px] font-bold text-white/80">Time Table</span>
+                                </Link>
+
+                                <Link 
+                                    href="/student/leaves" 
+                                    prefetch={true}
+                                    onClick={() => setMobileMoreOpen(false)}
+                                    className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#3B82F6]/20 transition-all text-center group"
+                                >
+                                    <div className="w-9 h-9 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-105 transition-transform mb-1.5">
+                                        <FileText size={18} />
+                                    </div>
+                                    <span className="text-[10px] font-bold text-white/80">Leaves</span>
+                                </Link>
+
+                                <Link 
+                                    href="/student/holidays" 
+                                    prefetch={true}
+                                    onClick={() => setMobileMoreOpen(false)}
+                                    className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#3B82F6]/20 transition-all text-center group"
+                                >
+                                    <div className="w-9 h-9 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-400 group-hover:scale-105 transition-transform mb-1.5">
+                                        <Calendar size={18} />
+                                    </div>
+                                    <span className="text-[10px] font-bold text-white/80">Holidays</span>
+                                </Link>
+
+                                <Link 
+                                    href="/student/profile" 
+                                    prefetch={true}
+                                    onClick={() => setMobileMoreOpen(false)}
+                                    className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#3B82F6]/20 transition-all text-center group"
+                                >
+                                    <div className="w-9 h-9 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400 group-hover:scale-105 transition-transform mb-1.5">
+                                        <User size={18} />
+                                    </div>
+                                    <span className="text-[10px] font-bold text-white/80">Profile</span>
+                                </Link>
+                            </div>
+
+                            <div className="border-t border-white/5 pt-4">
+                                <button
+                                    onClick={() => {
+                                        setMobileMoreOpen(false);
+                                        signOut();
+                                    }}
+                                    className="w-full h-12 rounded-xl bg-red-500/10 border border-red-500/20 text-[#FF5555] font-black text-sm uppercase tracking-wider flex items-center justify-center gap-2 hover:bg-red-500/25 transition-all"
+                                >
+                                    <LogOut size={16} /> Sign Out
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </main>
         </div>
     );
 }
-
-import { StudentDataProvider } from "@/context/StudentDataContext";
 
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
     return (

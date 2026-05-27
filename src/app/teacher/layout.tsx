@@ -25,7 +25,7 @@ const TEACHER_NAV = [
     { label: "Dashboard", icon: LayoutDashboard, href: "/teacher", exact: true },
     { label: "Students", icon: GraduationCap, href: "/teacher/students" },
     { label: "Attendance", icon: CheckCircle, href: "/teacher/attendance" },
-    { label: "My Schedule", icon: Clock, href: "/teacher/timetable" },
+    { label: "Time Table", icon: Clock, href: "/teacher/timetable" },
     { label: "Homework", icon: BookOpen, href: "/teacher/homework" },
     { label: "Notices", icon: Bell, href: "/teacher/notices" },
     { label: "Groups", icon: Users, href: "/teacher/groups" },
@@ -40,6 +40,12 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
     const { user, userData, loading, signOut } = useAuth();
     const router = useRouter();
     const pathname = usePathname();
+
+    const [optimisticPath, setOptimisticPath] = useState<string | null>(null);
+
+    useEffect(() => {
+        setOptimisticPath(null);
+    }, [pathname]);
 
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
     const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
@@ -96,7 +102,7 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
     }, [user, userData, loading, pathname, router]);
 
     // Hard fallback UI if user slips through somehow without data to stop loops dead in their tracks
-    if (!loading && (!user || !userData || !userData.role)) {
+    if (!loading && (!userData || !userData.role)) {
         return (
             <div className="h-screen w-full flex flex-col items-center justify-center bg-[#0A192F] text-white">
                 <p className="text-red-400 mb-4 text-xl font-bold uppercase tracking-widest">Session Invalid</p>
@@ -108,7 +114,8 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
         );
     }
 
-    if (loading) {
+    const isAuthenticating = loading && !userData;
+    if (isAuthenticating) {
         return <div className="h-screen w-full flex items-center justify-center bg-[#0A192F] text-[#10B981]"><Loader2 className="animate-spin" /></div>;
     }
 
@@ -125,15 +132,13 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
         <div className="flex h-screen bg-gradient-to-br from-[#0A192F] via-[#112240] to-[#0A192F] text-[#E6F1FF] font-sans overflow-hidden">
             {/* Sidebar (Desktop & Tablet) */}
             <aside className={cn(
-                "hidden md:flex fixed lg:static inset-y-0 left-0 border-r border-[#10B981]/10 bg-[#0A192F]/80 backdrop-blur-xl flex-col h-full z-50 transition-all duration-300 shrink-0",
-                sidebarCollapsed 
-                    ? "md:w-20 lg:w-20 xl:w-20" 
-                    : "md:w-20 lg:w-20 xl:w-64" // Collapsed on tablet (md/lg), expanded on desktop (xl)
+                "hidden md:flex border-r border-[#10B981]/10 bg-[#0A192F]/80 backdrop-blur-xl flex-col h-full z-50 transition-all duration-300 shrink-0",
+                sidebarCollapsed ? "w-0 border-none overflow-hidden" : "w-64"
             )}>
                 {/* Brand Header */}
-                <div className="h-20 flex items-center justify-between px-4 border-b border-[#10B981]/10 select-none">
+                <div className="h-20 flex items-center justify-between px-4 border-b border-[#10B981]/10 select-none shrink-0">
                     <div className="flex items-center gap-3 overflow-hidden">
-                        <div className="w-8 h-8 rounded bg-transparent flex items-center justify-center border border-white/20 shadow-md shrink-0 overflow-hidden">
+                        <div className="w-8 h-8 shrink-0 overflow-hidden flex items-center justify-center bg-transparent">
                             {!imageError ? (
                                 <img
                                     src={branding?.schoolLogo || "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png"}
@@ -142,95 +147,65 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
                                     onError={() => setImageError(true)}
                                 />
                             ) : (
-                                <div className="w-full h-full bg-[#10B981]/10 flex items-center justify-center text-[#10B981] font-bold font-mono text-sm">T</div>
+                                <div className="w-full h-full bg-amber-500/10 flex items-center justify-center text-amber-500 font-bold font-mono text-sm">T</div>
                             )}
                         </div>
-                        
-                        {/* Hide text completely on collapsed tablet/desktop sidebars */}
-                        <h1 className={cn(
-                            "font-display font-bold text-xl text-white tracking-tight truncate transition-all duration-200",
-                            sidebarCollapsed ? "hidden" : "hidden xl:block"
-                        )}>
+                        <h1 className="font-display font-bold text-xl text-white tracking-tight truncate">
                             {branding?.schoolName ? (
-                                <span className="text-white text-sm md:text-base font-black">{branding.schoolName}</span>
+                                <span className="text-white text-sm font-black leading-tight">{branding.schoolName}</span>
                             ) : (
                                 <>Teacher<span className="text-[#10B981]">.Panel</span></>
                             )}
                         </h1>
                     </div>
+                    <button
+                        onClick={toggleSidebar}
+                        className="p-2 hover:bg-white/5 rounded-lg text-white/70 hover:text-white transition-colors cursor-pointer"
+                        title="Collapse Menu"
+                    >
+                        <Menu className="w-5 h-5 text-[#10B981]" />
+                    </button>
                 </div>
 
                 {/* Sidebar Navigation */}
                 <nav className="flex-1 py-6 px-3 space-y-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10">
                     {TEACHER_NAV.map((item) => {
-                        const isActive = item.exact ? pathname === item.href : pathname.startsWith(item.href);
-                        const isCollapsed = sidebarCollapsed;
+                        const activePath = optimisticPath || pathname;
+                        const isActive = item.exact ? activePath === item.href : activePath.startsWith(item.href);
                         return (
                             <Link
                                 key={item.href}
                                 href={item.href}
+                                prefetch={true}
+                                onClick={() => setOptimisticPath(item.href)}
                                 className={cn(
-                                    "flex items-center gap-3 px-3 py-3 rounded-md transition-all duration-200 text-sm font-medium border border-transparent group relative",
+                                    "flex items-center gap-3 px-3 py-3 rounded-md transition-all duration-200 text-sm font-medium border border-transparent group relative justify-start",
                                     isActive
                                         ? "bg-[#10B981]/10 text-[#10B981] border-[#10B981]/20 shadow-[0_0_15px_-5px_#10B981]"
-                                        : "text-[#8892B0] hover:text-[#E6F1FF] hover:bg-white/5",
-                                    "md:justify-center lg:justify-center xl:justify-start",
-                                    isCollapsed && "xl:justify-center"
+                                        : "text-[#8892B0] hover:text-[#E6F1FF] hover:bg-white/5"
                                 )}
                             >
                                 <item.icon size={18} className="shrink-0" />
                                 
-                                <span className={cn(
-                                    "transition-all duration-200",
-                                    isCollapsed ? "hidden" : "hidden xl:inline"
-                                )}>
+                                <span className="transition-all duration-200 inline">
                                     {item.label}
                                 </span>
-
-                                {/* Hover tooltip on collapsed sidebars */}
-                                <div className={cn(
-                                    "absolute left-16 hidden group-hover:block bg-[#0A192F] border border-[#10B981]/20 text-white font-bold text-xs px-2.5 py-1.5 rounded shadow-lg z-50 whitespace-nowrap pointer-events-none",
-                                    isCollapsed ? "block" : "xl:hidden"
-                                )}>
-                                    {item.label}
-                                </div>
                             </Link>
                         );
                     })}
                 </nav>
 
                 {/* Bottom Profile / Action Bar */}
-                <div className="p-4 border-t border-[#10B981]/10">
+                <div className="p-4 border-t border-[#10B981]/10 shrink-0">
                     <button 
                         onClick={signOut} 
-                        className={cn(
-                            "flex items-center gap-3 px-3 py-3 text-sm font-medium text-[#8892B0] hover:text-[#FF5555] hover:bg-[#FF5555]/10 w-full rounded-md transition-colors relative group",
-                            "md:justify-center lg:justify-center xl:justify-start",
-                            sidebarCollapsed && "xl:justify-center"
-                        )}
+                        className="flex items-center gap-3 px-3 py-3 text-sm font-medium text-[#8892B0] hover:text-[#FF5555] hover:bg-[#FF5555]/10 w-full rounded-md transition-colors relative group cursor-pointer justify-start"
                     >
                         <LogOut size={18} className="shrink-0" />
-                        <span className={cn(sidebarCollapsed ? "hidden" : "hidden xl:inline")}>Sign Out</span>
-                        <div className={cn(
-                            "absolute left-16 hidden group-hover:block bg-[#0A192F] border border-red-500/20 text-[#FF5555] font-bold text-xs px-2.5 py-1.5 rounded shadow-lg z-50 whitespace-nowrap pointer-events-none",
-                            sidebarCollapsed ? "block" : "xl:hidden"
-                        )}>
-                            Sign Out
-                        </div>
-                    </button>
-
-                    {/* Desktop Sidebar Collapse Arrow Trigger */}
-                    <button
-                        onClick={toggleSidebar}
-                        className="hidden xl:flex w-full mt-3 items-center justify-center p-2 rounded bg-white/5 border border-white/5 text-neutral-400 hover:text-white hover:bg-white/10 transition-all"
-                    >
-                        {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
+                        <span className="inline">Sign Out</span>
                     </button>
                     
-                    <div className={cn(
-                        "mt-2 text-center text-[#8892B0]/50 font-mono text-[10px] transition-all",
-                        (sidebarCollapsed) ? "hidden" : "hidden xl:block"
-                    )}>
+                    <div className="mt-2 text-center text-[#8892B0]/50 font-mono text-[10px] transition-all block">
                         v1.2.0
                     </div>
                 </div>
@@ -239,9 +214,12 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
             {/* Main Content Area */}
             <main className="flex-1 flex flex-col relative min-w-0 overflow-hidden">
                 {/* Mobile Header (Only visible below 768px) */}
-                <header className="h-16 md:hidden border-b border-[#10B981]/10 flex items-center justify-between px-4 bg-[#0A192F]/80 backdrop-blur sticky top-0 z-40 shrink-0">
-                    <div className="flex items-center gap-2 overflow-hidden">
-                        <div className="w-7 h-7 rounded bg-transparent flex items-center justify-center border border-white/20 shadow-md shrink-0 overflow-hidden">
+                <header className={cn(
+                    "h-16 md:hidden border-b border-[#10B981]/10 flex items-center justify-between px-4 bg-[#0A192F]/80 backdrop-blur sticky top-0 z-40 shrink-0",
+                    (pathname === "/teacher/students" || pathname === "/teacher/attendance" || pathname === "/teacher/timetable") && "hidden"
+                )}>
+                    <div className="flex items-center gap-2 flex-1 min-w-0 overflow-hidden pr-2">
+                        <div className="w-8 h-8 shrink-0 overflow-hidden flex items-center justify-center bg-transparent">
                             {!imageError ? (
                                 <img
                                     src={branding?.schoolLogo || "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png"}
@@ -250,11 +228,11 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
                                     onError={() => setImageError(true)}
                                 />
                             ) : (
-                                <div className="w-full h-full bg-[#10B981]/10 flex items-center justify-center text-[#10B981] font-bold font-mono text-xs">T</div>
+                                <div className="w-full h-full bg-amber-500/10 flex items-center justify-center text-amber-500 font-bold font-mono text-xs">T</div>
                             )}
                         </div>
-                        <h2 className="font-bold text-sm md:text-base capitalize text-[#E6F1FF] tracking-tight truncate max-w-[120px] xs:max-w-[160px]">
-                            {branding?.schoolName || "Dashboard"}
+                        <h2 className="font-bold text-sm md:text-base capitalize text-[#E6F1FF] tracking-tight truncate">
+                            {pathname === '/teacher/timetable' ? 'Time Table' : (pathname === '/teacher' ? (branding?.schoolName || "Spoorthy Concept School") : pathname.split('/').pop()?.replace('-', ' ') || "Dashboard")}
                         </h2>
                     </div>
 
@@ -267,11 +245,50 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
                 </header>
 
                 {/* Tablet & Desktop Header (Visible 768px and above) */}
-                <header className="hidden md:flex h-16 border-b border-[#10B981]/10 items-center justify-between px-8 bg-[#0A192F]/50 backdrop-blur sticky top-0 z-40 shrink-0">
-                    <div className="flex items-center gap-8 flex-1">
-                        <h2 className="font-semibold text-lg capitalize text-[#E6F1FF] tracking-wide shrink-0">
-                            {pathname.split('/').pop()?.replace('-', ' ') || "Dashboard"}
+                <header className="hidden md:flex h-16 border-b border-[#10B981]/10 items-center justify-between px-4 bg-[#0A192F]/50 backdrop-blur sticky top-0 z-40 shrink-0">
+                    <div className="flex items-center gap-4 flex-1">
+                        {/* Hamburger menu to toggle sidebar on desktop/tablet (Only shown when sidebar is closed) */}
+                        <button
+                            onClick={toggleSidebar}
+                            className={cn(
+                                "p-2 hover:bg-white/5 rounded-lg text-white/70 hover:text-white transition-all duration-300 cursor-pointer mr-2 shrink-0",
+                                sidebarCollapsed ? "opacity-100 block" : "opacity-0 hidden pointer-events-none"
+                            )}
+                            title="Toggle Menu"
+                        >
+                            <Menu className="w-5 h-5 text-[#10B981]" />
+                        </button>
+
+                        {/* Brand Logo and Name (Only shown when sidebar is closed) */}
+                        <div className={cn(
+                            "flex items-center gap-3 overflow-hidden transition-all duration-300",
+                            sidebarCollapsed ? "opacity-100 max-w-[300px]" : "opacity-0 max-w-0 pointer-events-none"
+                        )}>
+                            <div className="w-8 h-8 shrink-0 overflow-hidden flex items-center justify-center bg-transparent">
+                                {!imageError ? (
+                                    <img
+                                        src={branding?.schoolLogo || "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png"}
+                                        alt="Logo"
+                                        className="w-full h-full object-contain filter drop-shadow-sm"
+                                        onError={() => setImageError(true)}
+                                    />
+                                ) : (
+                                    <div className="w-full h-full bg-amber-500/10 flex items-center justify-center text-amber-500 font-bold font-mono text-sm">T</div>
+                                )}
+                            </div>
+                            <span className="font-display font-black text-sm text-white tracking-tight truncate">
+                                {branding?.schoolName || "Spoorthy School"}
+                            </span>
+                        </div>
+
+                        {/* Page Title (Only visible when sidebar is open to avoid branding duplication) */}
+                        <h2 className={cn(
+                            "font-semibold text-lg capitalize text-[#E6F1FF] tracking-wide shrink-0 transition-all duration-300 truncate",
+                            sidebarCollapsed ? "opacity-0 max-w-0 overflow-hidden" : "opacity-100 max-w-[260px]"
+                        )}>
+                            {pathname === '/teacher/timetable' ? 'Time Table' : (pathname === '/teacher' ? (branding?.schoolName || "Spoorthy Concept School") : pathname.split('/').pop()?.replace('-', ' ') || "Dashboard")}
                         </h2>
+
                         <div className="max-w-md w-full">
                             <UniversalSearch />
                         </div>
@@ -313,42 +330,50 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
                 </div>
 
                 {/* Mobile Bottom Navigation Bar (Visible only on Mobile) */}
-                <nav className="fixed bottom-0 left-0 right-0 h-16 bg-[#0A192F]/90 backdrop-blur-xl border-t border-[#10B981]/20 flex items-center justify-around px-2 z-50 md:hidden shadow-[0_-5px_15px_rgba(0,0,0,0.5)]">
-                    <Link href="/teacher" className={cn(
+                <nav className="fixed bottom-[-4px] pb-[4px] left-0 right-0 h-[68px] bg-[#040A15]/95 backdrop-blur-xl border-t border-[#22c55e]/20 flex items-center justify-around px-2 z-50 md:hidden shadow-[0_-8px_30px_rgba(34,197,94,0.08)]">
+                    <Link href="/teacher" prefetch={true} onClick={() => setOptimisticPath("/teacher")} className={cn(
                         "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all",
-                        pathname === "/teacher" ? "text-[#10B981] scale-105" : "text-[#8892B0]"
+                        (optimisticPath || pathname) === "/teacher" 
+                            ? "text-[#22c55e] scale-105 drop-shadow-[0_0_8px_rgba(34,197,94,0.6)]" 
+                            : "text-zinc-500"
                     )}>
-                        <LayoutDashboard size={20} />
+                        <LayoutDashboard size={20} className={cn((optimisticPath || pathname) === "/teacher" && "stroke-[2.5]")} />
                         <span className="text-[9px] font-bold mt-1 tracking-wide">Home</span>
                     </Link>
 
-                    <Link href="/teacher/students" className={cn(
+                    <Link href="/teacher/students" prefetch={true} onClick={() => setOptimisticPath("/teacher/students")} className={cn(
                         "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all",
-                        pathname.startsWith("/teacher/students") ? "text-[#10B981] scale-105" : "text-[#8892B0]"
+                        (optimisticPath || pathname).startsWith("/teacher/students") 
+                            ? "text-[#22c55e] scale-105 drop-shadow-[0_0_8px_rgba(34,197,94,0.6)]" 
+                            : "text-zinc-500"
                     )}>
-                        <GraduationCap size={20} />
+                        <GraduationCap size={20} className={cn((optimisticPath || pathname).startsWith("/teacher/students") && "stroke-[2.5]")} />
                         <span className="text-[9px] font-bold mt-1 tracking-wide">Students</span>
                     </Link>
 
-                    <Link href="/teacher/timetable" className={cn(
+                    <Link href="/teacher/timetable" prefetch={true} onClick={() => setOptimisticPath("/teacher/timetable")} className={cn(
                         "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all",
-                        pathname.startsWith("/teacher/timetable") ? "text-[#10B981] scale-105" : "text-[#8892B0]"
+                        (optimisticPath || pathname).startsWith("/teacher/timetable") 
+                            ? "text-[#22c55e] scale-105 drop-shadow-[0_0_8px_rgba(34,197,94,0.6)]" 
+                            : "text-zinc-500"
                     )}>
-                        <Clock size={20} />
-                        <span className="text-[9px] font-bold mt-1 tracking-wide">Schedule</span>
+                        <Clock size={20} className={cn((optimisticPath || pathname).startsWith("/teacher/timetable") && "stroke-[2.5]")} />
+                        <span className="text-[9px] font-bold mt-1 tracking-wide">Time Table</span>
                     </Link>
 
-                    <Link href="/teacher/attendance" className={cn(
+                    <Link href="/teacher/attendance" prefetch={true} onClick={() => setOptimisticPath("/teacher/attendance")} className={cn(
                         "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all",
-                        pathname.startsWith("/teacher/attendance") ? "text-[#10B981] scale-105" : "text-[#8892B0]"
+                        (optimisticPath || pathname).startsWith("/teacher/attendance") 
+                            ? "text-[#22c55e] scale-105 drop-shadow-[0_0_8px_rgba(34,197,94,0.6)]" 
+                            : "text-zinc-500"
                     )}>
-                        <CheckCircle size={20} />
+                        <CheckCircle size={20} className={cn((optimisticPath || pathname).startsWith("/teacher/attendance") && "stroke-[2.5]")} />
                         <span className="text-[9px] font-bold mt-1 tracking-wide">Attendance</span>
                     </Link>
 
                     <button 
                         onClick={() => setMobileMoreOpen(true)}
-                        className="flex flex-col items-center justify-center w-16 h-12 rounded-xl text-[#8892B0] hover:text-[#E6F1FF] transition-all"
+                        className="flex flex-col items-center justify-center w-16 h-12 rounded-xl text-zinc-500 hover:text-zinc-300 transition-all"
                     >
                         <Menu size={20} />
                         <span className="text-[9px] font-bold mt-1 tracking-wide">More</span>
@@ -376,7 +401,8 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
                             <div className="grid grid-cols-3 gap-3">
                                 <Link 
                                     href="/teacher/homework" 
-                                    onClick={() => setMobileMoreOpen(false)}
+                                    prefetch={true}
+                                    onClick={() => { setMobileMoreOpen(false); setOptimisticPath("/teacher/homework"); }}
                                     className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#10B981]/20 transition-all text-center group"
                                 >
                                     <div className="w-9 h-9 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-105 transition-transform mb-1.5">
@@ -387,7 +413,8 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
 
                                 <Link 
                                     href="/teacher/notices" 
-                                    onClick={() => setMobileMoreOpen(false)}
+                                    prefetch={true}
+                                    onClick={() => { setMobileMoreOpen(false); setOptimisticPath("/teacher/notices"); }}
                                     className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#10B981]/20 transition-all text-center group"
                                 >
                                     <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:scale-105 transition-transform mb-1.5">
@@ -398,7 +425,8 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
 
                                 <Link 
                                     href="/teacher/groups" 
-                                    onClick={() => setMobileMoreOpen(false)}
+                                    prefetch={true}
+                                    onClick={() => { setMobileMoreOpen(false); setOptimisticPath("/teacher/groups"); }}
                                     className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#10B981]/20 transition-all text-center group"
                                 >
                                     <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform mb-1.5">
@@ -409,7 +437,8 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
 
                                 <Link 
                                     href="/teacher/leaves" 
-                                    onClick={() => setMobileMoreOpen(false)}
+                                    prefetch={true}
+                                    onClick={() => { setMobileMoreOpen(false); setOptimisticPath("/teacher/leaves"); }}
                                     className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#10B981]/20 transition-all text-center group"
                                 >
                                     <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 group-hover:scale-105 transition-transform mb-1.5">
@@ -420,7 +449,8 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
 
                                 <Link 
                                     href="/teacher/holidays" 
-                                    onClick={() => setMobileMoreOpen(false)}
+                                    prefetch={true}
+                                    onClick={() => { setMobileMoreOpen(false); setOptimisticPath("/teacher/holidays"); }}
                                     className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#10B981]/20 transition-all text-center group"
                                 >
                                     <div className="w-9 h-9 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-400 group-hover:scale-105 transition-transform mb-1.5">
@@ -431,7 +461,8 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
 
                                 <Link 
                                     href="/teacher/profile" 
-                                    onClick={() => setMobileMoreOpen(false)}
+                                    prefetch={true}
+                                    onClick={() => { setMobileMoreOpen(false); setOptimisticPath("/teacher/profile"); }}
                                     className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#10B981]/20 transition-all text-center group"
                                 >
                                     <div className="w-9 h-9 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400 group-hover:scale-105 transition-transform mb-1.5">

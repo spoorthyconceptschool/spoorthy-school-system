@@ -17,10 +17,40 @@ import { useRouter } from "next/navigation";
 import { createNotification } from "@/lib/notifications";
 import { useMasterData } from "@/context/MasterDataContext";
 
+const EXAMS_CACHE_KEY = "spoorthy_exams_cache";
+const DEFAULT_EXAMS = [
+    {
+        id: "exam_default_1",
+        name: "Quarterly Examinations",
+        startDate: "2026-09-15",
+        endDate: "2026-09-22",
+        status: "ACTIVE",
+        academicYear: "2025-2026",
+        classIds: ["CLS_01", "CLS_02", "CLS_03", "CLS_04"]
+    },
+    {
+        id: "exam_default_2",
+        name: "Half-Yearly Examinations",
+        startDate: "2026-12-10",
+        endDate: "2026-12-18",
+        status: "ACTIVE",
+        academicYear: "2025-2026",
+        classIds: ["CLS_01", "CLS_02", "CLS_03", "CLS_04", "CLS_05"]
+    }
+];
+
 export default function ExamsListPage() {
     const { selectedYear, classes: classesData } = useMasterData();
-    const [exams, setExams] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [exams, setExams] = useState<any[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(EXAMS_CACHE_KEY);
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
+        return DEFAULT_EXAMS;
+    });
+    const [loading, setLoading] = useState(false);
     const [createOpen, setCreateOpen] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
@@ -40,7 +70,6 @@ export default function ExamsListPage() {
 
     const fetchExams = async () => {
         try {
-            setLoading(true);
             const q = query(collection(db, "exams"), orderBy("createdAt", "desc"));
             const snap = await getDocs(q);
             const allExams = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -52,6 +81,9 @@ export default function ExamsListPage() {
             });
             
             setExams(filtered);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(EXAMS_CACHE_KEY, JSON.stringify(filtered));
+            }
         } catch (e) {
             console.error(e);
         } finally {

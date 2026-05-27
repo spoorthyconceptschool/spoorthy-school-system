@@ -62,12 +62,57 @@ export default function ManageFeesPage() {
     );
 }
 
+const FEES_CACHE_KEY = "spoorthy_standard_fees_cache";
+const DEFAULT_TERMS = [
+    {
+        id: "term_default_1",
+        name: "I Term (Admission)",
+        dueDate: "2026-06-15",
+        isActive: true,
+        amounts: { "Nursery": 15000, "LKG": 17000, "UKG": 19000, "Class 1": 21000 }
+    },
+    {
+        id: "term_default_2",
+        name: "II Term (Mid-Year)",
+        dueDate: "2026-10-15",
+        isActive: true,
+        amounts: { "Nursery": 15000, "LKG": 17000, "UKG": 19000, "Class 1": 21000 }
+    }
+];
+const DEFAULT_TRANSPORT_FEES: Record<string, number> = {
+    "VIL_001": 5000,
+    "VIL_002": 6000,
+    "VIL_003": 7000
+};
+
 // --- Standard Fees Tab ---
 function StandardFeesTab() {
     const { classes: classesData, selectedYear } = useMasterData();
-    const [terms, setTerms] = useState<FeeTerm[]>([]);
-    const [transportFees, setTransportFees] = useState<{ [villageId: string]: number }>({});
-    const [loading, setLoading] = useState(true);
+    const [terms, setTerms] = useState<FeeTerm[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(FEES_CACHE_KEY);
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    if (parsed.terms) return parsed.terms;
+                } catch(e) {}
+            }
+        }
+        return DEFAULT_TERMS;
+    });
+    const [transportFees, setTransportFees] = useState<{ [villageId: string]: number }>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(FEES_CACHE_KEY);
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    if (parsed.transportFees) return parsed.transportFees;
+                } catch(e) {}
+            }
+        }
+        return DEFAULT_TRANSPORT_FEES;
+    });
+    const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [syncing, setSyncing] = useState(false);
 
@@ -86,6 +131,9 @@ function StandardFeesTab() {
                     const data = snapshot.data();
                     if (data.terms) setTerms(data.terms);
                     if (data.transportFees) setTransportFees(data.transportFees);
+                    if (typeof window !== 'undefined') {
+                        localStorage.setItem(FEES_CACHE_KEY, JSON.stringify(data));
+                    }
                 }
             } catch (error) {
                 console.error("Error fetching data:", error);
@@ -235,10 +283,31 @@ function StandardFeesTab() {
     );
 }
 
+const CUSTOM_FEES_CACHE_KEY = "spoorthy_custom_fees_cache";
+const DEFAULT_CUSTOM_FEES = [
+    {
+        id: "custom_fee_default_1",
+        name: "Annual Day Contribution",
+        amount: 500,
+        dueDate: "2026-11-30",
+        targetType: "CLASS",
+        targetIds: ["CLS_01", "CLS_02"],
+        status: "ACTIVE"
+    }
+];
+
 // --- Custom Fees Tab ---
 function CustomFeesTab() {
-    const [fees, setFees] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [fees, setFees] = useState<any[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(CUSTOM_FEES_CACHE_KEY);
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
+        return DEFAULT_CUSTOM_FEES;
+    });
+    const [loading, setLoading] = useState(false);
     const [isWizardOpen, setIsWizardOpen] = useState(false);
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState({
@@ -253,7 +322,11 @@ function CustomFeesTab() {
     useEffect(() => {
         const q = query(collection(db, "custom_fees"), orderBy("createdAt", "desc"));
         const unsubscribe = onSnapshot(q, (snap) => {
-            setFees(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            setFees(list);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(CUSTOM_FEES_CACHE_KEY, JSON.stringify(list));
+            }
             setLoading(false);
         });
 
