@@ -134,10 +134,7 @@ export function TopBar() {
 
                     {systemConfig.testingMode && <SeedDataButton />}
 
-                    {/* Pill Action Button - Optional Quick Action */}
-                    <Button variant="ghost" size="icon" className="h-9 w-9 rounded-full text-[#64FFDA]/50 hover:text-[#64FFDA] hover:bg-[#64FFDA]/10 sm:hidden lg:flex">
-                        <Plus size={18} />
-                    </Button>
+
                 </div>
 
                 {/* Real-time Notifications */}

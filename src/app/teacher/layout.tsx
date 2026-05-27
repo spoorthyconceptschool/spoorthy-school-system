@@ -53,6 +53,10 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
     const [imageError, setImageError] = useState(false);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
+    const currentPath = optimisticPath || pathname;
+    const isMainRouteActive = currentPath === "/teacher" || currentPath.startsWith("/teacher/students") || currentPath.startsWith("/teacher/timetable") || currentPath.startsWith("/teacher/attendance");
+    const isMoreActive = !isMainRouteActive;
+
     useEffect(() => {
         setImageError(false);
     }, [branding?.schoolLogo]);
@@ -332,48 +336,53 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
                 {/* Mobile Bottom Navigation Bar (Visible only on Mobile) */}
                 <nav className="fixed bottom-[-4px] pb-[4px] left-0 right-0 h-[68px] bg-[#040A15]/95 backdrop-blur-xl border-t border-[#22c55e]/20 flex items-center justify-around px-2 z-50 md:hidden shadow-[0_-8px_30px_rgba(34,197,94,0.08)]">
                     <Link href="/teacher" prefetch={true} onClick={() => setOptimisticPath("/teacher")} className={cn(
-                        "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all",
-                        (optimisticPath || pathname) === "/teacher" 
-                            ? "text-[#22c55e] scale-105 drop-shadow-[0_0_8px_rgba(34,197,94,0.6)]" 
-                            : "text-zinc-500"
+                        "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all duration-300 ease-in-out",
+                        currentPath === "/teacher" 
+                            ? "text-[#22c55e] scale-105 drop-shadow-[0_0_8px_rgba(34,197,94,0.6)] font-bold" 
+                            : "text-zinc-500 hover:text-zinc-300 active:scale-95"
                     )}>
-                        <LayoutDashboard size={20} className={cn((optimisticPath || pathname) === "/teacher" && "stroke-[2.5]")} />
+                        <LayoutDashboard size={20} className={cn(currentPath === "/teacher" && "stroke-[2.5]")} />
                         <span className="text-[9px] font-bold mt-1 tracking-wide">Home</span>
                     </Link>
 
                     <Link href="/teacher/students" prefetch={true} onClick={() => setOptimisticPath("/teacher/students")} className={cn(
-                        "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all",
-                        (optimisticPath || pathname).startsWith("/teacher/students") 
-                            ? "text-[#22c55e] scale-105 drop-shadow-[0_0_8px_rgba(34,197,94,0.6)]" 
-                            : "text-zinc-500"
+                        "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all duration-300 ease-in-out",
+                        currentPath.startsWith("/teacher/students") 
+                            ? "text-[#22c55e] scale-105 drop-shadow-[0_0_8px_rgba(34,197,94,0.6)] font-bold" 
+                            : "text-zinc-500 hover:text-zinc-300 active:scale-95"
                     )}>
-                        <GraduationCap size={20} className={cn((optimisticPath || pathname).startsWith("/teacher/students") && "stroke-[2.5]")} />
+                        <GraduationCap size={20} className={cn(currentPath.startsWith("/teacher/students") && "stroke-[2.5]")} />
                         <span className="text-[9px] font-bold mt-1 tracking-wide">Students</span>
                     </Link>
 
                     <Link href="/teacher/timetable" prefetch={true} onClick={() => setOptimisticPath("/teacher/timetable")} className={cn(
-                        "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all",
-                        (optimisticPath || pathname).startsWith("/teacher/timetable") 
-                            ? "text-[#22c55e] scale-105 drop-shadow-[0_0_8px_rgba(34,197,94,0.6)]" 
-                            : "text-zinc-500"
+                        "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all duration-300 ease-in-out",
+                        currentPath.startsWith("/teacher/timetable") 
+                            ? "text-[#22c55e] scale-105 drop-shadow-[0_0_8px_rgba(34,197,94,0.6)] font-bold" 
+                            : "text-zinc-500 hover:text-zinc-300 active:scale-95"
                     )}>
-                        <Clock size={20} className={cn((optimisticPath || pathname).startsWith("/teacher/timetable") && "stroke-[2.5]")} />
+                        <Clock size={20} className={cn(currentPath.startsWith("/teacher/timetable") && "stroke-[2.5]")} />
                         <span className="text-[9px] font-bold mt-1 tracking-wide">Time Table</span>
                     </Link>
 
                     <Link href="/teacher/attendance" prefetch={true} onClick={() => setOptimisticPath("/teacher/attendance")} className={cn(
-                        "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all",
-                        (optimisticPath || pathname).startsWith("/teacher/attendance") 
-                            ? "text-[#22c55e] scale-105 drop-shadow-[0_0_8px_rgba(34,197,94,0.6)]" 
-                            : "text-zinc-500"
+                        "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all duration-300 ease-in-out",
+                        currentPath.startsWith("/teacher/attendance") 
+                            ? "text-[#22c55e] scale-105 drop-shadow-[0_0_8px_rgba(34,197,94,0.6)] font-bold" 
+                            : "text-zinc-500 hover:text-zinc-300 active:scale-95"
                     )}>
-                        <CheckCircle size={20} className={cn((optimisticPath || pathname).startsWith("/teacher/attendance") && "stroke-[2.5]")} />
+                        <CheckCircle size={20} className={cn(currentPath.startsWith("/teacher/attendance") && "stroke-[2.5]")} />
                         <span className="text-[9px] font-bold mt-1 tracking-wide">Attendance</span>
                     </Link>
 
                     <button 
                         onClick={() => setMobileMoreOpen(true)}
-                        className="flex flex-col items-center justify-center w-16 h-12 rounded-xl text-zinc-500 hover:text-zinc-300 transition-all"
+                        className={cn(
+                            "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all duration-300 ease-in-out",
+                            isMoreActive
+                                ? "text-[#22c55e] scale-105 drop-shadow-[0_0_8px_rgba(34,197,94,0.6)] font-bold" 
+                                : "text-zinc-500 hover:text-zinc-300 active:scale-95"
+                        )}
                     >
                         <Menu size={20} />
                         <span className="text-[9px] font-bold mt-1 tracking-wide">More</span>

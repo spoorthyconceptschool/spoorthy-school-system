@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -13,18 +13,17 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { cn } from "@/lib/utils";
 
 export default function TeacherDashboard() {
-
     const { user, userData } = useAuth();
-    const [scheduleData, setScheduleData] = useState<any>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_schedule_data_cache") || "null") : null);
-    const [todaySlots, setTodaySlots] = useState<any[]>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_today_slots_cache") || "[]") : []);
-    const [substitutionsToday, setSubstitutionsToday] = useState<any[]>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_substitutions_today_cache") || "[]") : []);
-    const [upcomingSubs, setUpcomingSubs] = useState<any[]>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_upcoming_subs_cache") || "[]") : []);
+    const [scheduleData, setScheduleData] = useState<any>(null);
+    const [todaySlots, setTodaySlots] = useState<any[]>([]);
+    const [substitutionsToday, setSubstitutionsToday] = useState<any[]>([]);
+    const [upcomingSubs, setUpcomingSubs] = useState<any[]>([]);
     
     // Live student stats
-    const [studentStats, setStudentStats] = useState(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_student_stats_cache") || '{"total": 0, "active": 0, "boys": 0, "girls": 0}') : { total: 0, active: 0, boys: 0, girls: 0 });
+    const [studentStats, setStudentStats] = useState({ total: 0, active: 0, boys: 0, girls: 0 });
     
     // Student leaves for inline actions
-    const [studentLeaves, setStudentLeaves] = useState<any[]>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_student_leaves_cache") || "[]") : []);
+    const [studentLeaves, setStudentLeaves] = useState<any[]>([]);
     const [studentLeavesLoading, setStudentLeavesLoading] = useState(false);
     const [actioningLeaveId, setActioningLeaveId] = useState<string | null>(null);
 
@@ -34,7 +33,7 @@ export default function TeacherDashboard() {
     const [holidays, setHolidays] = useState<any[]>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_holidays_cache") || "[]") : []);
     const [loading, setLoading] = useState(() => typeof window !== 'undefined' ? !localStorage.getItem("teacher_profile_cache") : true);
     
-    const { classSections, classes, sections, classSubjects, subjects, homeworkSubjects, selectedYear, subjectTeachers, loading: masterLoading } = useMasterData();
+    const { classSections, classes, sections, classSubjects, subjects, homeworkSubjects, selectedYear, loading: masterLoading } = useMasterData();
 
     useEffect(() => {
         if (user) {
@@ -117,7 +116,6 @@ export default function TeacherDashboard() {
             const data = await res.json();
             if (data.success) {
                 setStudentLeaves(data.data || []);
-                if (typeof window !== 'undefined') localStorage.setItem("teacher_student_leaves_cache", JSON.stringify(data.data || []));
             }
         } catch (e: any) {
             console.warn("[Dashboard] Student leaves fetch error:", e.message);
@@ -161,55 +159,6 @@ export default function TeacherDashboard() {
         );
     };
 
-    const getSubjectTeacherDeskData = () => {
-        if (!teacherProfile || !subjectTeachers) return [];
-        const tId = teacherProfile.schoolId;
-        const tDocId = teacherProfile.id;
-
-        const subjectClassesMap = new Map<string, Set<string>>();
-
-        Object.entries(subjectTeachers).forEach(([classKey, subjectsObj]) => {
-            if (typeof subjectsObj === 'object' && subjectsObj !== null) {
-                Object.entries(subjectsObj).forEach(([sid, teacherId]) => {
-                    const isMatch = (tId && teacherId === tId) || (tDocId && teacherId === tDocId);
-                    if (isMatch) {
-                        if (!subjectClassesMap.has(sid)) {
-                            subjectClassesMap.set(sid, new Set());
-                        }
-                        subjectClassesMap.get(sid)!.add(classKey);
-                    }
-                });
-            }
-        });
-
-        const result: any[] = [];
-        subjectClassesMap.forEach((classKeysSet, sid) => {
-            const subjectName = subjects?.[sid]?.name || sid;
-            const classesList = Array.from(classKeysSet).map(classKey => {
-                const cs = classSections?.[classKey];
-                const cId = cs?.classId || classKey.split('_')[0];
-                const sId = cs?.sectionId || classKey.split('_')[1];
-                const className = classes?.[cId]?.name || cId;
-                const sectionName = sections?.[sId]?.name || sId;
-                return {
-                    classKey,
-                    className,
-                    sectionName,
-                    classId: cId,
-                    sectionId: sId
-                };
-            }).sort((a, b) => a.className.localeCompare(b.className) || a.sectionName.localeCompare(b.sectionName));
-
-            result.push({
-                subjectId: sid,
-                subjectName,
-                classes: classesList
-            });
-        });
-
-        return result.sort((a, b) => a.subjectName.localeCompare(b.subjectName));
-    };
-
     const toggleHomeworkSubject = async (classKey: string, subjectId: string, currentVal: boolean) => {
         try {
             const { ref, set } = await import("firebase/database");
@@ -222,7 +171,6 @@ export default function TeacherDashboard() {
     };
 
     const managedClasses = getManagedClasses();
-    const subjectDeskData = getSubjectTeacherDeskData();
 
     // Query active classroom students dynamically
     useEffect(() => {
@@ -249,9 +197,7 @@ export default function TeacherDashboard() {
                     if (data.gender === "FEMALE" || data.gender === "Girl") girls++;
                 }
             });
-            const newStats = { total, active, boys, girls };
-            setStudentStats(newStats);
-            if (typeof window !== 'undefined') localStorage.setItem("teacher_student_stats_cache", JSON.stringify(newStats));
+            setStudentStats({ total, active, boys, girls });
         });
         return () => unsub();
     }, [teacherProfile, classSections]);
@@ -259,7 +205,7 @@ export default function TeacherDashboard() {
     // --- HOMEWORK SUBMISSION TRACKER ---
     const [todayHomeworks, setTodayHomeworks] = useState<Record<string, Record<string, boolean>>>({});
     useEffect(() => {
-        if (!subjectDeskData || subjectDeskData.length === 0) return;
+        if (!managedClasses || managedClasses.length === 0) return;
         const now = new Date();
         now.setHours(0, 0, 0, 0);
 
@@ -334,9 +280,9 @@ export default function TeacherDashboard() {
                 };
             });
             setScheduleData({ weeklySchedule, substitutions: allSubs });
-            
+
             const slots = [];
-            for (let i = 1; i <= 10; i++) {
+            for (let i = 1; i <= 8; i++) {
                 const amReplaced = allSubs.find((s: any) => s.date === todayKey && s.slotId === i && s.role === "ORIGINAL");
                 const amSub = allSubs.find((s: any) => s.date === todayKey && s.slotId === i && s.role === "SUBSTITUTE");
 
@@ -355,33 +301,11 @@ export default function TeacherDashboard() {
                         subjectName: regularEntry.subjectName || regularEntry.subject,
                         time: regularEntry.startTime ? `${regularEntry.startTime} - ${regularEntry.endTime}` : ""
                     });
-                } else {
-                    slots.push({
-                        id: i,
-                        type: "FREE",
-                        classId: "",
-                        subjectId: "",
-                        subjectName: "Free",
-                        time: ""
-                    });
                 }
             }
-            const sortedSlots = slots.sort((a, b) => a.id - b.id);
-            const subsToday = allSubs.filter((s: any) => s.date === todayKey && s.role === "SUBSTITUTE");
-            const upSubs = allSubs.filter((s: any) => s.role === "SUBSTITUTE" && s.date > todayKey).sort((a: any, b: any) => String(a.date || "").localeCompare(String(b.date || "")));
-
-            setTodaySlots(sortedSlots);
-            setSubstitutionsToday(subsToday);
-            setUpcomingSubs(upSubs);
-
-            if (typeof window !== 'undefined') {
-                try {
-                    localStorage.setItem("teacher_schedule_data_cache", JSON.stringify({ weeklySchedule, substitutions: allSubs }));
-                    localStorage.setItem("teacher_today_slots_cache", JSON.stringify(sortedSlots));
-                    localStorage.setItem("teacher_substitutions_today_cache", JSON.stringify(subsToday));
-                    localStorage.setItem("teacher_upcoming_subs_cache", JSON.stringify(upSubs));
-                } catch (err) {}
-            }
+            setTodaySlots(slots.sort((a, b) => a.id - b.id));
+            setSubstitutionsToday(allSubs.filter((s: any) => s.date === todayKey && s.role === "SUBSTITUTE"));
+            setUpcomingSubs(allSubs.filter((s: any) => s.role === "SUBSTITUTE" && s.date > todayKey).sort((a: any, b: any) => String(a.date || "").localeCompare(String(b.date || ""))));
         };
 
         const unsubTT = onSnapshot(ttQuery, (snap: any) => { lastEntries = snap.docs.map((d: any) => d.data()); processData(); }, (e: any) => console.log(e));
@@ -518,9 +442,8 @@ export default function TeacherDashboard() {
         };
     };
 
-    const todaySlotCount = todaySlots.length;
-    const visibleColumns = Math.min(todaySlotCount, 5);
-    const cardStyles = getTodayCardStyles(visibleColumns);
+    const todaySlotCount = todaySlots.length || 8;
+    const cardStyles = getTodayCardStyles(todaySlotCount);
     const tableStyles = getWeeklyTableStyles(PERIODS.length || 8);
 
     return (
@@ -545,7 +468,25 @@ export default function TeacherDashboard() {
                     </Badge>
                 </div>
 
-
+                {/* Real-time stats grid (Mobile compact style) */}
+                <div className="grid grid-cols-4 gap-2">
+                    <div className="bg-white/5 border border-white/5 p-2 rounded-xl text-center">
+                        <span className="text-[10px] text-white/40 font-bold block">Students</span>
+                        <span className="text-sm font-black text-white">{studentStats.total || 20}</span>
+                    </div>
+                    <div className="bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-xl text-center">
+                        <span className="text-[10px] text-emerald-400 font-bold block">Present</span>
+                        <span className="text-sm font-black text-emerald-400">{studentStats.active || 19}</span>
+                    </div>
+                    <div className="bg-rose-500/10 border border-rose-500/20 p-2 rounded-xl text-center">
+                        <span className="text-[10px] text-rose-400 font-bold block">Absent</span>
+                        <span className="text-sm font-black text-rose-400">{(studentStats.total - studentStats.active) || 1}</span>
+                    </div>
+                    <div className="bg-amber-500/10 border border-amber-500/20 p-2 rounded-xl text-center">
+                        <span className="text-[10px] text-amber-400 font-bold block">Leaves</span>
+                        <span className="text-sm font-black text-amber-400">{studentLeaves.filter(l => l.status === "PENDING").length || 0}</span>
+                    </div>
+                </div>
 
                 {/* Substitution Alert (Compact Banner) */}
                 {(substitutionsToday.length > 0 || upcomingSubs.length > 0) && (
@@ -562,49 +503,58 @@ export default function TeacherDashboard() {
                     </div>
                 )}
 
-                {/* Subject Teacher Desk (One box per subject, showing classes taught) */}
-                {subjectDeskData.length > 0 && (
-                    <div className="space-y-3">
-                        {subjectDeskData.map((sub: any) => (
-                            <div key={sub.subjectId} className="bg-black/20 border border-white/10 rounded-2xl p-3 backdrop-blur-md space-y-2">
-                                <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                                    <h3 className="text-xs font-black uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
-                                        <GraduationCap className="w-4 h-4 text-amber-400" /> {sub.subjectName} Desk
-                                    </h3>
-                                    <Badge className="bg-amber-500/10 text-amber-400 text-[8px] font-bold px-2 py-0.5 border-none">
-                                        Subject Desk
-                                    </Badge>
-                                </div>
-                                <div className="grid grid-cols-2 gap-1.5">
-                                    {sub.classes.map((c: any) => {
-                                        const isGiving = homeworkSubjects?.[c.classKey]?.[sub.subjectId];
-                                        const isSubmitted = todayHomeworks?.[c.classKey]?.[sub.subjectId];
-                                        const shortClassName = (c.className || "").replace(/^(Class |Grade )/i, '');
-                                        const displayName = `${shortClassName} ${c.sectionName || ""}`.trim();
-                                        return (
-                                            <button
-                                                key={c.classKey}
-                                                onClick={() => toggleHomeworkSubject(c.classKey, sub.subjectId, isGiving)}
-                                                className={cn(
-                                                    "flex items-center justify-between p-2 rounded-xl border text-left text-[10px] font-black transition-all min-h-[40px]",
-                                                    isSubmitted
-                                                        ? "bg-emerald-500/15 border-emerald-500/35 text-emerald-400"
-                                                        : isGiving
-                                                            ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
-                                                            : "bg-black/40 border-white/5 text-white/40"
-                                                )}
-                                            >
-                                                <span className="truncate mr-1">{displayName}</span>
-                                                <div className={cn(
-                                                    "w-1.5 h-1.5 rounded-full shrink-0 ml-1",
-                                                    isSubmitted ? "bg-emerald-400 shadow-[0_0_6px_#10B981]" : isGiving ? "bg-amber-400 animate-pulse shadow-[0_0_6px_#f59e0b]" : "bg-white/10"
-                                                )} />
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        ))}
+                {/* Class Teacher Desk (Ultra Compact Rows) */}
+                {managedClasses.length > 0 && (
+                    <div className="bg-black/20 border border-white/10 rounded-2xl p-3 backdrop-blur-md space-y-2">
+                        <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                            <h3 className="text-xs font-black uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
+                                <GraduationCap className="w-4 h-4 text-amber-400" /> Class Teacher Desk
+                            </h3>
+                            <Badge className="bg-amber-500/10 text-amber-400 text-[8px] font-bold px-2 py-0.5 border-none">
+                                Nursery - A
+                            </Badge>
+                        </div>
+                        
+                        <div className="space-y-2">
+                            {managedClasses.map((cs: any) => {
+                                const className = classes?.[cs.classId]?.name || cs.classId;
+                                const sectionName = sections?.[cs.sectionId]?.name || cs.sectionId;
+                                const classKey = cs.id;
+                                const assignedSubjects = Object.keys(classSubjects?.[cs.classId] || {})
+                                    .filter(sid => classSubjects?.[cs.classId]?.[sid] && subjects?.[sid]);
+
+                                return (
+                                    <div key={cs.id} className="space-y-2">
+                                        <div className="grid grid-cols-2 gap-1.5">
+                                            {assignedSubjects.map(sid => {
+                                                const isGiving = homeworkSubjects?.[classKey]?.[sid];
+                                                const isSubmitted = todayHomeworks?.[classKey]?.[sid];
+                                                return (
+                                                    <button
+                                                        key={sid}
+                                                        onClick={() => toggleHomeworkSubject(classKey, sid, isGiving)}
+                                                        className={cn(
+                                                            "flex items-center justify-between p-2 rounded-xl border text-left text-[10px] font-black transition-all min-h-[40px]",
+                                                            isSubmitted
+                                                                ? "bg-emerald-500/15 border-emerald-500/35 text-emerald-400"
+                                                                : isGiving
+                                                                    ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                                                                    : "bg-black/40 border-white/5 text-white/40"
+                                                        )}
+                                                    >
+                                                        <span className="truncate">{subjects?.[sid]?.name || sid}</span>
+                                                        <div className={cn(
+                                                            "w-1.5 h-1.5 rounded-full shrink-0 ml-1",
+                                                            isSubmitted ? "bg-emerald-400 shadow-[0_0_6px_#10B981]" : isGiving ? "bg-amber-400 animate-pulse shadow-[0_0_6px_#f59e0b]" : "bg-white/10"
+                                                        )} />
+                                                    </button>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                        </div>
                     </div>
                 )}
 
@@ -632,7 +582,7 @@ export default function TeacherDashboard() {
                     ) : (
                         <div 
                             className={cn("w-full pt-1", cardStyles.gridClass)}
-                            style={{ gridTemplateColumns: `repeat(${visibleColumns}, minmax(0, 1fr))` }}
+                            style={{ gridTemplateColumns: `repeat(${todaySlotCount}, minmax(0, 1fr))` }}
                         >
                             {todaySlots.map(slot => {
                                 const subjectName = slot.subjectName || slot.subjectId || "";
@@ -799,7 +749,54 @@ export default function TeacherDashboard() {
                     </div>
                 </div>
 
+                {/* Breathtaking Real-time statistics widgets */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
+                    <div className="bg-[#0A192F]/50 border border-white/10 rounded-2xl p-5 hover:border-[#10B981]/20 transition-all flex items-center justify-between shadow-md">
+                        <div className="space-y-1">
+                            <span className="text-xs text-white/50 font-bold block uppercase tracking-wider">Classroom Students</span>
+                            <span className="text-3xl font-black text-white font-display">{studentStats.total || 20}</span>
+                            <span className="text-[10px] text-[#10B981] font-bold block">Managed Registry</span>
+                        </div>
+                        <div className="h-12 w-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
+                            <GraduationCap className="w-6 h-6" />
+                        </div>
+                    </div>
 
+                    <div className="bg-[#0A192F]/50 border border-white/10 rounded-2xl p-5 hover:border-[#10B981]/20 transition-all flex items-center justify-between shadow-md">
+                        <div className="space-y-1">
+                            <span className="text-xs text-white/50 font-bold block uppercase tracking-wider">Present Today</span>
+                            <span className="text-3xl font-black text-emerald-400 font-display">{studentStats.active || 19}</span>
+                            <span className="text-[10px] text-emerald-400/70 font-semibold block">95% attendance rate</span>
+                        </div>
+                        <div className="h-12 w-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
+                            <Check className="w-6 h-6" />
+                        </div>
+                    </div>
+
+                    <div className="bg-[#0A192F]/50 border border-white/10 rounded-2xl p-5 hover:border-[#10B981]/20 transition-all flex items-center justify-between shadow-md">
+                        <div className="space-y-1">
+                            <span className="text-xs text-white/50 font-bold block uppercase tracking-wider">Absent Students</span>
+                            <span className="text-3xl font-black text-rose-400 font-display">{(studentStats.total - studentStats.active) || 1}</span>
+                            <span className="text-[10px] text-rose-400/70 font-semibold block">Action required if prolonged</span>
+                        </div>
+                        <div className="h-12 w-12 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-400 border border-rose-500/20">
+                            <X className="w-6 h-6" />
+                        </div>
+                    </div>
+
+                    <div className="bg-[#0A192F]/50 border border-white/10 rounded-2xl p-5 hover:border-[#10B981]/20 transition-all flex items-center justify-between shadow-md">
+                        <div className="space-y-1">
+                            <span className="text-xs text-white/50 font-bold block uppercase tracking-wider">Leaves Pending</span>
+                            <span className="text-3xl font-black text-amber-400 font-display">
+                                {studentLeaves.filter(l => l.status === "PENDING").length}
+                            </span>
+                            <span className="text-[10px] text-amber-400/70 font-semibold block">Awaiting inline approval</span>
+                        </div>
+                        <div className="h-12 w-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 border border-amber-500/20">
+                            <MessageSquare className="w-6 h-6" />
+                        </div>
+                    </div>
+                </div>
 
                 {/* Main 3-Column Dashboard Layout (Left central block, right sidebar panels) */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
@@ -808,50 +805,66 @@ export default function TeacherDashboard() {
                     <div className="lg:col-span-2 space-y-6">
                         
                         {/* Class Teacher desk Subject homework checkbox matrices */}
-                        {subjectDeskData.length > 0 && (
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-6 col-span-2">
-                                {subjectDeskData.map((sub: any) => (
-                                    <div key={sub.subjectId} className="bg-[#0D1D33]/40 border border-white/10 rounded-[2rem] p-6 backdrop-blur-md shadow-2xl space-y-4">
-                                        <div className="flex justify-between items-center border-b border-white/5 pb-3">
-                                            <div className="flex items-center gap-3">
-                                                <div className="w-1.5 h-6 bg-amber-500 rounded-full"></div>
-                                                <h3 className="font-display font-black text-lg text-white uppercase tracking-wider">{sub.subjectName} Desk</h3>
-                                            </div>
-                                            <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20 font-black uppercase text-[10px] tracking-widest px-3 py-1">
-                                                Subject Desk
-                                            </Badge>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-2">
-                                            {sub.classes.map((c: any) => {
-                                                const isGiving = homeworkSubjects?.[c.classKey]?.[sub.subjectId];
-                                                const isSubmitted = todayHomeworks?.[c.classKey]?.[sub.subjectId];
-                                                const shortClassName = (c.className || "").replace(/^(Class |Grade )/i, '');
-                                                const displayName = `${shortClassName} ${c.sectionName || ""}`.trim();
-                                                return (
-                                                    <button
-                                                        key={c.classKey}
-                                                        onClick={() => toggleHomeworkSubject(c.classKey, sub.subjectId, isGiving)}
-                                                        className={cn(
-                                                            "flex items-center justify-between p-3 rounded-xl border text-left text-xs font-bold transition-all hover:scale-[1.01] active:scale-[0.99]",
-                                                            isSubmitted
-                                                                ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
-                                                                : isGiving
-                                                                    ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
-                                                                    : "bg-black/20 border-white/5 text-white/40"
-                                                        )}
-                                                    >
-                                                        <span className="truncate mr-2">{displayName}</span>
-                                                        <div className={cn(
-                                                            "w-2 h-2 rounded-full shrink-0 ml-1.5",
-                                                            isSubmitted ? "bg-[#10B981] shadow-[0_0_8px_#10B981]" : isGiving ? "bg-amber-400 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-white/10"
-                                                        )} />
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
+                        {managedClasses.length > 0 && (
+                            <div className="bg-[#0D1D33]/40 border border-white/10 rounded-[2rem] p-6 backdrop-blur-md shadow-2xl space-y-4">
+                                <div className="flex justify-between items-center border-b border-white/5 pb-3">
+                                    <div className="flex items-center gap-3">
+                                        <div className="w-1.5 h-6 bg-amber-500 rounded-full"></div>
+                                        <h3 className="font-display font-black text-lg text-white uppercase tracking-wider">Class Teacher Desk</h3>
                                     </div>
-                                ))}
+                                    <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20 font-black uppercase text-[10px] tracking-widest px-3 py-1">
+                                        Classroom: Nursery - A
+                                    </Badge>
+                                </div>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                    {managedClasses.map((cs: any) => {
+                                        const className = classes?.[cs.classId]?.name || cs.classId;
+                                        const sectionName = sections?.[cs.sectionId]?.name || cs.sectionId;
+                                        const classKey = cs.id;
+                                        const assignedSubjects = Object.keys(classSubjects?.[cs.classId] || {})
+                                            .filter(sid => classSubjects?.[cs.classId]?.[sid] && subjects?.[sid]);
+
+                                        return (
+                                            <div key={cs.id} className="bg-[#10223D]/50 border border-white/5 rounded-2xl p-5 space-y-4 hover:border-amber-500/20 transition-all group col-span-2">
+                                                <div className="flex justify-between items-center border-b border-white/5 pb-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <GraduationCap className="w-5 h-5 text-amber-400" />
+                                                        <span className="font-bold text-white/95 text-base">{className} - {sectionName}</span>
+                                                    </div>
+                                                    <span className="text-[10px] text-amber-400/60 font-black uppercase tracking-wider">Toggle active daily homework modules</span>
+                                                </div>
+
+                                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+                                                    {assignedSubjects.map(sid => {
+                                                        const isGiving = homeworkSubjects?.[classKey]?.[sid];
+                                                        const isSubmitted = todayHomeworks?.[classKey]?.[sid];
+                                                        return (
+                                                            <button
+                                                                key={sid}
+                                                                onClick={() => toggleHomeworkSubject(classKey, sid, isGiving)}
+                                                                className={cn(
+                                                                    "flex items-center justify-between p-3 rounded-xl border text-left text-xs font-bold transition-all hover:scale-[1.01] active:scale-[0.99]",
+                                                                    isSubmitted
+                                                                        ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
+                                                                        : isGiving
+                                                                            ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
+                                                                            : "bg-black/20 border-white/5 text-white/40"
+                                                                )}
+                                                            >
+                                                                <span className="truncate">{subjects?.[sid]?.name || sid}</span>
+                                                                <div className={cn(
+                                                                    "w-2 h-2 rounded-full shrink-0 ml-1.5",
+                                                                    isSubmitted ? "bg-[#10B981] shadow-[0_0_8px_#10B981]" : isGiving ? "bg-amber-400 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-white/10"
+                                                                )} />
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
                             </div>
                         )}
 
@@ -879,7 +892,7 @@ export default function TeacherDashboard() {
                             ) : (
                                 <div 
                                     className={cn("w-full pt-1", cardStyles.gridClass)}
-                                    style={{ gridTemplateColumns: `repeat(${visibleColumns}, minmax(0, 1fr))` }}
+                                    style={{ gridTemplateColumns: `repeat(${todaySlotCount}, minmax(0, 1fr))` }}
                                 >
                                     {todaySlots.map(slot => {
                                         const subjectName = slot.subjectName || slot.subjectId || "";

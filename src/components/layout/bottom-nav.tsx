@@ -52,10 +52,10 @@ export function BottomNav() {
             <nav className="fixed bottom-[-4px] pb-[4px] left-0 right-0 h-[68px] bg-[#040A15]/95 backdrop-blur-xl border-t border-[#64FFDA]/20 flex items-center justify-around px-2 z-50 md:hidden shadow-[0_-8px_30px_rgba(100,255,218,0.08)]">
                 {/* Home */}
                 <Link href="/admin" prefetch={true} onClick={() => setOptimisticPath("/admin")} className={cn(
-                    "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all",
+                    "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all duration-300 ease-in-out",
                     currentPath === "/admin" 
-                        ? "text-[#64FFDA] scale-105 drop-shadow-[0_0_8px_rgba(100,255,218,0.6)]" 
-                        : "text-zinc-500 active:scale-90"
+                        ? "text-[#64FFDA] scale-105 drop-shadow-[0_0_8px_rgba(100,255,218,0.6)] font-bold" 
+                        : "text-zinc-500 hover:text-zinc-300 active:scale-95"
                 )}>
                     <LayoutGrid size={20} className={cn(currentPath === "/admin" && "stroke-[2.5]")} />
                     <span className="text-[9px] font-bold mt-1 tracking-wide">Home</span>
@@ -63,10 +63,10 @@ export function BottomNav() {
 
                 {/* Students */}
                 <Link href="/admin/students" prefetch={true} onClick={() => setOptimisticPath("/admin/students")} className={cn(
-                    "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all",
+                    "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all duration-300 ease-in-out",
                     currentPath.startsWith("/admin/students") 
-                        ? "text-[#64FFDA] scale-105 drop-shadow-[0_0_8px_rgba(100,255,218,0.6)]" 
-                        : "text-zinc-500 active:scale-90"
+                        ? "text-[#64FFDA] scale-105 drop-shadow-[0_0_8px_rgba(100,255,218,0.6)] font-bold" 
+                        : "text-zinc-500 hover:text-zinc-300 active:scale-95"
                 )}>
                     <GraduationCap size={20} className={cn(currentPath.startsWith("/admin/students") && "stroke-[2.5]")} />
                     <span className="text-[9px] font-bold mt-1 tracking-wide">Students</span>
@@ -74,10 +74,10 @@ export function BottomNav() {
 
                 {/* Time Table */}
                 <Link href="/admin/timetable/manage" prefetch={true} onClick={() => setOptimisticPath("/admin/timetable/manage")} className={cn(
-                    "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all",
+                    "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all duration-300 ease-in-out",
                     currentPath.startsWith("/admin/timetable") 
-                        ? "text-[#64FFDA] scale-105 drop-shadow-[0_0_8px_rgba(100,255,218,0.6)]" 
-                        : "text-zinc-500 active:scale-90"
+                        ? "text-[#64FFDA] scale-105 drop-shadow-[0_0_8px_rgba(100,255,218,0.6)] font-bold" 
+                        : "text-zinc-500 hover:text-zinc-300 active:scale-95"
                 )}>
                     <Clock size={20} className={cn(currentPath.startsWith("/admin/timetable") && "stroke-[2.5]")} />
                     <span className="text-[9px] font-bold mt-1 tracking-wide">Time Table</span>
@@ -85,10 +85,10 @@ export function BottomNav() {
 
                 {/* Attendance */}
                 <Link href="/admin/attendance" prefetch={true} onClick={() => setOptimisticPath("/admin/attendance")} className={cn(
-                    "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all",
+                    "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all duration-300 ease-in-out",
                     currentPath.startsWith("/admin/attendance") 
-                        ? "text-[#64FFDA] scale-105 drop-shadow-[0_0_8px_rgba(100,255,218,0.6)]" 
-                        : "text-zinc-500 active:scale-90"
+                        ? "text-[#64FFDA] scale-105 drop-shadow-[0_0_8px_rgba(100,255,218,0.6)] font-bold" 
+                        : "text-zinc-500 hover:text-zinc-300 active:scale-95"
                 )}>
                     <CheckCircle size={20} className={cn(currentPath.startsWith("/admin/attendance") && "stroke-[2.5]")} />
                     <span className="text-[9px] font-bold mt-1 tracking-wide">Attendance</span>
@@ -98,10 +98,10 @@ export function BottomNav() {
                 <button 
                     onClick={() => setMobileMoreOpen(true)}
                     className={cn(
-                        "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all",
+                        "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all duration-300 ease-in-out",
                         isMoreActive
-                            ? "text-[#64FFDA] scale-105 drop-shadow-[0_0_8px_rgba(100,255,218,0.6)]" 
-                            : "text-zinc-500 hover:text-zinc-300 active:scale-90"
+                            ? "text-[#64FFDA] scale-105 drop-shadow-[0_0_8px_rgba(100,255,218,0.6)] font-bold" 
+                            : "text-zinc-500 hover:text-zinc-300 active:scale-95"
                     )}
                 >
                     <Menu size={20} />

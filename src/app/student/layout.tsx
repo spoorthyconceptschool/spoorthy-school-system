@@ -46,6 +46,10 @@ function StudentContent({ children }: { children: React.ReactNode }) {
     const [imageError, setImageError] = useState(false);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
 
+    const currentPath = pathname;
+    const isMainRouteActive = currentPath === "/student" || currentPath.startsWith("/student/fees") || currentPath.startsWith("/student/homework") || currentPath.startsWith("/student/exams");
+    const isMoreActive = !isMainRouteActive;
+
     useEffect(() => {
         setImageError(false);
     }, [branding?.schoolLogo]);
@@ -308,45 +312,58 @@ function StudentContent({ children }: { children: React.ReactNode }) {
                 </div>
 
                 {/* Mobile Bottom Navigation Bar (Visible only on Mobile/Tablet) */}
-                <nav className="fixed bottom-0 left-0 right-0 h-12 h-[calc(48px+env(safe-area-inset-bottom))] pb-0 pb-[env(safe-area-inset-bottom)] bg-[#0A192F] border-t border-[#3B82F6]/20 flex items-center justify-around px-2 z-50 lg:hidden shadow-[0_-5px_15px_rgba(0,0,0,0.5)]">
+                <nav className="fixed bottom-[-4px] pb-[4px] left-0 right-0 h-[68px] bg-[#040A15]/95 backdrop-blur-xl border-t border-[#3B82F6]/20 flex items-center justify-around px-2 z-50 lg:hidden shadow-[0_-8px_30px_rgba(59,130,246,0.08)]">
                     <Link href="/student" prefetch={true} className={cn(
-                        "flex flex-col items-center justify-center w-16 h-9.5 rounded-xl transition-all",
-                        pathname === "/student" ? "text-[#3B82F6] scale-105" : "text-[#8892B0]"
+                        "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all duration-300 ease-in-out",
+                        pathname === "/student" 
+                            ? "text-[#3B82F6] scale-105 drop-shadow-[0_0_8px_rgba(59,130,246,0.6)] font-bold" 
+                            : "text-zinc-500 hover:text-zinc-300 active:scale-95"
                     )}>
-                        <LayoutDashboard size={18} className={cn("transition-transform duration-300", pathname === "/student" && "scale-110")} />
-                        <span className="text-[8.5px] font-bold mt-0.5 tracking-wide">Home</span>
+                        <LayoutDashboard size={20} className={cn(pathname === "/student" && "stroke-[2.5]")} />
+                        <span className="text-[9px] font-bold mt-1 tracking-wide">Home</span>
                     </Link>
 
                     <Link href="/student/fees" prefetch={true} className={cn(
-                        "flex flex-col items-center justify-center w-16 h-9.5 rounded-xl transition-all",
-                        pathname.startsWith("/student/fees") ? "text-[#3B82F6] scale-105" : "text-[#8892B0]"
+                        "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all duration-300 ease-in-out",
+                        pathname.startsWith("/student/fees") 
+                            ? "text-[#3B82F6] scale-105 drop-shadow-[0_0_8px_rgba(59,130,246,0.6)] font-bold" 
+                            : "text-zinc-500 hover:text-zinc-300 active:scale-95"
                     )}>
-                        <Wallet size={18} className={cn("transition-transform duration-300", pathname.startsWith("/student/fees") && "scale-110")} />
-                        <span className="text-[8.5px] font-bold mt-0.5 tracking-wide">Fees</span>
+                        <Wallet size={20} className={cn(pathname.startsWith("/student/fees") && "stroke-[2.5]")} />
+                        <span className="text-[9px] font-bold mt-1 tracking-wide">Fees</span>
                     </Link>
 
                     <Link href="/student/homework" prefetch={true} className={cn(
-                        "flex flex-col items-center justify-center w-16 h-9.5 rounded-xl transition-all",
-                        pathname.startsWith("/student/homework") ? "text-[#3B82F6] scale-105" : "text-[#8892B0]"
+                        "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all duration-300 ease-in-out",
+                        pathname.startsWith("/student/homework") 
+                            ? "text-[#3B82F6] scale-105 drop-shadow-[0_0_8px_rgba(59,130,246,0.6)] font-bold" 
+                            : "text-zinc-500 hover:text-zinc-300 active:scale-95"
                     )}>
-                        <BookOpen size={18} className={cn("transition-transform duration-300", pathname.startsWith("/student/homework") && "scale-110")} />
-                        <span className="text-[8.5px] font-bold mt-0.5 tracking-wide">Homework</span>
+                        <BookOpen size={20} className={cn(pathname.startsWith("/student/homework") && "stroke-[2.5]")} />
+                        <span className="text-[9px] font-bold mt-1 tracking-wide">Homework</span>
                     </Link>
 
                     <Link href="/student/exams" prefetch={true} className={cn(
-                        "flex flex-col items-center justify-center w-16 h-9.5 rounded-xl transition-all",
-                        pathname.startsWith("/student/exams") ? "text-[#3B82F6] scale-105" : "text-[#8892B0]"
+                        "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all duration-300 ease-in-out",
+                        pathname.startsWith("/student/exams") 
+                            ? "text-[#3B82F6] scale-105 drop-shadow-[0_0_8px_rgba(59,130,246,0.6)] font-bold" 
+                            : "text-zinc-500 hover:text-zinc-300 active:scale-95"
                     )}>
-                        <Ticket size={18} className={cn("transition-transform duration-300", pathname.startsWith("/student/exams") && "scale-110")} />
-                        <span className="text-[8.5px] font-bold mt-0.5 tracking-wide">Exams</span>
+                        <Ticket size={20} className={cn(pathname.startsWith("/student/exams") && "stroke-[2.5]")} />
+                        <span className="text-[9px] font-bold mt-1 tracking-wide">Exams</span>
                     </Link>
 
                     <button 
                         onClick={() => setMobileMoreOpen(true)}
-                        className="flex flex-col items-center justify-center w-16 h-9.5 rounded-xl text-[#8892B0] hover:text-[#E6F1FF] transition-all"
+                        className={cn(
+                            "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all duration-300 ease-in-out",
+                            isMoreActive
+                                ? "text-[#3B82F6] scale-105 drop-shadow-[0_0_8px_rgba(59,130,246,0.6)] font-bold" 
+                                : "text-zinc-500 hover:text-zinc-300 active:scale-95"
+                        )}
                     >
-                        <Menu size={18} />
-                        <span className="text-[8.5px] font-bold mt-0.5 tracking-wide">More</span>
+                        <Menu size={20} />
+                        <span className="text-[9px] font-bold mt-1 tracking-wide">More</span>
                     </button>
                 </nav>
 

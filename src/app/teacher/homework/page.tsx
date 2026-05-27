@@ -123,6 +123,34 @@ export default function TeacherHomeworkPage() {
         };
     }, [user, teacherId, useFallback]);
 
+    const parseClassSectionKey = (key: string) => {
+        const cs = classSections[key];
+        if (cs?.classId && cs?.sectionId) {
+            return { classId: cs.classId, sectionId: cs.sectionId };
+        }
+
+        const parts = key.split('_');
+        let classId = "";
+        let sectionId = "";
+
+        if (parts.length >= 4) {
+            classId = `${parts[0]}_${parts[1]}`;
+            sectionId = `${parts[2]}_${parts[3]}`;
+        } else if (parts.length === 3) {
+            classId = `${parts[0]}_${parts[1]}`;
+            const sec = parts[2].toUpperCase();
+            sectionId = sec.startsWith("SEC") ? sec : `SEC_${sec}`;
+        } else if (parts.length === 2) {
+            classId = `${parts[0]}_${parts[1]}`;
+            sectionId = "SEC_A";
+        } else {
+            classId = key;
+            sectionId = "SEC_A";
+        }
+
+        return { classId, sectionId };
+    };
+
     const getAuthorizedClasses = () => {
         if (!teacherId || !subjectTeachers || !classSections) return [];
         const set = new Map<string, { classId: string, sectionId: string, key: string }>();
@@ -130,10 +158,7 @@ export default function TeacherHomeworkPage() {
         Object.keys(subjectTeachers).forEach(key => {
             const subjectsObj = subjectTeachers[key];
             if (Object.values(subjectsObj).includes(teacherId)) {
-                const cs = classSections[key];
-                const parts = key.split('_');
-                const cId = cs?.classId || (parts.length >= 4 ? `${parts[0]}_${parts[1]}` : parts[0]);
-                const sId = cs?.sectionId || (parts.length >= 4 ? `${parts[2]}_${parts[3]}` : parts[1]);
+                const { classId: cId, sectionId: sId } = parseClassSectionKey(key);
                 set.set(key, { classId: cId, sectionId: sId, key });
             }
         });
@@ -163,10 +188,7 @@ export default function TeacherHomeworkPage() {
 
         setLoading(true);
         
-        const selectedClass = getAuthorizedClasses().find(c => c.key === targetClassId);
-        const parts = targetClassId.split('_');
-        const cId = selectedClass?.classId || (parts.length >= 4 ? `${parts[0]}_${parts[1]}` : parts[0]);
-        const sId = selectedClass?.sectionId || (parts.length >= 4 ? `${parts[2]}_${parts[3]}` : parts[1]);
+        const { classId: cId, sectionId: sId } = parseClassSectionKey(targetClassId);
 
         try {
             let successCount = 0;
