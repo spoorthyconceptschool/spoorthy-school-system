@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Save, Plus, Trash2, RefreshCw, Bus, Users, MapPin, Calendar, IndianRupee, Edit, Settings2, Layers } from "lucide-react";
+import { Loader2, Save, Plus, Trash2, RefreshCw, Bus, Users, MapPin, Calendar, IndianRupee, Edit, Settings2, Layers, ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useMasterData } from "@/context/MasterDataContext";
 import { toast } from "@/lib/toast-store";
@@ -19,6 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 
 // --- Types ---
 interface FeeTerm {
@@ -33,6 +34,13 @@ interface FeeTerm {
 export default function ManageFeesPage() {
     return (
         <div className="space-y-6 md:space-y-10 p-4 md:p-6 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-7xl mx-auto pb-24">
+            <Link 
+                href="/admin/fees" 
+                className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-muted-foreground hover:text-white transition-colors group"
+            >
+                <ArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-1" />
+                Back to Fee Center
+            </Link>
             <div className="space-y-1">
                 <h1 className="text-2xl md:text-4xl font-display font-bold tracking-tight text-white italic">Fee Management</h1>
                 <p className="text-muted-foreground text-xs md:text-lg">Configure standard class fees and assign specialized custom payments.</p>

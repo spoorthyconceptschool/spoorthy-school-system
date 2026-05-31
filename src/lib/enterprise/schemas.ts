@@ -13,7 +13,7 @@ const MoneySchema = z.number().int().min(0).describe("Store money as integers (c
 // 2. Student Schemas
 export const CreateStudentSchema = z.object({
     studentName: z.string().min(2).max(100),
-    firstName: z.string().min(2, "First name must be at least 2 characters").max(50),
+    firstName: z.string().min(1, "First name must be at least 1 character").max(50),
     lastName: z.string().max(50).optional(),
     admissionNumber: z.string().min(4).max(20).describe("Primary Key equivalent"),
     classId: z.string().min(1, "Class ID is required"),

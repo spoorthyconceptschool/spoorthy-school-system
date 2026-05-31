@@ -42,6 +42,17 @@ export async function POST(req: NextRequest) {
 
             // Transform legacy payload to enterprise payload for migration compatibility
             // This ensures we capture all fields from the frontend while adhering to strict schema
+            let dob = body.dateOfBirth || "2000-01-01";
+            if (dob && typeof dob === 'string') {
+                if (dob.match(/^\d{2}-\d{2}-\d{4}$/)) {
+                    const parts = dob.split('-');
+                    dob = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                } else if (dob.match(/^\d{2}\/\d{2}\/\d{4}$/)) {
+                    const parts = dob.split('/');
+                    dob = `${parts[2]}-${parts[1]}-${parts[0]}`;
+                }
+            }
+
             const normalizedBody = {
                 studentName: body.studentName || "Unknown",
                 firstName: body.studentName?.split(' ')[0] || "Unknown",
@@ -53,7 +64,7 @@ export async function POST(req: NextRequest) {
                 sectionName: body.sectionName || "",
                 villageId: body.villageId || "",
                 villageName: body.villageName || "",
-                dateOfBirth: body.dateOfBirth || "2000-01-01",
+                dateOfBirth: dob,
                 gender: String(body.gender || "other").toLowerCase(), // Normalize to lowercase for schema enum
                 parentName: body.parentName || "",
                 parentMobile: body.parentMobile || "",

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { collection, getDocs, query, orderBy, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Loader2, Download, Printer, Search, FileText, Bell, User, MapPin, ShieldAlert } from "lucide-react";
+import { Loader2, Download, Printer, Search, FileText, Bell, User, MapPin, ShieldAlert, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,7 @@ import { toast } from "@/lib/toast-store";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { FeeSlipGenerator } from "@/components/admin/fee-slip-generator";
+import Link from "next/link";
 
 const DEFAULT_PENDING_LEDGERS = [
     {
@@ -426,9 +427,15 @@ export default function FeePendingsPage() {
     };
 
     const totalDuesAmount = filtered.reduce((sum, l) => sum + (l.pendingAmount || 0), 0);
-
     return (
         <div className="space-y-6 animate-in fade-in duration-500 max-w-none p-0 pb-20">
+            <Link 
+                href="/admin/fees" 
+                className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-muted-foreground hover:text-white transition-colors group px-2 md:px-0"
+            >
+                <ArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-1" />
+                Back to Fee Center
+            </Link>
             {/* Header */}
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between pt-4 gap-6 px-2 md:px-0">
                 <div>

@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/context/AuthContext";
 import { useMasterData } from "@/context/MasterDataContext";
+import Link from "next/link";
 
 interface Payment {
     id: string;
@@ -20,9 +21,11 @@ interface Payment {
     studentId: string;
     amount: number;
     type: "credit" | "debit";
-    method: "razorpay" | "cash";
+    method: string;
     date: any;
     status: string;
+    academicYear?: string;
+    remarks?: string;
 }
 
 
@@ -353,6 +356,13 @@ export default function PaymentsPage() {
 
     return (
         <div className="space-y-4 md:space-y-6 animate-in fade-in duration-200 max-w-none p-0 pb-20">
+            <Link 
+                href="/admin/fees" 
+                className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-muted-foreground hover:text-white transition-colors group px-2 md:px-0"
+            >
+                <ArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-1" />
+                Back to Fee Center
+            </Link>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between pt-2 md:pt-4 gap-4 md:gap-6 px-2 md:px-0">
                 <div className="space-y-0.5 md:space-y-1">
                     <h1 className="text-2xl md:text-5xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic leading-tight">
