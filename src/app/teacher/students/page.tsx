@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState, useMemo } from "react";
 import { collection, query, where, getDocs, limit, onSnapshot } from "firebase/firestore";
@@ -347,10 +347,6 @@ export default function TeacherStudentsPage() {
                                     #{String(s.rollNumber || "NA").padStart(2, '0')}
                                 </div>
 
-                                {/* Avatar Initials */}
-                                <div className="w-8 h-8 rounded-full bg-white/5 border border-white/10 flex items-center justify-center text-white/80 font-black text-[10px] uppercase shrink-0">
-                                    {s.studentName?.substring(0, 2).toUpperCase()}
-                                </div>
 
                                 {/* Info Stack */}
                                 <div className="flex flex-col min-w-0">

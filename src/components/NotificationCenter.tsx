@@ -96,18 +96,23 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
 
                     if (!isMounted) return;
 
-                    // A. Global Teacher Notifications
-                    const qAllFaculty = query(collection(db, "notifications"), where("target", "in", ["ALL", "ALL_FACULTY"]), limit(20));
-                    const unsubAllFaculty = onSnapshot(qAllFaculty, (snap) => {
-                        if (!isMounted) return;
-                        updateNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
-                    }, (err: any) => console.warn("Faculty notification listener error:", err.message));
-                    unsubscribes.push(unsubAllFaculty);
-
                     if (!tSnap.empty) {
                         const teacherData = tSnap.docs[0].data();
                         const schoolId = teacherData.schoolId || tSnap.docs[0].id;
                         if (schoolId) {
+                            // A. Global Teacher Notifications
+                            const qAllFaculty = query(
+                                collection(db, "notifications"), 
+                                where("schoolId", "==", schoolId),
+                                where("target", "in", ["ALL", "ALL_FACULTY"]), 
+                                limit(20)
+                            );
+                            const unsubAllFaculty = onSnapshot(qAllFaculty, (snap) => {
+                                if (!isMounted) return;
+                                updateNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
+                            }, (err: any) => console.warn("Faculty notification listener error:", err.message));
+                            unsubscribes.push(unsubAllFaculty);
+
                             const qSchool = query(collection(db, "notifications"), where("userId", "==", schoolId), limit(20));
                             const unsubSchool = onSnapshot(qSchool, (snap) => {
                                 if (!isMounted) return;
@@ -122,18 +127,25 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
 
                     if (!isMounted) return;
 
-                    // A. Global Student Notifications
-                    const qAllStudents = query(collection(db, "notifications"), where("target", "in", ["ALL", "ALL_STUDENTS"]), limit(20));
-                    const unsubAllStudents = onSnapshot(qAllStudents, (snap) => {
-                        if (!isMounted) return;
-                        updateNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
-                    }, (err: any) => console.warn("Global student notification listener error:", err.message));
-                    unsubscribes.push(unsubAllStudents);
-
                     if (!sSnap.empty) {
                         const studentData = sSnap.docs[0].data();
                         const classId = studentData.classId;
                         const schoolId = studentData.schoolId || sSnap.docs[0].id;
+
+                        if (schoolId) {
+                            // A. Global Student Notifications
+                            const qAllStudents = query(
+                                collection(db, "notifications"), 
+                                where("schoolId", "==", schoolId),
+                                where("target", "in", ["ALL", "ALL_STUDENTS"]), 
+                                limit(20)
+                            );
+                            const unsubAllStudents = onSnapshot(qAllStudents, (snap) => {
+                                if (!isMounted) return;
+                                updateNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
+                            }, (err: any) => console.warn("Global student notification listener error:", err.message));
+                            unsubscribes.push(unsubAllStudents);
+                        }
 
                         // B. Class Notifications
                         if (classId) {

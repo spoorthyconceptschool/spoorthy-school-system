@@ -11,11 +11,41 @@ import { Badge } from "@/components/ui/badge";
 import { Card, CardContent } from "@/components/ui/card";
 import { Loader2, ChevronRight, CheckCircle2, XCircle, User, Users, GraduationCap, Phone, MapPin, Edit, Plus } from "lucide-react";
 
+const APPROVALS_CACHE_KEY = "spoorthy_student_approvals_cache";
+const DEFAULT_APPROVALS = [
+    {
+        id: "req_default_1",
+        requestType: "ADD",
+        teacherId: "TCH-2026-042",
+        teacherName: "Prasad Kumar",
+        classId: "C1",
+        sectionId: "S1",
+        schoolId: "",
+        status: "PENDING",
+        createdAt: { seconds: Math.floor(Date.now() / 1000) },
+        newData: {
+            studentName: "Dinesh Reddy",
+            parentName: "Srinivas Reddy",
+            parentMobile: "9876543210",
+            villageId: "V1",
+            gender: "male"
+        }
+    }
+];
+
 export function StudentApprovalsManager() {
     const { user } = useAuth();
     const { selectedYear, classes, sections, villages } = useMasterData();
-    const [changeRequests, setChangeRequests] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [changeRequests, setChangeRequests] = useState<any[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(APPROVALS_CACHE_KEY);
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
+        return DEFAULT_APPROVALS;
+    });
+    const [loading, setLoading] = useState(false);
     const [expandedTeacher, setExpandedTeacher] = useState<string | null>(null);
     const [processingId, setProcessingId] = useState<string | null>(null);
 
@@ -31,6 +61,9 @@ export function StudentApprovalsManager() {
             // Sort client-side by createdAt descending to avoid composite index
             docs.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
             setChangeRequests(docs);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(APPROVALS_CACHE_KEY, JSON.stringify(docs));
+            }
             setLoading(false);
         }, (err) => {
             console.warn("Change requests error:", err.message);

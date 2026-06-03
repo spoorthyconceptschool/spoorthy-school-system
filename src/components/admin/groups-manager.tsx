@@ -140,12 +140,28 @@ function SelectionDialog({
     );
 }
 
+const GROUPS_CACHE_KEY = "spoorthy_groups_cache";
+const DEFAULT_GROUPS: Group[] = [
+    { id: "g_red", name: "Red Dragons", code: "RED", color: "#ff4d4d" },
+    { id: "g_blue", name: "Blue Falcons", code: "BLUE", color: "#4d79ff" },
+    { id: "g_green", name: "Green Giants", code: "GREEN", color: "#00cc66" },
+    { id: "g_yellow", name: "Yellow Suns", code: "YELLOW", color: "#ffcc00" }
+];
+
 export function GroupsManager() {
     const { user } = useAuth();
     const { branding, students: globalStudents, teachers: globalTeachers, loading: masterLoading } = useMasterData();
     // Data State
-    const [groups, setGroups] = useState<Group[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [groups, setGroups] = useState<Group[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(GROUPS_CACHE_KEY);
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
+        return DEFAULT_GROUPS;
+    });
+    const [loading, setLoading] = useState(false);
     const [students, setStudents] = useState<any[]>([]);
     const [teachers, setTeachers] = useState<any[]>([]);
 
@@ -216,11 +232,13 @@ export function GroupsManager() {
     // 1. Group Data Sync (Real-time and Cached)
     useEffect(() => {
         if (!user) return;
-        setLoading(true);
         const unsub = onSnapshot(collection(db, "groups"), (snap: any) => {
             const list: Group[] = [];
             snap.forEach((d: any) => list.push({ id: d.id, ...d.data() } as Group));
             setGroups(list);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(GROUPS_CACHE_KEY, JSON.stringify(list));
+            }
             setLoading(false);
         }, (err: any) => {
             console.error("Groups Sync Error:", err);

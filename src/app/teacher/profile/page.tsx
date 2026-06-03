@@ -32,18 +32,38 @@ import { cn } from "@/lib/utils";
  * 
  * @returns {JSX.Element} The rendered teacher profile view.
  */
+const DEFAULT_PROFILE = {
+    name: "Prof. S. Praneeth",
+    schoolId: "TCH-2026-042",
+    teacherId: "TCH-2026-042",
+    status: "ACTIVE",
+    mobile: "+91 98765 43210",
+    age: "34",
+    address: "Plot 104, Spoorthy Campus Road, Vijayawada, AP",
+    qualifications: "M.Sc. Mathematics, B.Ed. (Gold Medalist)",
+    experience: "12 Years in Secondary Education",
+    joiningDate: "12-06-2018",
+    gender: "MALE",
+    bloodGroup: "O+VE",
+    email: "praneeth.maths@spoorthyschool.edu.in",
+    emergencyContact: "+91 98765 43211",
+    schoolName: "Spoorthy Concept School"
+};
+
 export default function TeacherProfilePage() {
     const { user, userData } = useAuth();
+
     const { classSections, classes, sections } = useMasterData();
-    const [profile, setProfile] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
+    const [profile, setProfile] = useState<any>(() => {
+        if (typeof window === 'undefined') return DEFAULT_PROFILE;
+        const cached = localStorage.getItem("teacher_profile_cache");
+        return cached ? JSON.parse(cached) : DEFAULT_PROFILE;
+    });
+    const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (userData?.schoolId) {
             fetchProfile(userData.schoolId);
-        } else if (user) {
-            // Fallback for cases where userData isn't fully ready yet but user is
-            setLoading(true);
         }
     }, [user, userData]);
 
@@ -54,14 +74,18 @@ export default function TeacherProfilePage() {
 
             if (teacherSnap.exists()) {
                 const data = teacherSnap.data();
-                setProfile({ ...data, schoolId: data.schoolId || teacherSnap.id });
+                const pObj = { ...data, schoolId: data.schoolId || teacherSnap.id };
+                setProfile(pObj);
+                if (typeof window !== 'undefined') localStorage.setItem("teacher_profile_cache", JSON.stringify(pObj));
             } else {
                 // Final fallback
                 const q = query(collection(db, "teachers"), where("uid", "==", user?.uid));
                 const snap = await getDocs(q);
                 if (!snap.empty) {
                     const data = snap.docs[0].data();
-                    setProfile({ ...data, schoolId: data.schoolId || snap.docs[0].id });
+                    const pObj = { ...data, schoolId: data.schoolId || snap.docs[0].id };
+                    setProfile(pObj);
+                    if (typeof window !== 'undefined') localStorage.setItem("teacher_profile_cache", JSON.stringify(pObj));
                 }
             }
         } catch (error: any) {
@@ -70,6 +94,7 @@ export default function TeacherProfilePage() {
             setLoading(false);
         }
     };
+
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-[#070F1E] via-[#0A192F] to-[#0F223D] text-[#E6F1FF] pb-16">

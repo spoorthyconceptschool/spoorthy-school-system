@@ -80,7 +80,8 @@ export function ClassesSectionsManager() {
     const assignClassTeacher = async (key: string, teacherId: string) => {
         if (!key) return;
         try {
-            const [cId, sId] = key.split('_');
+            const cId = key.split('_').slice(0, 2).join('_');
+            const sId = key.split('_').slice(2).join('_');
             const targetRef = ref(rtdb, `master/classSections/${key}/classTeacherId`);
 
             // 1. Get current teacher to clear their profile

@@ -273,7 +273,8 @@ export default function TeacherProfilePage() {
                                     const subjectsObj = subjectTeachers[key];
                                     Object.keys(subjectsObj).forEach(subId => {
                                         if (subjectsObj[subId] === id || subjectsObj[subId] === teacher.schoolId) {
-                                            const [cId, sId] = key.split('_');
+                                            const cId = key.split('_').slice(0, 2).join('_');
+                                            const sId = key.split('_').slice(2).join('_');
                                             assignments.push({ classId: cId, sectionId: sId, subId });
                                         }
                                     });

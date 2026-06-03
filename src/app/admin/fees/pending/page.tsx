@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { collection, getDocs, query, orderBy, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
-import { Loader2, Download, Printer, Search, FileText, Bell, User, MapPin, ShieldAlert } from "lucide-react";
+import { Loader2, Download, Printer, Search, FileText, Bell, User, MapPin, ShieldAlert, ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Badge } from "@/components/ui/badge";
@@ -18,6 +18,58 @@ import { toast } from "@/lib/toast-store";
 import { cn } from "@/lib/utils";
 import { useRouter } from "next/navigation";
 import { FeeSlipGenerator } from "@/components/admin/fee-slip-generator";
+import Link from "next/link";
+
+const DEFAULT_PENDING_LEDGERS = [
+    {
+        id: "ledger_default_1",
+        studentId: "SHS1001",
+        studentName: "Aarav Sharma",
+        parentName: "Vikram Sharma",
+        parentMobile: "9876543210",
+        className: "Class 1",
+        sectionName: "A",
+        villageName: "Miyapur",
+        villageId: "VIL_001",
+        totalFee: 45000,
+        totalPaid: 15000,
+        pendingAmount: 30000,
+        status: "PENDING",
+        studentStatus: "ACTIVE",
+        academicYearId: "2025-2026",
+        items: [
+            { name: "I Term Fee", amount: 15000, paidAmount: 15000, type: "TERM", status: "PAID" },
+            { name: "II Term Fee", amount: 15000, paidAmount: 0, type: "TERM", status: "PENDING" },
+            { name: "III Term Fee", amount: 15000, paidAmount: 0, type: "TERM", status: "PENDING" }
+        ],
+        transportFee: 0,
+        customFee: 0
+    },
+    {
+        id: "ledger_default_2",
+        studentId: "SHS1002",
+        studentName: "Aadhya Reddy",
+        parentName: "Somesh Reddy",
+        parentMobile: "9100060001",
+        className: "Class 2",
+        sectionName: "B",
+        villageName: "Bachupally",
+        villageId: "VIL_002",
+        totalFee: 51000,
+        totalPaid: 34000,
+        pendingAmount: 17000,
+        status: "PENDING",
+        studentStatus: "ACTIVE",
+        academicYearId: "2025-2026",
+        items: [
+            { name: "I Term Fee", amount: 17000, paidAmount: 17000, type: "TERM", status: "PAID" },
+            { name: "II Term Fee", amount: 17000, paidAmount: 17000, type: "TERM", status: "PAID" },
+            { name: "III Term Fee", amount: 17000, paidAmount: 0, type: "TERM", status: "PENDING" }
+        ],
+        transportFee: 0,
+        customFee: 0
+    }
+];
 
 export default function FeePendingsPage() {
     const PENDING_CACHE_KEY = "spoorthy_pending_ledgers";
@@ -25,12 +77,12 @@ export default function FeePendingsPage() {
         if (typeof window !== 'undefined') {
             const cached = localStorage.getItem(PENDING_CACHE_KEY);
             if (cached) {
-                try { return JSON.parse(cached); } catch (e) { return []; }
+                try { return JSON.parse(cached); } catch (e) {}
             }
         }
-        return [];
+        return DEFAULT_PENDING_LEDGERS;
     });
-    const [loading, setLoading] = useState(ledgers.length === 0);
+    const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState("");
     const [classFilter, setClassFilter] = useState("all");
     const [villageFilter, setVillageFilter] = useState("all");
@@ -375,9 +427,15 @@ export default function FeePendingsPage() {
     };
 
     const totalDuesAmount = filtered.reduce((sum, l) => sum + (l.pendingAmount || 0), 0);
-
     return (
         <div className="space-y-6 animate-in fade-in duration-500 max-w-none p-0 pb-20">
+            <Link 
+                href="/admin/fees" 
+                className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-muted-foreground hover:text-white transition-colors group px-2 md:px-0"
+            >
+                <ArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-1" />
+                Back to Fee Center
+            </Link>
             {/* Header */}
             <div className="flex flex-col lg:flex-row lg:items-center lg:justify-between pt-4 gap-6 px-2 md:px-0">
                 <div>

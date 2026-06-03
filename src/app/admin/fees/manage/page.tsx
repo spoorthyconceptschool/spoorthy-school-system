@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Switch } from "@/components/ui/switch";
-import { Loader2, Save, Plus, Trash2, RefreshCw, Bus, Users, MapPin, Calendar, IndianRupee, Edit, Settings2, Layers } from "lucide-react";
+import { Loader2, Save, Plus, Trash2, RefreshCw, Bus, Users, MapPin, Calendar, IndianRupee, Edit, Settings2, Layers, ArrowLeft } from "lucide-react";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { useMasterData } from "@/context/MasterDataContext";
 import { toast } from "@/lib/toast-store";
@@ -19,6 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
+import Link from "next/link";
 
 // --- Types ---
 interface FeeTerm {
@@ -33,6 +34,13 @@ interface FeeTerm {
 export default function ManageFeesPage() {
     return (
         <div className="space-y-6 md:space-y-10 p-4 md:p-6 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-7xl mx-auto pb-24">
+            <Link 
+                href="/admin/fees" 
+                className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-muted-foreground hover:text-white transition-colors group"
+            >
+                <ArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-1" />
+                Back to Fee Center
+            </Link>
             <div className="space-y-1">
                 <h1 className="text-2xl md:text-4xl font-display font-bold tracking-tight text-white italic">Fee Management</h1>
                 <p className="text-muted-foreground text-xs md:text-lg">Configure standard class fees and assign specialized custom payments.</p>
@@ -62,12 +70,57 @@ export default function ManageFeesPage() {
     );
 }
 
+const FEES_CACHE_KEY = "spoorthy_standard_fees_cache";
+const DEFAULT_TERMS = [
+    {
+        id: "term_default_1",
+        name: "I Term (Admission)",
+        dueDate: "2026-06-15",
+        isActive: true,
+        amounts: { "Nursery": 15000, "LKG": 17000, "UKG": 19000, "Class 1": 21000 }
+    },
+    {
+        id: "term_default_2",
+        name: "II Term (Mid-Year)",
+        dueDate: "2026-10-15",
+        isActive: true,
+        amounts: { "Nursery": 15000, "LKG": 17000, "UKG": 19000, "Class 1": 21000 }
+    }
+];
+const DEFAULT_TRANSPORT_FEES: Record<string, number> = {
+    "VIL_001": 5000,
+    "VIL_002": 6000,
+    "VIL_003": 7000
+};
+
 // --- Standard Fees Tab ---
 function StandardFeesTab() {
     const { classes: classesData, selectedYear } = useMasterData();
-    const [terms, setTerms] = useState<FeeTerm[]>([]);
-    const [transportFees, setTransportFees] = useState<{ [villageId: string]: number }>({});
-    const [loading, setLoading] = useState(true);
+    const [terms, setTerms] = useState<FeeTerm[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(FEES_CACHE_KEY);
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    if (parsed.terms) return parsed.terms;
+                } catch(e) {}
+            }
+        }
+        return DEFAULT_TERMS;
+    });
+    const [transportFees, setTransportFees] = useState<{ [villageId: string]: number }>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(FEES_CACHE_KEY);
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    if (parsed.transportFees) return parsed.transportFees;
+                } catch(e) {}
+            }
+        }
+        return DEFAULT_TRANSPORT_FEES;
+    });
+    const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [syncing, setSyncing] = useState(false);
 
@@ -86,6 +139,9 @@ function StandardFeesTab() {
                     const data = snapshot.data();
                     if (data.terms) setTerms(data.terms);
                     if (data.transportFees) setTransportFees(data.transportFees);
+                    if (typeof window !== 'undefined') {
+                        localStorage.setItem(FEES_CACHE_KEY, JSON.stringify(data));
+                    }
                 }
             } catch (error) {
                 console.error("Error fetching data:", error);
@@ -235,10 +291,31 @@ function StandardFeesTab() {
     );
 }
 
+const CUSTOM_FEES_CACHE_KEY = "spoorthy_custom_fees_cache";
+const DEFAULT_CUSTOM_FEES = [
+    {
+        id: "custom_fee_default_1",
+        name: "Annual Day Contribution",
+        amount: 500,
+        dueDate: "2026-11-30",
+        targetType: "CLASS",
+        targetIds: ["CLS_01", "CLS_02"],
+        status: "ACTIVE"
+    }
+];
+
 // --- Custom Fees Tab ---
 function CustomFeesTab() {
-    const [fees, setFees] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [fees, setFees] = useState<any[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(CUSTOM_FEES_CACHE_KEY);
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
+        return DEFAULT_CUSTOM_FEES;
+    });
+    const [loading, setLoading] = useState(false);
     const [isWizardOpen, setIsWizardOpen] = useState(false);
     const [step, setStep] = useState(1);
     const [formData, setFormData] = useState({
@@ -253,7 +330,11 @@ function CustomFeesTab() {
     useEffect(() => {
         const q = query(collection(db, "custom_fees"), orderBy("createdAt", "desc"));
         const unsubscribe = onSnapshot(q, (snap) => {
-            setFees(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            setFees(list);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(CUSTOM_FEES_CACHE_KEY, JSON.stringify(list));
+            }
             setLoading(false);
         });
 

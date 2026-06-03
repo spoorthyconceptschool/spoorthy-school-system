@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -460,7 +460,7 @@ export default function TeacherDashboard() {
                             <Activity className="w-3 h-3 text-[#10B981] animate-pulse" /> Live Session
                         </p>
                         <h1 className="text-xl font-display font-black text-white leading-tight mt-1">
-                            {teacherProfile?.name ? `Hi, ${teacherProfile.name.split(' ')[0]}` : "Welcome"}
+                            {teacherProfile?.name ? `Hi, ${teacherProfile.name}` : "Welcome"}
                         </h1>
                     </div>
                     <Badge className="bg-blue-500/10 border border-blue-500/30 text-blue-400 font-mono text-[10px] px-2.5 py-1">

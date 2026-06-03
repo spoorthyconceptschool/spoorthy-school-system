@@ -144,6 +144,7 @@ export default function RootLayout({
           <MasterDataProvider>
             {children}
             <SpeculativeLoader />
+            <Toaster />
           </MasterDataProvider>
         </AuthProvider>
       </body>

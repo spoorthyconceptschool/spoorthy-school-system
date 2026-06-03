@@ -15,7 +15,7 @@ interface StudentExportModalProps {
     students: any[];
 }
 
-export function StudentExportModal({ students }: StudentExportModalProps) {
+export function StudentExportModal({ students, children }: StudentExportModalProps & { children?: React.ReactNode }) {
     const { classes: classesData, villages: villagesData, branding } = useMasterData();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -208,12 +208,14 @@ export function StudentExportModal({ students }: StudentExportModalProps) {
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button
-                    variant="outline"
-                    className="h-9 md:h-12 gap-2 border-white/10 bg-white/5 text-white/70 hover:bg-white/10 rounded-xl px-4 md:px-6 transition-all"
-                >
-                    <FileText className="w-4 h-4" /> <span className="hidden sm:inline">Reports & Export</span><span className="sm:hidden">Reports</span>
-                </Button>
+                {children || (
+                    <Button
+                        variant="outline"
+                        className="h-9 md:h-12 gap-2 border-white/10 bg-white/5 text-white/70 hover:bg-white/10 rounded-xl px-4 md:px-6 transition-all"
+                    >
+                        <FileText className="w-4 h-4" /> <span className="hidden sm:inline">Reports & Export</span><span className="sm:hidden">Reports</span>
+                    </Button>
+                )}
             </DialogTrigger>
             <DialogContent className="bg-[#0A192F] border-white/10 text-white max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl backdrop-blur-3xl">
                 <DialogHeader>

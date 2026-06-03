@@ -11,9 +11,10 @@ import { useAuth } from "@/context/AuthContext";
 
 interface StudentImportModalProps {
     onSuccess: () => void;
+    children?: React.ReactNode;
 }
 
-export function StudentImportModal({ onSuccess }: StudentImportModalProps) {
+export function StudentImportModal({ onSuccess, children }: StudentImportModalProps) {
     const [open, setOpen] = useState(false);
     const [file, setFile] = useState<File | null>(null);
     const [parsedData, setParsedData] = useState<any[]>([]);
@@ -85,9 +86,11 @@ export function StudentImportModal({ onSuccess }: StudentImportModalProps) {
     return (
         <Dialog open={open} onOpenChange={(val) => { setOpen(val); if (!val) { setFile(null); setParsedData([]); setResults(null); } }}>
             <DialogTrigger asChild>
-                <Button variant="outline" className="gap-2 border-emerald-500/20 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20">
-                    <FileSpreadsheet className="w-4 h-4" /> Bulk Import
-                </Button>
+                {children || (
+                    <Button variant="outline" className="gap-2 border-emerald-500/20 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20">
+                        <FileSpreadsheet className="w-4 h-4" /> Bulk Import
+                    </Button>
+                )}
             </DialogTrigger>
             <DialogContent className="bg-black/95 border-white/10 text-white max-w-2xl">
                 <DialogHeader>

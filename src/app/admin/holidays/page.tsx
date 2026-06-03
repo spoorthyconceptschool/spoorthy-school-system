@@ -14,10 +14,40 @@ import { collection, query, orderBy, onSnapshot, where } from "firebase/firestor
 import { db } from "@/lib/firebase";
 import { toast } from "@/lib/toast-store";
 
+const HOLIDAYS_CACHE_KEY = "spoorthy_holidays_cache";
+const DEFAULT_HOLIDAYS = [
+    {
+        id: "hol_default_1",
+        title: "Summer Vacation",
+        description: "Annual summer break for all classes.",
+        startDate: "2026-05-01",
+        endDate: "2026-06-10",
+        type: "HOLIDAY",
+        status: "PUBLISHED"
+    },
+    {
+        id: "hol_default_2",
+        title: "Diwali Festival",
+        description: "Festival of lights holidays.",
+        startDate: "2026-11-10",
+        endDate: "2026-11-12",
+        type: "HOLIDAY",
+        status: "PUBLISHED"
+    }
+];
+
 export default function AdminHolidaysPage() {
     const { user, userData } = useAuth();
-    const [holidays, setHolidays] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [holidays, setHolidays] = useState<any[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(HOLIDAYS_CACHE_KEY);
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
+        return DEFAULT_HOLIDAYS;
+    });
+    const [loading, setLoading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [openAdd, setOpenAdd] = useState(false);
 
@@ -49,6 +79,9 @@ export default function AdminHolidaysPage() {
                 });
                 
             setHolidays(hols);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(HOLIDAYS_CACHE_KEY, JSON.stringify(hols));
+            }
             setLoading(false);
         }, (error) => {
             console.error("Error fetching holidays:", error);

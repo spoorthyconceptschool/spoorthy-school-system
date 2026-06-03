@@ -15,10 +15,48 @@ import { db } from "@/lib/firebase";
 import { toast } from "@/lib/toast-store";
 import { DataTable } from "@/components/ui/data-table";
 
+const NOTICES_CACHE_KEY = "spoorthy_notices_cache";
+const DEFAULT_NOTICES = [
+    {
+        id: "notice_default_1",
+        title: "Academic Year 2026-27 Enrollment",
+        content: "Admissions are officially open for the next academic year. Please refer to the admin desk for details.",
+        type: "REGULAR",
+        target: "ALL",
+        senderName: "Principal",
+        createdAt: { seconds: Math.floor(Date.now() / 1000) }
+    },
+    {
+        id: "notice_default_2",
+        title: "Annual Sports Day 2026",
+        content: "Sports day events will begin next week. All students are requested to register with their house captains.",
+        type: "REGULAR",
+        target: "STUDENTS",
+        senderName: "PE Director",
+        createdAt: { seconds: Math.floor(Date.now() / 1000) - 86400 }
+    }
+];
+
+const formatTimestamp = (ts: any) => {
+    if (!ts) return "Just now";
+    if (ts.seconds) {
+        return new Date(ts.seconds * 1000).toLocaleDateString();
+    }
+    return new Date(ts).toLocaleDateString();
+};
+
 export default function AdminNoticesPage() {
     const { user, userData } = useAuth();
-    const [notices, setNotices] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [notices, setNotices] = useState<any[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(NOTICES_CACHE_KEY);
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
+        return DEFAULT_NOTICES;
+    });
+    const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [useFallback, setUseFallback] = useState(false);
 
@@ -50,6 +88,9 @@ export default function AdminNoticesPage() {
                 list = [...list].sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
             }
             setNotices(list);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(NOTICES_CACHE_KEY, JSON.stringify(list));
+            }
             setLoading(false);
         }, (err) => {
             if (!isMounted) return;
@@ -214,7 +255,7 @@ export default function AdminNoticesPage() {
                                                     Holiday
                                                     {n.startDate && (
                                                         <span className="opacity-80 font-mono tracking-tighter">
-                                                            [{new Date(n.startDate?.seconds * 1000).toLocaleDateString()} {n.endDate && n.startDate.seconds !== n.endDate.seconds ? `- ${new Date(n.endDate?.seconds * 1000).toLocaleDateString()}` : ''}]
+                                                            [{formatTimestamp(n.startDate)} {n.endDate && n.startDate.seconds !== n.endDate.seconds ? `- ${formatTimestamp(n.endDate)}` : ''}]
                                                         </span>
                                                     )}
                                                 </Badge>
@@ -231,7 +272,7 @@ export default function AdminNoticesPage() {
                                     render: (n) => (
                                         <div className="flex flex-col items-end">
                                             <span className="text-[9px] font-black text-muted-foreground uppercase tracking-widest leading-none">{n.senderName}</span>
-                                            <span className="text-[8px] text-muted-foreground/40 mt-1 uppercase font-mono">{n.createdAt ? new Date(n.createdAt?.seconds * 1000).toLocaleDateString() : "Just now"}</span>
+                                            <span className="text-[8px] text-muted-foreground/40 mt-1 uppercase font-mono">{formatTimestamp(n.createdAt)}</span>
                                         </div>
                                     )
                                 }

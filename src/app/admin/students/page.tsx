@@ -7,7 +7,7 @@ import { db } from "@/lib/firebase";
 import { AddStudentModal } from "@/components/admin/add-student-modal";
 import { DeleteUserModal } from "@/components/admin/delete-user-modal";
 import { AdminChangePasswordModal } from "@/components/admin/admin-change-password-modal";
-import { Filter, Search as SearchIcon, Plus, Download, IndianRupee, Users, MoreHorizontal, User, Key, Trash2, CreditCard, Loader2, CheckCircle2, MapPin, Phone, BookOpen, RefreshCw } from "lucide-react";
+import { Filter, Search as SearchIcon, Plus, Download, IndianRupee, Users, MoreHorizontal, MoreVertical, ArrowUpDown, User, Key, Trash2, CreditCard, Loader2, CheckCircle2, MapPin, Phone, BookOpen, RefreshCw, ArrowRight, Lock, GraduationCap, Clock, FileSpreadsheet, FileText } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { StudentImportModal } from "@/components/admin/student-import-modal";
 import { DataTable } from "@/components/ui/data-table";
@@ -52,6 +52,37 @@ interface Student {
 
 import { StudentApprovalsManager } from "@/components/admin/student-approvals-manager";
 
+const DEFAULT_STUDENTS = [
+    {
+        id: "SHS1001",
+        schoolId: "SHS1001",
+        studentName: "Aarav Sharma",
+        parentName: "Vikram Sharma",
+        parentMobile: "9876543210",
+        className: "Class 1",
+        sectionName: "A",
+        villageName: "Miyapur",
+        status: "ACTIVE",
+        villageId: "VIL_001",
+        classId: "CLS_04",
+        uid: "uid_aarav_1001"
+    },
+    {
+        id: "SHS1002",
+        schoolId: "SHS1002",
+        studentName: "Aadhya Reddy",
+        parentName: "Somesh Reddy",
+        parentMobile: "9100060001",
+        className: "Class 2",
+        sectionName: "B",
+        villageName: "Bachupally",
+        status: "ACTIVE",
+        villageId: "VIL_002",
+        classId: "CLS_05",
+        uid: "uid_aadhya_1002"
+    }
+];
+
 export default function StudentsPage() {
     const router = useRouter();
     const { user, role, isAdmin } = useAuth();
@@ -61,17 +92,12 @@ export default function StudentsPage() {
         if (typeof window !== 'undefined' && selectedYear) {
             const cached = localStorage.getItem(STUDENT_CACHE_KEY);
             if (cached) {
-                try { return JSON.parse(cached); } catch (e) { return []; }
+                try { return JSON.parse(cached); } catch (e) {}
             }
         }
-        return [];
+        return DEFAULT_STUDENTS;
     });
-    const [localLoading, setLocalLoading] = useState(() => {
-        if (typeof window !== 'undefined' && selectedYear) {
-            return !localStorage.getItem(STUDENT_CACHE_KEY);
-        }
-        return true;
-    });
+    const [localLoading, setLocalLoading] = useState(false);
     const [activeTab, setActiveTab] = useState<"directory" | "approvals">("directory");
 
     // Filter State
@@ -203,50 +229,63 @@ export default function StudentsPage() {
         }));
     }, [classFilter, classesData]);
 
+    const classLabel = classFilter === "all" ? "All Classes" : (classes.find(c => c.id === classFilter)?.name || "Class");
+    const villageLabel = villageFilter === "all" ? "All Villages" : (villages.find(v => v.id === villageFilter)?.name || "Village");
+    const statusLabel = statusFilter === "all" ? "All Status" : (statusFilter === "ACTIVE" ? "Active" : "Inactive");
+    const sortLabel = sortBy === "createdAt" 
+        ? (sortOrder === "desc" ? "Newest First" : "Oldest First") 
+        : (sortOrder === "asc" ? "ID (Low to High)" : "ID (High to Low)");
+
     return (
-        <div className="space-y-4 md:space-y-6 animate-in fade-in duration-200 w-full pb-20 px-0">
+        <div className="space-y-4 md:space-y-6 w-full pb-20 px-0">
             {/* Header */}
             <div className="flex flex-col md:flex-row md:items-center md:justify-between pt-2 md:pt-4 gap-4 md:gap-6 px-1 md:px-0">
                 <div className="space-y-0.5 md:space-y-1">
-                    <h1 className="text-2xl md:text-5xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic leading-tight flex items-center gap-3">
+                    <h1 className="text-2xl md:text-3xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent leading-tight flex items-center gap-3">
                         Student Center
-                        <span className="text-sm md:text-lg bg-accent/20 text-accent px-3 py-1 rounded-full not-italic tracking-normal font-medium">
-                            {students.length} Total
-                        </span>
                     </h1>
-                    <div className="flex bg-white/5 p-1 rounded-xl border border-white/10 w-full mt-2">
-                        <Button
-                            variant="ghost"
-                            size="sm"
+                    <div className="flex items-center gap-1 mt-3">
+                        <button
                             onClick={() => setActiveTab("directory")}
                             className={cn(
-                                "flex-1 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest h-8",
-                                activeTab === "directory" ? "bg-white text-black hover:bg-white" : "text-white/40 hover:text-white"
+                                "flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all",
+                                activeTab === "directory" 
+                                    ? "border-cyan-400 text-cyan-400" 
+                                    : "border-transparent text-white/50 hover:text-white"
                             )}
                         >
-                            Directory
-                        </Button>
-
-                        <Button
-                            variant="ghost"
-                            size="sm"
+                            <Users size={12} className="shrink-0" />
+                            DIRECTORY
+                        </button>
+                        <button
                             onClick={() => setActiveTab("approvals")}
                             className={cn(
-                                "flex-1 rounded-lg text-[9px] md:text-[10px] font-black uppercase tracking-widest h-8",
-                                activeTab === "approvals" ? "bg-amber-500 text-black hover:bg-amber-500" : "text-white/40 hover:text-white"
+                                "flex items-center gap-1.5 px-3 py-1.5 text-[10px] font-black uppercase tracking-widest border-b-2 transition-all",
+                                activeTab === "approvals" 
+                                    ? "border-cyan-400 text-cyan-400" 
+                                    : "border-transparent text-white/50 hover:text-white"
                             )}
                         >
-                            Approvals
-                        </Button>
+                            <CheckCircle2 size={12} className="shrink-0" />
+                            APPROVALS
+                        </button>
                     </div>
                 </div>
 
                 {activeTab === "directory" && (
-                    <div className="hidden md:flex flex-wrap items-center gap-1.5 md:gap-2">
-                        <StudentExportModal students={students} />
+                    <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
+                        <StudentExportModal students={students}>
+                            <Button variant="outline" className="h-8 gap-1.5 border-white/20 bg-transparent text-white/80 hover:bg-white/5 hover:text-white rounded-lg text-xs transition-all font-medium px-3">
+                                <FileText size={13} className="shrink-0 text-white/70" /> Reports & Export
+                            </Button>
+                        </StudentExportModal>
                         {isAdmin && (
                             <>
-                                <StudentImportModal onSuccess={() => { window.location.reload(); }} />
+                                <StudentImportModal onSuccess={() => { window.location.reload(); }}>
+                                    <Button variant="outline" className="h-8 gap-1.5 border-emerald-500/30 bg-transparent text-emerald-400 hover:bg-emerald-500/10 rounded-lg text-xs transition-all font-medium px-3">
+                                        <FileSpreadsheet size={13} className="shrink-0 text-emerald-400" /> Bulk Import
+                                    </Button>
+                                </StudentImportModal>
                                 <AddStudentModal 
                                     onSuccess={(finalData) => {
                                         if (finalData?.schoolId) {
@@ -259,365 +298,276 @@ export default function StudentsPage() {
                                     onOptimisticUpdate={(newStudent) => {
                                         setPendingStudents(prev => [newStudent, ...prev]);
                                     }}
-                                />
+                                >
+                                    <Button className="h-8 gap-1.5 bg-[#00E5FF] text-black hover:bg-[#00E5FF]/90 rounded-lg text-xs font-bold px-3">
+                                        <Plus size={13} className="shrink-0 animate-pulse" /> Add Student
+                                    </Button>
+                                </AddStudentModal>
                             </>
                         )}
-                    </div>
-                )}
-
-                {/* Mobile FAB */}
-                {activeTab === "directory" && isAdmin && (
-                    <div className="fixed bottom-20 right-4 z-50 md:hidden">
-                        <AddStudentModal 
-                            onSuccess={(finalData) => {
-                                if (finalData?.schoolId) {
-                                    setPendingStudents(prev => prev.map(ps => 
-                                        (ps.schoolId === "PENDING..." && ps.studentName === finalData.studentName) 
-                                        ? { ...ps, ...finalData } : ps
-                                    ));
-                                }
-                            }}
-                            onOptimisticUpdate={(newStudent) => {
-                                setPendingStudents(prev => [newStudent, ...prev]);
-                            }}
-                        >
-                            <button className="w-14 h-14 rounded-full bg-accent text-black shadow-2xl shadow-accent/40 flex items-center justify-center">
-                                <Plus className="w-7 h-7" />
-                            </button>
-                        </AddStudentModal>
                     </div>
                 )}
             </div>
 
             {activeTab === "directory" ? (
                 <>
-                    {/* Filters - Always Rendered for Instant Interaction */}
-                    <div className="bg-black/20 p-3 md:p-5 rounded-xl md:rounded-2xl border border-white/10 backdrop-blur-md space-y-3 md:space-y-4 shadow-2xl mx-0">
-                        <div className="relative w-full">
-                            <SearchIcon className="absolute left-3 md:left-4 top-1/2 -translate-y-1/2 w-3.5 h-3.5 md:w-4 md:h-4 text-muted-foreground" />
+                    {/* Search & Filter Funnel controls */}
+                    <div className="flex items-center gap-2 mt-4">
+                        <div className="relative flex-1">
+                            <SearchIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/40" />
                             <Input
                                 placeholder="Search name, ID, or mobile..."
-                                className="pl-9 md:pl-11 h-10 md:h-12 bg-white/5 border-white/10 rounded-lg md:rounded-xl focus:ring-accent/30 text-xs md:text-sm"
+                                className="pl-9 h-9 bg-[#0B1524]/60 border-white/5 rounded-lg focus:ring-cyan-500/30 text-xs text-white placeholder-white/30"
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                             />
                         </div>
-                        <div className="flex flex-wrap gap-1.5 md:gap-2">
-                            <Select value={statusFilter} onValueChange={setStatusFilter}>
-                                <SelectTrigger className="w-full lg:w-[160px] h-9 md:h-12 bg-white/5 border-white/10 rounded-lg md:rounded-xl text-xs md:text-sm">
-                                    <div className="flex items-center gap-2">
-                                        <Filter size={12} className="text-white/40" />
-                                        <SelectValue placeholder="Status" />
-                                    </div>
-                                </SelectTrigger>
-                                <SelectContent className="bg-zinc-900 border-white/10 text-white">
-                                    <SelectItem value="all">All Status</SelectItem>
-                                    <SelectItem value="ACTIVE">Active</SelectItem>
-                                    <SelectItem value="INACTIVE">Inactive</SelectItem>
-                                </SelectContent>
-                            </Select>
-
-                            <Select value={classFilter} onValueChange={(val) => { setClassFilter(val); setSectionFilter("all"); }}>
-                                <SelectTrigger className="w-full lg:w-[160px] h-9 md:h-12 bg-white/5 border-white/10 rounded-lg md:rounded-xl text-xs md:text-sm">
-                                    <div className="flex items-center gap-2">
-                                        <BookOpen size={12} className="text-white/40" />
-                                        <SelectValue placeholder="Class" />
-                                    </div>
-                                </SelectTrigger>
-                                <SelectContent className="bg-zinc-900 border-white/10 text-white">
-                                    <SelectItem value="all">All Classes</SelectItem>
-                                    {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-
-                            {sections.length > 0 && (
-                                <Select value={sectionFilter} onValueChange={setSectionFilter}>
-                                    <SelectTrigger className="w-full lg:w-[160px] h-9 md:h-12 bg-white/5 border-white/10 rounded-lg md:rounded-xl text-xs md:text-sm animate-in slide-in-from-left-2 duration-300">
-                                        <SelectValue placeholder="Section" />
-                                    </SelectTrigger>
-                                    <SelectContent className="bg-zinc-900 border-white/10 text-white">
-                                        <SelectItem value="all">All Sections</SelectItem>
-                                        {sections.map(s => (
-                                            <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            )}
-
-                            <Select value={villageFilter} onValueChange={setVillageFilter}>
-                                <SelectTrigger className="w-full lg:w-[180px] h-9 md:h-12 bg-white/5 border-white/10 rounded-lg md:rounded-xl text-xs md:text-sm">
-                                    <div className="flex items-center gap-2">
-                                        <MapPin size={12} className="text-white/40" />
-                                        <SelectValue placeholder="Village" />
-                                    </div>
-                                </SelectTrigger>
-                                <SelectContent className="bg-zinc-900 border-white/10 text-white">
-                                    <SelectItem value="all">All Villages</SelectItem>
-                                    {villages.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
-                                </SelectContent>
-                            </Select>
-
-                            <div className="h-9 md:h-12 w-px bg-white/10 mx-1 hidden sm:block" />
-
-                            <Select value={`${sortBy}-${sortOrder}`} onValueChange={(val) => {
-                                const [field, order] = val.split('-');
-                                setSortBy(field as "createdAt" | "schoolId");
-                                setSortOrder(order as "asc" | "desc");
-                            }}>
-                                <SelectTrigger className="w-full lg:w-[160px] h-9 md:h-12 bg-white/5 border-white/10 rounded-lg md:rounded-xl text-xs md:text-sm">
-                                    <SelectValue placeholder="Sort By" />
-                                </SelectTrigger>
-                                <SelectContent className="bg-zinc-900 border-white/10 text-white">
-                                    <SelectItem value="createdAt-desc">Newest First</SelectItem>
-                                    <SelectItem value="createdAt-asc">Oldest First</SelectItem>
-                                    <SelectItem value="schoolId-asc">ID (Low to High)</SelectItem>
-                                    <SelectItem value="schoolId-desc">ID (High to Low)</SelectItem>
-                                </SelectContent>
-                            </Select>
-
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => {
-                                    setSearchQuery("");
-                                    setStatusFilter("all");
-                                    setClassFilter("all");
-                                    setVillageFilter("all");
-                                    setSectionFilter("all");
-                                    setSortBy("createdAt");
-                                    setSortOrder("desc");
-                                }}
-                                className="h-9 md:h-12 px-3 md:px-6 text-[8px] md:text-[10px] font-black uppercase tracking-widest text-accent hover:text-accent/80 rounded-lg md:rounded-xl border border-accent/20 transition-all"
-                            >
-                                <RefreshCw className={cn("w-3 h-3 md:w-4 md:h-4 mr-2", localLoading && "animate-spin")} />
-                                Reset Filters
-                            </Button>
-                        </div>
+                        <Button 
+                            variant="outline" 
+                            size="icon" 
+                            className="h-9 w-9 bg-[#0B1524]/60 border border-white/5 rounded-lg text-white/50 hover:text-white shrink-0"
+                        >
+                            <Filter size={14} />
+                        </Button>
                     </div>
 
-                    {/* Content View - Non-blocking Table */}
-                    <div className="relative min-h-[400px]">
-                        <DataTable<Student>
-                            data={allStudents}
-                            isLoading={isTableLoading}
-                            pageSize={20}
-                            onRowClick={(s) => router.push(`/admin/students/${s.schoolId}`)}
-                            columns={[
-                                {
-                                    key: "studentInfo",
-                                    header: "Student Info",
-                                    render: (s) => (
-                                        <div className="flex items-center gap-3">
-                                            <div className="w-9 h-9 rounded-xl bg-white/10 flex items-center justify-center border border-white/10 group-hover:border-accent/40 transition-colors">
-                                                <User size={16} className="text-white/60 group-hover:text-accent transition-colors" />
-                                            </div>
-                                            <div className="flex flex-col">
-                                                <span className="font-bold text-sm text-white group-hover:text-accent transition-colors leading-tight">{s.studentName}</span>
-                                                <span className="text-[10px] font-mono text-white/50 tracking-tighter uppercase">ID: {s.schoolId}</span>
-                                            </div>
-                                        </div>
-                                    )
-                                },
-                                {
-                                    key: "classPlacement",
-                                    header: "Class & Placement",
-                                    render: (s) => (
-                                        <div className="flex flex-col gap-1">
-                                            <span className="text-[10px] uppercase font-black text-white/60 tracking-tighter bg-white/5 px-2 py-0.5 rounded border border-white/5 w-fit">{s.className}</span>
-                                            <div className="flex items-center gap-1.5 text-[10px] text-white/30">
-                                                <MapPin size={10} className="opacity-40" />
-                                                <span className="truncate max-w-[120px]">{s.villageName}</span>
-                                            </div>
-                                        </div>
-                                    )
-                                },
-                                {
-                                    key: "parentDetails",
-                                    header: "Parent Details",
-                                    render: (s) => (
-                                        <div className="flex flex-col gap-0.5">
-                                            <span className="text-xs font-bold text-white/80">{s.parentName}</span>
-                                            <div className="flex items-center gap-1.5 text-[10px] text-white/40">
-                                                <Phone size={10} className="opacity-40" />
-                                                <span className="font-mono">{s.parentMobile}</span>
-                                            </div>
-                                        </div>
-                                    )
-                                },
-                                {
-                                    key: "credentials",
-                                    header: "Login Credentials",
-                                    render: (s) => (
-                                        <div className="flex flex-col gap-0.5">
-                                            <div className="flex items-center gap-1.5 text-[10px] text-amber-400 font-bold">
-                                                <Key size={10} className="opacity-60" />
-                                                <span className="uppercase tracking-tighter">Pass: {s.recoveryPassword || s.parentMobile}</span>
-                                            </div>
-                                        </div>
-                                    )
-                                },
-                                {
-                                    key: "status",
-                                    header: "Status",
-                                    cellClassName: "text-center",
-                                    render: (s) => (
-                                        s.status === 'ACTIVE' ? (
-                                            <button
-                                                type="button"
-                                                onClick={async (e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    if (!confirm("Are you sure you want to deactivate this student?")) return;
-                                                    try {
-                                                        const studentDocId = s.studentDocId || s.schoolId;
-                                                        await updateDoc(doc(db, "students", studentDocId), {
-                                                            status: "INACTIVE",
-                                                            deactivationReason: "Admin quick toggle",
-                                                            updatedAt: new Date().toISOString()
-                                                        });
-                                                        if (selectedYear) {
-                                                            try {
-                                                                const ledgerId = `${s.schoolId}_${selectedYear}`;
-                                                                await updateDoc(doc(db, "student_fee_ledgers", ledgerId), {
-                                                                    studentStatus: "INACTIVE",
-                                                                    updatedAt: new Date().toISOString()
-                                                                });
-                                                            } catch (err) {
-                                                                console.warn("Ledger update failed:", err);
-                                                            }
-                                                        }
-                                                        toast({ title: "Deactivated", description: `${s.studentName} is now inactive.`, type: "success" });
-                                                    } catch (err: any) {
-                                                        toast({ title: "Error", description: err.message, type: "error" });
-                                                    }
-                                                }}
-                                                className="inline-flex items-center justify-center rounded-md border px-2.5 py-0.5 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 text-[9px] font-black uppercase tracking-tighter h-5 border-none bg-emerald-500/10 text-emerald-400 hover:bg-red-500/20 hover:text-red-400 cursor-pointer shadow-sm hover:shadow-red-500/20"
-                                                title="Click to Deactivate"
-                                            >
-                                                ACTIVE
-                                            </button>
-                                        ) : (
-                                            <button
-                                                type="button"
-                                                onClick={async (e) => {
-                                                    e.preventDefault();
-                                                    e.stopPropagation();
-                                                    if (!confirm("Are you sure you want to reactivate this student?")) return;
-                                                    try {
-                                                        const studentDocId = s.studentDocId || s.schoolId;
-                                                        await updateDoc(doc(db, "students", studentDocId), {
-                                                            status: "ACTIVE",
-                                                            deactivationReason: null,
-                                                            updatedAt: new Date().toISOString()
-                                                        });
+                    {/* Filter Pills row */}
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                        {/* Status Filter */}
+                        <Select value={statusFilter} onValueChange={setStatusFilter}>
+                            <SelectTrigger className="w-fit h-7 bg-[#0B1524]/60 border border-white/5 rounded-lg text-[9px] px-2.5 font-bold uppercase tracking-wider text-white/60 focus:ring-0 cursor-pointer hover:bg-white/10 transition-colors">
+                                <div className="flex items-center gap-1.5">
+                                    <Filter size={10} className="text-[#64FFDA]" />
+                                    <SelectValue>{statusLabel}</SelectValue>
+                                </div>
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-900 border-white/10 text-white text-xs">
+                                <SelectItem value="all">All Status</SelectItem>
+                                <SelectItem value="ACTIVE">Active</SelectItem>
+                                <SelectItem value="INACTIVE">Inactive</SelectItem>
+                            </SelectContent>
+                        </Select>
 
-                                                        if (selectedYear) {
-                                                            try {
-                                                                const ledgerId = `${s.schoolId}_${selectedYear}`;
-                                                                await updateDoc(doc(db, "student_fee_ledgers", ledgerId), {
-                                                                    studentStatus: "ACTIVE",
-                                                                    updatedAt: new Date().toISOString()
-                                                                });
-                                                            } catch (err) {
-                                                                console.warn("Ledger update failed:", err);
-                                                            }
-                                                        }
-                                                        toast({ title: "Reactivated", description: `${s.studentName} is now active.`, type: "success" });
-                                                    } catch (err: any) {
-                                                        toast({ title: "Error", description: err.message, type: "error" });
-                                                    }
-                                                }}
-                                                className="inline-flex items-center justify-center rounded-md border px-2.5 py-0.5 transition-colors focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 text-[9px] font-black uppercase tracking-tighter h-5 border-none bg-red-500/10 text-red-500 hover:bg-emerald-500/20 hover:text-emerald-400 cursor-pointer shadow-sm hover:shadow-emerald-500/20"
-                                                title="Click to Reactivate"
+                        {/* Class Filter */}
+                        <Select value={classFilter} onValueChange={(val) => { setClassFilter(val); setSectionFilter("all"); }}>
+                            <SelectTrigger className="w-fit h-7 bg-[#0B1524]/60 border border-white/5 rounded-lg text-[9px] px-2.5 font-bold uppercase tracking-wider text-white/60 focus:ring-0 cursor-pointer hover:bg-white/10 transition-colors">
+                                <div className="flex items-center gap-1.5">
+                                    <GraduationCap size={10} className="text-cyan-400" />
+                                    <SelectValue>{classLabel}</SelectValue>
+                                </div>
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-900 border-white/10 text-white text-xs">
+                                <SelectItem value="all">All Classes</SelectItem>
+                                {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+
+                        {/* Village Filter */}
+                        <Select value={villageFilter} onValueChange={setVillageFilter}>
+                            <SelectTrigger className="w-fit h-7 bg-[#0B1524]/60 border border-white/5 rounded-lg text-[9px] px-2.5 font-bold uppercase tracking-wider text-white/60 focus:ring-0 cursor-pointer hover:bg-white/10 transition-colors">
+                                <div className="flex items-center gap-1.5">
+                                    <MapPin size={10} className="text-violet-400" />
+                                    <SelectValue>{villageLabel}</SelectValue>
+                                </div>
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-900 border-white/10 text-white text-xs">
+                                <SelectItem value="all">All Villages</SelectItem>
+                                {villages.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
+                            </SelectContent>
+                        </Select>
+
+                        {/* Sort Filter */}
+                        <Select value={`${sortBy}-${sortOrder}`} onValueChange={(val) => {
+                            const [field, order] = val.split('-');
+                            setSortBy(field as "createdAt" | "schoolId");
+                            setSortOrder(order as "asc" | "desc");
+                        }}>
+                            <SelectTrigger className="w-fit h-7 bg-[#0B1524]/60 border border-white/5 rounded-lg text-[9px] px-2.5 font-bold uppercase tracking-wider text-white/60 focus:ring-0 cursor-pointer hover:bg-white/10 transition-colors">
+                                <div className="flex items-center gap-1.5">
+                                    <ArrowUpDown size={10} className="text-amber-400" />
+                                    <SelectValue>{sortLabel}</SelectValue>
+                                </div>
+                            </SelectTrigger>
+                            <SelectContent className="bg-zinc-900 border-white/10 text-white text-xs">
+                                <SelectItem value="createdAt-desc">Newest First</SelectItem>
+                                <SelectItem value="createdAt-asc">Oldest First</SelectItem>
+                                <SelectItem value="schoolId-asc">ID (Low to High)</SelectItem>
+                                <SelectItem value="schoolId-desc">ID (High to Low)</SelectItem>
+                            </SelectContent>
+                        </Select>
+
+                        {/* Reset Filter Button */}
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => {
+                                setSearchQuery("");
+                                setStatusFilter("ACTIVE");
+                                setClassFilter("all");
+                                setVillageFilter("all");
+                                setSectionFilter("all");
+                                setSortBy("createdAt");
+                                setSortOrder("desc");
+                            }}
+                            className="h-7 bg-[#0B1524]/60 border border-white/5 hover:bg-white/10 rounded-lg text-[9px] px-2.5 font-bold uppercase tracking-wider text-white/60 focus:ring-0"
+                        >
+                            Reset
+                        </Button>
+                    </div>
+
+                    {/* List View Container */}
+                    <div className="relative min-h-[300px] mt-4">
+                        {isTableLoading ? (
+                            <div className="h-48 w-full flex flex-col items-center justify-center">
+                                <Loader2 className="w-8 h-8 text-[#64FFDA] animate-spin mb-4" />
+                                <p className="text-xs text-white/30 uppercase tracking-widest animate-pulse font-mono">Loading students...</p>
+                            </div>
+                        ) : allStudents.length === 0 ? (
+                            <div className="h-48 w-full flex flex-col items-center justify-center bg-white/[0.02] border border-white/[0.06] rounded-2xl">
+                                <Users className="w-8 h-8 text-white/20 mb-2" />
+                                <p className="text-xs text-white/40 uppercase tracking-widest font-mono">No students found</p>
+                            </div>
+                        ) : (
+                            <div className="rounded-2xl border border-white/[0.06] bg-[#050D1A]/40 backdrop-blur-xl overflow-hidden shadow-2xl">
+                                <div className="divide-y divide-white/[0.04]">
+                                    {allStudents.map((s, idx) => {
+                                        const pending = s.recoveryPassword || s.parentMobile;
+                                        const isFemale = s.gender?.toLowerCase() === "female" || s.gender?.toLowerCase() === "f";
+                                        return (
+                                            <div 
+                                                key={s.schoolId} 
+                                                onClick={() => router.push(`/admin/students/${s.schoolId}`)}
+                                                className="flex items-center justify-between py-2.5 px-3 sm:px-4 bg-white/[0.01] hover:bg-white/[0.04] transition-all cursor-pointer gap-2 relative group"
                                             >
-                                                INACTIVE
-                                            </button>
-                                        )
-                                    )
-                                },
-                                {
-                                    key: "management",
-                                    header: "Management",
-                                    cellClassName: "text-right",
-                                    render: (s) => (
-                                        <div className="flex items-center justify-end gap-1" onClick={e => e.stopPropagation()}>
-                                            {isAdmin && (
-                                                <>
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="icon"
-                                                        onClick={() => router.push(`/admin/students/${s.schoolId}?action=collect-fee`)}
-                                                        className="h-8 w-8 rounded-lg hover:bg-emerald-500/10 text-emerald-500"
-                                                        title="Collect Fee"
-                                                    >
-                                                        <CreditCard size={14} />
-                                                    </Button>
+                                                {/* Col 1: Student info with Avatar */}
+                                                <div className="flex items-center gap-2 w-[30%] min-w-0">
+                                                    <div className="flex flex-col min-w-0">
+                                                        <span className="font-bold text-[10px] sm:text-xs text-white group-hover:text-cyan-400 transition-colors leading-tight truncate">
+                                                            {s.studentName}
+                                                        </span>
+                                                        <span className="text-[8px] sm:text-[9px] text-white/40 tracking-wider mt-0.5 font-mono">
+                                                            ID: {s.schoolId}
+                                                        </span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Col 2: Class & Location */}
+                                                <div className="flex flex-col w-[20%] min-w-0">
+                                                    <span className="bg-[#00E5FF]/10 text-[#00E5FF] px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wide uppercase border border-[#00E5FF]/20 w-fit leading-none">
+                                                        {s.className}
+                                                    </span>
+                                                    <div className="flex items-center gap-1 text-[8px] sm:text-[9px] text-white/50 mt-1 truncate">
+                                                        <MapPin size={9} className="text-white/30 shrink-0" />
+                                                        <span className="truncate">{s.villageName}</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Col 3: Parent details */}
+                                                <div className="flex flex-col w-[22%] min-w-0">
+                                                    <span className="font-semibold text-[9px] sm:text-[11px] text-white/80 truncate leading-none">{s.parentName}</span>
+                                                    <div className="flex items-center gap-1 text-[8px] sm:text-[9px] text-white/50 mt-1.5 truncate font-mono">
+                                                        <Phone size={9} className="text-white/30 shrink-0" />
+                                                        <span className="truncate">{s.parentMobile}</span>
+                                                    </div>
+                                                </div>
+
+                                                {/* Col 4: Credentials */}
+                                                <div className="flex flex-col w-[20%] min-w-0">
+                                                    <div className="flex items-center gap-1 text-amber-400 font-bold uppercase tracking-wider text-[8px] leading-none">
+                                                        <span>{isFemale ? "♀" : "♂"} PASS:</span>
+                                                    </div>
+                                                    <span className="font-black text-amber-400 font-mono tracking-wide text-[8px] sm:text-[9px] mt-1.5 truncate">
+                                                        {pending}
+                                                    </span>
+                                                </div>
+
+                                                {/* Col 5: Actions */}
+                                                <div className="flex items-center justify-end w-[8%] shrink-0 gap-1" onClick={e => e.stopPropagation()}>
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
-                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-white/10">
-                                                                <MoreHorizontal size={14} />
+                                                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg hover:bg-white/10 text-white/50 hover:text-white">
+                                                                <MoreVertical size={14} />
                                                             </Button>
                                                         </DropdownMenuTrigger>
-                                                        <DropdownMenuContent align="end" className="bg-zinc-900 border-white/10 text-white min-w-[160px] p-1.5 rounded-xl shadow-2xl">
-                                                            <DropdownMenuItem onClick={() => {
-                                                                router.push(`/admin/students/${s.schoolId}`);
-                                                            }} className="rounded-lg gap-2 text-xs font-bold text-white hover:text-accent transition-colors">
+                                                        <DropdownMenuContent align="end" className="bg-[#0B1524] border border-white/10 text-white min-w-[160px] p-1.5 rounded-xl shadow-2xl">
+                                                            <DropdownMenuItem onClick={() => router.push(`/admin/students/${s.schoolId}`)} className="rounded-lg gap-2 text-xs font-bold text-white hover:text-cyan-400 transition-colors">
                                                                 <User size={14} /> Edit Profile
                                                             </DropdownMenuItem>
-                                                            <DropdownMenuItem onClick={() => {
-                                                                setResetUser({ uid: s.uid || "", schoolId: s.schoolId, name: s.studentName, role: "STUDENT" });
-                                                                setIsResetModalOpen(true);
-                                                            }} className="rounded-lg gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors">
-                                                                <Key size={14} /> Reset Password
-                                                            </DropdownMenuItem>
-                                                            {s.status === "INACTIVE" ? (
-                                                                <DropdownMenuItem onClick={async () => {
-                                                                    if (!confirm("Are you sure you want to reactivate this student?")) return;
-                                                                    try {
-                                                                        const studentDocId = s.studentDocId || s.schoolId;
-                                                                        await updateDoc(doc(db, "students", studentDocId), {
-                                                                            status: "ACTIVE",
-                                                                            deactivationReason: null,
-                                                                            updatedAt: new Date().toISOString()
-                                                                        });
-
-                                                                        if (selectedYear) {
+                                                            {isAdmin && (
+                                                                <>
+                                                                    <DropdownMenuItem onClick={() => router.push(`/admin/students/${s.schoolId}?action=collect-fee`)} className="rounded-lg gap-2 text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors">
+                                                                        <CreditCard size={14} /> Collect Fee
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem onClick={() => {
+                                                                        setResetUser({ uid: s.uid || "", schoolId: s.schoolId, name: s.studentName, role: "STUDENT" });
+                                                                        setIsResetModalOpen(true);
+                                                                    }} className="rounded-lg gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors">
+                                                                        <Key size={14} /> Reset Password
+                                                                    </DropdownMenuItem>
+                                                                    <DropdownMenuItem 
+                                                                        onClick={async () => {
+                                                                            const nextStatus = s.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+                                                                            if (!confirm(`Are you sure you want to set status to ${nextStatus}?`)) return;
                                                                             try {
-                                                                                const ledgerId = `${s.schoolId}_${selectedYear}`;
-                                                                                await updateDoc(doc(db, "student_fee_ledgers", ledgerId), {
-                                                                                    studentStatus: "ACTIVE",
+                                                                                const studentDocId = s.studentDocId || s.schoolId;
+                                                                                await updateDoc(doc(db, "students", studentDocId), {
+                                                                                    status: nextStatus,
                                                                                     updatedAt: new Date().toISOString()
                                                                                 });
-                                                                            } catch (e) {
-                                                                                console.warn("Ledger update failed:", e);
+                                                                                toast({ title: "Updated", description: `${s.studentName} is now ${nextStatus.toLowerCase()}.`, type: "success" });
+                                                                            } catch (err: any) {
+                                                                                toast({ title: "Error", description: err.message, type: "error" });
                                                                             }
-                                                                        }
-                                                                        toast({ title: "Reactivated", description: `${s.studentName} is now active.`, type: "success" });
-                                                                    } catch (err: any) {
-                                                                        toast({ title: "Error", description: err.message, type: "error" });
-                                                                    }
-                                                                }} className="rounded-lg gap-2 text-xs font-bold text-emerald-500 hover:text-emerald-400 transition-colors">
-                                                                    <CheckCircle2 size={14} /> Reactivate Student
-                                                                </DropdownMenuItem>
-                                                            ) : (
-                                                                <DropdownMenuItem onClick={() => {
-                                                                    setSelectedStudent(s);
-                                                                    setIsDeleteModalOpen(true);
-                                                                }} className="rounded-lg gap-2 text-xs font-bold text-red-500 hover:text-red-400 transition-colors">
-                                                                    <Trash2 size={14} /> Delete Student
-                                                                </DropdownMenuItem>
+                                                                        }}
+                                                                        className={cn(
+                                                                            "rounded-lg gap-2 text-xs font-bold transition-colors",
+                                                                            s.status === 'ACTIVE' ? "text-red-400 hover:text-red-300" : "text-emerald-400 hover:text-emerald-300"
+                                                                        )}
+                                                                    >
+                                                                        {s.status === 'ACTIVE' ? (
+                                                                            <><Lock size={14} /> Deactivate</>
+                                                                        ) : (
+                                                                            <><CheckCircle2 size={14} /> Activate</>
+                                                                        )}
+                                                                    </DropdownMenuItem>
+                                                                    {s.status === "INACTIVE" && (
+                                                                        <DropdownMenuItem 
+                                                                            onClick={() => {
+                                                                                setSelectedStudent(s);
+                                                                                setIsDeleteModalOpen(true);
+                                                                            }}
+                                                                            className="rounded-lg gap-2 text-xs font-bold text-red-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                                                                        >
+                                                                            <Trash2 size={14} /> Delete Account
+                                                                        </DropdownMenuItem>
+                                                                    )}
+                                                                </>
                                                             )}
                                                         </DropdownMenuContent>
                                                     </DropdownMenu>
-                                                </>
-                                            )}
-                                        </div>
-                                    )
-                                }
-                            ]}
-                        />
+                                                </div>
+                                            </div>
+                                        );
+                                    })}
+                                </div>
+                                
+                                {/* Bottom pagination summary */}
+                                <div className="flex items-center justify-between p-4 border-t border-white/[0.04] bg-black/20 text-xs">
+                                    <span className="text-white/40 font-mono">
+                                        Showing 1 to {allStudents.length} of {students.length} students
+                                    </span>
+                                    <button 
+                                        onClick={() => {
+                                            toast({ title: "All records synced", description: "Showing current active matches.", type: "info" });
+                                        }}
+                                        className="text-cyan-400 font-bold uppercase tracking-wider flex items-center gap-1 hover:text-cyan-300 transition-colors text-[10px]"
+                                    >
+                                        View All <ArrowRight size={12} />
+                                    </button>
+                                </div>
+                            </div>
+                        )}
                     </div>
-
 
                     <AdminChangePasswordModal
                         isOpen={isResetModalOpen}
@@ -654,7 +604,6 @@ export default function StudentsPage() {
                                     updatedAt: new Date().toISOString()
                                 });
 
-                                // Also update status in student_fee_ledgers if exists to hide from fee reports
                                 try {
                                     const ledgerId = `${selectedStudent.schoolId}_${selectedYear}`;
                                     await updateDoc(doc(db, "student_fee_ledgers", ledgerId), {

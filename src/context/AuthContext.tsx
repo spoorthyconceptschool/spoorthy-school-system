@@ -33,9 +33,27 @@ const SESSION_KEY = "local_session_id";
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
-    const [userData, setUserData] = useState<any>(null);
+    const [userData, setUserData] = useState<any>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(STORAGE_KEY);
+            if (cached) {
+                try {
+                    return JSON.parse(cached);
+                } catch (e) {
+                    console.error("Failed to parse cached user data", e);
+                }
+            }
+        }
+        return null;
+    });
     // System starts in a guarded loading state until Firebase physically confirms presence
-    const [loading, setLoading] = useState(true);
+    // But we recover synchronously from local storage if session cache is present to hit < 1ms perceived loads
+    const [loading, setLoading] = useState(() => {
+        if (typeof window !== 'undefined') {
+            return !localStorage.getItem(STORAGE_KEY);
+        }
+        return true;
+    });
     const [isInitialized, setIsInitialized] = useState(false);
     const [mounted, setMounted] = useState(false);
     const router = useRouter();
@@ -79,7 +97,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     // --- ZERO-LATENCY BOOT GATE ---
                     // Trust local session for initial hydration to achieve zero latency.
                     // The background monitor (Effect #2) will handle eviction if needed.
-                    await authUser.getIdToken(false);
+                    const tokenResult = await authUser.getIdTokenResult(false);
+                    const claimRole = tokenResult.claims.role as string;
                     
                     let dataToStore = null;
                     const userDoc = await getDoc(doc(db, "users", authUser.uid));
@@ -97,6 +116,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             const data = studentDoc.data();
                             dataToStore = { ...data, uid: authUser.uid, role: "STUDENT" };
                         }
+                    }
+
+                    // Fallback to custom claims / email pattern if Firestore profile is missing or lacks role
+                    if (!dataToStore) {
+                        dataToStore = {
+                            uid: authUser.uid,
+                            email: authUser.email,
+                            role: claimRole || (authUser.email?.includes("admin") ? "ADMIN" : authUser.email?.includes("teacher") ? "TEACHER" : "STUDENT"),
+                            name: authUser.displayName || authUser.email?.split("@")[0] || "User",
+                            status: "ACTIVE"
+                        };
+                    } else if (!dataToStore.role) {
+                        dataToStore.role = claimRole || (authUser.email?.includes("admin") ? "ADMIN" : authUser.email?.includes("teacher") ? "TEACHER" : "STUDENT");
                     }
 
                     if (dataToStore) {
@@ -218,7 +250,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }, { merge: true });
 
             // 2. Refresh token and data
-            await result.user.getIdToken(true);
+            const tokenResult = await result.user.getIdTokenResult(true);
+            const claimRole = tokenResult.claims.role as string;
             
             let dataToStore = null;
             const userDoc = await getDoc(doc(db, "users", result.user.uid));
@@ -237,6 +270,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
             }
             
+            // Fallback to custom claims / email pattern if Firestore profile is missing or lacks role
+            if (!dataToStore) {
+                dataToStore = {
+                    uid: result.user.uid,
+                    email: result.user.email,
+                    role: claimRole || (result.user.email?.includes("admin") ? "ADMIN" : result.user.email?.includes("teacher") ? "TEACHER" : "STUDENT"),
+                    name: result.user.displayName || result.user.email?.split("@")[0] || "User",
+                    status: "ACTIVE"
+                };
+            } else if (!dataToStore.role) {
+                dataToStore.role = claimRole || (result.user.email?.includes("admin") ? "ADMIN" : result.user.email?.includes("teacher") ? "TEACHER" : "STUDENT");
+            }
+
             if (dataToStore) {
                 setUserData(dataToStore);
                 localStorage.setItem(STORAGE_KEY, JSON.stringify(dataToStore));

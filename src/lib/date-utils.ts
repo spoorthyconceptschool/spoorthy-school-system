@@ -5,24 +5,29 @@
  * @param dateStr - A valid ISO date string (YYYY-MM-DD) or a Date object.
  * @returns A formatted string or the original input if invalid.
  */
-export function formatDateToDDMMYYYY(dateStr: string): string {
+export function formatDateToDDMMYYYY(dateStr: any): string {
     if (!dateStr) return '';
 
-    // Handle both YYYY-MM-DD and Date objects
-    const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+    // Handle both YYYY-MM-DD, Timestamp and Date objects
+    let date: Date;
+    if (typeof dateStr === 'object' && dateStr.seconds !== undefined) {
+        date = new Date(dateStr.seconds * 1000);
+    } else {
+        date = dateStr instanceof Date ? dateStr : new Date(dateStr);
+    }
 
     // Check if valid date
-    if (isNaN(date.getTime())) return dateStr;
+    if (isNaN(date.getTime())) return String(dateStr);
 
     const day = String(date.getDate()).padStart(2, '0');
     const month = String(date.getMonth() + 1).padStart(2, '0');
-    const year = date.getFullYear();
+    const year = String(date.getFullYear()).slice(-2);
 
-    return `${day}/${month}/${year}`;
+    return `${day}-${month}-${year}`;
 }
 
 /**
- * Specifically converts a Firestore-style Timestamp object into DD/MM/YYYY format.
+ * Specifically converts a Firestore-style Timestamp object into dd-mm-yy format.
  * Provides fallback for standard string dates if the toDate method is missing.
  * 
  * @param timestamp - The Firestore timestamp or raw date reference.
@@ -34,5 +39,5 @@ export function formatTimestampToDDMMYYYY(timestamp: any): string {
     // Handle Firestore Timestamp
     const date = timestamp.toDate ? timestamp.toDate() : new Date(timestamp);
 
-    return formatDateToDDMMYYYY(date.toISOString().split('T')[0]);
+    return formatDateToDDMMYYYY(date);
 }

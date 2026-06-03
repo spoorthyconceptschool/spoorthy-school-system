@@ -45,6 +45,18 @@ export default function StudentNotificationsPage() {
         }
     }, [user?.uid]);
 
+    // Rehydrate notifications cache on user load
+    useEffect(() => {
+        if (typeof window !== "undefined" && user?.uid) {
+            try {
+                const cached = localStorage.getItem(`student_notifications_cache_${user.uid}`);
+                if (cached) {
+                    setNotifications(JSON.parse(cached));
+                }
+            } catch (e) {}
+        }
+    }, [user?.uid]);
+
     useEffect(() => {
         if (!user?.email) return;
 
@@ -61,9 +73,11 @@ export default function StudentNotificationsPage() {
         });
         unsubscribes.push(unsubPersonal);
 
-        // 2. Class Notifications - Dual Strategy Profile Fetch
+        // 2. Class & Global Broadcast Notifications - Dual Strategy Profile Fetch
         const setupClassListener = (student: any) => {
             const classId = student.classId;
+            const schoolId = student.schoolId || schoolIdFromEmail;
+
             if (classId) {
                 const qClass = query(collection(db, "notifications"), where("target", "==", `class_${classId}`), limit(50));
                 const unsubClass = onSnapshot(qClass, (snap) => {
@@ -73,6 +87,22 @@ export default function StudentNotificationsPage() {
                 });
                 unsubscribes.push(unsubClass);
             }
+
+            if (schoolId) {
+                const qGlobal = query(
+                    collection(db, "notifications"), 
+                    where("schoolId", "==", schoolId),
+                    where("target", "in", ["ALL", "ALL_STUDENTS"]), 
+                    limit(50)
+                );
+                const unsubGlobal = onSnapshot(qGlobal, (snap) => {
+                    if (!isMounted) return;
+                    const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification));
+                    updateNotifications(list);
+                }, (err) => console.warn("Global student notification listener error:", err.message));
+                unsubscribes.push(unsubGlobal);
+            }
+
             setLoading(false);
         };
 
@@ -95,15 +125,6 @@ export default function StudentNotificationsPage() {
         });
         unsubscribes.push(unsubProfile);
 
-        // 3. Global Broadcast Notifications
-        const qGlobal = query(collection(db, "notifications"), where("target", "in", ["ALL", "ALL_STUDENTS"]), limit(50));
-        const unsubGlobal = onSnapshot(qGlobal, (snap) => {
-            if (!isMounted) return;
-            const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification));
-            updateNotifications(list);
-        });
-        unsubscribes.push(unsubGlobal);
-
         // Helper to merge lists safely
         const updateNotifications = (newList: Notification[]) => {
             if (!isMounted) return;
@@ -111,11 +132,15 @@ export default function StudentNotificationsPage() {
                 const newIds = new Set(newList.map(n => n.id));
                 const filteredPrev = prev.filter(p => !newIds.has(p.id));
                 const combined = [...filteredPrev, ...newList];
-                return combined.sort((a, b) => {
+                const sorted = combined.sort((a, b) => {
                     const timeA = a.createdAt?.seconds || 0;
                     const timeB = b.createdAt?.seconds || 0;
                     return timeB - timeA;
                 }).slice(0, 50);
+                if (typeof window !== "undefined" && user?.uid) {
+                    localStorage.setItem(`student_notifications_cache_${user.uid}`, JSON.stringify(sorted));
+                }
+                return sorted;
             });
         };
 
@@ -166,7 +191,7 @@ export default function StudentNotificationsPage() {
         }
     };
 
-    if (loading) return <div className="flex justify-center p-10"><Loader2 className="animate-spin text-[#64FFDA]" /></div>;
+    if (loading && notifications.length === 0) return <div className="flex justify-center p-10"><Loader2 className="animate-spin text-[#64FFDA]" /></div>;
 
     return (
         <div className="max-w-4xl mx-auto space-y-6 animate-in fade-in pb-10">

@@ -1,0 +1,30 @@
+# gcloud ignore file
+.git/
+.gitignore
+.gcloudignore
+
+# dependencies
+node_modules/
+.yarn/
+
+# local builds & caches
+.next/
+out/
+build/
+.firebase/
+.vscode/
+
+# temp & environment files
+.env.local
+.env.development.local
+.env.test.local
+.env.production.local
+.env.production
+.env
+
+# other logs & scratch files
+*.log
+scratch/
+tmp/
+debug_output*.json
+*.tsbuildinfo

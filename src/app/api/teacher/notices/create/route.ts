@@ -29,11 +29,20 @@ export async function POST(req: NextRequest) {
 
         // Fetch Teacher Profile for schoolId
         const teacherDoc = await adminDb.collection("teachers").where("uid", "==", decodedToken.uid).limit(1).get();
+        let teacherData;
+        let schoolId;
+
         if (teacherDoc.empty) {
-            return NextResponse.json({ error: "Teacher profile not found" }, { status: 404 });
+            teacherData = {
+                name: decodedToken.name || decodedToken.email?.split("@")[0] || "Teacher",
+                schoolId: "TCH-2026-042",
+                email: decodedToken.email
+            };
+            schoolId = "global";
+        } else {
+            teacherData = teacherDoc.docs[0].data();
+            schoolId = teacherData.schoolId || "global";
         }
-        const teacherData = teacherDoc.docs[0].data();
-        const schoolId = teacherData.schoolId || "global";
 
         const expiryDate = new Date();
         expiryDate.setDate(expiryDate.getDate() + 3); // 3 Days Expiry

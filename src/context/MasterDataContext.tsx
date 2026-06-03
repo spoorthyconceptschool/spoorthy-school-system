@@ -66,23 +66,72 @@ interface MasterDataState {
     };
     /** Registry of active custom fees (targeted by class/student). */
     customFees: any[];
+    /** Cache of active student groups. */
+    groups: any[];
     /** Tracks the initial synchronization status with the RTDB. */
     loading: boolean;
 }
 
+const defaultClasses: Record<string, any> = {
+    "CLS_01": { id: "CLS_01", name: "Nursery", isActive: true, order: 1 },
+    "CLS_02": { id: "CLS_02", name: "LKG", isActive: true, order: 2 },
+    "CLS_03": { id: "CLS_03", name: "UKG", isActive: true, order: 3 },
+    "CLS_04": { id: "CLS_04", name: "Class 1", isActive: true, order: 4 },
+    "CLS_05": { id: "CLS_05", name: "Class 2", isActive: true, order: 5 },
+    "CLS_06": { id: "CLS_06", name: "Class 3", isActive: true, order: 6 },
+    "CLS_07": { id: "CLS_07", name: "Class 4", isActive: true, order: 7 },
+    "CLS_08": { id: "CLS_08", name: "Class 5", isActive: true, order: 8 },
+    "CLS_09": { id: "CLS_09", name: "Class 6", isActive: true, order: 9 },
+    "CLS_10": { id: "CLS_10", name: "Class 7", isActive: true, order: 10 }
+};
+
+const defaultSections: Record<string, any> = {
+    "SEC_A": { id: "SEC_A", name: "A", isActive: true },
+    "SEC_B": { id: "SEC_B", name: "B", isActive: true }
+};
+
+const defaultVillages: Record<string, any> = {
+    "VIL_001": { id: "VIL_001", name: "Miyapur", isActive: true },
+    "VIL_002": { id: "VIL_002", name: "Bachupally", isActive: true },
+    "VIL_003": { id: "VIL_003", name: "Nizampet", isActive: true },
+    "VIL_004": { id: "VIL_004", name: "Kukatpally", isActive: true }
+};
+
+const defaultSubjects: Record<string, any> = {
+    "math": { id: "math", name: "Mathematics", isActive: true },
+    "science": { id: "science", name: "Science", isActive: true },
+    "english": { id: "english", name: "English", isActive: true }
+};
+
+const defaultClassSections: Record<string, any> = {};
+Object.keys(defaultClasses).forEach(cId => {
+    Object.keys(defaultSections).forEach(sId => {
+        const id = `${cId}_${sId}`;
+        defaultClassSections[id] = {
+            id,
+            classId: cId,
+            className: defaultClasses[cId].name,
+            sectionId: sId,
+            sectionName: defaultSections[sId].name,
+            displayName: `${defaultClasses[cId].name} - ${defaultSections[sId].name}`,
+            isActive: true
+        };
+    });
+});
+
 const initialState: MasterDataState = {
-    villages: {},
-    classes: {},
-    sections: {},
-    subjects: {},
-    classSections: {},
+    villages: defaultVillages,
+    classes: defaultClasses,
+    sections: defaultSections,
+    subjects: defaultSubjects,
+    classSections: defaultClassSections,
     classSubjects: {},
     subjectTeachers: {},
     homeworkSubjects: {},
     roles: {},
     branding: {
-        schoolName: "",
-        address: "",
+        schoolName: "Spoorthy Concept School",
+        address: "Miyapur, Hyderabad",
         schoolLogo: "",
         principalSignature: "",
         studentIdPrefix: "SCS",
@@ -90,7 +139,9 @@ const initialState: MasterDataState = {
         studentIdSuffix: 1,
         teacherIdSuffix: 1
     },
-    academicYears: {},
+    academicYears: {
+        "2025-2026": { id: "2025-2026", name: "2025-2026", active: true, startDate: "", endDate: "" }
+    },
     systemConfig: {
         testingMode: false,
         developerMaintenance: false,
@@ -103,7 +154,7 @@ const initialState: MasterDataState = {
     groups: [],
     feeConfig: { terms: [] },
     customFees: [],
-    loading: true
+    loading: false
 };
 
 const MasterDataContext = createContext<MasterDataState>(initialState);
@@ -142,35 +193,35 @@ const MASTER_CACHE_KEY = "spoorthy_master_cache";
  * UI components in sync with the school's master configuration.
  */
 export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
-    const [data, setData] = useState<Omit<MasterDataState, 'selectedYear' | 'setSelectedYear'>>(initialState);
-    const [selectedYear, setSelectedYear] = useState("2025-2026");
-    const [mounted, setMounted] = useState(false);
-
-    useEffect(() => {
-        setMounted(true);
+    const [data, setData] = useState<Omit<MasterDataState, 'selectedYear' | 'setSelectedYear'>>(() => {
         if (typeof window !== 'undefined') {
-            const cachedYear = localStorage.getItem("spoorthy_academic_year");
-            if (cachedYear) setSelectedYear(cachedYear);
-
             const cachedData = localStorage.getItem(MASTER_CACHE_KEY);
             if (cachedData) {
                 try {
                     const parsed = JSON.parse(cachedData);
-                    setData(prev => ({
-                        ...prev,
+                    return {
+                        ...initialState,
                         ...parsed,
                         branding: { ...initialState.branding, ...(parsed.branding || {}) },
                         systemConfig: { ...initialState.systemConfig, ...(parsed.systemConfig || {}) },
                         loading: false
-                    }));
+                    };
                 } catch (e) {}
             }
         }
-    }, []);
+        return initialState;
+    });
+    const [selectedYear, setSelectedYear] = useState(() => {
+        if (typeof window !== 'undefined') {
+            const cachedYear = localStorage.getItem("spoorthy_academic_year");
+            if (cachedYear) return cachedYear;
+        }
+        return "2025-2026";
+    });
+    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
-        // Cache is already loaded synchronously above.
-        // We only use this for initial Auth check or other setup if needed.
+        setMounted(true);
     }, []);
 
     // Helper to persist data
@@ -273,10 +324,9 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
                         endDate: null
                     };
 
-                    // Auto-set selected year if not set locally
-                    if (!localStorage.getItem("spoorthy_academic_year")) {
-                        setSelectedYear(config.currentYear);
-                    }
+                    // Always sync to the authoritative Firebase currentYear
+                    setSelectedYear(config.currentYear);
+                    localStorage.setItem("spoorthy_academic_year", config.currentYear);
                 }
 
                 // Upcoming
@@ -405,7 +455,7 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
 
         // Sync Students (Active only)
         let studentsBaseQ = query(collection(db, "students"), where("status", "==", "ACTIVE"));
-        if (userData?.schoolId && userData.schoolId !== "global") {
+        if (userData?.schoolId && userData.schoolId !== "global" && normalizedRole !== "TEACHER") {
             studentsBaseQ = query(studentsBaseQ, where("branchId", "==", userData.schoolId));
         }
         const studentsUnsub = onSnapshot(studentsBaseQ, (snap) => {

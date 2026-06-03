@@ -12,10 +12,48 @@ import { formatDateToDDMMYYYY } from "@/lib/date-utils";
 import { toast } from "@/lib/toast-store";
 import { cn } from "@/lib/utils";
 
+const STUDENT_LEAVES_CACHE_KEY = "spoorthy_student_leaves_cache";
+const DEFAULT_STUDENT_LEAVES = [
+    {
+        id: "SL-2026-001",
+        studentId: "SPO-2026-005",
+        studentName: "Aditya Vardhan",
+        className: "Class 5",
+        sectionName: "Section A",
+        fromDate: "2026-05-30",
+        toDate: "2026-05-31",
+        type: "Personal",
+        reason: "Sister's marriage",
+        status: "PENDING",
+        createdAt: "2026-05-25T10:00:00.000Z"
+    },
+    {
+        id: "SL-2026-002",
+        studentId: "SPO-2026-012",
+        studentName: "Pooja Hegde",
+        className: "Class 4",
+        sectionName: "Section B",
+        fromDate: "2026-05-26",
+        toDate: "2026-05-26",
+        type: "Sick",
+        reason: "High fever",
+        status: "APPROVED",
+        createdAt: "2026-05-24T08:30:00.000Z"
+    }
+];
+
 export function StudentLeavesManager() {
     const { user } = useAuth();
-    const [leaves, setLeaves] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [leaves, setLeaves] = useState<any[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(STUDENT_LEAVES_CACHE_KEY);
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
+        return DEFAULT_STUDENT_LEAVES;
+    });
+    const [loading, setLoading] = useState(false);
     const [actioning, setActioning] = useState<string | null>(null);
 
     useEffect(() => {
@@ -31,6 +69,9 @@ export function StudentLeavesManager() {
                 ...doc.data()
             }));
             setLeaves(loaded);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(STUDENT_LEAVES_CACHE_KEY, JSON.stringify(loaded));
+            }
             setLoading(false);
         }, (err) => {
             console.error("Student Leaves Sync Error:", err);

@@ -30,7 +30,7 @@ export default function StudentAttendancePage() {
     const nextMonth = () => setCurrentMonth(addMonths(currentMonth, 1));
     const prevMonth = () => setCurrentMonth(subMonths(currentMonth, 1));
 
-    if (loading) {
+    if (loading && Object.keys(attendanceMap).length === 0) {
         return (
             <div className="h-[60vh] w-full flex flex-col items-center justify-center gap-4 text-[#10B981]">
                 <Loader2 className="w-10 h-10 animate-spin text-[#10B981]" />

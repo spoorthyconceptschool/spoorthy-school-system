@@ -20,6 +20,7 @@ import { cn } from "@/lib/utils";
 import { ClassesSectionsManager } from "@/components/admin/master-data/ClassesSectionsManager";
 import { SubjectsManager } from "@/components/admin/master-data/SubjectsManager";
 import { VillagesManager } from "@/components/admin/master-data/VillagesManager";
+import { TeacherAssignmentsManager } from "@/components/admin/master-data/TeacherAssignmentsManager";
 import { useMasterData } from "@/context/MasterDataContext";
 
 export default function MasterDataPage() {
@@ -199,6 +200,9 @@ export default function MasterDataPage() {
                     </div>
                 ))}
             </div>
+
+            {/* Live Teacher Assignments Directory */}
+            <TeacherAssignmentsManager />
 
             {/* Bottom Footer Section */}
             <div className="rounded-2xl md:rounded-3xl border border-white/5 bg-gradient-to-br from-blue-500/10 via-transparent to-purple-500/5 p-6 md:p-12 flex flex-col md:flex-row items-center justify-between gap-6 md:gap-10 overflow-hidden relative group">

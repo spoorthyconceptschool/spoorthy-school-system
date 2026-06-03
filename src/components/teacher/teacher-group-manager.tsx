@@ -29,6 +29,13 @@ interface Student {
     groupName?: string;
 }
 
+const DEFAULT_GROUPS: Group[] = [
+    { id: "g_red", name: "Red Dragons", color: "#ff4d4d" },
+    { id: "g_blue", name: "Blue Falcons", color: "#4d79ff" },
+    { id: "g_green", name: "Green Giants", color: "#00cc66" },
+    { id: "g_yellow", name: "Yellow Suns", color: "#ffcc00" }
+];
+
 export function TeacherGroupManager() {
     const { classes: classesData, sections: sectionsData, classSections } = useMasterData();
 
@@ -36,12 +43,31 @@ export function TeacherGroupManager() {
     const classes = Object.values(classesData).map((c: any) => ({ id: c.id, name: c.name, order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
 
     // State
-    const [selectedClassId, setSelectedClassId] = useState<string>("");
-    const [selectedSectionId, setSelectedSectionId] = useState<string>("all");
-    const [groups, setGroups] = useState<Group[]>([]);
-    const [students, setStudents] = useState<Student[]>([]);
+    const [selectedClassId, setSelectedClassId] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem("teacher_group_selected_class") || "" : "");
+    const [selectedSectionId, setSelectedSectionId] = useState<string>(() => typeof window !== 'undefined' ? localStorage.getItem("teacher_group_selected_section") || "all" : "all");
+    const [groups, setGroups] = useState<Group[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem("groups_cache");
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
+        return DEFAULT_GROUPS;
+    });
+    const [students, setStudents] = useState<Student[]>(() => {
+        if (typeof window === 'undefined') return [];
+        const cId = localStorage.getItem("teacher_group_selected_class") || "";
+        const sId = localStorage.getItem("teacher_group_selected_section") || "all";
+        const cached = localStorage.getItem(`group_students_${cId}_${sId}`);
+        return cached ? JSON.parse(cached) : [];
+    });
     const [filteredStudents, setFilteredStudents] = useState<Student[]>([]);
-    const [loading, setLoading] = useState(false);
+    const [loading, setLoading] = useState(() => {
+        if (typeof window === 'undefined') return false;
+        const cId = localStorage.getItem("teacher_group_selected_class") || "";
+        const sId = localStorage.getItem("teacher_group_selected_section") || "all";
+        return !!(cId && !localStorage.getItem(`group_students_${cId}_${sId}`));
+    });
     const [availableSections, setAvailableSections] = useState<any[]>([]);
     const [searchQuery, setSearchQuery] = useState("");
 
@@ -50,6 +76,13 @@ export function TeacherGroupManager() {
     const [targetGroupId, setTargetGroupId] = useState<string>("");
     const [assigning, setAssigning] = useState(false);
 
+    useEffect(() => {
+        if (typeof window !== 'undefined') {
+            localStorage.setItem("teacher_group_selected_class", selectedClassId);
+            localStorage.setItem("teacher_group_selected_section", selectedSectionId);
+        }
+    }, [selectedClassId, selectedSectionId]);
+
     // Initial Data Fetch (Groups)
     useEffect(() => {
         const fetchGroups = async () => {
@@ -57,6 +90,9 @@ export function TeacherGroupManager() {
             const list: Group[] = [];
             snap.forEach(d => list.push({ id: d.id, ...d.data() } as Group));
             setGroups(list);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem("groups_cache", JSON.stringify(list));
+            }
         };
         fetchGroups();
     }, []);
@@ -69,7 +105,10 @@ export function TeacherGroupManager() {
                 .map((cs: any) => sectionsData[cs.sectionId])
                 .filter(Boolean);
             setAvailableSections(secs);
-            setSelectedSectionId("all");
+            setSelectedSectionId(prev => {
+                const isValid = secs.some(s => s.id === prev) || prev === "all";
+                return isValid ? prev : "all";
+            });
         } else {
             setAvailableSections([]);
         }
@@ -83,7 +122,10 @@ export function TeacherGroupManager() {
         }
 
         const fetchStudents = async () => {
-            setLoading(true);
+            const hasCache = typeof window !== 'undefined' && localStorage.getItem(`group_students_${selectedClassId}_${selectedSectionId}`);
+            if (!hasCache) {
+                setLoading(true);
+            }
             try {
                 let q = query(collection(db, "students"), where("classId", "==", selectedClassId));
                 if (selectedSectionId !== "all") {
@@ -97,6 +139,9 @@ export function TeacherGroupManager() {
                 // Sort by Name
                 list.sort((a, b) => String(a.studentName || "").localeCompare(String(b.studentName || "")));
                 setStudents(list);
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem(`group_students_${selectedClassId}_${selectedSectionId}`, JSON.stringify(list));
+                }
                 setSelectedStudentIds([]); // clear selection on refetch
             } catch (error) {
                 console.error("Error fetching students:", error);

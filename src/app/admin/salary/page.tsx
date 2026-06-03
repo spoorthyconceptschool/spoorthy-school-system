@@ -14,10 +14,40 @@ import { useMasterData } from "@/context/MasterDataContext";
 import { cn } from "@/lib/utils";
 
 export default function SalaryPage() {
-    const { branding } = useMasterData();
-    const [loading, setLoading] = useState(true);
-    const [employees, setEmployees] = useState<any[]>([]);
-    const [payments, setPayments] = useState<any[]>([]);
+    const { branding, teachers: masterTeachers, staff: masterStaff } = useMasterData();
+    const [employees, setEmployees] = useState<any[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem("spoorthy_salary_employees_cache");
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
+        const teachersList = (masterTeachers || []).map((t: any) => ({
+            id: t.id,
+            ...t,
+            personType: "TEACHER",
+            roleDisplay: "Teacher",
+            baseSalary: t.baseSalary || t.salary
+        }));
+        const staffList = (masterStaff || []).map((s: any) => ({
+            id: s.id,
+            ...s,
+            personType: "STAFF",
+            roleDisplay: s.roleName || "Staff",
+            baseSalary: s.baseSalary || s.salary
+        }));
+        return [...teachersList, ...staffList].sort((a: any, b: any) => String(a.name || "").localeCompare(String(b.name || "")));
+    });
+    const [payments, setPayments] = useState<any[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem("spoorthy_salary_payments_cache");
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
+        return [];
+    });
+    const [loading, setLoading] = useState(false);
     const [leavesMap, setLeavesMap] = useState<Record<string, number>>({});
 
     // Filters
@@ -38,7 +68,6 @@ export default function SalaryPage() {
     }, [month, year]);
 
     const fetchData = async () => {
-        setLoading(true);
         try {
             // 1. Fetch Teachers
             const tSnap = await getDocs(query(collection(db, "teachers"), where("status", "==", "ACTIVE")));
@@ -78,6 +107,11 @@ export default function SalaryPage() {
             const pSnap = await getDocs(pQuery);
             const paymentData = pSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setPayments(paymentData);
+
+            if (typeof window !== 'undefined') {
+                localStorage.setItem("spoorthy_salary_employees_cache", JSON.stringify(allEmployees));
+                localStorage.setItem("spoorthy_salary_payments_cache", JSON.stringify(paymentData));
+            }
 
             // 4. Fetch Teacher Attendance for Leaves
             const monthIndex = new Date(`${month} 1, 2000`).getMonth() + 1;

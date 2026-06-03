@@ -49,10 +49,42 @@ interface CoverageTask {
  * 
  * @returns JSX Element representing the coverage management view.
  */
+const COVERAGE_TASKS_CACHE_KEY = "spoorthy_coverage_tasks_cache";
+const COVERAGE_TEACHERS_CACHE_KEY = "spoorthy_coverage_teachers_cache";
+const DEFAULT_COVERAGE_TASKS: CoverageTask[] = [
+    {
+        id: "cov_default_1",
+        date: "2026-05-30",
+        day: "SATURDAY",
+        slotId: 2,
+        classId: "C1-A",
+        originalTeacherId: "TCH-2026-042",
+        status: "PENDING",
+        suggestedSubstituteId: "TCH-2026-002",
+        suggestedType: "SUBSTITUTE"
+    }
+];
+
 export function CoverageManager() {
-    const [tasks, setTasks] = useState<CoverageTask[]>([]);
-    const [loading, setLoading] = useState(true);
-    const [teachers, setTeachers] = useState<any[]>([]);
+    const [tasks, setTasks] = useState<CoverageTask[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(COVERAGE_TASKS_CACHE_KEY);
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
+        return DEFAULT_COVERAGE_TASKS;
+    });
+    const [loading, setLoading] = useState(false);
+    const [teachers, setTeachers] = useState<any[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(COVERAGE_TEACHERS_CACHE_KEY);
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
+        return [];
+    });
     const [showResolved, setShowResolved] = useState(false);
 
     // Resolve Modal
@@ -71,14 +103,22 @@ export function CoverageManager() {
         // Real-time Tasks
         const q = query(collection(db, "coverage_tasks"), orderBy("createdAt", "desc"), limit(100));
         const unsubscribeTasks = onSnapshot(q, (snapshot) => {
-            setTasks(snapshot.docs.map(d => ({ id: d.id, ...d.data() } as CoverageTask)));
+            const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as CoverageTask));
+            setTasks(list);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(COVERAGE_TASKS_CACHE_KEY, JSON.stringify(list));
+            }
             setLoading(false);
         }, (err) => {
             console.warn("Task Listener Error, falling back...", err);
             // Fallback for missing index
             const qFallback = query(collection(db, "coverage_tasks"), limit(100));
             onSnapshot(qFallback, (snap) => {
-                setTasks(snap.docs.map(d => ({ id: d.id, ...d.data() } as CoverageTask)));
+                const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as CoverageTask));
+                setTasks(list);
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem(COVERAGE_TASKS_CACHE_KEY, JSON.stringify(list));
+                }
                 setLoading(false);
             });
         });
@@ -86,7 +126,11 @@ export function CoverageManager() {
         // Real-time Teachers
         const qT = query(collection(db, "teachers"), where("status", "==", "ACTIVE"));
         const unsubscribeTeachers = onSnapshot(qT, (snapshot) => {
-            setTeachers(snapshot.docs.map(d => ({ id: d.id, ...d.data() })));
+            const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            setTeachers(list);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(COVERAGE_TEACHERS_CACHE_KEY, JSON.stringify(list));
+            }
         });
 
         return () => {

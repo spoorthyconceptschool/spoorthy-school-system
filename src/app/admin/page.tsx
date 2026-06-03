@@ -78,6 +78,7 @@ interface DashboardStats {
         transportPaid: number;
         schoolFee: number;
         schoolPaid: number;
+        customFees?: Record<string, { total: number; paid: number }>;
         terms: Record<string, { total: number; paid: number }>;
     };
 }
@@ -554,7 +555,288 @@ export default function AdminDashboard() {
 
     // Default Admin View
     return (
-        <div className="space-y-6 md:space-y-8 animate-in fade-in duration-200 pb-10 w-full">
+        <div className="w-full h-full">
+            {/* ═══ MOBILE VIEW (Classy Slate-Blue Theme, Viewport Fitted) ═══ */}
+            <div className="md:hidden flex flex-col h-[calc(100dvh-4.5rem)] w-full overflow-y-auto no-scrollbar px-2 pt-2 pb-20 gap-2 animate-in fade-in">
+                {/* Header Compact */}
+                <div className="flex items-center justify-between shrink-0 px-1">
+                    <div>
+                        <h1 className="font-display text-base font-bold tracking-tight italic text-white leading-none">
+                            Admin <span className="text-[#64FFDA]">Central</span>
+                        </h1>
+                        <p className="text-[7px] text-muted-foreground uppercase tracking-widest font-black mt-0.5">Real-time School Operations</p>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                        <Button variant="outline" size="sm" className="h-8 gap-1.5 border-white/10 bg-[#131e35]/80 hover:bg-white/5 text-[10px] rounded-xl px-2.5">
+                            <Download size={12} className="text-[#64FFDA]" />
+                            <span>Export</span>
+                        </Button>
+                        <AddStudentModal>
+                            <Button size="sm" className="h-8 gap-1 bg-[#64FFDA] text-black hover:bg-[#64FFDA]/90 text-[10px] font-bold rounded-xl px-2.5">
+                                <Plus size={12} className="stroke-[3]" />
+                                <span>Add Student</span>
+                            </Button>
+                        </AddStudentModal>
+                    </div>
+                </div>
+
+                {/* 4 KPI Cards in a tight 2x2 grid (MEMBERS, STUDENTS ATT., STAFF ATT., FEE COLLECTION) */}
+                <div className="grid grid-cols-2 gap-1.5 shrink-0">
+                    {/* Card 1: Members */}
+                    <div className="bg-[#131e35]/80 border border-white/10 rounded-xl p-2.5 flex flex-col justify-between cursor-pointer hover:border-[#64FFDA]/30 transition-all" onClick={() => router.push("/admin/students")}>
+                        <div className="flex justify-between items-center mb-2 shrink-0">
+                            <span className="text-[9px] font-black uppercase text-slate-300 tracking-wider">Members</span>
+                            <Users className="w-3.5 h-3.5 text-[#38bdf8]" />
+                        </div>
+                        <div className="grid grid-cols-3 gap-0.5 text-center flex-1 items-center">
+                            <div className="flex flex-col justify-center">
+                                <span className="text-[7px] font-semibold text-slate-400 uppercase tracking-widest leading-none">Students</span>
+                                <span className="text-sm font-extrabold text-[#38bdf8] font-mono mt-1 leading-none">{calculatedStats.totalStudents}</span>
+                            </div>
+                            <div className="flex flex-col justify-center border-l border-white/10">
+                                <span className="text-[7px] font-semibold text-slate-400 uppercase tracking-widest leading-none">Teachers</span>
+                                <span className="text-sm font-extrabold text-[#c084fc] font-mono mt-1 leading-none">{calculatedStats.totalTeachers}</span>
+                            </div>
+                            <div className="flex flex-col justify-center border-l border-white/10">
+                                <span className="text-[7px] font-semibold text-slate-400 uppercase tracking-widest leading-none">Staff</span>
+                                <span className="text-sm font-extrabold text-[#818cf8] font-mono mt-1 leading-none">{calculatedStats.totalStaff}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Card 2: Student Att. */}
+                    <div className="bg-[#131e35]/80 border border-white/10 rounded-xl p-2.5 flex flex-col justify-between cursor-pointer hover:border-[#64FFDA]/30 transition-all" onClick={() => router.push("/admin/attendance")}>
+                        <div className="flex justify-between items-center mb-2 shrink-0">
+                            <span className="text-[9px] font-black uppercase text-slate-300 tracking-wider">Students Att.</span>
+                            <CheckCircle className="w-3.5 h-3.5 text-emerald-400" />
+                        </div>
+                        <div className="grid grid-cols-3 gap-0.5 text-center flex-1 items-center">
+                            <div className="flex flex-col justify-center">
+                                <span className="text-[7px] font-semibold text-slate-400 uppercase tracking-widest leading-none">Present</span>
+                                <span className="text-sm font-extrabold text-emerald-400 font-mono mt-1 leading-none">{calculatedStats.presentStudents}</span>
+                            </div>
+                            <div className="flex flex-col justify-center border-l border-white/10">
+                                <span className="text-[7px] font-semibold text-slate-400 uppercase tracking-widest leading-none">Absent</span>
+                                <span className="text-sm font-extrabold text-[#f43f5e] font-mono mt-1 leading-none">{calculatedStats.absentStudents}</span>
+                            </div>
+                            <div className="flex flex-col justify-center border-l border-white/10">
+                                <span className="text-[7px] font-semibold text-slate-400 uppercase tracking-widest leading-none">Unmarked</span>
+                                <span className="text-sm font-extrabold text-[#f59e0b] font-mono mt-1 leading-none">{calculatedStats.pendingStudents}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Card 3: Staff Att. */}
+                    <div className="bg-[#131e35]/80 border border-white/10 rounded-xl p-2.5 flex flex-col justify-between cursor-pointer hover:border-[#64FFDA]/30 transition-all" onClick={() => router.push("/admin/attendance")}>
+                        <div className="flex justify-between items-center mb-2 shrink-0">
+                            <span className="text-[9px] font-black uppercase text-slate-300 tracking-wider">Staff Att.</span>
+                            <ClipboardList className="w-3.5 h-3.5 text-purple-400" />
+                        </div>
+                        <div className="grid grid-cols-3 gap-0.5 text-center flex-1 items-center">
+                            <div className="flex flex-col justify-center">
+                                <span className="text-[7px] font-semibold text-slate-400 uppercase tracking-widest leading-none">Present</span>
+                                <span className="text-sm font-extrabold text-emerald-400 font-mono mt-1 leading-none">{calculatedStats.presentTeachers + calculatedStats.presentStaff}</span>
+                            </div>
+                            <div className="flex flex-col justify-center border-l border-white/10">
+                                <span className="text-[7px] font-semibold text-slate-400 uppercase tracking-widest leading-none">Absent</span>
+                                <span className="text-sm font-extrabold text-[#f43f5e] font-mono mt-1 leading-none">{calculatedStats.absentTeachers + calculatedStats.absentStaff}</span>
+                            </div>
+                            <div className="flex flex-col justify-center border-l border-white/10">
+                                <span className="text-[7px] font-semibold text-slate-400 uppercase tracking-widest leading-none">Unmarked</span>
+                                <span className="text-sm font-extrabold text-[#f59e0b] font-mono mt-1 leading-none">{calculatedStats.pendingTeachers + calculatedStats.pendingStaff}</span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Card 4: Fee Collection */}
+                    <div className="bg-[#131e35]/80 border border-white/10 rounded-xl p-2.5 flex flex-col justify-between cursor-pointer hover:border-[#64FFDA]/30 transition-all" onClick={() => router.push("/admin/payments")}>
+                        <div className="flex justify-between items-center mb-1 shrink-0">
+                            <span className="text-[9px] font-black uppercase text-slate-300 tracking-wider">Fee Collection</span>
+                            <IndianRupee className="w-3.5 h-3.5 text-emerald-400" />
+                        </div>
+                        <div className="flex flex-col items-center justify-center flex-1 mt-1">
+                            <span className="text-base font-extrabold text-white font-mono leading-none">₹{calculatedStats.todayCollection.toLocaleString()}</span>
+                            <span className="text-[7px] font-black uppercase text-emerald-400 tracking-widest mt-1.5 leading-none">Today Collection</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Redesigned Fee Collection Overview Card */}
+                <div className="bg-gradient-to-br from-[#1a2b4b] via-[#101b33] to-[#0a1122] border border-[#3b82f6]/20 rounded-2xl p-3.5 shrink-0 flex flex-col justify-between shadow-2xl">
+                    <div className="flex justify-between items-center mb-3">
+                        <div className="flex items-center gap-2">
+                            <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400">
+                                <Wallet size={14} />
+                            </div>
+                            <span className="text-xs font-bold text-white uppercase tracking-wider">Fee Collection Overview</span>
+                        </div>
+                        <div className="p-1.5 rounded-full bg-white/5 text-zinc-400">
+                            <Filter size={10} />
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-3">
+                        <div>
+                            <div className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Pending Fees</div>
+                            <div className="text-lg font-bold text-white font-mono mt-1">
+                                ₹{((calculatedStats.finance?.totalFee || 0) - (calculatedStats.finance?.totalPaid || 0)).toLocaleString()}
+                            </div>
+                            <div className="text-[8px] text-zinc-500 italic mt-0.5">From all fee categories</div>
+                        </div>
+                        <div className="text-right">
+                            <div className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Collection Progress</div>
+                            <div className="text-lg font-bold text-[#64FFDA] font-mono mt-1">
+                                {calculatedStats.finance?.totalFee ? Math.round((calculatedStats.finance.totalPaid / calculatedStats.finance.totalFee) * 100) : 0}%
+                            </div>
+                            <div className="text-[8px] text-zinc-500 italic mt-0.5">
+                                ₹{(calculatedStats.finance?.totalPaid || 0).toLocaleString()} of ₹{(calculatedStats.finance?.totalFee || 0).toLocaleString()}
+                            </div>
+                        </div>
+                        <div className="col-span-2 w-full h-1.5 bg-white/5 rounded-full mt-1.5 overflow-hidden">
+                            <div 
+                                className="h-full bg-gradient-to-r from-blue-500 to-[#64FFDA] transition-all duration-1000" 
+                                style={{ width: `${calculatedStats.finance?.totalFee ? (calculatedStats.finance.totalPaid / calculatedStats.finance.totalFee) * 100 : 0}%` }}
+                            />
+                        </div>
+                        <div className="mt-1">
+                            <div className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Expected Collection</div>
+                            <div className="text-xs font-bold text-purple-300 font-mono mt-1">
+                                ₹{(calculatedStats.finance?.totalFee || 0).toLocaleString()}
+                            </div>
+                        </div>
+                        <div className="text-right mt-1">
+                            <div className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Academic Year</div>
+                            <div className="text-xs font-bold text-blue-300 font-mono mt-1">{selectedYear}</div>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Batch 1: Term Fee Analytics */}
+                <div className="shrink-0 flex flex-col gap-1.5">
+                    <div className="flex items-center justify-between px-1">
+                        <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Term Fee Analytics</span>
+                        <Link href="/admin/fees" className="text-[8px] text-accent/80 font-bold uppercase tracking-tighter hover:underline">View Details →</Link>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pb-0.5">
+                        {Object.entries(calculatedStats.finance?.terms || {})
+                            .sort(([a], [b]) => a.localeCompare(b))
+                            .map(([name, data]) => {
+                                const pct = data.total > 0 ? Math.round((data.paid / data.total) * 100) : 0;
+                                return (
+                                    <div key={name} className="p-2.5 bg-[#131e35]/80 border border-white/10 rounded-xl flex flex-col justify-between">
+                                        <div className="text-[8px] font-black uppercase text-slate-300 tracking-wider truncate mb-1.5">{name}</div>
+                                        <div className="flex items-center gap-1.5">
+                                            {/* Circular SVG */}
+                                            <div className="relative w-8 h-8 shrink-0">
+                                                <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                                                    <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3.5" />
+                                                    <circle cx="18" cy="18" r="16" fill="none" stroke="#60a5fa" strokeWidth="3.5" strokeDasharray={`${pct} 100`} strokeDashoffset="0" className="transition-all duration-1000 ease-out" />
+                                                </svg>
+                                                <div className="absolute inset-0 flex items-center justify-center text-[6px] font-mono font-bold text-white">
+                                                    {pct}%
+                                                </div>
+                                            </div>
+                                            {/* Details */}
+                                            <div className="flex-1 min-w-0 space-y-0.5 text-[8px]">
+                                                <div className="flex justify-between items-center text-zinc-500 font-semibold">
+                                                    <span>TOTAL</span>
+                                                    <span className="text-white font-mono">₹{data.total.toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-emerald-400 font-semibold">
+                                                    <span>PAID</span>
+                                                    <span className="text-white font-mono">₹{data.paid.toLocaleString()}</span>
+                                                </div>
+                                                <div className="flex justify-between items-center text-rose-400 font-semibold">
+                                                    <span>PENDING</span>
+                                                    <span className="text-white font-mono">₹{(data.total - data.paid).toLocaleString()}</span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+                                );
+                            })}
+                    </div>
+                </div>
+
+                {/* Batch 2: Other Fee Analytics */}
+                <div className="shrink-0 flex flex-col gap-1.5">
+                    <div className="px-1">
+                        <span className="text-[9px] font-black uppercase text-slate-400 tracking-wider">Other Fee Analytics</span>
+                    </div>
+                    <div className="grid grid-cols-2 gap-2 pb-0.5">
+                        {[
+                            { label: "School Fees (Total)", paid: calculatedStats.finance?.schoolPaid || 0, total: calculatedStats.finance?.schoolFee || 0, color: "#60a5fa" },
+                            { label: "Transport", paid: calculatedStats.finance?.transportPaid || 0, total: calculatedStats.finance?.transportFee || 0, color: "#3b82f6" },
+                            ...Object.entries(calculatedStats.finance?.customFees || {}).map(([name, data]: [string, any]) => {
+                                let color = "#f59e0b"; // Curated amber
+                                const upperName = name.toUpperCase();
+                                if (upperName.includes("HOSTEL")) color = "#10b981";
+                                else if (upperName.includes("EXAM")) color = "#a855f7";
+                                else if (upperName.includes("BOOK") || upperName.includes("LIBRARY")) color = "#ec4899";
+                                else if (upperName.includes("UNIFORM")) color = "#06b6d4";
+                                return {
+                                    label: name,
+                                    paid: data.paid || 0,
+                                    total: data.total || 0,
+                                    color
+                                };
+                            })
+                        ].map((fee, idx) => {
+                            const pct = fee.total > 0 ? Math.round((fee.paid / fee.total) * 100) : 0;
+                            return (
+                                <div key={idx} className="p-2.5 bg-[#131e35]/80 border border-white/10 rounded-xl flex flex-col justify-between">
+                                    <div className="text-[8px] font-black uppercase text-zinc-300 tracking-wider truncate mb-1.5">{fee.label}</div>
+                                    <div className="flex items-center gap-1.5">
+                                        {/* Circular SVG */}
+                                        <div className="relative w-8 h-8 shrink-0">
+                                            <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
+                                                <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3.5" />
+                                                <circle cx="18" cy="18" r="16" fill="none" stroke={fee.color} strokeWidth="3.5" strokeDasharray={`${pct} 100`} strokeDashoffset="0" className="transition-all duration-1000 ease-out" />
+                                            </svg>
+                                            <div className="absolute inset-0 flex items-center justify-center text-[6px] font-mono font-bold text-white">
+                                                {pct}%
+                                            </div>
+                                        </div>
+                                        {/* Details */}
+                                        <div className="flex-1 min-w-0 space-y-0.5 text-[8px]">
+                                            <div className="flex justify-between items-center text-zinc-500 font-semibold">
+                                                <span>TOTAL</span>
+                                                <span className="text-white font-mono">₹{fee.total.toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-emerald-400 font-semibold">
+                                                <span>PAID</span>
+                                                <span className="text-white font-mono">₹{fee.paid.toLocaleString()}</span>
+                                            </div>
+                                            <div className="flex justify-between items-center text-rose-400 font-semibold">
+                                                <span>PENDING</span>
+                                                <span className="text-white font-mono">₹{(fee.total - fee.paid).toLocaleString()}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* Latest Registrations Table Section */}
+                <div className="flex-1 bg-[#131e35]/80 border border-white/10 rounded-2xl flex flex-col overflow-hidden min-h-0">
+                    <div className="px-3 py-2 border-b border-white/5 shrink-0 flex justify-between items-center">
+                        <span className="text-[9px] font-black uppercase text-white/80">Latest Registrations</span>
+                        <Link href="/admin/students" className="text-[8px] text-accent font-bold hover:underline">ALL</Link>
+                    </div>
+                    <div className="flex-1 overflow-auto p-1 scrollbar-thin">
+                        <DataTable
+                            data={recentStudents.filter(s => s.classId && (classes as any)?.[s.classId]).slice(0, 3)}
+                            columns={columns}
+                            isLoading={false}
+                            onRowClick={() => router.push("/admin/students")}
+                        />
+                    </div>
+                </div>
+            </div>
+
+            {/* ═══ DESKTOP VIEW ═══ */}
+            <div className="hidden md:block space-y-6 md:space-y-8 animate-in fade-in duration-200 pb-10 w-full">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
                     <h1 className="font-display text-3xl md:text-5xl font-bold tracking-tighter italic pb-1 text-white">
@@ -570,81 +852,105 @@ export default function AdminDashboard() {
                 </div>
             </div>
 
+            {/* Desktop KPI Grid (MEMBERS, STUDENTS ATT., STAFF ATT., FEE COLLECTION) */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-3 md:gap-4">
-                <KPICard
-                    title="Active Directory"
-                    value={
-                        <div className="flex flex-col gap-1 md:gap-2 mt-1 md:mt-2 w-full pr-2">
-                            <div className="flex justify-between items-center group/row">
-                                <span className="text-[10px] md:text-xs font-black text-blue-400 uppercase tracking-widest italic">Students</span>
-                                <span className="text-sm md:text-2xl font-black text-blue-400 font-display italic leading-none">{calculatedStats.totalStudents}</span>
-                            </div>
-                            <div className="flex justify-between items-center group/row border-t border-white/5 pt-1 md:pt-2">
-                                <span className="text-[10px] md:text-xs font-black text-purple-400 uppercase tracking-widest italic">Teachers</span>
-                                <span className="text-sm md:text-2xl font-black text-purple-400 font-display italic leading-none">{calculatedStats.totalTeachers}</span>
-                            </div>
-                            <div className="flex justify-between items-center group/row border-t border-white/5 pt-1 md:pt-2">
-                                <span className="text-[10px] md:text-xs font-black text-indigo-400 uppercase tracking-widest italic">Support</span>
-                                <span className="text-sm md:text-2xl font-black text-indigo-400 font-display italic leading-none">{calculatedStats.totalStaff}</span>
-                            </div>
-                        </div>
-                    }
-                    icon={<Users className="w-4 h-4 text-blue-400" />}
-                    className="bg-blue-500/5 border-blue-500/10 col-span-1 md:col-span-1"
+                {/* Card 1: Members */}
+                <div 
+                    className="bg-[#131e35]/80 border border-white/10 rounded-2xl p-4 md:p-6 flex flex-col justify-between cursor-pointer hover:border-[#64FFDA]/30 hover:bg-[#172542]/95 transition-all duration-300 shadow-xl"
                     onClick={() => router.push("/admin/students")}
-                />
-                <KPICard
-                    title="Student Attendance"
-                    value={
-                        <div className="flex flex-col gap-1 md:gap-2 mt-1 md:mt-2 w-full pr-2">
-                            <div className="flex justify-between items-center group/row">
-                                <span className="text-[10px] md:text-xs font-black text-emerald-400 uppercase tracking-widest italic">Present</span>
-                                <span className="text-sm md:text-2xl font-black text-emerald-400 font-display italic leading-none">{calculatedStats.presentStudents}</span>
-                            </div>
-                            <div className="flex justify-between items-center group/row border-t border-white/5 pt-1 md:pt-2">
-                                <span className="text-[10px] md:text-xs font-black text-rose-400 uppercase tracking-widest italic">Absent</span>
-                                <span className="text-sm md:text-2xl font-black text-rose-400 font-display italic leading-none">{calculatedStats.absentStudents}</span>
-                            </div>
-                            <div className="flex justify-between items-center group/row border-t border-white/5 pt-1 md:pt-2">
-                                <span className="text-[10px] md:text-xs font-black text-amber-400 uppercase tracking-widest italic">Pending</span>
-                                <span className="text-sm md:text-2xl font-black text-amber-400 font-display italic leading-none">{calculatedStats.pendingStudents}</span>
-                            </div>
+                >
+                    <div className="flex justify-between items-center mb-4 shrink-0">
+                        <span className="text-[10px] md:text-xs font-black uppercase text-slate-300 tracking-wider">Members</span>
+                        <div className="p-2 bg-white/5 rounded-xl text-[#38bdf8] border border-white/5">
+                            <Users className="w-5 h-5" />
                         </div>
-                    }
-                    icon={<Users className="w-4 h-4 text-emerald-400" />}
-                    className="bg-emerald-500/5 border-emerald-500/10 col-span-1 md:col-span-1"
-                    onClick={() => router.push("/admin/attendance")}
-                />
-                <KPICard
-                    title="Faculty Attendance"
-                    value={
-                        <div className="flex flex-col gap-1 md:gap-2 mt-1 md:mt-2 w-full pr-2">
-                            <div className="flex justify-between items-center group/row">
-                                <span className="text-[10px] md:text-xs font-black text-emerald-400 uppercase tracking-widest italic">Present</span>
-                                <span className="text-sm md:text-2xl font-black text-emerald-400 font-display italic leading-none">{calculatedStats.presentTeachers + calculatedStats.presentStaff}</span>
-                            </div>
-                            <div className="flex justify-between items-center group/row border-t border-white/5 pt-1 md:pt-2">
-                                <span className="text-[10px] md:text-xs font-black text-rose-400 uppercase tracking-widest italic">Absent</span>
-                                <span className="text-sm md:text-2xl font-black text-rose-400 font-display italic leading-none">{calculatedStats.absentTeachers + calculatedStats.absentStaff}</span>
-                            </div>
-                            <div className="flex justify-between items-center group/row border-t border-white/5 pt-1 md:pt-2">
-                                <span className="text-[10px] md:text-xs font-black text-amber-400 uppercase tracking-widest italic">Pending</span>
-                                <span className="text-sm md:text-2xl font-black text-amber-400 font-display italic leading-none">{calculatedStats.pendingTeachers + calculatedStats.pendingStaff}</span>
-                            </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 text-center items-center flex-1">
+                        <div className="flex flex-col justify-center">
+                            <span className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">Students</span>
+                            <span className="text-base md:text-2xl font-extrabold text-[#38bdf8] font-mono mt-1.5 leading-none">{calculatedStats.totalStudents}</span>
                         </div>
-                    }
-                    icon={<ClipboardList className="w-4 h-4 text-emerald-400" />}
-                    className="bg-emerald-500/5 border-emerald-500/10 col-span-1 md:col-span-1"
+                        <div className="flex flex-col justify-center border-l border-white/10 h-8 md:h-12">
+                            <span className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">Teachers</span>
+                            <span className="text-base md:text-2xl font-extrabold text-[#c084fc] font-mono mt-1.5 leading-none">{calculatedStats.totalTeachers}</span>
+                        </div>
+                        <div className="flex flex-col justify-center border-l border-white/10 h-8 md:h-12">
+                            <span className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">Staff</span>
+                            <span className="text-base md:text-2xl font-extrabold text-[#818cf8] font-mono mt-1.5 leading-none">{calculatedStats.totalStaff}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Card 2: Student Attendance */}
+                <div 
+                    className="bg-[#131e35]/80 border border-white/10 rounded-2xl p-4 md:p-6 flex flex-col justify-between cursor-pointer hover:border-[#64FFDA]/30 hover:bg-[#172542]/95 transition-all duration-300 shadow-xl"
                     onClick={() => router.push("/admin/attendance")}
-                />
-                <KPICard
-                    title="Today's Collection"
-                    value={`₹${calculatedStats.todayCollection}`}
-                    icon={<IndianRupee className="w-4 h-4 text-emerald-400" />}
-                    trend="Financial Flow"
-                    className="bg-emerald-500/5 border-emerald-500/10 cursor-pointer"
+                >
+                    <div className="flex justify-between items-center mb-4 shrink-0">
+                        <span className="text-[10px] md:text-xs font-black uppercase text-slate-300 tracking-wider">Students Att.</span>
+                        <div className="p-2 bg-white/5 rounded-xl text-emerald-400 border border-white/5">
+                            <CheckCircle className="w-5 h-5" />
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 text-center items-center flex-1">
+                        <div className="flex flex-col justify-center">
+                            <span className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">Present</span>
+                            <span className="text-base md:text-2xl font-extrabold text-emerald-400 font-mono mt-1.5 leading-none">{calculatedStats.presentStudents}</span>
+                        </div>
+                        <div className="flex flex-col justify-center border-l border-white/10 h-8 md:h-12">
+                            <span className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">Absent</span>
+                            <span className="text-base md:text-2xl font-extrabold text-[#f43f5e] font-mono mt-1.5 leading-none">{calculatedStats.absentStudents}</span>
+                        </div>
+                        <div className="flex flex-col justify-center border-l border-white/10 h-8 md:h-12">
+                            <span className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">Unmarked</span>
+                            <span className="text-base md:text-2xl font-extrabold text-[#f59e0b] font-mono mt-1.5 leading-none">{calculatedStats.pendingStudents}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Card 3: Staff Attendance */}
+                <div 
+                    className="bg-[#131e35]/80 border border-white/10 rounded-2xl p-4 md:p-6 flex flex-col justify-between cursor-pointer hover:border-[#64FFDA]/30 hover:bg-[#172542]/95 transition-all duration-300 shadow-xl"
+                    onClick={() => router.push("/admin/attendance")}
+                >
+                    <div className="flex justify-between items-center mb-4 shrink-0">
+                        <span className="text-[10px] md:text-xs font-black uppercase text-slate-300 tracking-wider">Staff Att.</span>
+                        <div className="p-2 bg-white/5 rounded-xl text-purple-400 border border-white/5">
+                            <ClipboardList className="w-5 h-5" />
+                        </div>
+                    </div>
+                    <div className="grid grid-cols-3 gap-1 text-center items-center flex-1">
+                        <div className="flex flex-col justify-center">
+                            <span className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">Present</span>
+                            <span className="text-base md:text-2xl font-extrabold text-emerald-400 font-mono mt-1.5 leading-none">{calculatedStats.presentTeachers + calculatedStats.presentStaff}</span>
+                        </div>
+                        <div className="flex flex-col justify-center border-l border-white/10 h-8 md:h-12">
+                            <span className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">Absent</span>
+                            <span className="text-base md:text-2xl font-extrabold text-[#f43f5e] font-mono mt-1.5 leading-none">{calculatedStats.absentTeachers + calculatedStats.absentStaff}</span>
+                        </div>
+                        <div className="flex flex-col justify-center border-l border-white/10 h-8 md:h-12">
+                            <span className="text-[9px] md:text-[10px] font-bold text-slate-500 uppercase tracking-widest leading-none">Unmarked</span>
+                            <span className="text-base md:text-2xl font-extrabold text-[#f59e0b] font-mono mt-1.5 leading-none">{calculatedStats.pendingTeachers + calculatedStats.pendingStaff}</span>
+                        </div>
+                    </div>
+                </div>
+
+                {/* Card 4: Fee Collection */}
+                <div 
+                    className="bg-[#131e35]/80 border border-white/10 rounded-2xl p-4 md:p-6 flex flex-col justify-between cursor-pointer hover:border-[#64FFDA]/30 hover:bg-[#172542]/95 transition-all duration-300 shadow-xl"
                     onClick={() => router.push("/admin/payments")}
-                />
+                >
+                    <div className="flex justify-between items-center mb-2 shrink-0">
+                        <span className="text-[10px] md:text-xs font-black uppercase text-slate-300 tracking-wider">Fee Collection</span>
+                        <div className="p-2 bg-white/5 rounded-xl text-emerald-400 border border-white/5">
+                            <IndianRupee className="w-5 h-5" />
+                        </div>
+                    </div>
+                    <div className="flex flex-col items-center justify-center flex-1 mt-1">
+                        <span className="text-xl md:text-3xl font-extrabold text-white font-mono leading-none">₹{calculatedStats.todayCollection.toLocaleString()}</span>
+                        <span className="text-[9px] md:text-[10px] font-black uppercase text-emerald-400 tracking-widest mt-2 leading-none">Today Collection</span>
+                    </div>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 md:gap-8">
@@ -852,6 +1158,7 @@ export default function AdminDashboard() {
                         </div>
                     </div>
                 </div>
+            </div>
             </div>
         </div>
     );

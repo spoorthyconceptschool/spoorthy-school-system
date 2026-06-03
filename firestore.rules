@@ -61,6 +61,9 @@ service cloud.firestore {
     match /audit_logs/{log} { allow read, write: if isManager() && isSameSchool(resource.data); }
     match /analytics/{doc} { allow read, write: if isManager() && isSameSchool(resource.data); }
     
+    // Counters
+    match /counters/{id} { allow read: if isSignedIn(); allow write: if isSuperAdmin(); }
+    
     // Core Config
     match /config/academic_years { allow read: if true; allow write: if isSuperAdmin(); }
     match /config/{doc} { allow read: if isSignedIn(); allow write: if isSuperAdmin(); }
@@ -87,12 +90,7 @@ service cloud.firestore {
 
     // Students & Teachers
     match /students/{studentId} {
-      allow read: if isSignedIn() && (
-        request.auth.uid == studentId || 
-        request.auth.uid == resource.data.uid || 
-        (request.auth.token.email != null && request.auth.token.email.split('@')[0].upper() == studentId) ||
-        (isSameSchool(resource.data) && (isManager() || isTeacher()))
-      );
+      allow read: if isSignedIn();
       allow write: if isManager() && (isSuperAdmin() || request.resource.data.schoolId == getSchoolId());
     }
     
@@ -103,7 +101,7 @@ service cloud.firestore {
 
     match /student_change_requests/{id} {
       allow create: if isTeacher() && request.resource.data.teacherId == request.auth.uid && request.resource.data.schoolId == getSchoolId();
-      allow read: if isSameSchool(resource.data) && (isManager() || (isSignedIn() && resource.data.teacherId == request.auth.uid));
+      allow read: if isSignedIn();
       allow update, delete: if isManager() && isSameSchool(resource.data);
     }
 
@@ -138,32 +136,17 @@ service cloud.firestore {
     }
     
     match /student_fee_ledgers/{id} { 
-      allow read: if isSignedIn() && (
-        request.auth.uid == resource.data.uid || 
-        request.auth.uid == resource.data.studentId ||
-        (request.auth.token.email != null && request.auth.token.email.split('@')[0].upper() == resource.data.studentId) ||
-        (isSameSchool(resource.data) && isManager())
-      ); 
+      allow read: if isSignedIn();
       allow write: if isManager() && isSameSchool(resource.data); 
     }
 
     match /payments/{id} { 
-      allow read: if isSignedIn() && (
-        request.auth.uid == resource.data.uid || 
-        request.auth.uid == resource.data.studentId ||
-        (request.auth.token.email != null && request.auth.token.email.split('@')[0].upper() == resource.data.studentId) ||
-        (isSameSchool(resource.data) && isManager())
-      ); 
+      allow read: if isSignedIn();
       allow write: if isManager() && isSameSchool(resource.data); 
     }
     
     match /invoices/{id} { 
-      allow read: if isSignedIn() && (
-        request.auth.uid == resource.data.uid || 
-        request.auth.uid == resource.data.studentId ||
-        (request.auth.token.email != null && request.auth.token.email.split('@')[0].upper() == resource.data.studentId) ||
-        (isSameSchool(resource.data) && isManager())
-      ); 
+      allow read: if isSignedIn();
       allow write: if isManager() && isSameSchool(resource.data); 
     }
 
@@ -199,10 +182,7 @@ service cloud.firestore {
     }
 
     match /leave_requests/{id} {
-      allow read: if isSignedIn() && (
-        resource.data.teacherId == request.auth.uid || 
-        (isSameSchool(resource.data) && isManager())
-      );
+      allow read: if isSignedIn();
       allow create: if isTeacher() && request.resource.data.teacherId == request.auth.uid && request.resource.data.schoolId == getSchoolId();
       allow update, delete: if isManager() && isSameSchool(resource.data);
     }

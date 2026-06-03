@@ -21,16 +21,7 @@ import { doc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
 export default function FeeDashboard() {
-    const { user } = useAuth();
-    const [role, setRole] = useState<string>("");
-
-    useEffect(() => {
-        if (!user) return;
-        const unsub = onSnapshot(doc(db, "users", user.uid), (d) => {
-            if (d.exists()) setRole(d.data().role);
-        });
-        return () => unsub();
-    }, [user]);
+    const { role } = useAuth();
 
     const modules = [
         {

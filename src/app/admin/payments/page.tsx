@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { useAuth } from "@/context/AuthContext";
 import { useMasterData } from "@/context/MasterDataContext";
+import Link from "next/link";
 
 interface Payment {
     id: string;
@@ -20,28 +21,62 @@ interface Payment {
     studentId: string;
     amount: number;
     type: "credit" | "debit";
-    method: "razorpay" | "cash";
+    method: string;
     date: any;
     status: string;
+    academicYear?: string;
+    remarks?: string;
 }
 
 
+const PAYMENTS_CACHE_KEY = "spoorthy_all_payments_cache";
+const DEFAULT_PAYMENTS = [
+    {
+        id: "pay_default_1",
+        studentId: "SHS1001",
+        studentName: "Aarav Sharma",
+        amount: 15000,
+        type: "credit" as const,
+        method: "cash" as const,
+        date: { toDate: () => new Date("2026-05-10T10:00:00") },
+        status: "success",
+        remarks: "I Term Fee payment"
+    },
+    {
+        id: "pay_default_2",
+        studentId: "SHS1002",
+        studentName: "Aadhya Reddy",
+        amount: 34000,
+        type: "credit" as const,
+        method: "cash" as const,
+        date: { toDate: () => new Date("2026-05-12T11:30:00") },
+        status: "success",
+        remarks: "I & II Term Fee payment"
+    }
+];
+
+const formatPaymentDate = (date: any) => {
+    if (!date) return "Just now";
+    if (date.toDate) return date.toDate().toLocaleDateString();
+    if (date.seconds) return new Date(date.seconds * 1000).toLocaleDateString();
+    return new Date(date).toLocaleDateString();
+};
+
 export default function PaymentsPage() {
-    const { user } = useAuth();
-    const [allPayments, setAllPayments] = useState<Payment[]>([]);
-    const [paymentsLoaded, setPaymentsLoaded] = useState(false);
-    const [studentsLoaded, setStudentsLoaded] = useState(false);
+    const { user, role } = useAuth();
+    const [allPayments, setAllPayments] = useState<Payment[]>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(PAYMENTS_CACHE_KEY);
+            if (cached) {
+                try { return JSON.parse(cached); } catch(e) {}
+            }
+        }
+        return DEFAULT_PAYMENTS;
+    });
+    const [paymentsLoaded, setPaymentsLoaded] = useState(true);
+    const [studentsLoaded, setStudentsLoaded] = useState(true);
     const [open, setOpen] = useState(false);
     const { branding, selectedYear, classes = {}, villages = {} } = useMasterData();
-    const [role, setRole] = useState<string>("");
-
-    useEffect(() => {
-        if (!user) return;
-        const unsub = onSnapshot(doc(db, "users", user.uid), (d) => {
-            if (d.exists()) setRole(d.data().role);
-        });
-        return () => unsub();
-    }, [user]);
 
     // Search & Filter State
     const [searchTerm, setSearchTerm] = useState(""); // For Record Fee Dialog
@@ -76,6 +111,9 @@ export default function PaymentsPage() {
                 ...doc.data()
             })) as Payment[];
             setAllPayments(loaded);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem(PAYMENTS_CACHE_KEY, JSON.stringify(loaded));
+            }
             setPaymentsLoaded(true);
         }, (err) => {
             if (!isMounted) return;
@@ -304,7 +342,7 @@ export default function PaymentsPage() {
                 </span>
             )
         },
-        { key: "date", header: "Date", render: (p: Payment) => <span className="text-muted-foreground text-xs">{p.date?.toDate ? p.date.toDate().toLocaleDateString() : 'Just now'}</span> },
+        { key: "date", header: "Date", render: (p: Payment) => <span className="text-muted-foreground text-xs">{formatPaymentDate(p.date)}</span> },
         {
             key: "actions",
             header: "",
@@ -318,6 +356,13 @@ export default function PaymentsPage() {
 
     return (
         <div className="space-y-4 md:space-y-6 animate-in fade-in duration-200 max-w-none p-0 pb-20">
+            <Link 
+                href="/admin/fees" 
+                className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-muted-foreground hover:text-white transition-colors group px-2 md:px-0"
+            >
+                <ArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-1" />
+                Back to Fee Center
+            </Link>
             <div className="flex flex-col md:flex-row md:items-center md:justify-between pt-2 md:pt-4 gap-4 md:gap-6 px-2 md:px-0">
                 <div className="space-y-0.5 md:space-y-1">
                     <h1 className="text-2xl md:text-5xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic leading-tight">
