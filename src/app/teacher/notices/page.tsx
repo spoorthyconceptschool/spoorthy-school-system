@@ -238,7 +238,7 @@ export default function NoticesPage() {
                                         <SelectTrigger className="h-9 bg-black/40 border-white/10 text-xs rounded-lg">
                                             <SelectValue placeholder="Select Target Class" />
                                         </SelectTrigger>
-                                        <SelectContent className="bg-slate-900 border-white/10 text-white text-xs">
+                                        <SelectContent className="bg-[#030712] border-white/10 text-white text-xs">
                                             {classes.map(c => <SelectItem key={c} value={c}>Class {c}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
@@ -340,7 +340,7 @@ export default function NoticesPage() {
                                         <label className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] ml-1">Target Class</label>
                                         <Select onValueChange={setTargetClassId} value={targetClassId}>
                                             <SelectTrigger className="h-12 bg-white/5 border border-white/10 rounded-xl font-bold"><SelectValue placeholder="Select target classroom" /></SelectTrigger>
-                                            <SelectContent className="bg-slate-900 border-white/10 text-white">
+                                            <SelectContent className="bg-[#030712] border-white/10 text-white">
                                                 {classes.map(c => <SelectItem key={c} value={c} className="focus:bg-accent focus:text-black py-3">Class {c}</SelectItem>)}
                                             </SelectContent>
                                         </Select>

@@ -96,7 +96,7 @@ export default function StudentNoticesPage() {
             {/* =======================================
                 DESKTOP SPLIT PANEL VIEW (>= lg)
                 ======================================= */}
-            <div className="hidden lg:flex lg:flex-col lg:space-y-6 w-full max-w-7xl mx-auto px-6 py-8 animate-in fade-in duration-500 relative">
+            <div className="hidden lg:flex flex-col space-y-6 w-full max-w-7xl mx-auto px-6 py-8 animate-in fade-in duration-500 relative">
                 
                 {/* Glowing decorations */}
                 <div className="absolute top-[-5%] left-[-5%] w-[35%] h-[40%] bg-blue-500/10 rounded-full blur-[100px] pointer-events-none" />
@@ -249,34 +249,34 @@ export default function StudentNoticesPage() {
             </div>
 
             {/* =======================================
-                MOBILE LIST VIEW (< lg Breakpoint)
+                MOBILE/TABLET STREAM VIEW (< lg Breakpoint)
                 ======================================= */}
-            <div className="max-w-md mx-auto flex lg:hidden flex-col h-[calc(100vh-100px)] space-y-4 animate-in fade-in duration-500 pb-3 relative overflow-hidden select-none bg-gradient-to-b from-[#0a192f] via-[#0f224a] to-[#0a192f] px-2.5">
+            <div className="w-full lg:hidden flex flex-col space-y-5 animate-in fade-in duration-500 pb-10 relative select-none max-w-4xl mx-auto px-4 sm:px-6 mt-4">
                 
                 {/* Glowing blur decorations */}
                 <div className="absolute top-[-5%] left-[-5%] w-[40%] h-[30%] bg-blue-500/10 rounded-full blur-[80px] pointer-events-none" />
                 <div className="absolute bottom-[-5%] right-[-5%] w-[40%] h-[30%] bg-purple-500/10 rounded-full blur-[80px] pointer-events-none" />
 
                 {/* Title / Header */}
-                <div className="flex items-center justify-between px-1 shrink-0 mt-2">
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shadow-[0_0_15px_rgba(59,130,246,0.1)]">
-                            <Bell className="w-4 h-4 text-[#64FFDA]" />
+                <div className="flex items-center justify-between px-1 shrink-0">
+                    <div className="flex items-center gap-3.5">
+                        <div className="w-10 h-10 rounded-xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shadow-[0_0_15px_rgba(59,130,246,0.1)]">
+                            <Bell className="w-5 h-5 text-[#64FFDA]" />
                         </div>
                         <div className="text-left">
-                            <h1 className="text-base font-extrabold text-white">School Notices</h1>
-                            <p className="text-[10px] text-neutral-400">Official announcements and updates.</p>
+                            <h1 className="text-lg font-black text-white tracking-tight">School Notices</h1>
+                            <p className="text-xs text-neutral-400">Official announcements and updates.</p>
                         </div>
                     </div>
-                    <Link href="/student" className="w-8 h-8 rounded-lg bg-white/5 border border-white/10 flex items-center justify-center text-white/80 hover:bg-white/10 transition-all shadow">
+                    <Link href="/student" className="w-9 h-9 rounded-xl bg-white/5 border border-white/10 flex items-center justify-center text-white/80 hover:bg-white/10 transition-all shadow">
                         <ArrowLeft className="w-4 h-4" />
                     </Link>
                 </div>
 
-                {/* Mobile Notices Scroll Feed */}
-                <div className="flex-1 overflow-y-auto pr-0.5 space-y-3 min-h-0 relative z-10">
+                {/* Mobile Notices Scroll Feed - Native scrolling */}
+                <div className="space-y-4 relative z-10">
                     {notices.length === 0 ? (
-                        <div className="flex flex-col items-center justify-center py-24 bg-white/5 rounded-2xl border border-white/10 text-center h-full">
+                        <div className="flex flex-col items-center justify-center py-24 bg-[#112240]/40 rounded-2xl border border-white/10 text-center">
                             <div className="w-12 h-12 bg-white/5 rounded-full flex items-center justify-center mb-3">
                                 <Info className="w-6 h-6 text-neutral-500" />
                             </div>
@@ -293,32 +293,32 @@ export default function StudentNoticesPage() {
                                         animate={{ opacity: 1, y: 0 }}
                                         transition={{ duration: 0.25, delay: index * 0.05 }}
                                         key={n.id}
-                                        className={`group relative overflow-hidden rounded-2xl bg-[#112240]/40 border ${styles.border} transition-all duration-300 ${styles.glow} p-4 flex flex-col gap-3 text-left`}
+                                        className={`group relative overflow-hidden rounded-2xl bg-[#112240]/40 border ${styles.border} transition-all duration-300 ${styles.glow} p-5 flex flex-col gap-3.5 text-left`}
                                     >
                                         {/* Ambient Glow */}
                                         <div className={`absolute -right-16 -top-16 w-48 h-48 ${styles.bg} rounded-full blur-[60px] opacity-10 group-hover:opacity-35 transition-opacity duration-500 pointer-events-none`} />
      
-                                        <div className="flex items-start gap-3 relative z-10">
-                                            <div className={`p-2.5 rounded-xl ${styles.bg} border ${styles.border} shrink-0 shadow-inner mt-0.5`}>
+                                        <div className="flex items-start gap-4.5 relative z-10">
+                                            <div className={`p-3 rounded-xl ${styles.bg} border ${styles.border} shrink-0 shadow-inner mt-0.5`}>
                                                 {styles.icon}
                                             </div>
-                                            <div className="min-w-0 flex-1 space-y-1">
-                                                <div className="flex items-center flex-wrap gap-2">
-                                                    <h3 className="font-extrabold text-xs text-white tracking-tight truncate flex-1">
+                                            <div className="min-w-0 flex-1 space-y-1.5">
+                                                <div className="flex items-center flex-wrap gap-2.5">
+                                                    <h3 className="font-extrabold text-sm text-white tracking-tight truncate flex-1">
                                                         {n.title}
                                                     </h3>
                                                     {n.type && (
-                                                        <span className={`text-[7px] px-1.5 py-0 uppercase tracking-widest font-black rounded ${styles.badgeBg} ${styles.badgeText} shrink-0`}>
+                                                        <span className={`text-[8px] px-2.5 py-0.5 uppercase tracking-widest font-black rounded ${styles.badgeBg} ${styles.badgeText} shrink-0`}>
                                                             {n.type}
                                                         </span>
                                                     )}
                                                 </div>
-                                                <div className="flex items-center gap-1.5 text-[8px] text-neutral-500 font-bold uppercase">
-                                                    <CalendarIcon className="w-2.5 h-2.5" />
+                                                <div className="flex items-center gap-2 text-[9px] text-neutral-400 font-bold uppercase tracking-wider">
+                                                    <CalendarIcon className="w-3 h-3" />
                                                     <span>{formatTimestamp(n.createdAt)}</span>
                                                     {n.type === "HOLIDAY" && n.startDate && (
                                                         <>
-                                                            <span className="w-1 h-1 rounded-full bg-neutral-600" />
+                                                            <span className="w-1.5 h-1.5 rounded-full bg-neutral-600" />
                                                             <span className="text-amber-400">
                                                                 {new Date(n.startDate.seconds * 1000).toLocaleDateString()}
                                                             </span>
@@ -328,22 +328,28 @@ export default function StudentNoticesPage() {
                                             </div>
                                         </div>
 
-                                        <div className="pl-12 relative z-10">
-                                            <p className="text-[11px] text-[#8892B0] leading-relaxed whitespace-pre-wrap">
+                                        <div className="pl-14 sm:pl-16 relative z-10">
+                                            <p className="text-xs text-neutral-300 leading-relaxed whitespace-pre-wrap">
                                                 {n.content}
                                             </p>
                                         </div>
 
-                                        <div className="pl-12 pt-2.5 mt-1.5 border-t border-white/5 flex items-center gap-2 relative z-10 shrink-0 select-none">
-                                            <div className={`w-6 h-6 rounded-full ${styles.bg} border ${styles.border} flex items-center justify-center text-[9px] font-black text-white shadow-sm`}>
-                                                {n.senderName?.charAt(0)?.toUpperCase() || "A"}
+                                        <div className="pl-14 sm:pl-16 pt-3 mt-2 border-t border-white/5 flex items-center justify-between relative z-10 shrink-0 select-none">
+                                            <div className="flex items-center gap-2.5">
+                                                <div className={`w-7 h-7 rounded-full ${styles.bg} border ${styles.border} flex items-center justify-center text-[10px] font-black text-white shadow-sm`}>
+                                                    {n.senderName?.charAt(0)?.toUpperCase() || "A"}
+                                                </div>
+                                                <div className="truncate">
+                                                    <p className="text-xs font-bold text-[#E6F1FF] leading-none">{n.senderName || "Administrator"}</p>
+                                                    <p className="text-[8px] text-neutral-500 uppercase tracking-widest mt-1 leading-none font-bold">
+                                                        {n.senderRole || "Staff"}
+                                                    </p>
+                                                </div>
                                             </div>
-                                            <div className="truncate">
-                                                <p className="text-[10px] font-bold text-[#E6F1FF] leading-none">{n.senderName || "Administrator"}</p>
-                                                <p className="text-[7px] text-neutral-500 uppercase tracking-widest mt-0.5 leading-none">
-                                                    {n.senderRole || "Staff"}
-                                                </p>
-                                            </div>
+                                            
+                                            <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 font-bold px-2.5 py-0.5 rounded-lg text-[8px] uppercase tracking-widest">
+                                                Official Circular
+                                            </Badge>
                                         </div>
                                     </motion.div>
                                 );
@@ -353,10 +359,10 @@ export default function StudentNoticesPage() {
                 </div>
 
                 {/* Back to Home Button Footer */}
-                <div className="shrink-0 pt-1 shrink-0">
+                <div className="pt-2">
                     <Link href="/student" className="block">
-                        <button className="w-full bg-white/5 border border-white/10 hover:bg-white/10 text-white font-extrabold text-xs h-10 rounded-xl transition-all flex items-center justify-center gap-1.5 shadow-inner mb-2">
-                            <ArrowLeft className="w-3.5 h-3.5" /> Back to Dashboard
+                        <button className="w-full bg-white/5 border border-white/10 hover:bg-white/10 text-white font-extrabold text-xs h-11 rounded-xl transition-all flex items-center justify-center gap-2 shadow-inner mb-4">
+                            <ArrowLeft className="w-4 h-4" /> Back to Dashboard
                         </button>
                     </Link>
                 </div>
@@ -364,3 +370,7 @@ export default function StudentNoticesPage() {
         </div>
     );
 }
+
+
+
+

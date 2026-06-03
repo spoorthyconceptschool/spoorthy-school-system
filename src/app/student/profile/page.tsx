@@ -52,7 +52,7 @@ export default function StudentProfilePage() {
             {/* =======================================
                 DESKTOP FULL RESPONSIVE GRID (>= lg)
                 ======================================= */}
-            <div className="hidden lg:flex lg:flex-col lg:space-y-6 w-full max-w-7xl mx-auto px-6 py-8 animate-in fade-in duration-500 relative">
+            <div className="hidden lg:flex flex-col space-y-6 w-full max-w-7xl mx-auto px-6 py-8 animate-in fade-in duration-500 relative">
                 
                 {/* Glowing Accents */}
                 <div className="absolute top-[-5%] left-[-5%] w-[35%] h-[35%] bg-blue-500/10 rounded-full blur-[90px] pointer-events-none" />
@@ -78,7 +78,7 @@ export default function StudentProfilePage() {
                 </div>
 
                 {/* Desktop Grid Layout */}
-                <div className="grid grid-cols-3 gap-6 relative z-10 items-start">
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 relative z-10 items-start">
                     
                     {/* Left Panel: Profile Hero & Quick Stats */}
                     <div className="col-span-1 space-y-6">
@@ -132,9 +132,9 @@ export default function StudentProfilePage() {
                     </div>
 
                     {/* Right Panel: Complete Details Grid (Spans 2 cols) */}
-                    <div className="col-span-2 space-y-6">
+                    <div className="col-span-1 lg:col-span-2 space-y-6">
                         
-                        <div className="grid grid-cols-2 gap-6">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             
                             {/* Academic Details Card */}
                             <Card className="bg-[#112240]/40 border-white/5 backdrop-blur-md shadow-xl rounded-3xl">
@@ -223,7 +223,7 @@ export default function StudentProfilePage() {
             {/* =======================================
                 MOBILE COMPACT TABBED VIEW (< lg)
                 ======================================= */}
-            <div className="max-w-md mx-auto lg:hidden flex flex-col h-[calc(100vh-100px)] space-y-4 animate-in fade-in duration-500 pb-4 relative overflow-hidden select-none bg-gradient-to-b from-[#0a192f] via-[#0f224a] to-[#0a192f] px-2.5">
+            <div className="w-full max-w-4xl mx-auto lg:hidden flex flex-col space-y-4 animate-in fade-in duration-500 pb-8 relative select-none px-4 sm:px-6 mt-4">
                 
                 {/* Soft Glowing Blur Accents */}
                 <div className="absolute top-[-5%] left-[-5%] w-[40%] h-[30%] bg-blue-500/10 rounded-full blur-[80px] pointer-events-none" />
@@ -293,7 +293,7 @@ export default function StudentProfilePage() {
                 </div>
 
                 {/* Info Cards Container */}
-                <div className="flex-1 flex flex-col justify-between">
+                <div className="space-y-4 relative z-10">
                     <AnimatePresence mode="wait">
                         {activeTab === 'academic' ? (
                             <motion.div
@@ -302,15 +302,15 @@ export default function StudentProfilePage() {
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -5 }}
                                 transition={{ duration: 0.15 }}
-                                className="space-y-3.5 flex-1 flex flex-col"
+                                className="space-y-3.5"
                             >
-                                <Card className="bg-[#112240]/40 border-white/10 backdrop-blur-md shadow-lg flex-1 flex flex-col overflow-hidden">
-                                    <CardHeader className="pb-2 p-4 shrink-0">
+                                <Card className="bg-[#112240]/40 border-white/10 backdrop-blur-md shadow-lg rounded-2xl">
+                                    <CardHeader className="pb-2 p-4">
                                         <CardTitle className="text-xs font-bold text-white flex items-center gap-1.5">
                                             <GraduationCap className="w-4 h-4 text-blue-400" /> Academic Details
                                         </CardTitle>
                                     </CardHeader>
-                                    <CardContent className="grid grid-cols-2 gap-4 p-4 text-left overflow-y-auto max-h-[220px]">
+                                    <CardContent className="grid grid-cols-2 gap-4 p-4 text-left">
                                         <div className="space-y-0.5">
                                             <label className="text-[10px] font-bold text-blue-200/70 uppercase tracking-widest block">Full Name</label>
                                             <div className="text-xs font-bold text-white truncate">{studentName}</div>
@@ -357,15 +357,15 @@ export default function StudentProfilePage() {
                                 animate={{ opacity: 1, y: 0 }}
                                 exit={{ opacity: 0, y: -5 }}
                                 transition={{ duration: 0.15 }}
-                                className="space-y-3.5 flex-1 flex flex-col"
+                                className="space-y-3.5"
                             >
-                                <Card className="bg-[#112240]/40 border-white/10 backdrop-blur-md shadow-lg flex-1 flex flex-col overflow-hidden">
-                                    <CardHeader className="pb-2 p-4 shrink-0">
+                                <Card className="bg-[#112240]/40 border-white/10 backdrop-blur-md shadow-lg rounded-2xl">
+                                    <CardHeader className="pb-2 p-4">
                                         <CardTitle className="text-xs font-bold text-white flex items-center gap-1.5">
                                             <Contact className="w-4 h-4 text-purple-400" /> Contact & Location
                                         </CardTitle>
                                     </CardHeader>
-                                    <CardContent className="p-4 space-y-3 text-left overflow-y-auto max-h-[220px]">
+                                    <CardContent className="p-4 space-y-3 text-left">
                                         <div className="flex items-center justify-between p-2 rounded-xl bg-white/5 border border-white/5">
                                             <div className="space-y-0.5 truncate">
                                                 <label className="text-[10px] font-bold text-blue-200/70 uppercase tracking-widest block">Mobile Number</label>
@@ -415,3 +415,7 @@ export default function StudentProfilePage() {
         </div>
     );
 }
+
+
+
+

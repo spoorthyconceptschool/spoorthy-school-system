@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
-import { Loader2, LayoutDashboard, Clock, BookOpen, Bell, Calendar, Wallet, User, LogOut, Lock, Users, Menu, X, MessageSquare, GraduationCap, ChevronLeft, ChevronRight } from "lucide-react";
+import { Loader2, LayoutDashboard, Clock, BookOpen, Bell, Calendar, Wallet, User, LogOut, Lock, Users, Menu, X, MessageSquare, GraduationCap, ChevronLeft, ChevronRight, FileText } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 import { db } from "@/lib/firebase";
@@ -20,6 +20,8 @@ import {
 import { CheckCircle } from "lucide-react";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { UniversalSearch } from "@/components/admin/UniversalSearch";
+import { MobileHeader } from "@/components/layout/MobileHeader";
+import { MobileBottomNav } from "@/components/layout/MobileBottomNav";
 
 const TEACHER_NAV = [
     { label: "Dashboard", icon: LayoutDashboard, href: "/teacher", exact: true },
@@ -27,6 +29,7 @@ const TEACHER_NAV = [
     { label: "Attendance", icon: CheckCircle, href: "/teacher/attendance" },
     { label: "My Schedule", icon: Clock, href: "/teacher/timetable" },
     { label: "Homework", icon: BookOpen, href: "/teacher/homework" },
+    { label: "Exams", icon: FileText, href: "/teacher/exams" },
     { label: "Notices", icon: Bell, href: "/teacher/notices" },
     { label: "Groups", icon: Users, href: "/teacher/groups" },
     { label: "Leave", icon: MessageSquare, href: "/teacher/leaves" },
@@ -46,6 +49,14 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
     const { branding } = useMasterData();
     const [imageError, setImageError] = useState(false);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
+
+    const navItems = [
+        { label: "Home", icon: LayoutDashboard, href: "/teacher", isActive: pathname === "/teacher" },
+        { label: "Students", icon: GraduationCap, href: "/teacher/students", isActive: pathname.startsWith("/teacher/students") },
+        { label: "Schedule", icon: Clock, href: "/teacher/timetable", isActive: pathname.startsWith("/teacher/timetable") },
+        { label: "Attendance", icon: CheckCircle, href: "/teacher/attendance", isActive: pathname.startsWith("/teacher/attendance") },
+        { label: "More", icon: Menu, onClick: () => setMobileMoreOpen(true), isActive: false }
+    ];
 
     useEffect(() => {
         setImageError(false);
@@ -122,13 +133,13 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
 
 
     return (
-        <div className="flex h-screen bg-gradient-to-br from-[#0A192F] via-[#112240] to-[#0A192F] text-[#E6F1FF] font-sans overflow-hidden">
-            {/* Sidebar (Desktop & Tablet) */}
+        <div className="flex h-screen bg-gradient-to-b from-[#030712] via-[#09152b] to-[#030712] text-[#E6F1FF] font-sans overflow-hidden">
+            {/* Sidebar (Desktop & Laptop) */}
             <aside className={cn(
-                "hidden md:flex fixed lg:static inset-y-0 left-0 border-r border-[#10B981]/10 bg-[#0A192F]/80 backdrop-blur-xl flex-col h-full z-50 transition-all duration-300 shrink-0",
+                "hidden lg:flex fixed lg:static inset-y-0 left-0 border-r border-white/5 bg-[#030712]/80 backdrop-blur-xl flex-col h-full z-50 transition-all duration-300 shrink-0",
                 sidebarCollapsed 
-                    ? "md:w-20 lg:w-20 xl:w-20" 
-                    : "md:w-20 lg:w-20 xl:w-64" // Collapsed on tablet (md/lg), expanded on desktop (xl)
+                    ? "lg:w-20 xl:w-20" 
+                    : "lg:w-20 xl:w-64" // Collapsed on laptop (lg), expanded on desktop (xl)
             )}>
                 {/* Brand Header */}
                 <div className="h-20 flex items-center justify-between px-4 border-b border-[#10B981]/10 select-none">
@@ -174,7 +185,7 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
                                     isActive
                                         ? "bg-[#10B981]/10 text-[#10B981] border-[#10B981]/20 shadow-[0_0_15px_-5px_#10B981]"
                                         : "text-[#8892B0] hover:text-[#E6F1FF] hover:bg-white/5",
-                                    "md:justify-center lg:justify-center xl:justify-start",
+                                    "lg:justify-center xl:justify-start",
                                     isCollapsed && "xl:justify-center"
                                 )}
                             >
@@ -189,7 +200,7 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
 
                                 {/* Hover tooltip on collapsed sidebars */}
                                 <div className={cn(
-                                    "absolute left-16 hidden group-hover:block bg-[#0A192F] border border-[#10B981]/20 text-white font-bold text-xs px-2.5 py-1.5 rounded shadow-lg z-50 whitespace-nowrap pointer-events-none",
+                                    "absolute left-16 hidden group-hover:block bg-[#0A192F] border border-[#10B981]/25 text-white font-bold text-xs px-2.5 py-1.5 rounded shadow-lg z-50 whitespace-nowrap pointer-events-none",
                                     isCollapsed ? "block" : "xl:hidden"
                                 )}>
                                     {item.label}
@@ -205,7 +216,7 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
                         onClick={signOut} 
                         className={cn(
                             "flex items-center gap-3 px-3 py-3 text-sm font-medium text-[#8892B0] hover:text-[#FF5555] hover:bg-[#FF5555]/10 w-full rounded-md transition-colors relative group",
-                            "md:justify-center lg:justify-center xl:justify-start",
+                            "lg:justify-center xl:justify-start",
                             sidebarCollapsed && "xl:justify-center"
                         )}
                     >
@@ -238,36 +249,11 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
 
             {/* Main Content Area */}
             <main className="flex-1 flex flex-col relative min-w-0 overflow-hidden">
-                {/* Mobile Header (Only visible below 768px) */}
-                <header className="h-16 md:hidden border-b border-[#10B981]/10 flex items-center justify-between px-4 bg-[#0A192F]/80 backdrop-blur sticky top-0 z-40 shrink-0">
-                    <div className="flex items-center gap-2 overflow-hidden">
-                        <div className="w-7 h-7 rounded bg-transparent flex items-center justify-center border border-white/20 shadow-md shrink-0 overflow-hidden">
-                            {!imageError ? (
-                                <img
-                                    src={branding?.schoolLogo || "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png"}
-                                    alt="Logo"
-                                    className="w-full h-full object-contain filter drop-shadow-sm"
-                                    onError={() => setImageError(true)}
-                                />
-                            ) : (
-                                <div className="w-full h-full bg-[#10B981]/10 flex items-center justify-center text-[#10B981] font-bold font-mono text-xs">T</div>
-                            )}
-                        </div>
-                        <h2 className="font-bold text-sm md:text-base capitalize text-[#E6F1FF] tracking-tight truncate max-w-[120px] xs:max-w-[160px]">
-                            {branding?.schoolName || "Dashboard"}
-                        </h2>
-                    </div>
+                {/* Mobile Header (Only visible below 1024px) */}
+                <MobileHeader role="TEACHER" portalTitle="Teacher Portal" profileHref="/teacher/profile" />
 
-                    <div className="flex items-center gap-3">
-                        <NotificationCenter role="TEACHER" />
-                        <div className="w-8 h-8 rounded-full bg-[#10B981]/20 text-[#10B981] flex items-center justify-center font-bold text-xs border border-[#10B981]/30">
-                            {user?.email?.substring(0, 1).toUpperCase()}
-                        </div>
-                    </div>
-                </header>
-
-                {/* Tablet & Desktop Header (Visible 768px and above) */}
-                <header className="hidden md:flex h-16 border-b border-[#10B981]/10 items-center justify-between px-8 bg-[#0A192F]/50 backdrop-blur sticky top-0 z-40 shrink-0">
+                {/* Tablet & Desktop Header (Visible 1024px and above) */}
+                <header className="hidden lg:flex h-16 border-b border-[#10B981]/10 items-center justify-between px-8 bg-[#0A192F]/50 backdrop-blur sticky top-0 z-40 shrink-0">
                     <div className="flex items-center gap-8 flex-1">
                         <h2 className="font-semibold text-lg capitalize text-[#E6F1FF] tracking-wide shrink-0">
                             {pathname.split('/').pop()?.replace('-', ' ') || "Dashboard"}
@@ -308,56 +294,16 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
                 </header>
 
                 {/* Main Scrollable View */}
-                <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20 pb-24 md:pb-0">
+                <div className="flex-1 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20 pb-24 lg:pb-0">
                     {children}
                 </div>
 
-                {/* Mobile Bottom Navigation Bar (Visible only on Mobile) */}
-                <nav className="fixed bottom-0 left-0 right-0 h-16 bg-[#0A192F]/90 backdrop-blur-xl border-t border-[#10B981]/20 flex items-center justify-around px-2 z-50 md:hidden shadow-[0_-5px_15px_rgba(0,0,0,0.5)]">
-                    <Link href="/teacher" className={cn(
-                        "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all",
-                        pathname === "/teacher" ? "text-[#10B981] scale-105" : "text-[#8892B0]"
-                    )}>
-                        <LayoutDashboard size={20} />
-                        <span className="text-[9px] font-bold mt-1 tracking-wide">Home</span>
-                    </Link>
-
-                    <Link href="/teacher/students" className={cn(
-                        "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all",
-                        pathname.startsWith("/teacher/students") ? "text-[#10B981] scale-105" : "text-[#8892B0]"
-                    )}>
-                        <GraduationCap size={20} />
-                        <span className="text-[9px] font-bold mt-1 tracking-wide">Students</span>
-                    </Link>
-
-                    <Link href="/teacher/timetable" className={cn(
-                        "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all",
-                        pathname.startsWith("/teacher/timetable") ? "text-[#10B981] scale-105" : "text-[#8892B0]"
-                    )}>
-                        <Clock size={20} />
-                        <span className="text-[9px] font-bold mt-1 tracking-wide">Schedule</span>
-                    </Link>
-
-                    <Link href="/teacher/attendance" className={cn(
-                        "flex flex-col items-center justify-center w-16 h-12 rounded-xl transition-all",
-                        pathname.startsWith("/teacher/attendance") ? "text-[#10B981] scale-105" : "text-[#8892B0]"
-                    )}>
-                        <CheckCircle size={20} />
-                        <span className="text-[9px] font-bold mt-1 tracking-wide">Attendance</span>
-                    </Link>
-
-                    <button 
-                        onClick={() => setMobileMoreOpen(true)}
-                        className="flex flex-col items-center justify-center w-16 h-12 rounded-xl text-[#8892B0] hover:text-[#E6F1FF] transition-all"
-                    >
-                        <Menu size={20} />
-                        <span className="text-[9px] font-bold mt-1 tracking-wide">More</span>
-                    </button>
-                </nav>
+                {/* Mobile Bottom Navigation Bar (Visible only on Mobile/Tablet below lg) */}
+                <MobileBottomNav items={navItems} />
 
                 {/* Mobile "More" sliding action drawer overlay */}
                 {mobileMoreOpen && (
-                    <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-[100] md:hidden animate-in fade-in duration-200">
+                    <div className="fixed inset-0 bg-black/75 backdrop-blur-md z-[100] lg:hidden animate-in fade-in duration-200">
                         <div className="absolute inset-0" onClick={() => setMobileMoreOpen(false)} />
                         <div className="absolute bottom-0 left-0 right-0 bg-[#0B1524] border-t border-[#10B981]/30 rounded-t-[2.5rem] p-6 pb-10 space-y-6 z-10 animate-in slide-in-from-bottom duration-300 shadow-2xl">
                             <div className="flex items-center justify-between border-b border-white/5 pb-4">
@@ -377,7 +323,7 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
                                 <Link 
                                     href="/teacher/homework" 
                                     onClick={() => setMobileMoreOpen(false)}
-                                    className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#10B981]/20 transition-all text-center group"
+                                    className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#10B981]/25 transition-all text-center group"
                                 >
                                     <div className="w-9 h-9 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 group-hover:scale-105 transition-transform mb-1.5">
                                         <BookOpen size={18} />
@@ -386,9 +332,20 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
                                 </Link>
 
                                 <Link 
+                                    href="/teacher/exams" 
+                                    onClick={() => setMobileMoreOpen(false)}
+                                    className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#10B981]/25 transition-all text-center group"
+                                >
+                                    <div className="w-9 h-9 rounded-xl bg-indigo-500/10 flex items-center justify-center text-indigo-400 group-hover:scale-105 transition-transform mb-1.5">
+                                        <FileText size={18} />
+                                    </div>
+                                    <span className="text-[10px] font-bold text-white/80">Exams</span>
+                                </Link>
+
+                                <Link 
                                     href="/teacher/notices" 
                                     onClick={() => setMobileMoreOpen(false)}
-                                    className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#10B981]/20 transition-all text-center group"
+                                    className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#10B981]/25 transition-all text-center group"
                                 >
                                     <div className="w-9 h-9 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 group-hover:scale-105 transition-transform mb-1.5">
                                         <Bell size={18} />
@@ -399,7 +356,7 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
                                 <Link 
                                     href="/teacher/groups" 
                                     onClick={() => setMobileMoreOpen(false)}
-                                    className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#10B981]/20 transition-all text-center group"
+                                    className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#10B981]/25 transition-all text-center group"
                                 >
                                     <div className="w-9 h-9 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 group-hover:scale-105 transition-transform mb-1.5">
                                         <Users size={18} />
@@ -410,7 +367,7 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
                                 <Link 
                                     href="/teacher/leaves" 
                                     onClick={() => setMobileMoreOpen(false)}
-                                    className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#10B981]/20 transition-all text-center group"
+                                    className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#10B981]/25 transition-all text-center group"
                                 >
                                     <div className="w-9 h-9 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 group-hover:scale-105 transition-transform mb-1.5">
                                         <MessageSquare size={18} />
@@ -421,7 +378,7 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
                                 <Link 
                                     href="/teacher/holidays" 
                                     onClick={() => setMobileMoreOpen(false)}
-                                    className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#10B981]/20 transition-all text-center group"
+                                    className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#10B981]/25 transition-all text-center group"
                                 >
                                     <div className="w-9 h-9 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-400 group-hover:scale-105 transition-transform mb-1.5">
                                         <Calendar size={18} />
@@ -432,7 +389,7 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
                                 <Link 
                                     href="/teacher/profile" 
                                     onClick={() => setMobileMoreOpen(false)}
-                                    className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#10B981]/20 transition-all text-center group"
+                                    className="flex flex-col items-center justify-center p-3 bg-white/5 border border-white/10 rounded-2xl hover:bg-white/10 hover:border-[#10B981]/25 transition-all text-center group"
                                 >
                                     <div className="w-9 h-9 rounded-xl bg-cyan-500/10 flex items-center justify-center text-cyan-400 group-hover:scale-105 transition-transform mb-1.5">
                                         <User size={18} />

@@ -95,8 +95,18 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
     const [substitutions, setSubstitutions] = useState<any[]>([]);
     const [teacherMap, setTeacherMap] = useState<Record<string, string>>({});
     const [leaves, setLeaves] = useState<any[]>([]);
-    const [exams, setExams] = useState<any[]>([]);
-    const [classSyllabi, setClassSyllabi] = useState<any[]>([]);
+    const [exams, setExams] = useState<any[]>(() => {
+        if (typeof window !== "undefined") {
+            try { return JSON.parse(localStorage.getItem("student_exams_cache") || "[]"); } catch (e) { return []; }
+        }
+        return [];
+    });
+    const [classSyllabi, setClassSyllabi] = useState<any[]>(() => {
+        if (typeof window !== "undefined") {
+            try { return JSON.parse(localStorage.getItem("student_syllabi_cache") || "[]"); } catch (e) { return []; }
+        }
+        return [];
+    });
     const [loading, setLoading] = useState(true);
 
     // Dynamic refetch helper for Leaves
@@ -313,83 +323,92 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
             }
         }, (err) => console.error("[StudentCache] Attendance listen error:", err));
 
-        // F. Prefetch Background / Static endpoints once (or update context)
+        // F. Listen to Exams (real-time, zero latency)
+        const unsubExams = onSnapshot(collection(db, "exams"), (snap) => {
+            const allExams = snap.docs
+                .map(d => ({ id: d.id, ...d.data() }))
+                .filter((e: any) => e.status !== "DELETED")
+                .sort((a: any, b: any) => {
+                    const dateA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+                    const dateB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+                    return dateB - dateA;
+                });
+            setExams(allExams);
+            if (typeof window !== "undefined") {
+                localStorage.setItem("student_exams_cache", JSON.stringify(allExams));
+            }
+        }, (err) => console.error("[StudentCache] Exams listen error:", err));
+
+        // G. Listen to Syllabi (real-time, zero latency)
+        const unsubSyllabi = onSnapshot(
+            query(collection(db, "exam_syllabus"), where("classId", "==", classId)),
+            (snap) => {
+                const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                setClassSyllabi(list);
+                if (typeof window !== "undefined") {
+                    localStorage.setItem("student_syllabi_cache", JSON.stringify(list));
+                }
+            },
+            (err) => console.error("[StudentCache] Syllabi listen error:", err)
+        );
+
+        // H. Prefetch remaining static/dynamic endpoints in parallel
         const fetchInitialAsyncs = async () => {
             try {
                 const token = await user.getIdToken();
+                await Promise.allSettled([
+                    // 1. Timetable Schedule
+                    (async () => {
+                        try {
+                            const tRes = await fetch("/api/timetable/my-schedule", {
+                                headers: { Authorization: `Bearer ${token}` }
+                            });
+                            const tData = await tRes.json();
+                            if (tData.success) {
+                                setSchedule(tData.data.weeklySchedule || {});
+                                setSubstitutions(tData.data.substitutions || []);
+                            }
+                        } catch (err) {
+                            console.error("[StudentCache] Timetable fetch failed:", err);
+                        }
+                    })(),
 
-                // 1. Timetable Schedule
-                try {
-                    const tRes = await fetch("/api/timetable/my-schedule", {
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
-                    const tData = await tRes.json();
-                    if (tData.success) {
-                        setSchedule(tData.data.weeklySchedule || {});
-                        setSubstitutions(tData.data.substitutions || []);
-                    }
-                } catch (err) {
-                    console.error("[StudentCache] Timetable fetch failed:", err);
-                }
+                    // 2. Teachers
+                    (async () => {
+                        try {
+                            const teachersSnap = await getDocs(
+                                query(
+                                    collection(db, "teachers"),
+                                    where("schoolId", "==", userData?.schoolId || profile.schoolId || "global")
+                                )
+                            );
+                            const tMap: Record<string, string> = {};
+                            teachersSnap.docs.forEach(d => {
+                                const data = d.data();
+                                if (data.schoolId) tMap[data.schoolId] = data.name;
+                                tMap[d.id] = data.name;
+                            });
+                            setTeacherMap(tMap);
+                        } catch (err) {
+                            console.error("[StudentCache] Teachers fetch failed:", err);
+                        }
+                    })(),
 
-                // 2. Teachers
-                try {
-                    const teachersSnap = await getDocs(
-                        query(
-                            collection(db, "teachers"),
-                            where("schoolId", "==", userData?.schoolId || profile.schoolId || "global")
-                        )
-                    );
-                    const tMap: Record<string, string> = {};
-                    teachersSnap.docs.forEach(d => {
-                        const data = d.data();
-                        if (data.schoolId) tMap[data.schoolId] = data.name;
-                        tMap[d.id] = data.name;
-                    });
-                    setTeacherMap(tMap);
-                } catch (err) {
-                    console.error("[StudentCache] Teachers fetch failed:", err);
-                }
-
-                // 3. Leaves History
-                try {
-                    const lRes = await fetch("/api/student/leaves", {
-                        headers: { Authorization: `Bearer ${token}` }
-                    });
-                    const lData = await lRes.json();
-                    if (lData.success) {
-                        setLeaves(lData.data || []);
-                    }
-                } catch (err) {
-                    console.error("[StudentCache] Leaves fetch failed:", err);
-                }
-
-                // 4. Exams List (Safe sort in-memory to avoid missing Firestore index crashes)
-                try {
-                    const examsSnap = await getDocs(collection(db, "exams"));
-                    const allExams = examsSnap.docs
-                        .map(d => ({ id: d.id, ...d.data() }))
-                        .filter((e: any) => e.status !== "DELETED")
-                        .sort((a: any, b: any) => {
-                            const dateA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
-                            const dateB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
-                            return dateB - dateA;
-                        });
-                    setExams(allExams);
-                } catch (err) {
-                    console.error("[StudentCache] Exams fetch failed:", err);
-                }
-
-                // 5. Syllabi
-                try {
-                    const sylSnap = await getDocs(
-                        query(collection(db, "exam_syllabus"), where("classId", "==", classId))
-                    );
-                    setClassSyllabi(sylSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-                } catch (err) {
-                    console.error("[StudentCache] Syllabi fetch failed:", err);
-                }
-
+                    // 3. Leaves History
+                    (async () => {
+                        try {
+                            const lRes = await fetch("/api/student/leaves", {
+                                headers: { Authorization: `Bearer ${token}` }
+                            });
+                            const lData = await lRes.json();
+                            if (lData.success) {
+                                setLeaves(lData.data || []);
+                            }
+                        } catch (err) {
+                            console.error("[StudentCache] Leaves fetch failed:", err);
+                        }
+                    })()
+                ]);
             } catch (e) {
                 console.error("[StudentCache] Background fetches failed:", e);
             } finally {
@@ -405,6 +424,8 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
             unsubHomework();
             unsubNotices();
             unsubAttendance();
+            unsubExams();
+            unsubSyllabi();
         };
     }, [user, profile]);
 

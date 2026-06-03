@@ -447,7 +447,7 @@ export default function TeacherDashboard() {
     const tableStyles = getWeeklyTableStyles(PERIODS.length || 8);
 
     return (
-        <div className="animate-in fade-in duration-200 w-full text-[#E6F1FF] min-h-screen pb-16 bg-gradient-to-br from-[#070F1E] via-[#0A192F] to-[#0F223D]">
+        <div className="animate-in fade-in duration-200 w-full text-[#E6F1FF] min-h-screen pb-16 bg-gradient-to-b from-[#030712] via-[#09152b] to-[#030712]">
             
             {/* ========================================================================= */}
             {/* MOBILE VIEW (Strictly Optimized for compact, high-density, no scrolling) */}
@@ -725,9 +725,9 @@ export default function TeacherDashboard() {
             <div className="hidden md:block p-6 lg:p-10 space-y-6 max-w-[1600px] mx-auto">
                 
                 {/* Welcome Back Banner */}
-                <div className="relative overflow-hidden bg-gradient-to-r from-[#0F223D] via-[#162A4A] to-[#0A192F] border border-white/10 rounded-[2rem] p-8 shadow-2xl flex justify-between items-center">
-                    <div className="absolute top-0 right-0 w-80 h-80 bg-blue-500/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
-                    <div className="absolute bottom-0 left-0 w-60 h-60 bg-emerald-500/5 rounded-full blur-3xl pointer-events-none -ml-20 -mb-20"></div>
+                <div className="relative overflow-hidden bg-gradient-to-r from-[#09152b] via-[#0D1F3D] to-[#09152b] border border-white/10 rounded-[2rem] p-8 shadow-2xl flex justify-between items-center">
+                    <div className="absolute top-0 right-0 w-80 h-80 bg-[#3B82F6]/10 rounded-full blur-3xl pointer-events-none -mr-20 -mt-20"></div>
+                    <div className="absolute bottom-0 left-0 w-60 h-60 bg-[#64FFDA]/5 rounded-full blur-3xl pointer-events-none -ml-20 -mb-20"></div>
                     
                     <div className="relative z-10 space-y-3">
                         <span className="bg-emerald-500/10 border border-emerald-500/30 text-emerald-400 text-[10px] font-black tracking-widest px-3 py-1 rounded-full uppercase flex items-center gap-1.5 w-max">
@@ -751,7 +751,7 @@ export default function TeacherDashboard() {
 
                 {/* Breathtaking Real-time statistics widgets */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-[#0A192F]/50 border border-white/10 rounded-2xl p-5 hover:border-[#10B981]/20 transition-all flex items-center justify-between shadow-md">
+                    <div className="bg-[#0D1F3D]/30 border border-white/10 rounded-2xl p-5 hover:border-[#64FFDA]/20 transition-all flex items-center justify-between shadow-md">
                         <div className="space-y-1">
                             <span className="text-xs text-white/50 font-bold block uppercase tracking-wider">Classroom Students</span>
                             <span className="text-3xl font-black text-white font-display">{studentStats.total || 20}</span>
@@ -762,7 +762,7 @@ export default function TeacherDashboard() {
                         </div>
                     </div>
 
-                    <div className="bg-[#0A192F]/50 border border-white/10 rounded-2xl p-5 hover:border-[#10B981]/20 transition-all flex items-center justify-between shadow-md">
+                    <div className="bg-[#0D1F3D]/30 border border-white/10 rounded-2xl p-5 hover:border-[#64FFDA]/20 transition-all flex items-center justify-between shadow-md">
                         <div className="space-y-1">
                             <span className="text-xs text-white/50 font-bold block uppercase tracking-wider">Present Today</span>
                             <span className="text-3xl font-black text-emerald-400 font-display">{studentStats.active || 19}</span>
@@ -773,7 +773,7 @@ export default function TeacherDashboard() {
                         </div>
                     </div>
 
-                    <div className="bg-[#0A192F]/50 border border-white/10 rounded-2xl p-5 hover:border-[#10B981]/20 transition-all flex items-center justify-between shadow-md">
+                    <div className="bg-[#0D1F3D]/30 border border-white/10 rounded-2xl p-5 hover:border-[#64FFDA]/20 transition-all flex items-center justify-between shadow-md">
                         <div className="space-y-1">
                             <span className="text-xs text-white/50 font-bold block uppercase tracking-wider">Absent Students</span>
                             <span className="text-3xl font-black text-rose-400 font-display">{(studentStats.total - studentStats.active) || 1}</span>
@@ -784,7 +784,7 @@ export default function TeacherDashboard() {
                         </div>
                     </div>
 
-                    <div className="bg-[#0A192F]/50 border border-white/10 rounded-2xl p-5 hover:border-[#10B981]/20 transition-all flex items-center justify-between shadow-md">
+                    <div className="bg-[#0D1F3D]/30 border border-white/10 rounded-2xl p-5 hover:border-[#64FFDA]/20 transition-all flex items-center justify-between shadow-md">
                         <div className="space-y-1">
                             <span className="text-xs text-white/50 font-bold block uppercase tracking-wider">Leaves Pending</span>
                             <span className="text-3xl font-black text-amber-400 font-display">
@@ -869,7 +869,7 @@ export default function TeacherDashboard() {
                         )}
 
                         {/* Today's Schedule timeline */}
-                        <div className="bg-[#0A192F]/50 border border-white/10 rounded-[2rem] p-6 backdrop-blur-md shadow-xl space-y-4">
+                        <div className="bg-[#0D1F3D]/30 border border-white/10 rounded-[2rem] p-6 backdrop-blur-md shadow-xl space-y-4">
                             <div className="flex justify-between items-center border-b border-white/5 pb-3">
                                 <h3 className="flex items-center gap-2 font-bold text-lg text-white">
                                     <Clock className="w-5 h-5 text-[#10B981]" /> Today's Scheduled Lectures
@@ -948,7 +948,7 @@ export default function TeacherDashboard() {
                         </div>
 
                         {/* Beautiful color-coded Weekly Schedule Matrix */}
-                        <div className="bg-[#0A192F]/50 border border-white/10 rounded-[2rem] p-4 md:p-6 backdrop-blur-md shadow-xl space-y-4">
+                        <div className="bg-[#0D1F3D]/30 border border-white/10 rounded-[2rem] p-4 md:p-6 backdrop-blur-md shadow-xl space-y-4">
                             <div className="flex justify-between items-center border-b border-white/5 pb-3">
                                 <h3 className="flex items-center gap-2 font-bold text-lg text-white">
                                     <CheckSquare className="w-5 h-5 text-blue-400" /> Weekly Timetable Overview
@@ -1012,7 +1012,7 @@ export default function TeacherDashboard() {
                         </div>
 
                         {/* Desktop Actions Quick Bar */}
-                        <div className="bg-[#0A192F]/50 border border-white/10 rounded-[2rem] p-6 backdrop-blur-md shadow-xl space-y-4">
+                        <div className="bg-[#0D1F3D]/30 border border-white/10 rounded-[2rem] p-6 backdrop-blur-md shadow-xl space-y-4">
                             <h3 className="font-bold text-lg text-white">Quick Classroom Actions</h3>
                             <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
                                 <Link href="/teacher/homework" className="flex flex-col items-center justify-center p-4 bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-center group transition-all">
@@ -1065,7 +1065,7 @@ export default function TeacherDashboard() {
                     <div className="space-y-6">
                         
                         {/* Student Leaves Application Widget */}
-                        <div className="bg-[#0A192F]/50 border border-white/10 rounded-[2rem] p-6 backdrop-blur-md shadow-xl space-y-4">
+                        <div className="bg-[#0D1F3D]/30 border border-white/10 rounded-[2rem] p-6 backdrop-blur-md shadow-xl space-y-4">
                             <div className="flex justify-between items-center border-b border-white/5 pb-3">
                                 <h3 className="font-bold text-base text-white flex items-center gap-2">
                                     <MessageSquare className="w-5 h-5 text-amber-400 animate-pulse" /> Student Leaves Request
@@ -1114,7 +1114,7 @@ export default function TeacherDashboard() {
                         </div>
 
                         {/* Upcoming holidays widget */}
-                        <div className="bg-[#0A192F]/50 border border-white/10 rounded-[2rem] p-6 backdrop-blur-md shadow-xl space-y-4">
+                        <div className="bg-[#0D1F3D]/30 border border-white/10 rounded-[2rem] p-6 backdrop-blur-md shadow-xl space-y-4">
                             <div className="flex justify-between items-center border-b border-white/5 pb-3">
                                 <h3 className="font-bold text-base text-white flex items-center gap-2">
                                     <Calendar className="w-5 h-5 text-emerald-400" /> Upcoming School Holidays
@@ -1141,7 +1141,7 @@ export default function TeacherDashboard() {
                         </div>
 
                         {/* Recent Announcements Widget */}
-                        <div className="bg-[#0A192F]/50 border border-white/10 rounded-[2rem] p-6 backdrop-blur-md shadow-xl space-y-4">
+                        <div className="bg-[#0D1F3D]/30 border border-white/10 rounded-[2rem] p-6 backdrop-blur-md shadow-xl space-y-4">
                             <div className="flex justify-between items-center border-b border-white/5 pb-3">
                                 <h3 className="font-bold text-base text-white flex items-center gap-2">
                                     <Bell className="w-5 h-5 text-purple-400" /> Recent Bulletins

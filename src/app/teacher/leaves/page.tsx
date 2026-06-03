@@ -162,12 +162,15 @@ export default function LeaveManagementPage() {
 
                 {/* Mobile Tabs Switcher */}
                 <Tabs defaultValue="my-leaves" className="space-y-4">
-                    <TabsList className="grid grid-cols-2 gap-1 bg-black/20 p-1 rounded-xl border border-white/10 w-full h-fit">
-                        <TabsTrigger value="my-leaves" className="py-1 text-[9px] font-black uppercase tracking-wider rounded-lg data-[state=active]:bg-emerald-500 data-[state=active]:text-black gap-1.5">
-                            <UserIcon className="w-3 h-3" /> My Leaves
+                    <TabsList className="grid grid-cols-3 gap-1 bg-black/20 p-1 rounded-xl border border-white/10 w-full h-fit">
+                        <TabsTrigger value="my-leaves" className="py-2.5 text-[9px] font-black uppercase tracking-wider rounded-lg data-[state=active]:bg-emerald-500 data-[state=active]:text-black gap-1">
+                            <Send className="w-3 h-3" /> Apply
                         </TabsTrigger>
-                        <TabsTrigger value="student-leaves" className="py-1 text-[9px] font-black uppercase tracking-wider rounded-lg data-[state=active]:bg-emerald-500 data-[state=active]:text-black gap-1.5">
-                            <Users className="w-3 h-3" /> Students
+                        <TabsTrigger value="leave-history" className="py-2.5 text-[9px] font-black uppercase tracking-wider rounded-lg data-[state=active]:bg-emerald-500 data-[state=active]:text-black gap-1">
+                            <History className="w-3.5 h-3.5" /> History
+                        </TabsTrigger>
+                        <TabsTrigger value="student-leaves" className="py-2.5 text-[9px] font-black uppercase tracking-wider rounded-lg data-[state=active]:bg-emerald-500 data-[state=active]:text-black gap-1">
+                            <Users className="w-3.5 h-3.5" /> Students
                         </TabsTrigger>
                     </TabsList>
 
@@ -197,7 +200,7 @@ export default function LeaveManagementPage() {
                                         <SelectTrigger className="h-9 bg-black/40 border-white/10 text-xs rounded-lg">
                                             <SelectValue />
                                         </SelectTrigger>
-                                        <SelectContent className="bg-slate-900 border-white/10 text-white text-xs">
+                                        <SelectContent className="bg-[#030712] border-white/10 text-white text-xs">
                                             <SelectItem value="Personal">Personal</SelectItem>
                                             <SelectItem value="Sick">Sick</SelectItem>
                                             <SelectItem value="Casual">Casual</SelectItem>
@@ -216,9 +219,11 @@ export default function LeaveManagementPage() {
                                 </Button>
                             </form>
                         </Card>
+                    </TabsContent>
 
+                    <TabsContent value="leave-history" className="space-y-4">
                         {/* Mobile Leave History List */}
-                        <div className="space-y-2 pt-2 border-t border-white/5">
+                        <div className="space-y-2 pt-2">
                             <div className="flex items-center gap-1.5">
                                 <History className="w-4 h-4 text-emerald-400" />
                                 <h2 className="text-xs font-black uppercase tracking-wider text-white">Leave History</h2>
@@ -364,7 +369,7 @@ export default function LeaveManagementPage() {
                                             <Label className="text-[10px] font-black uppercase text-muted-foreground tracking-[0.2em] ml-1">Absence Type</Label>
                                             <Select value={form.type} onValueChange={v => setForm({ ...form, type: v })}>
                                                 <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl font-bold"><SelectValue /></SelectTrigger>
-                                                <SelectContent className="bg-slate-900 border-white/10 text-white font-bold">
+                                                <SelectContent className="bg-[#030712] border-white/10 text-white font-bold">
                                                     <SelectItem value="Personal">Personal</SelectItem>
                                                     <SelectItem value="Sick">Sick</SelectItem>
                                                     <SelectItem value="Casual">Casual</SelectItem>

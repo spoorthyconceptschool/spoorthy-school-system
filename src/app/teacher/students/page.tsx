@@ -233,7 +233,7 @@ export default function TeacherStudentsPage() {
                                     <SelectValue placeholder="Select Class" />
                                 </div>
                             </SelectTrigger>
-                            <SelectContent className="bg-slate-900 border-white/10 text-white">
+                            <SelectContent className="bg-[#030712] border-white/10 text-white">
                                 {authorizedClasses.map(c => (
                                     <SelectItem key={c.key} value={c.key} className="py-2.5 cursor-pointer focus:bg-white/10">
                                         <span className="font-bold">{classes?.[c.classId]?.name || c.classId} - {sections?.[c.sectionId]?.name || c.sectionId}</span>
@@ -302,7 +302,7 @@ export default function TeacherStudentsPage() {
                         <SelectTrigger className="w-[140px] bg-black/30 border-white/5 rounded-xl h-11 focus:ring-[#10B981]/20 text-xs">
                             <SelectValue placeholder="Status" />
                         </SelectTrigger>
-                        <SelectContent className="bg-slate-900 border-white/10 text-white">
+                        <SelectContent className="bg-[#030712] border-white/10 text-white">
                             <SelectItem value="all">All Statuses</SelectItem>
                             <SelectItem value="ACTIVE">Active Only</SelectItem>
                             <SelectItem value="INACTIVE">Inactive Only</SelectItem>
@@ -502,7 +502,7 @@ export default function TeacherStudentsPage() {
                                                         <MoreHorizontal className="w-5 h-5 text-white/50" />
                                                     </Button>
                                                 </DropdownMenuTrigger>
-                                                <DropdownMenuContent align="end" className="bg-slate-900 border-white/10 text-white min-w-[160px] p-2 rounded-2xl shadow-2xl">
+                                                <DropdownMenuContent align="end" className="bg-[#030712] border-white/10 text-white min-w-[160px] p-2 rounded-2xl shadow-2xl">
                                                     <DropdownMenuItem
                                                         className="flex items-center gap-3 py-3 px-4 cursor-pointer focus:bg-white/10 rounded-xl"
                                                         onClick={() => router.push(`/teacher/students/${s.id}`)}

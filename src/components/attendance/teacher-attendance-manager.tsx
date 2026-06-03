@@ -22,7 +22,7 @@ export default function TeacherAttendanceManager({
 }: {
     defaultDate?: string;
 }) {
-    const { user } = useAuth();
+    const { user, userData } = useAuth();
     const { branding, teachers: globalTeachers } = useMasterData();
 
     const [teachers, setTeachers] = useState<any[]>(() => {
@@ -71,7 +71,7 @@ export default function TeacherAttendanceManager({
             fetchStats();
         } else {
             setLoading(true);
-            const schoolId = user.schoolId || "global";
+            const schoolId = userData?.schoolId || "global";
             const attId = `${schoolId}_TEACHERS_${date}`;
             const unsub = onSnapshot(doc(db, "attendance_daily", attId), (snap) => {
                 if (snap.exists()) {
@@ -114,7 +114,7 @@ export default function TeacherAttendanceManager({
         try {
             const tList = teachers;
             const currentYear = new Date().getFullYear();
-            const schoolId = user?.schoolId || "global";
+            const schoolId = userData?.schoolId || "global";
             let startKey, endKey;
             if (statsMonth === "ALL") {
                 startKey = `${schoolId}_TEACHERS_${currentYear}-01-01`;

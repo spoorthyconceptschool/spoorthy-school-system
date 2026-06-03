@@ -10,7 +10,7 @@ import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
-import { Loader2, Save, Printer, FileText, CheckCircle2, AlertCircle, Book, Calculator, Microscope, Globe, Laptop, Beaker, Code, Feather, Music, Dna } from "lucide-react";
+import { Loader2, Save, Printer, FileText, CheckCircle2, AlertCircle, Book, Calculator, Microscope, Globe, Laptop, Beaker, Code, Feather, Music, Dna, GraduationCap, Clock, MapPin, CalendarDays, BookOpen, Sparkles, ChevronDown, ChevronUp, Award, TrendingUp } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { cn } from "@/lib/utils";
 import { useMemo } from "react";
@@ -36,6 +36,93 @@ export function SyllabusManager({ examId, role }: SyllabusManagerProps) {
     const [syllabusText, setSyllabusText] = useState("");
     const [currentSyllabus, setCurrentSyllabus] = useState<any>(null);
     const [allStudentSyllabi, setAllStudentSyllabi] = useState<any[]>([]);
+
+    const [currentTime, setCurrentTime] = useState(new Date());
+    const [expandedSubjects, setExpandedSubjects] = useState<Record<string, boolean>>({});
+
+    useEffect(() => {
+        if (role !== "STUDENT") return;
+        const interval = setInterval(() => {
+            setCurrentTime(new Date());
+        }, 30000); // check countdowns every 30 seconds
+        return () => clearInterval(interval);
+    }, [role]);
+
+    const formatTime12h = (time24?: string) => {
+        if (!time24) return "";
+        try {
+            const [hoursStr, minutesStr] = time24.split(":");
+            let hours = parseInt(hoursStr, 10);
+            const minutes = minutesStr || "00";
+            const ampm = hours >= 12 ? "PM" : "AM";
+            hours = hours % 12;
+            hours = hours ? hours : 12;
+            return `${hours}:${minutes} ${ampm}`;
+        } catch (e) {
+            return time24;
+        }
+    };
+
+    const calculateHours = (startTime?: string, endTime?: string) => {
+        if (!startTime || !endTime) return "";
+        try {
+            const [sh, sm] = startTime.split(":").map(Number);
+            const [eh, em] = endTime.split(":").map(Number);
+            const diffMinutes = (eh * 60 + em) - (sh * 60 + sm);
+            if (diffMinutes <= 0) return "";
+            const hours = diffMinutes / 60;
+            return `${hours % 1 === 0 ? hours : hours.toFixed(1)} Hrs`;
+        } catch (e) {
+            return "";
+        }
+    };
+
+    const chronologicalSubjects = useMemo(() => {
+        if (role !== "STUDENT" || !selectedClassId || !exam?.timetables?.[selectedClassId]) return [];
+        
+        const timetable = exam.timetables[selectedClassId];
+        return Object.entries(timetable)
+            .map(([subId, d]: any) => {
+                const subObj = subjects[subId];
+                return {
+                    id: subId,
+                    name: subObj?.name || subId,
+                    date: d.date || "",
+                    startTime: d.startTime || "",
+                    endTime: d.endTime || "",
+                    maxMarks: d.maxMarks || "",
+                    passMarks: d.passMarks || "",
+                    room: d.room || "Exam Hall 1"
+                };
+            })
+            .filter(s => s.date)
+            .sort((a, b) => {
+                const dateA = new Date(`${a.date}T${a.startTime || "00:00"}`);
+                const dateB = new Date(`${b.date}T${b.startTime || "00:00"}`);
+                return dateA.getTime() - dateB.getTime();
+            });
+    }, [selectedClassId, exam, subjects, role]);
+
+    const durationDays = useMemo(() => {
+        if (!exam?.startDate || !exam?.endDate) return 0;
+        try {
+            const start = new Date(exam.startDate);
+            const end = new Date(exam.endDate);
+            const diffTime = Math.abs(end.getTime() - start.getTime());
+            const diffDays = Math.ceil(diffTime / (1000 * 60 * 60 * 24)) + 1;
+            return diffDays;
+        } catch (e) {
+            return 0;
+        }
+    }, [exam]);
+
+    const nextExam = useMemo(() => {
+        if (role !== "STUDENT") return null;
+        return chronologicalSubjects.find(s => {
+            const examStart = new Date(`${s.date}T${s.startTime || "00:00"}`);
+            return examStart > currentTime;
+        });
+    }, [chronologicalSubjects, currentTime, role]);
 
     const getSubjectIcon = (subjectName: string) => {
         const name = subjectName.toLowerCase();
@@ -353,85 +440,275 @@ export function SyllabusManager({ examId, role }: SyllabusManagerProps) {
 
     if (role === "STUDENT") {
         return (
-            <div className="space-y-6">
-                {/* Header Banner */}
-                <div className="flex flex-col md:flex-row justify-between items-center bg-[#0a192f] p-6 rounded-2xl border border-blue-500/20 shadow-[0_0_30px_-10px_theme(colors.blue.500/30)] relative overflow-hidden">
-                    <div className="absolute inset-0 bg-gradient-to-r from-blue-500/10 to-transparent pointer-events-none" />
+            <div className="space-y-8 animate-in fade-in duration-500 text-[#E6F1FF]">
+                {/* 1. Glassmorphic Hero block */}
+                <div className="relative overflow-hidden rounded-3xl border border-white/[0.08] bg-[#0A192F]/80 p-6 md:p-8 backdrop-blur-xl shadow-[0_20px_50px_rgba(0,0,0,0.5)]">
+                    <div className="absolute -right-20 -top-20 w-80 h-80 rounded-full bg-blue-500/10 blur-[100px] pointer-events-none" />
+                    <div className="absolute -left-20 -bottom-20 w-80 h-80 rounded-full bg-emerald-500/10 blur-[100px] pointer-events-none" />
                     
-                    <div className="z-10 text-center md:text-left">
-                        <h2 className="text-2xl md:text-3xl font-black text-white uppercase tracking-wider">
-                            {exam?.name || "Exam"} Syllabus
-                        </h2>
-                        <div className="mt-2 flex items-center justify-center md:justify-start gap-2 text-blue-400 font-bold text-sm tracking-widest">
-                            <span className="bg-blue-500/10 px-3 py-1 rounded-full border border-blue-500/20">
-                                {classes[selectedClassId]?.name || "Class"}
-                            </span>
-                            <span className="bg-emerald-500/10 px-3 py-1 rounded-full border border-emerald-500/20 text-emerald-400">
-                                {allowedSubjects.length} SUBJECTS
-                            </span>
+                    <div className="relative z-10 grid grid-cols-1 lg:grid-cols-12 gap-8 items-center">
+                        <div className="lg:col-span-7 space-y-4 text-center lg:text-left">
+                            <div className="inline-flex items-center gap-2 px-3 py-1 rounded-full bg-blue-500/10 border border-blue-500/20 text-blue-400 text-xs font-bold uppercase tracking-widest">
+                                <GraduationCap className="w-3.5 h-3.5" />
+                                {classes[selectedClassId]?.name || "Class Portal"}
+                            </div>
+                            
+                            <h1 className="text-3xl md:text-4xl font-extrabold tracking-tight text-white leading-tight font-display bg-gradient-to-r from-white via-[#E6F1FF] to-[#8892B0] bg-clip-text text-transparent">
+                                {exam?.name || "Academic Examination"}
+                            </h1>
+                            
+                            <p className="text-sm md:text-base text-[#8892B0] max-w-xl">
+                                Your comprehensive examination timeline, syllabus, and scheduler portal. Prepare well and track your targets.
+                            </p>
+                            
+                            <div className="flex flex-wrap items-center justify-center lg:justify-start gap-4 pt-2">
+                                <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-2xl">
+                                    <BookOpen className="w-4 h-4 text-emerald-400" />
+                                    <span className="text-xs font-bold text-[#E6F1FF]">{chronologicalSubjects.length} Scheduled Exams</span>
+                                </div>
+                                <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-4 py-2 rounded-2xl">
+                                    <CalendarDays className="w-4 h-4 text-blue-400" />
+                                    <span className="text-xs font-bold text-[#E6F1FF]">{durationDays ? `${durationDays} Days Duration` : "N/A"}</span>
+                                </div>
+                            </div>
                         </div>
-                    </div>
-                    
-                    <div className="z-10 mt-4 md:mt-0">
-                        <Button onClick={() => handlePrintClassSyllabus(selectedClassId)} className="bg-white hover:bg-gray-100 text-[#0a192f] font-black tracking-widest uppercase rounded-xl h-12 px-6 shadow-lg">
-                            <Printer className="w-5 h-5 mr-2" /> Print Syllabus
-                        </Button>
+
+                        <div className="lg:col-span-5 w-full">
+                            {/* Live Countdown widget */}
+                            {nextExam ? (
+                                <div className="relative overflow-hidden rounded-2xl border border-[#64FFDA]/20 bg-gradient-to-br from-[#112240]/90 to-[#0A192F]/90 p-5 shadow-[0_8px_32px_rgba(100,255,218,0.15)] group hover:border-[#64FFDA]/40 transition-all">
+                                    <div className="absolute top-0 right-0 w-32 h-32 bg-[#64FFDA]/5 rounded-full blur-2xl pointer-events-none group-hover:bg-[#64FFDA]/10 transition-all" />
+                                    
+                                    <div className="flex items-center justify-between border-b border-white/5 pb-3 mb-4">
+                                        <div className="flex items-center gap-2">
+                                            <span className="relative flex h-2.5 w-2.5">
+                                                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-[#64FFDA] opacity-75"></span>
+                                                <span className="relative inline-flex rounded-full h-2.5 w-2.5 bg-[#64FFDA]"></span>
+                                            </span>
+                                            <span className="text-[10px] font-black uppercase tracking-widest text-[#64FFDA]">Next Examination Countdown</span>
+                                        </div>
+                                        <Sparkles className="w-4 h-4 text-[#64FFDA] opacity-80" />
+                                    </div>
+                                    
+                                    <div className="space-y-3">
+                                        <div className="flex items-baseline justify-between">
+                                            <h3 className="text-lg font-bold text-white tracking-wide truncate max-w-[200px]">{nextExam.name}</h3>
+                                            <span className="text-xs text-[#8892B0] font-medium bg-white/5 px-2 py-0.5 rounded-lg border border-white/5">{nextExam.room}</span>
+                                        </div>
+                                        
+                                        {/* Digital Countdown block */}
+                                        {(() => {
+                                            const examStart = new Date(`${nextExam.date}T${nextExam.startTime || "00:00"}`);
+                                            const diffMs = examStart.getTime() - currentTime.getTime();
+                                            
+                                            if (diffMs <= 0) return null;
+                                            
+                                            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                                            const diffHrs = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                                            const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                                            
+                                            return (
+                                                <div className="grid grid-cols-3 gap-2 text-center bg-black/40 p-3 rounded-xl border border-white/5">
+                                                    <div>
+                                                        <div className="text-2xl font-black text-white font-mono leading-none">{String(diffDays).padStart(2, "0")}</div>
+                                                        <div className="text-[8px] font-black text-[#8892B0] uppercase tracking-wider mt-1">Days</div>
+                                                    </div>
+                                                    <div className="border-x border-white/5">
+                                                        <div className="text-2xl font-black text-[#64FFDA] font-mono leading-none">{String(diffHrs).padStart(2, "0")}</div>
+                                                        <div className="text-[8px] font-black text-[#8892B0] uppercase tracking-wider mt-1">Hours</div>
+                                                    </div>
+                                                    <div>
+                                                        <div className="text-2xl font-black text-white font-mono leading-none">{String(diffMins).padStart(2, "0")}</div>
+                                                        <div className="text-[8px] font-black text-[#8892B0] uppercase tracking-wider mt-1">Minutes</div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        })()}
+                                        
+                                        <div className="flex items-center justify-between text-[10px] text-[#8892B0] pt-1">
+                                            <span className="flex items-center gap-1"><CalendarDays className="w-3 h-3 text-[#64FFDA]" /> {new Date(nextExam.date).toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })}</span>
+                                            <span className="flex items-center gap-1"><Clock className="w-3 h-3 text-[#64FFDA]" /> {formatTime12h(nextExam.startTime)}</span>
+                                        </div>
+                                    </div>
+                                </div>
+                            ) : (
+                                <div className="rounded-2xl border border-white/5 bg-[#112240]/40 p-6 flex flex-col items-center justify-center text-center space-y-2 h-full">
+                                    <div className="w-10 h-10 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-400">
+                                        <Award className="w-5 h-5" />
+                                    </div>
+                                    <h3 className="text-sm font-bold text-white uppercase tracking-wider">All Exams Completed!</h3>
+                                    <p className="text-xs text-[#8892B0]">Fantastic effort. Check back for report cards and results.</p>
+                                </div>
+                            )}
+                        </div>
                     </div>
                 </div>
 
-                {/* Main Table */}
-                <div className="bg-[#112240] rounded-2xl border border-blue-500/10 overflow-hidden shadow-2xl">
-                    <div className="grid grid-cols-1 md:grid-cols-[30%_70%] bg-[#0a192f] border-b border-blue-500/20">
-                        <div className="p-4 md:p-6 text-center font-black text-[#8892B0] uppercase tracking-widest text-sm md:text-base border-b md:border-b-0 md:border-r border-blue-500/20">
-                            Subject
-                        </div>
-                        <div className="p-4 md:p-6 text-center font-black text-[#8892B0] uppercase tracking-widest text-sm md:text-base">
-                            Syllabus Details
-                        </div>
+                {/* Print Trigger Bar */}
+                <div className="flex justify-between items-center bg-[#112240]/30 border border-white/5 rounded-2xl px-6 py-4">
+                    <div className="text-sm font-medium text-[#8892B0]">
+                        Need a physical copy? Access high-fidelity print layout.
                     </div>
+                    <Button 
+                        onClick={() => handlePrintClassSyllabus(selectedClassId)}
+                        className="bg-white hover:bg-gray-100 text-[#0A192F] font-black text-xs tracking-widest uppercase rounded-xl h-10 px-5 shadow-lg flex items-center gap-2 border-0"
+                    >
+                        <Printer className="w-4 h-4" /> Print Syllabus
+                    </Button>
+                </div>
 
-                    <div className="divide-y divide-blue-500/10">
-                        {allowedSubjects.map((s: any) => {
-                            const syllabusData = allStudentSyllabi.find(sy => sy.subjectId === s.id);
-                            const content = syllabusData?.content?.trim();
-                            const isUpdated = !!content;
+                {/* 2. Chronological Connected Timeline */}
+                <div className="relative pl-6 md:pl-10 space-y-6">
+                    {/* Vertical timeline connector line */}
+                    <div className="absolute left-[11px] md:left-[19px] top-4 bottom-4 w-1.5 rounded bg-gradient-to-b from-blue-500/40 via-[#64FFDA]/30 to-[#8892B0]/10" />
 
-                            return (
-                                <div key={s.id} className="grid grid-cols-1 md:grid-cols-[30%_70%] transition-colors hover:bg-white/[0.02]">
-                                    {/* Subject Column */}
-                                    <div className="p-6 flex flex-col items-center justify-center gap-3 border-b md:border-b-0 md:border-r border-blue-500/10 bg-black/20">
-                                        <div className="p-4 rounded-2xl bg-[#0a192f] border border-white/5 shadow-inner">
-                                            {getSubjectIcon(s.name)}
-                                        </div>
-                                        <div className="text-center">
-                                            <h3 className="font-black text-white tracking-wide uppercase text-sm md:text-base">{s.name}</h3>
-                                        </div>
-                                    </div>
+                    {chronologicalSubjects.map((s: any, idx: number) => {
+                        const syllabusData = allStudentSyllabi.find(sy => sy.subjectId === s.id);
+                        const content = syllabusData?.content?.trim();
+                        const isUpdated = !!content;
+                        const isExpanded = !!expandedSubjects[s.id];
 
-                                    {/* Syllabus Details Column */}
-                                    <div className="p-6 md:p-8 flex items-center">
-                                        {!isUpdated ? (
-                                            <div className="w-full flex flex-col items-center justify-center p-8 border-2 border-dashed border-red-500/20 rounded-2xl bg-red-500/5 text-red-400">
-                                                <AlertCircle className="w-8 h-8 mb-2 opacity-80" />
-                                                <p className="font-bold text-sm tracking-widest uppercase">Not Updated Yet</p>
-                                                <p className="text-xs opacity-60 mt-2 text-center max-w-xs">The teacher has not provided the syllabus for this subject.</p>
-                                            </div>
-                                        ) : (
-                                            <div className="w-full whitespace-pre-wrap text-[#E6F1FF] text-sm md:text-base leading-relaxed bg-[#0a192f]/50 p-6 rounded-2xl border border-white/5">
-                                                {content}
-                                            </div>
-                                        )}
-                                    </div>
+                        // Calculate status
+                        let statusText = "UPCOMING";
+                        let statusColor = "text-[#64FFDA] bg-[#64FFDA]/10 border-[#64FFDA]/20";
+                        const now = new Date();
+                        const examStart = new Date(`${s.date}T${s.startTime || "00:00"}`);
+                        const examEnd = new Date(`${s.date}T${s.endTime || "23:59"}`);
+
+                        if (now > examEnd) {
+                            statusText = "COMPLETED";
+                            statusColor = "text-[#8892B0] bg-white/5 border-white/10";
+                        } else if (now >= examStart && now <= examEnd) {
+                            statusText = "ONGOING NOW";
+                            statusColor = "text-amber-400 bg-amber-500/10 border-amber-500/20 animate-pulse";
+                        } else {
+                            const diffMs = examStart.getTime() - now.getTime();
+                            const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
+                            const diffHrs = Math.floor((diffMs % (1000 * 60 * 60 * 24)) / (1000 * 60 * 60));
+                            const diffMins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+                            
+                            const pieces = [];
+                            if (diffDays > 0) pieces.push(`${diffDays}D`);
+                            if (diffHrs > 0 || diffDays > 0) pieces.push(`${diffHrs}H`);
+                            pieces.push(`${diffMins}M`);
+                            
+                            statusText = `UPCOMING ${pieces.join(" : ")}`;
+                        }
+
+                        const isNextExam = nextExam && nextExam.id === s.id;
+
+                        return (
+                            <div key={s.id} className="relative group animate-in slide-in-from-bottom-6 duration-500" style={{ animationDelay: `${idx * 100}ms` }}>
+                                {/* Timeline circular node */}
+                                <div className={cn(
+                                    "absolute -left-[27px] md:-left-[37px] top-6 w-7 h-7 md:w-9 md:h-9 rounded-full flex items-center justify-center border-4 border-[#0A192F] transition-all z-10",
+                                    isNextExam 
+                                        ? "bg-amber-400 shadow-[0_0_15px_#F59E0B]" 
+                                        : statusText === "COMPLETED" 
+                                            ? "bg-[#112240] border-[#8892B0]/40" 
+                                            : "bg-[#64FFDA] shadow-[0_0_15px_#64FFDA]"
+                                )}>
+                                    {statusText === "COMPLETED" ? (
+                                        <CheckCircle2 className="w-3.5 h-3.5 text-[#8892B0]" />
+                                    ) : (
+                                        <span className="w-2.5 h-2.5 md:w-3.5 md:h-3.5 rounded-full bg-[#0A192F]" />
+                                    )}
                                 </div>
-                            );
-                        })}
 
-                        {allowedSubjects.length === 0 && (
-                            <div className="p-12 text-center text-[#8892B0]">
-                                No subjects assigned for this exam yet.
+                                {/* Timeline card */}
+                                <div className={cn(
+                                    "rounded-2xl border bg-[#112240]/40 transition-all hover:bg-[#112240]/60",
+                                    isNextExam 
+                                        ? "border-amber-500/40 shadow-[0_4px_25px_rgba(245,158,11,0.05)]" 
+                                        : "border-white/5 hover:border-[#64FFDA]/20"
+                                )}>
+                                    <div className="p-5 md:p-6 flex flex-col md:flex-row gap-5 items-start justify-between">
+                                        <div className="flex items-start gap-4">
+                                            <div className="p-3.5 rounded-xl bg-black/30 border border-white/5 group-hover:scale-105 transition-transform shrink-0">
+                                                {getSubjectIcon(s.name)}
+                                            </div>
+                                            
+                                            <div className="space-y-1.5">
+                                                <div className="flex flex-wrap items-center gap-2.5">
+                                                    <h3 className="text-lg font-bold text-white tracking-wide">{s.name}</h3>
+                                                    <span className={cn("px-2 py-0.5 rounded text-[8px] font-black uppercase tracking-wider border", statusColor)}>
+                                                        {statusText}
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex flex-wrap items-center gap-x-4 gap-y-1.5 text-xs text-[#8892B0] font-medium">
+                                                    <span className="flex items-center gap-1.5 uppercase font-bold text-[10px] tracking-wider text-white/50">
+                                                        <CalendarDays className="w-3.5 h-3.5 text-blue-400" />
+                                                        {new Date(s.date).toLocaleDateString(undefined, { weekday: 'long', month: 'short', day: 'numeric' })}
+                                                    </span>
+                                                    <span className="flex items-center gap-1.5">
+                                                        <Clock className="w-3.5 h-3.5 text-emerald-400" />
+                                                        {formatTime12h(s.startTime)} - {formatTime12h(s.endTime)} ({calculateHours(s.startTime, s.endTime)})
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <div className="flex md:flex-col items-end gap-2.5 w-full md:w-auto border-t md:border-t-0 border-white/5 pt-3.5 md:pt-0 justify-between md:justify-start">
+                                            <div className="flex items-center gap-3">
+                                                <div className="text-right">
+                                                    <div className="text-[9px] uppercase font-bold text-[#8892B0] tracking-wider">Room Allocation</div>
+                                                    <div className="text-xs font-bold text-white">{s.room}</div>
+                                                </div>
+                                            </div>
+
+                                            <Button
+                                                onClick={() => toggleSubject(s.id)}
+                                                variant="ghost"
+                                                className="h-8 text-[10px] uppercase font-bold tracking-widest text-[#64FFDA] hover:text-[#64FFDA] hover:bg-[#64FFDA]/5 gap-1.5 px-3 rounded-lg border border-[#64FFDA]/10"
+                                            >
+                                                {isExpanded ? (
+                                                    <>Collapse Syllabus <ChevronUp className="w-3.5 h-3.5" /></>
+                                                ) : (
+                                                    <>View Syllabus <ChevronDown className="w-3.5 h-3.5" /></>
+                                                )}
+                                            </Button>
+                                        </div>
+                                    </div>
+
+                                    {/* Expandable Syllabus Drawer */}
+                                    {isExpanded && (
+                                        <div className="px-5 pb-6 pt-1 border-t border-white/5 animate-in slide-in-from-top-4 duration-300">
+                                            {isUpdated ? (
+                                                <div className="space-y-4 pt-3">
+                                                    <div className="flex items-center justify-between text-[10px] text-[#8892B0] font-black uppercase tracking-widest bg-black/25 px-4 py-2.5 rounded-xl border border-white/5">
+                                                        <span className="flex items-center gap-1.5"><BookOpen className="w-3.5 h-3.5 text-[#64FFDA]" /> Topics & Chapters Covered</span>
+                                                        <span>Max Marks: {s.maxMarks || "100"} (Pass: {s.passMarks || "35"})</span>
+                                                    </div>
+                                                    <div className="whitespace-pre-wrap text-sm leading-relaxed text-[#E6F1FF] bg-black/20 p-5 rounded-2xl border border-white/5 font-sans">
+                                                        {content}
+                                                    </div>
+                                                </div>
+                                            ) : (
+                                                <div className="pt-3">
+                                                    <div className="flex flex-col items-center justify-center p-8 border border-dashed border-[#8892B0]/20 rounded-2xl bg-black/10 text-center">
+                                                        <div className="w-10 h-10 rounded-full bg-amber-500/10 flex items-center justify-center text-amber-400/90 mb-3 border border-amber-500/20">
+                                                            <AlertCircle className="w-5 h-5" />
+                                                        </div>
+                                                        <h4 className="text-xs font-black uppercase text-white tracking-widest">Topics Not Yet Finalized</h4>
+                                                        <p className="text-[11px] text-[#8892B0] max-w-xs mt-1.5 leading-relaxed">
+                                                            The subject teacher is currently reviewing the curriculum. Syllabus details will appear here as soon as they are saved.
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
+                                    )}
+                                </div>
                             </div>
-                        )}
-                    </div>
+                        );
+                    })}
+
+                    {chronologicalSubjects.length === 0 && (
+                        <div className="text-center py-20 bg-[#112240]/20 border border-dashed border-white/10 rounded-2xl text-[#8892B0]">
+                            No exams have been scheduled in the class timetable yet.
+                        </div>
+                    )}
                 </div>
             </div>
         );

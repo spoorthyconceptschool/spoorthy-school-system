@@ -15,6 +15,7 @@ import { useMasterData } from "@/context/MasterDataContext";
 import { toast } from "@/lib/toast-store";
 import { cn } from "@/lib/utils";
 
+
 export default function TeacherHomeworkPage() {
     const { user } = useAuth();
     const { subjects, classes, sections, classSections, subjectTeachers } = useMasterData();
@@ -22,6 +23,7 @@ export default function TeacherHomeworkPage() {
     const [loading, setLoading] = useState(false);
     const [teacherId, setTeacherId] = useState<string | null>(null);
     const [useFallback, setUseFallback] = useState(false);
+    const [activeMobileTab, setActiveMobileTab] = useState<"assign" | "history">("assign");
 
     // Form State
     const [targetClassId, setTargetClassId] = useState("");
@@ -189,151 +191,157 @@ export default function TeacherHomeworkPage() {
                 {/* Switcher Tab header on Mobile */}
                 <div className="grid grid-cols-2 gap-1 bg-black/20 p-1 rounded-xl border border-white/10">
                     <button
-                        onClick={() => {
-                            const formEl = document.getElementById("mobile-form-section");
-                            if (formEl) formEl.scrollIntoView({ behavior: "smooth" });
-                        }}
-                        className="py-1 bg-emerald-500 text-black rounded-lg text-[9px] font-black uppercase tracking-wider transition-all"
+                        onClick={() => setActiveMobileTab("assign")}
+                        className={cn(
+                            "py-2.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all",
+                            activeMobileTab === "assign"
+                                ? "bg-[#10B981] text-black shadow-lg shadow-emerald-500/10 font-black"
+                                : "text-white/60 hover:text-white"
+                        )}
                     >
                         Assign Tasks
                     </button>
                     <button
-                        onClick={() => {
-                            const histEl = document.getElementById("mobile-history-section");
-                            if (histEl) histEl.scrollIntoView({ behavior: "smooth" });
-                        }}
-                        className="py-1 text-white/60 hover:text-white rounded-lg text-[9px] font-black uppercase tracking-wider transition-all"
+                        onClick={() => setActiveMobileTab("history")}
+                        className={cn(
+                            "py-2.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all",
+                            activeMobileTab === "history"
+                                ? "bg-[#10B981] text-black shadow-lg shadow-emerald-500/10 font-black"
+                                : "text-white/60 hover:text-white"
+                        )}
                     >
                         View History
                     </button>
                 </div>
 
-                {/* Mobile Assign Form Card */}
-                <Card id="mobile-form-section" className="bg-black/20 border-white/10 rounded-2xl overflow-hidden p-3.5 space-y-4">
-                    <div className="border-b border-white/5 pb-2">
-                        <div className="text-xs font-black uppercase tracking-wider text-white">New Homework Task</div>
-                        <p className="text-[8px] text-white/40 uppercase font-bold tracking-widest mt-0.5">Assign duties by subject for active courses</p>
-                    </div>
-
-                    <form onSubmit={handleSubmit} className="space-y-3.5">
-                        <div className="grid grid-cols-2 gap-2.5">
-                            <div className="space-y-1">
-                                <label className="text-[8px] font-black uppercase tracking-wider text-white/40 ml-0.5">Class & Section</label>
-                                <Select onValueChange={setTargetClassId} value={targetClassId} required>
-                                    <SelectTrigger className="h-9 bg-black/40 border-white/10 rounded-lg text-xs font-bold">
-                                        <SelectValue placeholder="Select" />
-                                    </SelectTrigger>
-                                    <SelectContent className="bg-slate-900 border-white/10 text-white">
-                                        {authorized.map(c => (
-                                            <SelectItem key={c.key} value={c.key} className="focus:bg-accent focus:text-black font-bold py-2">
-                                                {classes[c.classId]?.name || c.classId} - {sections[c.sectionId]?.name || c.sectionId}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            <div className="space-y-1">
-                                <label className="text-[8px] font-black uppercase tracking-wider text-white/40 ml-0.5">Due Date</label>
-                                <Input
-                                    type="date"
-                                    required
-                                    className="h-9 bg-black/40 border-white/10 rounded-lg text-xs font-bold text-white"
-                                    value={dueDate}
-                                    onChange={e => setDueDate(e.target.value)}
-                                />
-                            </div>
+                {activeMobileTab === "assign" ? (
+                    /* Mobile Assign Form Card */
+                    <Card className="bg-black/20 border-white/10 rounded-2xl overflow-hidden p-3.5 space-y-4">
+                        <div className="border-b border-white/5 pb-2">
+                            <div className="text-xs font-black uppercase tracking-wider text-white">New Homework Task</div>
+                            <p className="text-[8px] text-white/40 uppercase font-bold tracking-widest mt-0.5">Assign duties by subject for active courses</p>
                         </div>
 
-                        {/* Subject Textareas stack (High density list, no heavy table) */}
-                        {targetClassId && (
-                            <div className="space-y-2 max-h-[35vh] overflow-y-auto pr-1">
-                                <div className="text-[9px] uppercase tracking-widest font-black text-white/30 mb-1">Assigned Subjects Tasks</div>
-                                {getMySubjects(targetClassId).map((sid: string) => (
-                                    <div key={sid} className="bg-black/40 border border-white/5 p-2 rounded-xl space-y-1">
-                                        <div className="text-[10px] font-bold text-emerald-400">{subjects[sid]?.name || sid}</div>
-                                        <Textarea
-                                            placeholder={`Type assignment for ${subjects[sid]?.name || "this subject"}...`}
-                                            className="min-h-[45px] text-xs bg-transparent border-0 p-0 focus-visible:ring-0 focus:ring-0 resize-none placeholder:text-white/20"
-                                            value={homeworkInputs[sid] || ""}
-                                            onChange={e => setHomeworkInputs(prev => ({ ...prev, [sid]: e.target.value }))}
-                                        />
+                        <form onSubmit={handleSubmit} className="space-y-3.5">
+                            <div className="grid grid-cols-2 gap-2.5">
+                                <div className="space-y-1">
+                                    <label className="text-[8px] font-black uppercase tracking-wider text-white/40 ml-0.5">Class & Section</label>
+                                    <Select onValueChange={setTargetClassId} value={targetClassId} required>
+                                        <SelectTrigger className="h-9 bg-black/40 border-white/10 rounded-lg text-xs font-bold">
+                                            <SelectValue placeholder="Select" />
+                                        </SelectTrigger>
+                                        <SelectContent className="bg-[#030712] border-white/10 text-white">
+                                            {authorized.map(c => (
+                                                <SelectItem key={c.key} value={c.key} className="focus:bg-accent focus:text-black font-bold py-2">
+                                                    {classes[c.classId]?.name || c.classId} - {sections[c.sectionId]?.name || c.sectionId}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+
+                                <div className="space-y-1">
+                                    <label className="text-[8px] font-black uppercase tracking-wider text-white/40 ml-0.5">Due Date</label>
+                                    <Input
+                                        type="date"
+                                        required
+                                        className="h-9 bg-black/40 border-white/10 rounded-lg text-xs font-bold text-white"
+                                        value={dueDate}
+                                        onChange={e => setDueDate(e.target.value)}
+                                    />
+                                </div>
+                            </div>
+
+                            {/* Subject Textareas stack (High density list, no heavy table) */}
+                            {targetClassId && (
+                                <div className="space-y-2 max-h-[35vh] overflow-y-auto pr-1">
+                                    <div className="text-[9px] uppercase tracking-widest font-black text-white/30 mb-1">Assigned Subjects Tasks</div>
+                                    {getMySubjects(targetClassId).map((sid: string) => (
+                                        <div key={sid} className="bg-black/40 border border-white/5 p-2 rounded-xl space-y-1">
+                                            <div className="text-[10px] font-bold text-emerald-400">{subjects[sid]?.name || sid}</div>
+                                            <Textarea
+                                                placeholder={`Type assignment for ${subjects[sid]?.name || "this subject"}...`}
+                                                className="min-h-[45px] text-xs bg-transparent border-0 p-0 focus-visible:ring-0 focus:ring-0 resize-none placeholder:text-white/20"
+                                                value={homeworkInputs[sid] || ""}
+                                                onChange={e => setHomeworkInputs(prev => ({ ...prev, [sid]: e.target.value }))}
+                                            />
+                                        </div>
+                                    ))}
+                                    {getMySubjects(targetClassId).length === 0 && (
+                                        <div className="text-center py-6 text-[10px] text-white/40 italic bg-black/20 rounded-xl border border-dashed border-white/10">
+                                            No subjects assigned for this class.
+                                        </div>
+                                    )}
+                                </div>
+                            )}
+
+                            <Button type="submit" disabled={loading || !targetClassId} className="w-full bg-emerald-500 hover:bg-emerald-600 text-black font-black h-9 rounded-lg transition-all text-[10px] uppercase tracking-wider mt-2 shadow-lg shadow-emerald-500/10">
+                                {loading ? <Loader2 className="animate-spin w-4 h-4" /> : <><Send className="w-3.5 h-3.5 mr-1" /> Broadcast Tasks</>}
+                            </Button>
+                        </form>
+                    </Card>
+                ) : (
+                    /* Mobile History Section */
+                    <div className="space-y-2 pt-2">
+                        <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1.5">
+                                <History className="w-4 h-4 text-[#10B981]" />
+                                <h2 className="text-xs font-black uppercase tracking-wider text-white">Broadcast History</h2>
+                            </div>
+                            <Badge className="bg-white/5 border-white/10 text-[8px] text-white/40 uppercase tracking-widest font-black">History ({homeworkHistory.length})</Badge>
+                        </div>
+
+                        {homeworkHistory.length === 0 ? (
+                            <div className="py-12 text-center text-white/40 bg-white/5 rounded-2xl border border-dashed border-white/10 flex flex-col items-center justify-center gap-2">
+                                <History className="w-8 h-8 opacity-10" />
+                                <div className="space-y-0.5">
+                                    <p className="font-bold text-[10px] uppercase tracking-widest opacity-40">No entries yet</p>
+                                    <p className="text-[9px]">Tasks will appear here once broadcasted.</p>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="space-y-2">
+                                {homeworkHistory.map(hw => (
+                                    <div key={hw.id} className="relative bg-black/20 border border-white/5 rounded-xl p-3.5 space-y-2.5 overflow-hidden">
+                                        <div className="flex justify-between items-start">
+                                            <div className="flex flex-wrap gap-1">
+                                                <Badge className="bg-emerald-500 text-black border-none text-[8px] uppercase font-black tracking-wider px-2 py-0.5">
+                                                    {classes[hw.classId]?.name || hw.classId} {sections[hw.sectionId]?.name ? `- ${sections[hw.sectionId].name}` : ''}
+                                                </Badge>
+                                                <Badge variant="outline" className="border-white/10 text-white/40 text-[8px] uppercase font-black tracking-wider px-2 py-0.5">
+                                                    {subjects[hw.subjectId]?.name || hw.subjectId}
+                                                </Badge>
+                                            </div>
+                                            <Button
+                                                size="icon"
+                                                variant="ghost"
+                                                className="w-6 h-6 rounded-md text-red-500/40 hover:bg-red-500/10 hover:text-red-500 transition-all shrink-0 -mt-1 -mr-1"
+                                                onClick={() => handleDelete(hw.id)}
+                                            >
+                                                <Trash2 className="w-3.5 h-3.5" />
+                                            </Button>
+                                        </div>
+
+                                        <div className="space-y-1">
+                                            <h3 className="font-bold text-sm text-white leading-tight">{hw.title}</h3>
+                                            <p className="text-[10px] text-white/60 leading-normal line-clamp-3 font-medium">{hw.description}</p>
+                                        </div>
+
+                                        <div className="flex items-center justify-between border-t border-white/5 pt-2 text-[9px] text-white/40">
+                                            <div className="flex items-center gap-1 text-emerald-400 font-bold">
+                                                <Calendar className="w-3 h-3" />
+                                                Due {new Date(hw.dueDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
+                                            </div>
+                                            <span className="font-mono">
+                                                {hw.createdAt ? new Date(hw.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "..."}
+                                            </span>
+                                        </div>
                                     </div>
                                 ))}
-                                {getMySubjects(targetClassId).length === 0 && (
-                                    <div className="text-center py-6 text-[10px] text-white/40 italic bg-black/20 rounded-xl border border-dashed border-white/10">
-                                        No subjects assigned for this class.
-                                    </div>
-                                )}
                             </div>
                         )}
-
-                        <Button type="submit" disabled={loading || !targetClassId} className="w-full bg-emerald-500 hover:bg-emerald-600 text-black font-black h-9 rounded-lg transition-all text-[10px] uppercase tracking-wider mt-2 shadow-lg shadow-emerald-500/10">
-                            {loading ? <Loader2 className="animate-spin w-4 h-4" /> : <><Send className="w-3.5 h-3.5 mr-1" /> Broadcast Tasks</>}
-                        </Button>
-                    </form>
-                </Card>
-
-                {/* Mobile History Section */}
-                <div id="mobile-history-section" className="space-y-2 pt-2 border-t border-white/5">
-                    <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-1.5">
-                            <History className="w-4 h-4 text-emerald-400" />
-                            <h2 className="text-xs font-black uppercase tracking-wider text-white">Broadcast History</h2>
-                        </div>
-                        <Badge className="bg-white/5 border-white/10 text-[8px] text-white/40 uppercase tracking-widest font-black">History (10)</Badge>
                     </div>
-
-                    {homeworkHistory.length === 0 ? (
-                        <div className="py-12 text-center text-white/40 bg-white/5 rounded-2xl border border-dashed border-white/10 flex flex-col items-center justify-center gap-2">
-                            <History className="w-8 h-8 opacity-10" />
-                            <div className="space-y-0.5">
-                                <p className="font-bold text-[10px] uppercase tracking-widest opacity-40">No entries yet</p>
-                                <p className="text-[9px]">Tasks will appear here once broadcasted.</p>
-                            </div>
-                        </div>
-                    ) : (
-                        <div className="space-y-2">
-                            {homeworkHistory.map(hw => (
-                                <div key={hw.id} className="relative bg-black/20 border border-white/5 rounded-xl p-3.5 space-y-2.5 overflow-hidden">
-                                    <div className="flex justify-between items-start">
-                                        <div className="flex flex-wrap gap-1">
-                                            <Badge className="bg-emerald-500 text-black border-none text-[8px] uppercase font-black tracking-wider px-2 py-0.5">
-                                                {classes[hw.classId]?.name || hw.classId} {sections[hw.sectionId]?.name ? `- ${sections[hw.sectionId].name}` : ''}
-                                            </Badge>
-                                            <Badge variant="outline" className="border-white/10 text-white/40 text-[8px] uppercase font-black tracking-wider px-2 py-0.5">
-                                                {subjects[hw.subjectId]?.name || hw.subjectId}
-                                            </Badge>
-                                        </div>
-                                        <Button
-                                            size="icon"
-                                            variant="ghost"
-                                            className="w-6 h-6 rounded-md text-red-500/40 hover:bg-red-500/10 hover:text-red-500 transition-all shrink-0 -mt-1 -mr-1"
-                                            onClick={() => handleDelete(hw.id)}
-                                        >
-                                            <Trash2 className="w-3.5 h-3.5" />
-                                        </Button>
-                                    </div>
-
-                                    <div className="space-y-1">
-                                        <h3 className="font-bold text-sm text-white leading-tight">{hw.title}</h3>
-                                        <p className="text-[10px] text-white/60 leading-normal line-clamp-3 font-medium">{hw.description}</p>
-                                    </div>
-
-                                    <div className="flex items-center justify-between border-t border-white/5 pt-2 text-[9px] text-white/40">
-                                        <div className="flex items-center gap-1 text-emerald-400 font-bold">
-                                            <Calendar className="w-3 h-3" />
-                                            Due {new Date(hw.dueDate).toLocaleDateString(undefined, { day: 'numeric', month: 'short' })}
-                                        </div>
-                                        <span className="font-mono">
-                                            {hw.createdAt ? new Date(hw.createdAt.seconds * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : "..."}
-                                        </span>
-                                    </div>
-                                </div>
-                            ))}
-                        </div>
-                    )}
-                </div>
+                )}
             </div>
 
             {/* ========================================================================= */}
@@ -375,7 +383,7 @@ export default function TeacherHomeworkPage() {
                                             <SelectTrigger className="h-12 bg-white/5 border-white/10 rounded-xl font-bold focus:ring-accent/20">
                                                 <SelectValue placeholder="Select Class" />
                                             </SelectTrigger>
-                                            <SelectContent className="bg-[#0A192F] border-white/10 text-white">
+                                            <SelectContent className="bg-[#030712] border-white/10 text-white">
                                                 {authorized.map(c => (
                                                     <SelectItem key={c.key} value={c.key} className="focus:bg-accent focus:text-black font-bold py-3">
                                                         {classes[c.classId]?.name || c.classId} - {sections[c.sectionId]?.name || c.sectionId}

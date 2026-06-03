@@ -35,6 +35,7 @@ export default function MarkAttendancePage() {
     }, [user, userData]);
 
     const fetchTeacher = async () => {
+        if (!user || !userData?.schoolId) return;
         setLoading(true);
         try {
             let q = query(collection(db, "teachers"), where("schoolId", "==", userData.schoolId), limit(1));
@@ -78,9 +79,10 @@ export default function MarkAttendancePage() {
 
         // 1. Classes where I am Class Teacher (Dynamic from RTDB)
         Object.values(classSections).forEach((cs: any) => {
+            if (!cs) return;
             const isMatch = (tId && cs.classTeacherId === tId) || (tDocId && cs.classTeacherId === tDocId);
             if (isMatch && cs.isActive !== false) {
-                set.set(cs.id, { classId: cs.classId, sectionId: cs.sectionId, key: cs.id, isClassTeacher: true });
+                set.set(cs.id, { classId: cs.classId || "", sectionId: cs.sectionId || "", key: cs.id, isClassTeacher: true });
             }
         });
 
@@ -88,12 +90,13 @@ export default function MarkAttendancePage() {
         if (subjectTeachers) {
             Object.keys(subjectTeachers).forEach(key => {
                 const subjectsObj = subjectTeachers[key];
+                if (!subjectsObj || typeof subjectsObj !== 'object') return;
                 const teacherIds = Object.values(subjectsObj);
                 const isMatch = (tId && teacherIds.includes(tId)) || (tDocId && teacherIds.includes(tDocId));
 
                 if (isMatch) {
                     // BUG FIX: Don't split by underscore as IDs often contain them (e.g. CLS_01)
-                    const cs = classSections[key];
+                    const cs = classSections?.[key];
                     const cId = cs?.classId || key.split('_')[0];
                     const sId = cs?.sectionId || key.split('_')[1];
 
@@ -125,7 +128,7 @@ export default function MarkAttendancePage() {
         );
     }
 
-    const currentSelection = authorizedClasses.find(c => c.key === selectedClassKey) || authorizedClasses[0];
+    const currentSelection = authorizedClasses.find(c => c.key === selectedClassKey) || authorizedClasses[0] || {};
 
     return (
         <div className="p-6 md:p-10 lg:p-12 space-y-8 max-w-[1600px] mx-auto animate-in fade-in pb-20">
@@ -149,11 +152,11 @@ export default function MarkAttendancePage() {
                             <SelectTrigger className="w-full md:w-[220px] h-12 bg-white/5 border-white/10 rounded-xl font-bold hover:bg-white/10 transition-all">
                                 <SelectValue placeholder="Select Class" />
                             </SelectTrigger>
-                            <SelectContent className="bg-slate-900 border-white/10 text-white">
+                            <SelectContent className="bg-[#030712] border-white/10 text-white">
                                 {authorizedClasses.map(c => (
                                     <SelectItem key={c.key} value={c.key} className="focus:bg-accent focus:text-black font-bold py-3">
                                         <div className="flex items-center justify-between w-full gap-4">
-                                            <span>{classes[c.classId]?.name || c.classId} - {sections[c.sectionId]?.name || c.sectionId}</span>
+                                            <span>{(classes?.[c.classId]?.name || c.classId)} - {(sections?.[c.sectionId]?.name || c.sectionId)}</span>
                                             {c.isClassTeacher && <Badge className="text-[8px] bg-amber-500 text-black">In-charge</Badge>}
                                         </div>
                                     </SelectItem>
@@ -172,8 +175,8 @@ export default function MarkAttendancePage() {
 
             <div className="bg-black/20 border border-white/10 rounded-3xl p-2 md:p-6 backdrop-blur-xl shadow-2xl">
                 <AttendanceManager
-                    classId={currentSelection.classId}
-                    sectionId={currentSelection.sectionId}
+                    classId={currentSelection?.classId || ""}
+                    sectionId={currentSelection?.sectionId || ""}
                     defaultDate={today}
                 />
             </div>

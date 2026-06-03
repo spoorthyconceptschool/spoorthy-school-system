@@ -121,7 +121,7 @@ export default function AddStudentClientPage() {
                                     <Label className="text-xs uppercase tracking-widest text-muted-foreground font-black">Gender</Label>
                                     <Select value={formData.gender} onValueChange={(val) => setFormData({ ...formData, gender: val })}>
                                         <SelectTrigger className="bg-white/5 border-white/10"><SelectValue placeholder="Gender" /></SelectTrigger>
-                                        <SelectContent className="bg-slate-900 border-white/10 text-white">
+                                        <SelectContent className="bg-[#030712] border-white/10 text-white">
                                             <SelectItem value="Male">Male</SelectItem>
                                             <SelectItem value="Female">Female</SelectItem>
                                             <SelectItem value="Other">Other</SelectItem>
@@ -155,7 +155,7 @@ export default function AddStudentClientPage() {
                                     <Label className="text-xs uppercase tracking-widest text-muted-foreground font-black">Village/Area</Label>
                                     <Select value={formData.villageId} onValueChange={(val) => setFormData({ ...formData, villageId: val })}>
                                         <SelectTrigger className="bg-white/5 border-white/10"><SelectValue placeholder="Select Village" /></SelectTrigger>
-                                        <SelectContent className="bg-slate-900 border-white/10 text-white">
+                                        <SelectContent className="bg-[#030712] border-white/10 text-white">
                                             {Object.values(villages || {}).map((v: any) => (
                                                 <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>
                                             ))}

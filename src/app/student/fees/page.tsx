@@ -17,7 +17,8 @@ import {
     CreditCard,
     Clock,
     Info,
-    AlertCircle
+    AlertCircle,
+    ShieldCheck
 } from "lucide-react";
 import { printPaymentReceipt } from "@/lib/export-utils";
 
@@ -197,12 +198,113 @@ export default function StudentFeesPage() {
         }
     };
 
+    const handlePrintFeeStructure = () => {
+        const printWindow = window.open('', '_blank');
+        if (!printWindow) return;
+
+        const html = `
+            <html>
+                <head>
+                    <title>Fee Structure - ${profile?.studentName || "Student"}</title>
+                    <style>
+                        body { font-family: 'Segoe UI', sans-serif; padding: 40px; color: #1f2937; line-height: 1.5; }
+                        .header { text-align: center; border-bottom: 2px solid #e5e7eb; padding-bottom: 20px; margin-bottom: 30px; }
+                        h1 { margin: 0; font-size: 24px; color: #111827; }
+                        h2 { margin: 5px 0 0 0; font-size: 16px; color: #4b5563; font-weight: normal; }
+                        .student-info { margin-bottom: 30px; font-size: 14px; background: #f9fafb; padding: 15px; border-radius: 8px; border: 1px solid #f3f4f6; }
+                        .student-info table { width: 100%; border-collapse: collapse; }
+                        .student-info td { padding: 5px 10px; }
+                        .student-info td.label { font-weight: bold; color: #4b5563; width: 15%; }
+                        table.fees-table { width: 100%; border-collapse: collapse; margin-top: 10px; }
+                        table.fees-table th { background: #f3f4f6; color: #374151; font-weight: bold; text-align: left; padding: 12px; border: 1px solid #e5e7eb; font-size: 14px; }
+                        table.fees-table td { padding: 12px; border: 1px solid #e5e7eb; font-size: 14px; }
+                        table.fees-table tr:nth-child(even) { background: #f9fafb; }
+                        .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 20px; }
+                        @media print {
+                            body { padding: 0; }
+                            .print-btn { display: none; }
+                        }
+                    </style>
+                </head>
+                <body>
+                    <div class="header">
+                        <h1>SPOORTHY CONCEPT SCHOOL</h1>
+                        <h2>Official Fee Structure Overview</h2>
+                    </div>
+                    
+                    <div class="student-info">
+                        <table>
+                            <tr>
+                                <td class="label">Student Name:</td>
+                                <td>${profile?.studentName || "N/A"}</td>
+                                <td class="label">Admission No:</td>
+                                <td>${profile?.admissionNo || "N/A"}</td>
+                            </tr>
+                            <tr>
+                                <td class="label">Class & Sec:</td>
+                                <td>${profile?.className || "N/A"} ${profile?.sectionName || ""}</td>
+                                <td class="label">Academic Year:</td>
+                                <td>${profile?.academicYear || "2025-2026"}</td>
+                            </tr>
+                        </table>
+                    </div>
+
+                    <table class="fees-table">
+                        <thead>
+                            <tr>
+                                <th>Term</th>
+                                <th>Tuition Fee (₹)</th>
+                                <th>Other Fees (₹)</th>
+                                <th>Total (₹)</th>
+                                <th>Due Date</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            <tr>
+                                <td style="font-weight: 500;">I Term (Admission)</td>
+                                <td>3,000</td>
+                                <td>300</td>
+                                <td style="font-weight: 600; color: #10b981;">3,300</td>
+                                <td>Jun 15, 2026</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: 500;">II Term (Mid-Year)</td>
+                                <td>30,000</td>
+                                <td>3,000</td>
+                                <td style="font-weight: 600; color: #10b981;">33,000</td>
+                                <td>Oct 15, 2026</td>
+                            </tr>
+                            <tr>
+                                <td style="font-weight: 500;">III Term (Final)</td>
+                                <td>30,000</td>
+                                <td>3,000</td>
+                                <td style="font-weight: 600; color: #10b981;">33,000</td>
+                                <td>Feb 15, 2027</td>
+                            </tr>
+                        </tbody>
+                    </table>
+
+                    <div style="margin-top: 20px; font-size: 12px; color: #6b7280; font-style: italic;">
+                        * Fee structure is subject to change. Please contact the school administration office for billing clarifications.
+                    </div>
+
+                    <div class="footer">
+                        This is an official document generated by the Spoorthy Concept School student portal.
+                    </div>
+                    <script>window.onload = () => { window.print(); };</script>
+                </body>
+            </html>
+        `;
+        printWindow.document.write(html);
+        printWindow.document.close();
+    };
+
     if (loading) {
         return (
-            <div className="h-[40vh] flex flex-col items-center justify-center gap-4 text-[#64FFDA]">
+            <div className="h-[40vh] flex flex-col items-center justify-center gap-4 text-blue-500">
                 <Loader2 className="w-10 h-10 animate-spin" />
-                <p className="text-xs font-black uppercase tracking-widest text-[#8892B0] font-mono animate-pulse">
-                    Loading outstanding ledger...
+                <p className="text-xs font-black uppercase tracking-widest text-white/40 font-mono animate-pulse">
+                    Syncing Ledger Balance...
                 </p>
             </div>
         );
@@ -218,58 +320,118 @@ export default function StudentFeesPage() {
     const reductions = ledgerItems.filter((i: any) => i.amount < 0);
 
     return (
-        <div className="max-w-7xl mx-auto space-y-8 p-4 md:p-8 animate-in fade-in duration-500 pb-20 relative overflow-hidden select-none bg-gradient-to-b from-[#0a192f] via-[#0f224a] to-[#0a192f] min-h-[calc(100vh-100px)] rounded-3xl">
-            {/* Glowing accents */}
-            <div className="absolute top-[-5%] left-[-5%] w-[40%] h-[30%] bg-blue-500/10 rounded-full blur-[80px] pointer-events-none" />
-            <div className="absolute bottom-[-5%] right-[-5%] w-[40%] h-[30%] bg-emerald-500/10 rounded-full blur-[80px] pointer-events-none" />
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="max-w-7xl mx-auto space-y-8 p-4 md:p-8 animate-in fade-in duration-500 pb-20 relative overflow-hidden bg-transparent">
+            {/* Ambient visual background glow */}
+            <div className="absolute top-[-20%] left-[-20%] w-[60%] h-[40%] bg-blue-500/5 rounded-full blur-[120px] pointer-events-none" />
+            <div className="absolute bottom-[-20%] right-[-20%] w-[60%] h-[40%] bg-emerald-500/5 rounded-full blur-[120px] pointer-events-none" />
+
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/[0.04] pb-6">
                 <div>
-                    <h1 className="text-3xl md:text-4xl font-display font-black text-white tracking-tight">
+                    <h1 className="text-2xl md:text-3xl font-bold tracking-tight text-white">
                         Fee Payment Portal
                     </h1>
-                    <p className="text-white/60 font-medium text-sm">
+                    <p className="text-white/60 text-sm mt-1">
                         Select individual classes or term elements to pay securely.
                     </p>
                 </div>
-                <Badge className={ledgerPendingFee <= 0 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 py-1.5 px-4 font-black uppercase tracking-widest text-[10px]" : "bg-yellow-500/10 text-yellow-500 border-yellow-500/20 py-1.5 px-4 font-black uppercase tracking-widest text-[10px]"}>
-                    {ledgerPendingFee <= 0 ? "Dues Cleared" : "Payment Outstanding"}
+                <Badge className={ledgerPendingFee <= 0 ? "bg-emerald-500/10 text-emerald-400 border-emerald-500/20 py-1.5 px-4 font-bold uppercase tracking-wider text-[10px] rounded-full" : "bg-amber-500/10 text-amber-500 border-amber-500/20 py-1.5 px-4 font-bold uppercase tracking-wider text-[10px] rounded-full"}>
+                    {ledgerPendingFee <= 0 ? "● Dues Cleared" : "● Payment Outstanding"}
                 </Badge>
             </div>
 
-            {/* Core Workspace */}
+            {/* UPGRADE REQUIREMENT: Fee Structure Overview Table at the Top */}
+            <Card className="bg-[#112240]/20 border border-white/[0.05] shadow-2xl rounded-3xl overflow-hidden backdrop-blur-md">
+                <CardHeader className="py-5 px-6 border-b border-white/[0.04] flex flex-row items-center justify-between gap-4 flex-wrap">
+                    <div className="space-y-0.5">
+                        <div className="flex items-center gap-2">
+                            <h3 className="font-bold text-white tracking-wide uppercase text-xs">Fee Structure Overview</h3>
+                            <Info className="w-4 h-4 text-white/40 cursor-help" title="Standard fee guidelines for the current session" />
+                        </div>
+                        <p className="text-[10px] text-white/40 font-medium">Approved school academic board tuition terms</p>
+                    </div>
+                    <Button
+                        onClick={handlePrintFeeStructure}
+                        className="bg-white/5 border border-white/10 hover:bg-white/10 hover:border-white/20 text-white rounded-xl font-bold transition-all text-xs h-9 px-4 gap-2 flex items-center shadow-md shadow-black/10"
+                    >
+                        <Printer className="w-4 h-4 text-blue-400" /> Print Fee Structure
+                    </Button>
+                </CardHeader>
+                <CardContent className="p-0 overflow-x-auto">
+                    <table className="w-full text-left border-collapse min-w-[700px]">
+                        <thead>
+                            <tr className="border-b border-white/[0.04] bg-white/[0.01]">
+                                <th className="p-4 px-6 text-xs font-bold text-white/50 uppercase tracking-wider">Term</th>
+                                <th className="p-4 px-6 text-xs font-bold text-white/50 uppercase tracking-wider">Tuition Fee (₹)</th>
+                                <th className="p-4 px-6 text-xs font-bold text-white/50 uppercase tracking-wider">Other Fees (₹)</th>
+                                <th className="p-4 px-6 text-xs font-bold text-white/50 uppercase tracking-wider">Total (₹)</th>
+                                <th className="p-4 px-6 text-xs font-bold text-white/50 uppercase tracking-wider">Due Date</th>
+                            </tr>
+                        </thead>
+                        <tbody className="divide-y divide-white/[0.03] text-sm">
+                            <tr className="hover:bg-white/[0.01] transition-colors">
+                                <td className="p-4 px-6 font-medium text-white/90">I Term (Admission)</td>
+                                <td className="p-4 px-6 text-white/70">3,000</td>
+                                <td className="p-4 px-6 text-white/70">300</td>
+                                <td className="p-4 px-6 font-mono font-bold text-emerald-400">3,300</td>
+                                <td className="p-4 px-6 text-white/60">Jun 15, 2026</td>
+                            </tr>
+                            <tr className="hover:bg-white/[0.01] transition-colors">
+                                <td className="p-4 px-6 font-medium text-white/90">II Term (Mid-Year)</td>
+                                <td className="p-4 px-6 text-white/70">30,000</td>
+                                <td className="p-4 px-6 text-white/70">3,000</td>
+                                <td className="p-4 px-6 font-mono font-bold text-emerald-400">33,000</td>
+                                <td className="p-4 px-6 text-white/60">Oct 15, 2026</td>
+                            </tr>
+                            <tr className="hover:bg-white/[0.01] transition-colors">
+                                <td className="p-4 px-6 font-medium text-white/90">III Term (Final)</td>
+                                <td className="p-4 px-6 text-white/70">30,000</td>
+                                <td className="p-4 px-6 text-white/70">3,000</td>
+                                <td className="p-4 px-6 font-mono font-bold text-emerald-400">33,000</td>
+                                <td className="p-4 px-6 text-white/60">Feb 15, 2027</td>
+                            </tr>
+                        </tbody>
+                    </table>
+                    <div className="p-4 px-6 bg-white/[0.01] border-t border-white/[0.03] flex items-center gap-2 text-white/40 text-[10px] uppercase font-bold tracking-wider">
+                        <Clock className="w-3.5 h-3.5" />
+                        <span>Fee structure is subject to change. Please contact the administration for more details.</span>
+                    </div>
+                </CardContent>
+            </Card>
+
+            {/* Core Split Workspace */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-                {/* Left side: Interactive checklist options */}
+                {/* Left Column: Interactive checklist options */}
                 <div className="lg:col-span-2 space-y-6">
-                    {/* Scholarships & Reductions Info */}
+                    {/* Scholarships & Reductions Info Banner */}
                     {reductions.length > 0 && (
-                        <div className="bg-emerald-500/5 border border-emerald-500/20 rounded-2xl p-5 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div className="bg-emerald-500/[0.03] border border-emerald-500/10 rounded-2xl p-5 flex flex-col sm:flex-row sm:items-center justify-between gap-4">
                             <div className="flex items-center gap-3">
-                                <div className="bg-emerald-500/20 p-2.5 rounded-xl border border-emerald-500/30">
+                                <div className="bg-emerald-500/10 p-2.5 rounded-xl border border-emerald-500/20">
                                     <CheckCircle className="w-5 h-5 text-emerald-400" />
                                 </div>
                                 <div className="space-y-0.5">
-                                    <h3 className="font-bold text-emerald-400 text-sm tracking-wide uppercase">
-                                        Applied Scholarships / Credits
+                                    <h3 className="font-bold text-emerald-400 text-xs tracking-wider uppercase">
+                                        Scholarships / Credits Applied
                                     </h3>
-                                    <p className="text-[10px] text-emerald-400/60 font-bold uppercase">
-                                        Scholarships are auto-deducted from terms below.
+                                    <p className="text-[10px] text-white/40 font-medium">
+                                        Reductions are automatically computed and applied below.
                                     </p>
                                 </div>
                             </div>
-                            <div className="text-right">
-                                <span className="text-[9px] text-emerald-500/50 uppercase font-black tracking-widest">Total Value</span>
-                                <p className="text-2xl font-black text-emerald-400">- ₹{ledgerTotalReductions.toLocaleString()}</p>
+                            <div className="text-left sm:text-right">
+                                <span className="text-[9px] text-white/40 uppercase font-bold tracking-wider">Deduction Credit</span>
+                                <p className="text-xl font-bold text-emerald-400">- ₹{ledgerTotalReductions.toLocaleString()}</p>
                             </div>
                         </div>
                     )}
 
-                    {/* Term Fees Checklist */}
-                    <div className="bg-[#112240]/40 border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
-                        <div className="bg-white/[0.03] px-6 py-4 flex justify-between items-center border-b border-white/10">
-                            <h3 className="font-bold text-white tracking-wide uppercase text-xs">Standard Term Fees</h3>
-                            <span className="text-[10px] text-white/40 bg-white/5 px-2 py-0.5 rounded font-black tracking-widest uppercase">Tuition</span>
+                    {/* Select Terms to Pay Card */}
+                    <Card className="bg-[#112240]/20 border border-white/[0.05] rounded-3xl overflow-hidden backdrop-blur-md shadow-2xl">
+                        <div className="bg-white/[0.02] px-6 py-4 flex justify-between items-center border-b border-white/[0.04]">
+                            <h3 className="font-bold text-white tracking-wide uppercase text-xs">Select Terms To Pay</h3>
+                            <Badge className="bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-md font-bold">Tuition</Badge>
                         </div>
-                        <div className="p-4 space-y-3">
+                        <div className="p-4 space-y-3.5">
                             {(() => {
                                 let rollingReduction = ledgerTotalReductions;
                                 return termFees.length > 0 ? (
@@ -284,52 +446,54 @@ export default function StudentFeesPage() {
                                         return (
                                             <div
                                                 key={item.id}
-                                                className={`flex flex-col md:flex-row md:items-center justify-between p-4 rounded-2xl border transition-all ${
+                                                className={`flex flex-col md:flex-row md:items-center justify-between p-5 rounded-2xl border transition-all ${
                                                     isSelected
-                                                        ? "bg-[#3B82F6]/10 border-[#3B82F6]/20 shadow-[0_0_15px_-5px_#3B82F6]"
-                                                        : "bg-[#0A192F]/60 hover:bg-white/5 border-transparent"
-                                                } ${netRemaining === 0 ? "opacity-60 grayscale-[0.3]" : ""}`}
+                                                        ? "bg-blue-500/[0.06] border-blue-500/30 shadow-lg shadow-blue-500/5"
+                                                        : "bg-white/[0.01] hover:bg-white/[0.02] border-white/[0.04]"
+                                                } ${netRemaining === 0 ? "opacity-50" : ""}`}
                                             >
-                                                <div className="flex items-center gap-4">
+                                                <div className="flex items-start gap-4">
                                                     {netRemaining === 0 ? (
-                                                        <div className="w-5 h-5 flex items-center justify-center bg-emerald-500 rounded-md">
-                                                            <CheckCircle className="w-4 h-4 text-white" />
+                                                        <div className="w-5 h-5 flex items-center justify-center bg-emerald-500 rounded-md shrink-0 mt-0.5">
+                                                            <CheckCircle className="w-3.5 h-3.5 text-white" />
                                                         </div>
                                                     ) : (
                                                         <Checkbox
                                                             checked={isSelected}
                                                             onCheckedChange={() => handleToggleItem(item.id, netRemaining)}
+                                                            className="mt-1 border-white/20 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
                                                         />
                                                     )}
-                                                    <div>
-                                                        <h4 className="font-bold text-white text-base tracking-tight flex items-center flex-wrap gap-2">
+                                                    <div className="space-y-1">
+                                                        <h4 className="font-bold text-white text-base tracking-tight flex items-center flex-wrap gap-2 leading-tight">
                                                             {item.name}
                                                             {discountForThisItem > 0 && (
-                                                                <span className="text-[9px] bg-emerald-500/20 text-emerald-400 px-2 py-0.5 rounded-full font-black uppercase tracking-widest">
-                                                                    ₹{discountForThisItem.toLocaleString()} Deducted
-                                                                </span>
+                                                                <Badge className="bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 text-[9px] uppercase tracking-wider py-0 px-2 rounded-full font-bold">
+                                                                    ₹{discountForThisItem.toLocaleString()} scholarship
+                                                                </Badge>
                                                             )}
                                                         </h4>
-                                                        <p className="text-[10px] text-white/40 flex items-center gap-1 uppercase tracking-wider font-bold mt-1">
-                                                            <Clock className="w-3.5 h-3.5 text-white/30" /> Fee: ₹{item.amount.toLocaleString()} • Due: {item.dueDate || "N/A"}
+                                                        <p className="text-[10px] text-white/40 flex items-center gap-1.5 uppercase font-bold tracking-wider">
+                                                            <Clock className="w-3.5 h-3.5" />
+                                                            <span>Gross Fee: ₹{item.amount.toLocaleString()} • Due Date: {item.dueDate || "N/A"}</span>
                                                         </p>
                                                     </div>
                                                 </div>
 
-                                                <div className="flex items-center gap-6 mt-4 md:mt-0 justify-between md:justify-end">
+                                                <div className="flex items-center gap-6 mt-4 md:mt-0 justify-between md:justify-end border-t md:border-t-0 border-white/5 pt-3 md:pt-0">
                                                     <div className="text-right">
-                                                        <span className="text-[9px] text-white/40 uppercase font-black tracking-widest">Net Balance</span>
+                                                        <span className="text-[9px] text-white/40 uppercase font-bold tracking-wider">Net Balance</span>
                                                         <p className={`font-mono font-bold text-base ${netRemaining === 0 ? "text-emerald-400" : "text-white"}`}>
                                                             ₹{netRemaining.toLocaleString()}
                                                         </p>
                                                     </div>
-                                                    <div className={`w-32 bg-[#0A192F]/80 rounded-xl border border-white/10 p-1 flex items-center px-3 gap-1.5 ${netRemaining === 0 ? "opacity-25" : ""}`}>
-                                                        <span className="text-xs text-white/40 font-bold">₹</span>
+                                                    <div className={`w-32 bg-black/40 rounded-xl border border-white/10 p-1 flex items-center px-3 gap-1.5 ${netRemaining === 0 ? "opacity-25" : ""}`}>
+                                                        <span className="text-xs text-white/30 font-bold">₹</span>
                                                         <input
                                                             type="text"
                                                             value={paymentAmounts[item.id] || ""}
                                                             onChange={(e) => handleAmountChange(item.id, e.target.value, netRemaining)}
-                                                            className="bg-transparent border-none outline-none text-sm font-bold w-full text-white"
+                                                            className="bg-transparent border-none outline-none text-sm font-bold w-full text-white font-mono placeholder:text-white/10"
                                                             placeholder="0"
                                                             disabled={!isSelected || netRemaining === 0}
                                                         />
@@ -339,19 +503,19 @@ export default function StudentFeesPage() {
                                         );
                                     })
                                 ) : (
-                                    <div className="p-8 text-center text-white/40 text-sm">No standard term tuition assigned.</div>
+                                    <div className="p-8 text-center text-white/40 text-sm">No tuition terms currently assigned.</div>
                                 );
                             })()}
                         </div>
-                    </div>
+                    </Card>
 
-                    {/* Custom Fees Checklist */}
+                    {/* Custom Fees Checklist Card */}
                     {customFees.length > 0 && (
-                        <div className="bg-[#112240]/40 border border-white/5 rounded-3xl overflow-hidden shadow-2xl">
-                            <div className="bg-white/[0.03] px-6 py-4 flex justify-between items-center border-b border-white/10">
-                                <h3 className="font-bold text-amber-500 tracking-wide uppercase text-xs">Special / Custom Fees</h3>
+                        <Card className="bg-[#112240]/20 border border-white/[0.05] rounded-3xl overflow-hidden backdrop-blur-md shadow-2xl">
+                            <div className="bg-white/[0.02] px-6 py-4 flex justify-between items-center border-b border-white/[0.04]">
+                                <h3 className="font-bold text-amber-500 tracking-wide uppercase text-xs">Special / Activity Fees</h3>
                             </div>
-                            <div className="p-4 space-y-3">
+                            <div className="p-4 space-y-3.5">
                                 {customFees.map((item: any) => {
                                     const remaining = item.amount - (item.paidAmount || 0);
                                     const isSelected = selectedItems.has(item.id);
@@ -359,44 +523,44 @@ export default function StudentFeesPage() {
                                     return (
                                         <div
                                             key={item.id}
-                                            className={`flex flex-col md:flex-row md:items-center justify-between p-4 rounded-2xl border transition-all ${
+                                            className={`flex flex-col md:flex-row md:items-center justify-between p-5 rounded-2xl border transition-all ${
                                                 isSelected
-                                                    ? "bg-amber-500/10 border-amber-500/20"
-                                                    : "bg-[#0A192F]/60 hover:bg-white/5 border-transparent"
-                                            } ${remaining === 0 ? "opacity-60 grayscale-[0.3]" : ""}`}
+                                                    ? "bg-amber-500/[0.04] border-amber-500/20"
+                                                    : "bg-white/[0.01] hover:bg-white/[0.02] border-white/[0.04]"
+                                            } ${remaining === 0 ? "opacity-50" : ""}`}
                                         >
-                                            <div className="flex items-center gap-4">
+                                            <div className="flex items-start gap-4">
                                                 {remaining === 0 ? (
-                                                    <div className="w-5 h-5 flex items-center justify-center bg-emerald-500 rounded-md">
-                                                        <CheckCircle className="w-4 h-4 text-white" />
+                                                    <div className="w-5 h-5 flex items-center justify-center bg-emerald-500 rounded-md shrink-0 mt-0.5">
+                                                        <CheckCircle className="w-3.5 h-3.5 text-white" />
                                                     </div>
                                                 ) : (
                                                     <Checkbox
                                                         checked={isSelected}
                                                         onCheckedChange={() => handleToggleItem(item.id, remaining)}
-                                                        className="data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
+                                                        className="mt-1 border-white/20 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
                                                     />
                                                 )}
-                                                <div>
-                                                    <h4 className="font-bold text-white text-base tracking-tight">{item.name}</h4>
-                                                    <p className="text-[10px] text-white/40 uppercase tracking-widest font-black mt-1">Special / Custom Activity</p>
+                                                <div className="space-y-1">
+                                                    <h4 className="font-bold text-white text-base tracking-tight leading-tight">{item.name}</h4>
+                                                    <p className="text-[10px] text-white/40 uppercase font-bold tracking-wider">Custom / One-off Activity</p>
                                                 </div>
                                             </div>
 
-                                            <div className="flex items-center gap-6 mt-4 md:mt-0 justify-between md:justify-end">
+                                            <div className="flex items-center gap-6 mt-4 md:mt-0 justify-between md:justify-end border-t md:border-t-0 border-white/5 pt-3 md:pt-0">
                                                 <div className="text-right">
-                                                    <span className="text-[9px] text-white/40 uppercase font-black tracking-widest">Balance</span>
+                                                    <span className="text-[9px] text-white/40 uppercase font-bold tracking-wider">Balance</span>
                                                     <p className={`font-mono font-bold text-base ${remaining === 0 ? "text-emerald-400" : "text-white"}`}>
                                                         ₹{remaining.toLocaleString()}
                                                     </p>
                                                 </div>
-                                                <div className={`w-32 bg-[#0A192F]/80 rounded-xl border border-white/10 p-1 flex items-center px-3 gap-1.5 ${remaining === 0 ? "opacity-25" : ""}`}>
-                                                    <span className="text-xs text-white/40 font-bold">₹</span>
+                                                <div className={`w-32 bg-black/40 rounded-xl border border-white/10 p-1 flex items-center px-3 gap-1.5 ${remaining === 0 ? "opacity-25" : ""}`}>
+                                                    <span className="text-xs text-white/30 font-bold">₹</span>
                                                     <input
                                                         type="text"
                                                         value={paymentAmounts[item.id] || ""}
                                                         onChange={(e) => handleAmountChange(item.id, e.target.value, remaining)}
-                                                        className="bg-transparent border-none outline-none text-sm font-bold w-full text-white"
+                                                        className="bg-transparent border-none outline-none text-sm font-bold w-full text-white font-mono placeholder:text-white/10"
                                                         placeholder="0"
                                                         disabled={!isSelected || remaining === 0}
                                                     />
@@ -406,22 +570,28 @@ export default function StudentFeesPage() {
                                     );
                                 })}
                             </div>
-                        </div>
+                        </Card>
                     )}
+
+                    {/* Security Notice */}
+                    <div className="flex items-center gap-2.5 px-4 text-white/40 text-xs font-bold uppercase tracking-wider">
+                        <ShieldCheck className="w-5 h-5 text-emerald-500/80" />
+                        <span>Your payment information is fully safe and secure.</span>
+                    </div>
                 </div>
 
-                {/* Right side: Razorpay Summary checkout card & payment history */}
+                {/* Right Column: Checkout summary & history */}
                 <div className="space-y-6">
                     {/* Checkout Card */}
-                    <div className="bg-[#112240] p-6 md:p-8 rounded-3xl border border-white/5 shadow-2xl relative overflow-hidden">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-[#3B82F6]/5 rounded-full blur-3xl pointer-events-none" />
-                        <h2 className="text-lg font-bold mb-6 flex items-center gap-2 text-white">
-                            <CreditCard className="w-5 h-5 text-[#3B82F6]" />
+                    <Card className="bg-[#112240]/30 border border-white/[0.05] p-6 md:p-8 rounded-3xl shadow-2xl relative overflow-hidden backdrop-blur-md">
+                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+                        <h3 className="text-sm font-bold uppercase tracking-widest text-white mb-6 flex items-center gap-2">
+                            <CreditCard className="w-4 h-4 text-blue-400" />
                             Checkout Summary
-                        </h2>
+                        </h3>
 
-                        <div className="space-y-4 mb-6">
-                            <div className="space-y-2.5 p-4 bg-[#0A192F]/60 rounded-2xl border border-white/5 text-xs font-bold font-mono">
+                        <div className="space-y-5">
+                            <div className="space-y-3 p-4 bg-black/30 rounded-2xl border border-white/[0.04] text-xs font-mono font-bold">
                                 <div className="flex justify-between items-center text-white/50">
                                     <span>TUITION TOTAL</span>
                                     <span>₹{ledgerTotalFee.toLocaleString()}</span>
@@ -430,74 +600,73 @@ export default function StudentFeesPage() {
                                     <span>SCHOLARSHIPS</span>
                                     <span>- ₹{ledgerTotalReductions.toLocaleString()}</span>
                                 </div>
-                                <div className="h-px bg-white/15 my-1" />
-                                <div className="flex justify-between items-center text-[#3B82F6] text-sm">
+                                <div className="h-px bg-white/10 my-1" />
+                                <div className="flex justify-between items-center text-blue-400">
                                     <span>TOTAL REMAINING</span>
                                     <span>₹{ledgerPendingFee.toLocaleString()}</span>
                                 </div>
                             </div>
 
-                            <div className="h-px bg-white/5 w-full" />
-
-                            <div className="space-y-1.5">
-                                <span className="text-[9px] text-white/40 uppercase font-black tracking-widest">
+                            <div className="space-y-1.5 pt-1">
+                                <span className="text-[9px] text-white/40 uppercase font-black tracking-widest block">
                                     Amount selected to pay
                                 </span>
                                 <div className="flex items-baseline gap-1">
-                                    <span className="text-xl font-bold text-[#3B82F6]">₹</span>
-                                    <p className="text-4xl font-black text-white font-mono">
+                                    <span className="text-xl font-bold text-blue-400">₹</span>
+                                    <p className="text-4xl font-extrabold text-white tracking-tight font-mono">
                                         {Math.max(0, totalToPay).toLocaleString()}
                                     </p>
                                 </div>
                             </div>
+
+                            <Button
+                                onClick={handlePay}
+                                disabled={totalToPay === 0 || paying}
+                                className="w-full h-13 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/30 text-white rounded-2xl font-bold text-sm shadow-xl shadow-blue-500/10 transition-all flex items-center justify-center gap-2 border-0"
+                            >
+                                {paying ? (
+                                    <Loader2 className="w-5 h-5 animate-spin" />
+                                ) : (
+                                    <>
+                                        <CreditCard className="w-4 h-4" /> Pay Selected Fees
+                                    </>
+                                )}
+                            </Button>
+
+                            <p className="text-[8px] text-center text-white/30 font-bold tracking-widest uppercase">
+                                Secured payments powered by Razorpay
+                            </p>
                         </div>
-
-                        <Button
-                            onClick={handlePay}
-                            disabled={totalToPay === 0 || paying}
-                            className="w-full h-14 bg-[#3B82F6] hover:bg-[#2563EB] text-white rounded-2xl font-black text-lg shadow-[0_10px_25px_rgba(59,130,246,0.3)] transition-all flex items-center justify-center gap-2"
-                        >
-                            {paying ? (
-                                <Loader2 className="w-5 h-5 animate-spin mr-1" />
-                            ) : (
-                                <>
-                                    <CreditCard className="w-5 h-5" /> Pay Selected Fees
-                                </>
-                            )}
-                        </Button>
-
-                        <p className="text-[9px] text-center text-white/40 mt-4 font-bold tracking-widest uppercase">
-                            🔒 Secured Payments powered by Razorpay
-                        </p>
-                    </div>
+                    </Card>
 
                     {/* Transaction History Card */}
-                    <Card className="bg-[#112240]/40 border-white/5 shadow-2xl rounded-3xl overflow-hidden">
-                        <CardHeader className="bg-white/[0.01] border-b border-white/5 py-4 px-6 flex justify-between items-center">
-                            <CardTitle className="text-sm font-bold text-white flex items-center gap-2">
+                    <Card className="bg-[#112240]/20 border border-white/[0.05] shadow-2xl rounded-3xl overflow-hidden backdrop-blur-md">
+                        <CardHeader className="bg-white/[0.01] border-b border-white/[0.04] py-4 px-6 flex justify-between items-center">
+                            <CardTitle className="text-xs font-bold uppercase tracking-widest text-white flex items-center gap-2">
                                 <History className="w-4 h-4 text-emerald-400" /> Payment History
                             </CardTitle>
                         </CardHeader>
-                        <CardContent className="p-4 max-h-[350px] overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 space-y-3">
+                        <CardContent className="p-4 max-h-[350px] overflow-y-auto scrollbar-none space-y-3">
                             {transactions.length === 0 ? (
-                                <div className="text-center py-12 text-white/30 text-xs font-bold uppercase tracking-widest italic">
-                                    No transaction logs found.
+                                <div className="text-center py-14 text-white/30 text-[10px] font-bold uppercase tracking-widest italic flex flex-col items-center justify-center gap-3">
+                                    <FileText className="w-8 h-8 opacity-20" />
+                                    <span>No transaction logs found.</span>
                                 </div>
                             ) : (
                                 transactions.map((tx, idx) => (
                                     <div
                                         key={idx}
-                                        className="flex items-center justify-between p-3 rounded-2xl bg-[#0A192F]/60 border border-white/5 hover:border-emerald-500/20 transition-all"
+                                        className="flex items-center justify-between p-3.5 rounded-2xl bg-white/[0.01] border border-white/5 hover:border-emerald-500/20 transition-all gap-4"
                                     >
-                                        <div className="flex items-center gap-3">
-                                            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                                        <div className="flex items-center gap-3 min-w-0">
+                                            <div className="p-2 rounded-xl bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 shrink-0">
                                                 <CheckCircle className="w-4 h-4" />
                                             </div>
-                                            <div>
+                                            <div className="min-w-0">
                                                 <div className="font-mono font-bold text-sm text-white">
                                                     ₹{Number(tx.amount).toLocaleString()}
                                                 </div>
-                                                <div className="text-[10px] text-white/40 flex items-center gap-2 font-bold uppercase tracking-wider mt-1">
+                                                <div className="text-[9px] text-white/40 flex items-center gap-2 font-bold uppercase tracking-wider mt-1 truncate">
                                                     <span>
                                                         {tx.createdAt?.seconds
                                                             ? new Date(tx.createdAt.seconds * 1000).toLocaleDateString()
@@ -506,14 +675,14 @@ export default function StudentFeesPage() {
                                                             : "Recent"}
                                                     </span>
                                                     <span>•</span>
-                                                    <span className="text-emerald-400">{tx.method || "ONLINE"}</span>
+                                                    <span className="text-emerald-400 font-medium">{tx.method || "ONLINE"}</span>
                                                 </div>
                                             </div>
                                         </div>
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            className="border-white/10 hover:border-emerald-500/30 hover:bg-emerald-500/10 text-white/60 hover:text-white text-[10px] font-bold py-1 px-3 h-8 rounded-xl"
+                                            className="border-white/10 hover:border-emerald-500/20 hover:bg-emerald-500/10 text-white/60 hover:text-white text-[10px] font-bold py-1 px-3 h-8 rounded-xl shrink-0"
                                             onClick={() =>
                                                 printPaymentReceipt({
                                                     payment: tx,

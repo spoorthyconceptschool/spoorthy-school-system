@@ -243,10 +243,10 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
     return (
         <DropdownMenu>
             <DropdownMenuTrigger asChild>
-                <button className="relative p-2 hover:bg-white/5 rounded-full text-[#8892B0] hover:text-white transition-colors group">
-                    <Bell size={20} className={cn(unreadCount > 0 && "animate-pulse")} />
+                <button className="relative p-1.5 hover:bg-white/5 rounded-full text-white/70 hover:text-white transition-colors group">
+                    <Bell size={18} className={cn(unreadCount > 0 && "animate-pulse")} />
                     {unreadCount > 0 && (
-                        <span className="absolute top-1 right-1 w-4 h-4 bg-red-500 rounded-full text-[10px] flex items-center justify-center text-white font-bold border-2 border-[#0A192F]">
+                        <span className="absolute -top-0.5 -right-0.5 w-[16px] h-[16px] bg-gradient-to-tr from-pink-500 to-purple-600 rounded-full text-[8.5px] flex items-center justify-center text-white font-black border border-[#030712] shadow-lg animate-in zoom-in duration-200">
                             {unreadCount}
                         </span>
                     )}

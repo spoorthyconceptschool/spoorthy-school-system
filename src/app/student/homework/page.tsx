@@ -126,8 +126,6 @@ export default function StudentHomeworkPage() {
         return nameA.localeCompare(nameB);
     });
 
-    const displaySubjectsMobile = displaySubjects.slice(0, 4);
-
     const navigatePage = (direction: 'prev' | 'next') => {
         if (uniqueDates.length <= 1 || animating) return;
         const currentIndex = uniqueDates.indexOf(selectedDate);
@@ -191,7 +189,7 @@ export default function StudentHomeworkPage() {
             {/* =======================================
                 DESKTOP DOUBLE-PAGE VIEW (>= lg)
                 ======================================= */}
-            <div className="hidden lg:flex lg:flex-col lg:space-y-6 w-full max-w-6xl mx-auto px-6 py-8 animate-in fade-in duration-500 relative">
+            <div className="hidden lg:flex flex-col space-y-6 w-full max-w-6xl mx-auto px-6 py-8 animate-in fade-in duration-500 relative">
                 
                 {/* Glowing background accent blur */}
                 <div className="absolute top-[-10%] left-[-10%] w-[40%] h-[40%] bg-amber-500/10 rounded-full blur-[100px] pointer-events-none animate-pulse" />
@@ -400,54 +398,88 @@ export default function StudentHomeworkPage() {
             </div>
 
             {/* =======================================
-                MOBILE VIEW (< lg Breakpoint)
+                MOBILE & TABLET VIEW (< lg Breakpoint)
                 ======================================= */}
-            <div className="max-w-md mx-auto flex lg:hidden flex-col h-[calc(100vh-100px)] space-y-4 animate-in fade-in duration-500 pb-2 relative overflow-hidden select-none bg-gradient-to-b from-[#0a192f] via-[#0f224a] to-[#0a192f] px-2.5">
+            <div className="w-full max-w-4xl mx-auto flex lg:hidden flex-col space-y-5 animate-in fade-in duration-500 pb-8 relative select-none bg-gradient-to-b from-[#0a192f] via-[#0f224a] to-[#0a192f] px-4 md:px-8 pt-4">
                 
                 {/* Glowing background accent blur */}
                 <div className="absolute top-[-10%] left-[-10%] w-[50%] h-[40%] bg-amber-500/10 rounded-full blur-[100px] pointer-events-none" />
                 <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[40%] bg-blue-500/10 rounded-full blur-[100px] pointer-events-none" />
 
                 {/* Title Block */}
-                <div className="flex items-center justify-between px-1 mt-2">
-                    <div className="flex items-center gap-2">
-                        <div className="w-8 h-8 rounded-lg bg-amber-400/10 border border-amber-400/20 flex items-center justify-center shadow-[0_0_15px_rgba(251,191,36,0.1)]">
-                            <BookOpen className="w-4 h-4 text-amber-400" />
+                <div className="flex items-center justify-between px-1">
+                    <div className="flex items-center gap-3">
+                        <div className="w-9 h-9 rounded-xl bg-amber-400/10 border border-amber-400/20 flex items-center justify-center shadow-[0_0_15px_rgba(251,191,36,0.1)]">
+                            <BookOpen className="w-4.5 h-4.5 text-amber-400" />
                         </div>
                         <div>
-                            <h1 className="text-base font-extrabold text-white diary-title leading-tight">Student School Diary</h1>
-                            <p className="text-[10px] text-neutral-400 font-medium">Class {studentProfile?.className || "7 (B)"}</p>
+                            <h1 className="text-lg font-black text-white diary-title leading-tight">Student School Diary</h1>
+                            <p className="text-[11px] text-neutral-400 font-medium">Class {studentProfile?.className || "7 (B)"}</p>
                         </div>
                     </div>
 
-                    <div className="flex items-center gap-1.5 bg-white/5 border border-white/10 px-2.5 py-1 rounded-xl shadow-inner">
-                        <CalendarIcon className="w-3 h-3 text-amber-400" />
-                        <span className="text-[9px] font-bold text-white/90">
+                    <div className="flex items-center gap-2 bg-white/5 border border-white/10 px-3 py-1.5 rounded-xl shadow-inner">
+                        <CalendarIcon className="w-3.5 h-3.5 text-amber-400" />
+                        <span className="text-[10px] font-extrabold text-white/90">
                             {new Date(selectedDate || Date.now()).toLocaleDateString('en-US', { day: 'numeric', month: 'short' })}
                         </span>
                     </div>
                 </div>
 
                 {loading ? (
-                    <div className="flex-1 flex flex-col items-center justify-center gap-2">
+                    <div className="flex-1 flex flex-col items-center justify-center py-20 gap-2">
                         <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
                         <p className="text-[9px] font-black uppercase tracking-widest text-neutral-500 animate-pulse">Unlocking Diary...</p>
                     </div>
                 ) : (
-                    <div className="flex-1 flex flex-col justify-between space-y-3.5">
+                    <div className="flex flex-col space-y-4">
                         
-                        {/* Glowing Control Toggles */}
+                        {/* Premium Horizontal Date Slider */}
+                        <div className="w-full relative select-none shrink-0 border-y border-white/5 py-2.5">
+                            <div className="flex overflow-x-auto gap-2.5 pb-1 px-1 scrollbar-none snap-x">
+                                {uniqueDates.length === 0 ? (
+                                    <div className="text-neutral-500 font-bold uppercase tracking-wider text-[10px] py-1">
+                                        No Entries
+                                    </div>
+                                ) : (
+                                    uniqueDates.map(d => {
+                                        const isActive = d === selectedDate;
+                                        return (
+                                            <button
+                                                key={d}
+                                                onClick={() => {
+                                                    const currentIndex = uniqueDates.indexOf(selectedDate);
+                                                    const targetIndex = uniqueDates.indexOf(d);
+                                                    setAnimationDirection(targetIndex < currentIndex ? 'next' : 'prev');
+                                                    setSelectedDate(d);
+                                                }}
+                                                className={`snap-center shrink-0 py-2 px-4 rounded-xl border flex items-center gap-2 transition-all active:scale-95 ${
+                                                    isActive 
+                                                        ? 'bg-amber-500/20 border-amber-400/40 text-amber-300 font-black shadow-[0_0_15px_rgba(245,158,11,0.15)]'
+                                                        : 'bg-white/5 border-white/10 hover:bg-white/10 text-neutral-300 font-bold hover:text-white'
+                                                }`}
+                                            >
+                                                <span className="text-[10px] tracking-wider font-mono">{formatDiaryDate(d)}</span>
+                                                <BookOpenCheck className={`w-3.5 h-3.5 ${isActive ? 'text-amber-400' : 'text-neutral-400'}`} />
+                                            </button>
+                                        );
+                                    })
+                                )}
+                            </div>
+                        </div>
+
+                        {/* Swipe Toggles */}
                         <div className="flex items-center justify-between px-1 gap-4 select-none shrink-0">
                             <button
                                 onClick={() => navigatePage('prev')}
                                 disabled={!hasPrev}
-                                className={`flex-1 py-1.5 rounded-xl border text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${
+                                className={`flex-1 py-2 rounded-xl border text-[11px] font-extrabold flex items-center justify-center gap-1.5 transition-all ${
                                     hasPrev
                                         ? 'bg-white/5 border-white/10 hover:border-amber-400/30 text-white shadow-[0_0_15px_rgba(255,255,255,0.02)] active:scale-95'
                                         : 'bg-white/[0.02] border-white/5 text-white/20 cursor-not-allowed'
                                 }`}
                             >
-                                <ChevronLeft className="w-3.5 h-3.5 text-amber-400" /> Previous
+                                <ChevronLeft className="w-4 h-4 text-amber-400" /> Previous
                             </button>
                             
                             <div className="text-[9px] text-neutral-400 font-black uppercase tracking-wider flex items-center gap-1">
@@ -457,13 +489,13 @@ export default function StudentHomeworkPage() {
                             <button
                                 onClick={() => navigatePage('next')}
                                 disabled={!hasNext}
-                                className={`flex-1 py-1.5 rounded-xl border text-[10px] font-bold flex items-center justify-center gap-1 transition-all ${
+                                className={`flex-1 py-2 rounded-xl border text-[11px] font-extrabold flex items-center justify-center gap-1.5 transition-all ${
                                     hasNext
                                         ? 'bg-white/5 border-white/10 hover:border-amber-400/30 text-white shadow-[0_0_15px_rgba(255,255,255,0.02)] active:scale-95'
                                         : 'bg-white/[0.02] border-white/5 text-white/20 cursor-not-allowed'
                                 }`}
                             >
-                                Next <ChevronRight className="w-3.5 h-3.5 text-amber-400" />
+                                Next <ChevronRight className="w-4 h-4 text-amber-400" />
                             </button>
                         </div>
 
@@ -471,7 +503,7 @@ export default function StudentHomeworkPage() {
                         <div 
                             onTouchStart={handleTouchStart}
                             onTouchEnd={handleTouchEnd}
-                            className="relative bg-[#3e2723] rounded-[24px] p-2.5 shadow-2xl border-2 border-[#2d1b18] overflow-hidden flex-1 flex flex-col justify-between min-h-[360px]"
+                            className="relative bg-[#3e2723] rounded-[24px] p-3.5 md:p-5 shadow-2xl border-2 border-[#2d1b18] w-full flex flex-col justify-between"
                         >
                             {/* Leather grain textures */}
                             <div className="absolute inset-0 bg-gradient-to-tr from-black/30 via-transparent to-white/5 pointer-events-none z-10" />
@@ -484,7 +516,7 @@ export default function StudentHomeworkPage() {
                             </div>
 
                             {/* Inner Cream Paper Sheet */}
-                            <div className="relative flex-1 bg-[#fdfcf9] rounded-xl overflow-hidden shadow-inner border border-[#d7ccc8]/40 flex flex-col justify-between p-3.5 pl-6">
+                            <div className="relative flex-1 bg-[#fdfcf9] rounded-xl overflow-hidden shadow-inner border border-[#d7ccc8]/40 flex flex-col justify-between p-4 md:p-6 pl-8 md:pl-10">
                                 
                                 {/* Lined ruled paper margin rules */}
                                 <div className="absolute top-0 bottom-0 left-12 border-r border-red-400/25 pointer-events-none" />
@@ -512,63 +544,63 @@ export default function StudentHomeworkPage() {
                                             x: animationDirection === 'next' ? -40 : 40
                                         }}
                                         transition={{ type: "spring", stiffness: 220, damping: 22 }}
-                                        className="flex-1 flex flex-col justify-between space-y-3 relative z-10 w-full"
+                                        className="flex-1 flex flex-col justify-between space-y-4 relative z-10 w-full"
                                     >
                                         {/* Date Stamp Header */}
-                                        <div className="flex justify-between items-center pb-2 border-b border-neutral-300/40 gap-3 pl-8">
+                                        <div className="flex justify-between items-center pb-2.5 border-b border-neutral-300/40 gap-3 pl-8">
                                             <div className="flex items-center border border-neutral-700/80 rounded-lg overflow-hidden bg-white shadow-inner">
-                                                <div className="bg-neutral-800 text-white font-extrabold text-[8px] uppercase tracking-wider px-2 py-1 flex items-center justify-center border-r border-neutral-700">
+                                                <div className="bg-neutral-800 text-white font-extrabold text-[8px] md:text-[10px] uppercase tracking-wider px-2 py-0.5 flex items-center justify-center border-r border-neutral-700">
                                                     Date
                                                 </div>
-                                                <div className="px-2.5 py-1 text-neutral-800 font-extrabold text-[10px] tracking-wider font-mono">
+                                                <div className="px-2.5 py-0.5 text-neutral-800 font-extrabold text-[10px] md:text-[12px] tracking-wider font-mono">
                                                     {formatDiaryDate(selectedDate)}
                                                 </div>
                                             </div>
-                                            <span className="text-[8px] text-neutral-400 font-black uppercase font-mono bg-neutral-100 px-2 py-0.5 rounded border border-neutral-200">
+                                            <span className="text-[8px] md:text-[10px] text-neutral-400 font-black uppercase font-mono bg-neutral-100 px-2 py-0.5 rounded border border-neutral-200">
                                                 Pg {uniqueDates.indexOf(selectedDate) + 1} / {Math.max(1, uniqueDates.length)}
                                             </span>
                                         </div>
 
                                         {/* Notebook Homework Table */}
                                         <div className="border border-neutral-400/80 rounded-lg overflow-hidden bg-white flex-1 flex flex-col">
-                                            <div className="grid grid-cols-4 bg-neutral-50 border-b border-neutral-400/80 text-[8px] font-black uppercase tracking-wider text-neutral-500 text-center py-1.5 select-none">
+                                            <div className="grid grid-cols-4 bg-neutral-50 border-b border-neutral-400/80 text-[8px] md:text-[10px] font-black uppercase tracking-wider text-neutral-500 text-center py-2 select-none">
                                                 <div className="border-r border-neutral-400/80 col-span-1">Subject</div>
                                                 <div className="col-span-3">Homework Assignments</div>
                                             </div>
 
                                             <div className="divide-y divide-neutral-400/80 flex-1 flex flex-col">
-                                                {displaySubjectsMobile.length === 0 ? (
-                                                    <div className="flex-1 flex flex-col items-center justify-center py-10 text-neutral-400 font-bold uppercase tracking-widest text-[9px] pl-8">
+                                                {displaySubjects.length === 0 ? (
+                                                    <div className="flex-1 flex flex-col items-center justify-center py-14 text-neutral-400 font-bold uppercase tracking-widest text-[10px] pl-8">
                                                         <AlertCircle className="w-5 h-5 mb-1.5 text-neutral-300" />
-                                                        No subjects defined
+                                                        No homework entries
                                                     </div>
                                                 ) : (
-                                                    displaySubjectsMobile.map(sid => {
+                                                    displaySubjects.map(sid => {
                                                         const hw = activeHW[sid];
                                                         const subjectName = subjects[sid]?.name || sid;
                                                         const mappedSubject = formatSubjectName(subjectName);
 
                                                         return (
-                                                            <div key={sid} className="grid grid-cols-4 items-stretch flex-1 min-h-[58px]">
-                                                                <div className="col-span-1 bg-[#fbfbf9] border-r border-neutral-400/80 px-1.5 flex items-center justify-center text-center font-black text-[9px] uppercase tracking-tighter text-neutral-700">
+                                                            <div key={sid} className="grid grid-cols-4 items-stretch flex-1 min-h-[64px]">
+                                                                <div className="col-span-1 bg-[#fbfbf9] border-r border-neutral-400/80 px-1.5 flex items-center justify-center text-center font-black text-[9px] md:text-[11px] uppercase tracking-tighter text-neutral-700">
                                                                     {mappedSubject}
                                                                 </div>
 
-                                                                <div className="col-span-3 diary-lined py-0.5 px-3 pr-2 relative flex flex-col justify-center">
+                                                                <div className="col-span-3 diary-lined py-1.5 px-3 pr-2 relative flex flex-col justify-center">
                                                                     {hw ? (
                                                                         <div className="space-y-0.5">
-                                                                            <div className="diary-handwriting text-[#1b3a4b] font-bold tracking-normal text-xs break-words line-clamp-2 leading-relaxed">
+                                                                            <div className="diary-handwriting text-[#1b3a4b] font-bold tracking-normal text-xs md:text-sm break-words leading-relaxed">
                                                                                 {hw.title}
                                                                             </div>
                                                                             {hw.dueDate && (
-                                                                                <div className="text-[7.5px] font-bold font-mono text-red-500 flex items-center uppercase tracking-tighter mt-0.5">
-                                                                                    <Clock className="w-2 h-2 mr-0.5" /> Due: {hw.dueDate}
+                                                                                <div className="text-[7.5px] md:text-[9px] font-bold font-mono text-red-500 flex items-center uppercase tracking-tighter mt-1">
+                                                                                    <Clock className="w-2.5 h-2.5 mr-1" /> Due: {hw.dueDate}
                                                                                 </div>
                                                                             )}
                                                                         </div>
                                                                     ) : (
-                                                                        <div className="diary-handwriting text-neutral-300/60 italic font-bold tracking-wider text-xs pl-1">
-                                                                            --- Clean ---
+                                                                        <div className="diary-handwriting text-neutral-300/60 italic font-bold tracking-wider text-xs md:text-sm pl-1">
+                                                                            --- Completed ---
                                                                         </div>
                                                                     )}
                                                                 </div>
@@ -582,7 +614,7 @@ export default function StudentHomeworkPage() {
                                 </AnimatePresence>
 
                                 {/* Stamp block */}
-                                <div className="mt-2.5 pt-1.5 border-t border-neutral-300/40 flex justify-between items-center text-[8px] font-black tracking-widest text-neutral-400 uppercase font-mono pl-8 select-none">
+                                <div className="mt-3 pt-1.5 border-t border-neutral-300/40 flex justify-between items-center text-[8px] md:text-[10px] font-black tracking-widest text-neutral-400 uppercase font-mono pl-8 select-none">
                                     <div className="flex items-center gap-0.5 text-emerald-600 bg-emerald-50 border border-emerald-200/50 rounded px-1.5 py-0.2">
                                         <Check className="w-2.5 h-2.5" /> 
                                         <span>Verified</span>
@@ -593,14 +625,14 @@ export default function StudentHomeworkPage() {
                         </div>
 
                         {/* Bottom Tips Card */}
-                        <div className="bg-white/5 border border-white/10 p-2.5 rounded-xl flex items-start gap-2.5 shadow-inner">
-                            <div className="w-6 h-6 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
-                                <Info className="w-3.5 h-3.5 text-blue-400" />
+                        <div className="bg-white/5 border border-white/10 p-3.5 rounded-xl flex items-start gap-3 shadow-inner">
+                            <div className="w-7 h-7 rounded-lg bg-blue-500/10 border border-blue-500/20 flex items-center justify-center shrink-0">
+                                <Info className="w-4 h-4 text-blue-400" />
                             </div>
                             <div className="text-left">
-                                <h4 className="text-[9px] font-extrabold text-blue-400 uppercase tracking-widest leading-none">Diary Tips</h4>
-                                <p className="text-[8px] text-neutral-400 mt-0.5 font-medium leading-normal">
-                                    Use Previous or Next to check homework and assignments from other days.
+                                <h4 className="text-[10px] font-extrabold text-blue-400 uppercase tracking-widest leading-none">Diary Tips</h4>
+                                <p className="text-[9px] text-neutral-400 mt-1 font-medium leading-normal">
+                                    Select any date in the slider to directly view details, or swipe the diary page left/right.
                                 </p>
                             </div>
                         </div>
@@ -610,3 +642,7 @@ export default function StudentHomeworkPage() {
         </div>
     );
 }
+
+
+
+
