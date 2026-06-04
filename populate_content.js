@@ -8,9 +8,9 @@ const env = dotenv.parse(fs.readFileSync('.env.local'));
 if (!admin.apps.length) {
     admin.initializeApp({
         credential: admin.credential.cert({
-            projectId: env.NEXT_PUBLIC_FIREBASE_PROJECT_ID,
-            clientEmail: env.FIREBASE_CLIENT_EMAIL,
-            privateKey: env.FIREBASE_PRIVATE_KEY.replace(/\\n/g, '\n'),
+            projectId: env.NEXT_PUBLIC_FIREBASE_PROJECT_ID || "spoorthy-16292",
+            clientEmail: env.FIREBASE_CLIENT_EMAIL || "firebase-adminsdk-fbsvc@spoorthy-16292.iam.gserviceaccount.com",
+            privateKey: (env.SERVICE_ACCOUNT_PRIVATE_KEY || env.FIREBASE_PRIVATE_KEY || "").replace(/\\n/g, '\n'),
         }),
         databaseURL: env.NEXT_PUBLIC_FIREBASE_DATABASE_URL
     });

@@ -1,4 +1,8 @@
 
+import * as dotenv from 'dotenv';
+import * as path from 'path';
+dotenv.config({ path: path.join(__dirname, '../.env.local') });
+
 import { adminDb } from '../src/lib/firebase-admin';
 
 async function globalSync() {
