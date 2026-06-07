@@ -26,7 +26,7 @@ export const exportSingleStudentFee = ({ studentName, schoolId, className, items
 
         const data = [
             ["STUDENT FEE STRUCTURE REPORT"],
-            ["Generated on:", new Date().toLocaleDateString()],
+            ["Generated on:", new Date().toLocaleDateString('en-GB')],
             [],
             ["Student Name:", studentName],
             ["Student ID:", schoolId],
@@ -120,7 +120,7 @@ export const printStudentFeeStructure = ({ studentName, schoolId, className, ite
             <div class="header">
                 ${schoolLogo ? `<img src="${schoolLogo}" class="logo" />` : ''}
                 <div class="header-text">
-                    <div class="school-name">${schoolName || 'Spoorthy Concept School'}</div>
+                    <div class="school-name">${schoolName || 'Spoorthy High School'}</div>
                     <div class="sub-header">${schoolAddress || 'Excellence in Education | Quality | Innovation'}</div>
                     <div class="doc-title">OFFICIAL FEE STRUCTURE RECEIPT</div>
                 </div>
@@ -241,7 +241,7 @@ export const printPendingFeeReport = ({ studentName, schoolId, className, items,
             <div class="header">
                 ${schoolLogo ? `<img src="${schoolLogo}" class="logo" />` : ''}
                 <div class="header-text">
-                    <div class="school-name">${schoolName || 'Spoorthy Concept School'}</div>
+                    <div class="school-name">${schoolName || 'Spoorthy High School'}</div>
                     <div class="sub-header">${schoolAddress || 'Excellence in Education | Quality | Innovation'}</div>
                     <div class="doc-title">PENDING FEE STATEMENT</div>
                 </div>
@@ -251,7 +251,7 @@ export const printPendingFeeReport = ({ studentName, schoolId, className, items,
                 <div class="info-item"><div class="label">STUDENT NAME</div><div>${studentName}</div></div>
                 <div class="info-item"><div class="label">STUDENT ID</div><div>${schoolId}</div></div>
                 <div class="info-item"><div class="label">CLASS</div><div>${className}</div></div>
-                <div class="info-item"><div class="label">DATE</div><div>${new Date().toLocaleDateString()}</div></div>
+                <div class="info-item"><div class="label">DATE</div><div>${new Date().toLocaleDateString('en-GB')}</div></div>
             </div>
 
             <table>
@@ -299,7 +299,7 @@ export const exportAcademicLoad = (data: any[]) => {
     try {
         const rows = [
             ["ACADEMIC LOAD & TEACHER ASSIGNMENT REPORT"],
-            ["Generated on:", new Date().toLocaleDateString()],
+            ["Generated on:", new Date().toLocaleDateString('en-GB')],
             [],
             ["Class", "Section", "Class Teacher", "Subject", "Assigned Teacher"]
         ];
@@ -365,7 +365,7 @@ export const printAcademicLoadReport = (data: any[], branding?: any) => {
                         <div class="header">
                             ${branding?.schoolLogo ? `<img src="${branding.schoolLogo}" class="logo" />` : ''}
                             <div class="header-text">
-                                <h1>${branding?.schoolName || 'Spoorthy Concept School'}</h1>
+                                <h1>${branding?.schoolName || 'Spoorthy High School'}</h1>
                                 <h3 style="margin: 5px 0 0 0; color: #444;">Academic Assignments: ${item.className} - ${item.sectionName}</h3>
                                 <p style="margin: 2px 0 0 0; font-size: 12px; color: #666;">${branding?.address || ''}</p>
                             </div>
@@ -411,7 +411,8 @@ export const printPaymentReceipt = ({
     schoolLogo,
     schoolName,
     schoolAddress,
-    principalSignature
+    principalSignature,
+    previousPayment
 }: {
     payment: any;
     student: any;
@@ -420,6 +421,7 @@ export const printPaymentReceipt = ({
     schoolName?: string;
     schoolAddress?: string;
     principalSignature?: string;
+    previousPayment?: any;
 }) => {
     const totalFee = ledger?.totalFee || 0;
     const totalPaid = ledger?.totalPaid || 0;
@@ -474,7 +476,7 @@ export const printPaymentReceipt = ({
             <div class="header">
                 ${schoolLogo ? `<img src="${schoolLogo}" class="logo" />` : ''}
                 <div class="header-text">
-                    <div class="school-name">${schoolName || 'Spoorthy Concept School'}</div>
+                    <div class="school-name">${schoolName || 'Spoorthy High School'}</div>
                     <div class="sub-header">${schoolAddress || 'Survey No. 123, Edu City, Ongole, AP - 523001'}</div>
                     <div class="doc-title">PAYMENT RECEIPT</div>
                 </div>
@@ -482,7 +484,7 @@ export const printPaymentReceipt = ({
 
             <div class="receipt-meta">
                 <div class="meta-item"><strong>Receipt No:</strong> #${payment.id.slice(0, 8).toUpperCase()}</div>
-                <div class="meta-item"><strong>Date:</strong> ${payment.date?.toDate ? payment.date.toDate().toLocaleDateString() : new Date(payment.date).toLocaleDateString()}</div>
+                <div class="meta-item"><strong>Date:</strong> ${payment.date?.toDate ? payment.date.toDate().toLocaleDateString('en-GB') : new Date(payment.date).toLocaleDateString('en-GB')}</div>
             </div>
 
             <div class="info-grid">
@@ -497,6 +499,17 @@ export const printPaymentReceipt = ({
                 <div class="amount-label">Amount Received</div>
                 <div class="amount-value">₹${Number(payment.amount).toLocaleString('en-IN')}</div>
             </div>
+
+            ${previousPayment ? `
+            <div style="margin-top: 6mm; padding: 4mm; background: #fdfdfd; border: 1px solid #ddd; border-radius: 2mm;">
+                <h4 style="margin: 0 0 2mm 0; font-size: 11px; color: #666; text-transform: uppercase;">Previous Payment</h4>
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 2mm; font-size: 12px; color: #333;">
+                    <div><strong>Amount:</strong> ₹${Number(previousPayment.amount).toLocaleString('en-IN')}</div>
+                    <div><strong>Date:</strong> ${previousPayment.date?.toDate ? previousPayment.date.toDate().toLocaleDateString('en-GB') : new Date(previousPayment.date).toLocaleDateString('en-GB')}</div>
+                    <div style="grid-column: span 2;"><strong>Remarks:</strong> ${previousPayment.remarks || "No remarks provided"}</div>
+                </div>
+            </div>
+            ` : ''}
 
             <div class="ledger-summary">
                 <h4 style="margin: 0 0 4mm 0; font-size: 14px; text-transform: uppercase; border-bottom: 2px solid #eee; padding-bottom: 2mm;">Account Summary</h4>

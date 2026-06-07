@@ -93,7 +93,7 @@ export async function GET(req: NextRequest) {
             });
         });
 
-        await adminRtdb.ref("master").set({ villages, classes, sections, subjects, classSections, classSubjects, subjectTeachers, branding: { schoolName: "Spoorthy Concept School", address: "Hyderabad Campus" } });
+        await adminRtdb.ref("master").set({ villages, classes, sections, subjects, classSections, classSubjects, subjectTeachers, branding: { schoolName: "Spoorthy High School", address: "Hyderabad Campus" } });
 
         // Save teachers and staff directly to Firestore
         const facultyBatch = adminDb.batch();

@@ -81,7 +81,7 @@ export default function StudentNoticesPage() {
         }
     };
 
-    if (loading) {
+    if (loading && notices.length === 0) {
         return (
             <div className="flex h-[50vh] items-center justify-center">
                 <Loader2 className="w-8 h-8 animate-spin text-[#64FFDA]" />
@@ -320,7 +320,7 @@ export default function StudentNoticesPage() {
                                                         <>
                                                             <span className="w-1.5 h-1.5 rounded-full bg-neutral-600" />
                                                             <span className="text-amber-400">
-                                                                {new Date(n.startDate.seconds * 1000).toLocaleDateString()}
+                                                                {new Date(n.startDate.seconds * 1000).toLocaleDateString('en-GB')}
                                                             </span>
                                                         </>
                                                     )}

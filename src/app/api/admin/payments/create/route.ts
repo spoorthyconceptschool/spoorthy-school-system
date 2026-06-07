@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { adminDb } from "@/lib/firebase-admin";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
 
 export async function POST(request: Request) {
     try {
@@ -8,10 +8,24 @@ export async function POST(request: Request) {
             return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
         }
 
-        // Normally decode verifyIdToken(token) here, but assuming valid since middleware/layout protects
+        const token = authHeader.split("Bearer ")[1];
+        const decodedToken = await adminAuth.verifyIdToken(token);
+        const callerUid = decodedToken.uid;
+
+        // Fetch users/{uid} to get role and schoolId
+        const userDoc = await adminDb.collection("users").doc(callerUid).get();
+        const userData = userDoc.exists ? userDoc.data() : null;
+        const callerRole = userData?.role || decodedToken.role || "";
+        const callerSchoolId = userData?.schoolId || "";
 
         const body = await request.json();
         const { studentId, studentName, amount, method, date, remarks, adminId, currentYearId: passedYear } = body;
+
+        let finalRemarks = remarks || "";
+        if (callerRole === "MANAGER" || callerRole === "manager") {
+            const managerGlow = ` [Collected by Manager: ${callerSchoolId || decodedToken.email}]`;
+            finalRemarks = finalRemarks ? `${finalRemarks}${managerGlow}` : managerGlow.trim();
+        }
 
         if (!studentId || !amount || amount <= 0) {
             return NextResponse.json({ success: false, error: "Invalid payment details" }, { status: 400 });
@@ -68,9 +82,9 @@ export async function POST(request: Request) {
                 method,
                 date: new Date(date),
                 status: "success",
-                remarks: remarks || "",
+                remarks: finalRemarks,
                 createdAt: new Date(),
-                verifiedBy: adminId || "admin",
+                verifiedBy: (callerRole === "MANAGER" || callerRole === "manager") ? `manager:${callerSchoolId || decodedToken.email}` : (adminId || "admin"),
                 type: "credit",
                 academicYear: currentYearId
             });

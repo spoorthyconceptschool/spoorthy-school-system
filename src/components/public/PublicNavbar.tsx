@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import Link from 'next/link';
+import Image from 'next/image';
 import { motion, useScroll, useMotionValueEvent, AnimatePresence } from 'framer-motion';
 import { Menu, X, ArrowRight } from 'lucide-react';
 import { usePathname } from 'next/navigation';
@@ -44,9 +45,11 @@ export function PublicNavbar({ initialBranding }: { initialBranding: any }) {
                         <Link href="/" className="flex items-center gap-3 md:gap-4 group z-50 relative shrink-0 min-w-0">
                             <div className="relative w-10 h-10 min-w-[40px] md:w-12 md:min-w-[48px] md:h-12 lg:w-14 lg:h-14 lg:min-w-[56px] overflow-hidden rounded-xl bg-transparent group-hover:scale-105 transition-transform duration-500 shadow-xl shrink-0 flex items-center justify-center">
                                 {initialBranding.schoolLogo && !imageError ? (
-                                    <img
+                                    <Image
                                         src={initialBranding.schoolLogo}
                                         alt={initialBranding.schoolName || "Logo"}
+                                        width={56}
+                                        height={56}
                                         className="w-full h-full object-contain filter drop-shadow-sm"
                                         onError={() => setImageError(true)}
                                     />
@@ -58,7 +61,7 @@ export function PublicNavbar({ initialBranding }: { initialBranding: any }) {
                             </div>
                             <div className="flex flex-col justify-center overflow-hidden min-w-0">
                                 <span className="font-display font-black text-lg md:text-2xl lg:text-3xl tracking-tight text-white group-hover:text-accent transition-colors leading-tight truncate">
-                                    {initialBranding.schoolName || "Spoorthy Concept School"}
+                                    {initialBranding.schoolName || "Spoorthy High School"}
                                 </span>
                             </div>
                         </Link>

@@ -4,9 +4,10 @@ import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
 import { Loader2 } from "lucide-react";
-import { Sidebar } from "@/components/admin/sidebar";
 import { TopBar } from "@/components/admin/topbar";
 import { BottomNav } from "@/components/layout/bottom-nav";
+import { cn } from "@/lib/utils";
+import { useSidebarStore } from "@/lib/sidebar-store";
 
 import { AuthenticatedProvider } from "@/components/providers/AuthenticatedProvider";
 
@@ -27,8 +28,10 @@ function AdminContent({ children }: { children: React.ReactNode }) {
 
         // Verify Role
         if (userData && userData.role) {
-            const r = userData.role;
-            if (r === "TEACHER") {
+            const r = String(userData.role).toUpperCase();
+            if (["SUPER_ADMIN", "SUPERADMIN"].includes(r)) {
+                router.replace("/super-admin");
+            } else if (r === "TEACHER") {
                 router.replace("/teacher");
             } else if (r === "STUDENT") {
                 router.replace("/student");
@@ -49,20 +52,22 @@ function AdminContent({ children }: { children: React.ReactNode }) {
         );
     }
 
+    const { isOpen } = useSidebarStore();
+
     // Brief loading state while auth resolves
     const isAuthenticating = loading && !userData;
 
     return (
-        <div className="flex h-[100dvh] bg-gradient-to-br from-[#0A192F] via-[#112240] to-[#0A192F] text-foreground font-sans overflow-hidden">
-            {/* Desktop Sidebar - Persistent shell */}
-            <div className="hidden md:flex h-full shrink-0">
-                <Sidebar />
-            </div>
-
-            {/* Main Application Shell - Always stable */}
-            <div className="flex-1 flex flex-col relative min-w-0 overflow-hidden">
-                <TopBar />
-                <main className="flex-1 py-4 md:py-6 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20 pb-20 md:pb-6">
+        <div className="flex flex-col h-[100dvh] bg-gradient-to-br from-[#0A192F] via-[#112240] to-[#0A192F] text-foreground font-sans overflow-hidden">
+            {/* Full-width Top Header */}
+            <TopBar />
+            
+            {/* Content Area below header */}
+            <div className="flex-1 flex relative min-w-0 overflow-hidden">
+                <main className={cn(
+                    "flex-1 py-4 md:py-6 overflow-y-auto scrollbar-thin scrollbar-thumb-white/10 hover:scrollbar-thumb-white/20 pb-20 md:pb-6 transition-all duration-300",
+                    isOpen && "md:pl-[190px]"
+                )}>
                     <div className="w-full space-y-4 md:space-y-6">
                         {isAuthenticating ? (
                             <div className="h-full w-full flex flex-col items-center justify-center p-20">

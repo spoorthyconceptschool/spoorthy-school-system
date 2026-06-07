@@ -2,8 +2,10 @@ import { Hero } from "@/components/landing/Hero";
 import { ContactBand, Facilities, GalleryPreview, Leadership, Testimonials, WhyUs, Footer } from "@/components/landing/Sections";
 import { getPublicHeroContent, getPublicSectionsContent } from "@/lib/services/public-data";
 
-// Zero-Latency Pillar: SSG
-export const revalidate = 3600; // Revalidate every hour
+// Force dynamic rendering to keep CMS content constantly in sync
+export const revalidate = 0;
+export const dynamic = "force-dynamic";
+
 
 export default async function LandingPage() {
     const [heroContent, sectionsContent] = await Promise.all([

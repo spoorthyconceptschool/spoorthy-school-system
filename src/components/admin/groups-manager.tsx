@@ -207,6 +207,7 @@ export function GroupsManager() {
             const formData = new FormData();
             formData.append("file", file);
             formData.append("type", "house_symbol");
+            if (formSymbol) formData.append("oldUrl", formSymbol);
 
             const res = await fetch("/api/admin/media/upload", {
                 method: "POST",
@@ -484,7 +485,7 @@ export function GroupsManager() {
                     </div>
                 </div>
                 <div class="meta">
-                    Generated on ${new Date().toLocaleDateString()} &bull; ${selectedClasses.length > 0 ? 'Fitered List' : 'Full House List'}
+                    Generated on ${new Date().toLocaleDateString('en-GB')} &bull; ${selectedClasses.length > 0 ? 'Fitered List' : 'Full House List'}
                 </div>
                 
                 <div class="leadership">

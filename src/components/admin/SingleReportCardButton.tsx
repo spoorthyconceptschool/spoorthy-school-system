@@ -290,7 +290,7 @@ export function SingleReportCardButton({ exam, student }: SingleReportCardButton
                         <div class="header">
                             ${branding?.schoolLogo ? `<img src="${branding.schoolLogo}" class="logo" />` : ''}
                             <div class="header-content">
-                                <h1 class="school-name">${branding?.schoolName || "Spoorthy Concept School"}</h1>
+                                <h1 class="school-name">${branding?.schoolName || "Spoorthy High School"}</h1>
                                 <div class="sub-header">Official Academic Record</div>
                                 <div class="document-title">Scholastic Performance Report</div>
                             </div>
@@ -311,7 +311,7 @@ export function SingleReportCardButton({ exam, student }: SingleReportCardButton
                                 <div class="data-card">
                                     <div class="data-row"><span class="label">Examination</span> <span class="value">${exam.name}</span></div>
                                     <div class="data-row"><span class="label">Session</span> <span class="value">2025-2026</span></div>
-                                    <div class="data-row"><span class="label">Issue Date</span> <span class="value">${new Date().toLocaleDateString()}</span></div>
+                                    <div class="data-row"><span class="label">Issue Date</span> <span class="value">${new Date().toLocaleDateString('en-GB')}</span></div>
                                 </div>
                             </div>
                         </div>

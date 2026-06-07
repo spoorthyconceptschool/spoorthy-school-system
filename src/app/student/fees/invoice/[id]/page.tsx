@@ -94,7 +94,7 @@ export default function InvoicePage() {
                             <p className="opacity-80 mt-1 text-sm font-mono tracking-wider">#{transaction.transactionId}</p>
                         </div>
                         <div className="text-right">
-                            <h2 className="text-xl font-bold">Spoorthy Concept School</h2>
+                            <h2 className="text-xl font-bold">Spoorthy High School</h2>
                             <p className="text-sm opacity-80 mt-1">
                                 Survey No. 123, Edu City<br />
                                 Ongole, Andhra Pradesh - 523001<br />

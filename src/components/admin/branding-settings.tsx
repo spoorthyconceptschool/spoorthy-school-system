@@ -10,9 +10,14 @@ import { Loader2, Upload, Save, Image as ImageIcon, Building2, CheckCircle2, Rot
 import { toast } from "@/lib/toast-store";
 import { useMasterData } from "@/context/MasterDataContext";
 
-export function BrandingSettingsV2() {
+import { useAuth } from "@/context/AuthContext";
+import { branchService } from "@/lib/services/branchService";
+
+export function BrandingSettingsV2({ branchAdminMode = false, branchId }: { branchAdminMode?: boolean, branchId?: string }) {
     const { branding } = useMasterData();
+    const { userData } = useAuth();
     const [saving, setSaving] = useState(false);
+    const [isLoadingBranch, setIsLoadingBranch] = useState(false);
 
     // Form State
     const [schoolName, setSchoolName] = useState("");
@@ -37,36 +42,65 @@ export function BrandingSettingsV2() {
     const [manualSig, setManualSig] = useState(false);
 
     useEffect(() => {
-        // Only initialize form from DB if we aren't currently saving
-        // AND if the form hasn't been touched yet (all fields empty)
-        // or if we explicitly want to refresh data
         const isFormPristine = !schoolName && !address && !logoUrl && !signatureUrl;
-        const isPrefixPristine = studentIdPrefix === "SCS" && teacherIdPrefix === "SHST" && studentIdSuffix === 1 && teacherIdSuffix === 1;
+        
+        const fetchBranchData = async (bId: string) => {
+            setIsLoadingBranch(true);
+            try {
+                const b = await branchService.getBranchById(bId);
+                if (b && isFormPristine) {
+                    setSchoolName(b.schoolName || "");
+                    setAddress(b.address || "");
+                    setSignatureUrl(b.principalSignature || "");
+                    setStudentIdPrefix(b.studentIdPrefix || "SCS");
+                    setTeacherIdPrefix(b.teacherIdPrefix || "SHST");
+                    setStudentIdSuffix(b.studentIdSuffix || 1);
+                    setTeacherIdSuffix(b.teacherIdSuffix || 1);
+                }
+            } catch (e) {
+                console.error("Failed to load branch data", e);
+            } finally {
+                setIsLoadingBranch(false);
+            }
+        };
+
+        const isGlobalOnly = !branchAdminMode && !branchId;
 
         if (branding && (isFormPristine || !saving)) {
-            // If the user hasn't typed anything yet, or we're not saving, sync from DB
-            // However, to prevent overwriting WIP typing, we only do this when branding actually CHANGES
-            // and we're not focused on the fields. 
-            // For simplicity: only initialize if fields are empty
-            if (isFormPristine) {
-                setSchoolName(branding.schoolName || "");
-                setAddress(branding.address || "");
-                setLogoUrl(branding.schoolLogo || "");
-                setSignatureUrl(branding.principalSignature || "");
-                setStudentIdPrefix(branding.studentIdPrefix || "SCS");
-                setTeacherIdPrefix(branding.teacherIdPrefix || "SHST");
-                setStudentIdSuffix(branding.studentIdSuffix || 1);
-                setTeacherIdSuffix(branding.teacherIdSuffix || 1);
+            if (isGlobalOnly) {
+                // Global HQ mode: just logo
+                if (isFormPristine) {
+                    setLogoUrl(branding.schoolLogo || "");
+                }
+            } else {
+                // Branch mode
+                if (isFormPristine) {
+                    setLogoUrl(branding.schoolLogo || ""); // Logo is always global
+                }
+                const targetBranch = branchId || userData?.schoolId;
+                if (targetBranch && targetBranch !== "global") {
+                    fetchBranchData(targetBranch);
+                } else if (targetBranch === "global" && isFormPristine) {
+                     // Fallback for global admin without branch
+                    setSchoolName(branding.schoolName || "");
+                    setAddress(branding.address || "");
+                    setSignatureUrl(branding.principalSignature || "");
+                    setStudentIdPrefix(branding.studentIdPrefix || "SCS");
+                    setTeacherIdPrefix(branding.teacherIdPrefix || "SHST");
+                    setStudentIdSuffix(branding.studentIdSuffix || 1);
+                    setTeacherIdSuffix(branding.teacherIdSuffix || 1);
+                }
             }
         }
-    }, [branding, saving, schoolName, address, logoUrl, signatureUrl]);
+    }, [branding, saving, branchAdminMode, branchId, userData?.schoolId]);
 
     // SMARTER UPLOAD: Uses internal API which fallbacks between MediaVault and Firebase
-    const performSafeUpload = async (file: File, type: string) => {
+    const performSafeUpload = async (file: File, type: string, oldUrl?: string) => {
         const token = await auth.currentUser?.getIdToken();
         const formData = new FormData();
         formData.append("file", file);
         formData.append("type", type);
+        if (oldUrl) formData.append("oldUrl", oldUrl);
 
         const res = await fetch("/api/admin/media/upload", {
             method: "POST",
@@ -86,6 +120,8 @@ export function BrandingSettingsV2() {
 
     const handleFileUpload = async (file: File, type: 'logo' | 'signature') => {
         const isLogo = type === 'logo';
+        const oldUrl = isLogo ? logoUrl : signatureUrl;
+        
         if (isLogo) {
             setLogoUploading(true);
             setLogoPreview(URL.createObjectURL(file));
@@ -95,7 +131,7 @@ export function BrandingSettingsV2() {
         }
 
         try {
-            const downloadUrl = await performSafeUpload(file, type);
+            const downloadUrl = await performSafeUpload(file, type, oldUrl);
             if (isLogo) {
                 setLogoUrl(downloadUrl);
                 toast({ title: "Logo Ready", description: "Cloud storage sync complete.", type: "success" });
@@ -158,6 +194,7 @@ export function BrandingSettingsV2() {
                 method: "POST",
                 headers: { "Content-Type": "application/json", "Authorization": `Bearer ${token}` },
                 body: JSON.stringify({
+                    branchId: branchId || (branchAdminMode ? userData?.schoolId : "global"),
                     schoolName,
                     address,
                     schoolLogo: logoUrl,
@@ -192,6 +229,8 @@ export function BrandingSettingsV2() {
         studentIdSuffix !== (branding.studentIdSuffix || 1) ||
         teacherIdSuffix !== (branding.teacherIdSuffix || 1);
 
+    const isGlobalOnly = !branchAdminMode && !branchId;
+
     return (
         <Card className="bg-zinc-900/40 border-white/10 overflow-hidden shadow-2xl relative backdrop-blur-xl ring-1 ring-white/5">
             {(saving || logoUploading || sigUploading) && (
@@ -206,154 +245,163 @@ export function BrandingSettingsV2() {
                         <Building2 className="w-5 h-5 text-indigo-400" />
                     </div>
                     <div>
-                        <CardTitle className="text-base md:text-lg font-bold text-white tracking-tight">Organization Identity</CardTitle>
-                        <CardDescription className="text-zinc-400 text-xs mt-0.5">Manage official school branding and assets.</CardDescription>
+                        <CardTitle className="text-base md:text-lg font-bold text-white tracking-tight">
+                            {isGlobalOnly ? "Global Organization Identity" : "Branch Settings"}
+                        </CardTitle>
+                        <CardDescription className="text-zinc-400 text-xs mt-0.5">
+                            {isGlobalOnly ? "Manage global school branding." : "Manage branch-specific details and signatures."}
+                        </CardDescription>
                     </div>
                 </div>
             </CardHeader>
 
             <CardContent className="p-4 md:p-6 space-y-6">
-                <div className="grid md:grid-cols-2 gap-4 md:gap-6 pb-4 md:pb-6 border-b border-white/5">
-                    <div className="space-y-2">
-                        <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
-                            School Name
-                        </Label>
-                        <Input
-                            value={schoolName}
-                            onChange={e => setSchoolName(e.target.value)}
-                            className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700"
-                            placeholder="e.g. Spoorthy Concept School"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
-                            Address Line
-                        </Label>
-                        <Input
-                            value={address}
-                            onChange={e => setAddress(e.target.value)}
-                            className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700"
-                            placeholder="City, State, Country"
-                        />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
-                            Student ID Prefix
-                        </Label>
-                        <Input
-                            value={studentIdPrefix}
-                            onChange={e => setStudentIdPrefix(e.target.value.toUpperCase())}
-                            className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700 font-mono"
-                            placeholder="e.g. SCS"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
-                            Teacher ID Prefix
-                        </Label>
-                        <Input
-                            value={teacherIdPrefix}
-                            onChange={e => setTeacherIdPrefix(e.target.value.toUpperCase())}
-                            className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700 font-mono"
-                            placeholder="e.g. SHST"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
-                            Student ID Starting Number
-                        </Label>
-                        <Input
-                            type="number"
-                            min="1"
-                            value={studentIdSuffix}
-                            onChange={e => setStudentIdSuffix(parseInt(e.target.value) || 1)}
-                            className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700 font-mono"
-                            placeholder="e.g. 1000"
-                        />
-                    </div>
-                    <div className="space-y-2">
-                        <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
-                            Teacher ID Starting Number
-                        </Label>
-                        <Input
-                            type="number"
-                            min="1"
-                            value={teacherIdSuffix}
-                            onChange={e => setTeacherIdSuffix(parseInt(e.target.value) || 1)}
-                            className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700 font-mono"
-                            placeholder="e.g. 100"
-                        />
-                    </div>
-                </div>
-
-                <div className="grid grid-cols-2 gap-4 md:gap-8">
-                    {/* Logo Section */}
-                    <div className="space-y-3">
-                        <div className="flex justify-between items-center">
-                            <Label className="text-xs md:text-sm font-semibold text-zinc-300">School Logo</Label>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setManualLogo(!manualLogo)}
-                                className="text-[10px] font-medium text-zinc-500 hover:text-indigo-400 h-6 px-2 hover:bg-transparent"
-                            >
-                                {manualLogo ? "Upload File" : "Paste URL"}
-                            </Button>
+                {!isGlobalOnly && (
+                    <div className="grid md:grid-cols-2 gap-4 md:gap-6 pb-4 md:pb-6 border-b border-white/5">
+                        <div className="space-y-2">
+                            <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                                School Name
+                            </Label>
+                            <Input
+                                value={schoolName}
+                                onChange={e => setSchoolName(e.target.value)}
+                                className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700"
+                                placeholder="e.g. Spoorthy High School"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                                Address Line
+                            </Label>
+                            <Input
+                                value={address}
+                                onChange={e => setAddress(e.target.value)}
+                                className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700"
+                                placeholder="City, State, Country"
+                            />
                         </div>
 
-                        {manualLogo ? (
+                        <div className="space-y-2">
+                            <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                                Student ID Prefix
+                            </Label>
                             <Input
-                                value={logoUrl}
-                                onChange={e => setLogoUrl(e.target.value)}
-                                className="bg-zinc-950/50 border-white/10 h-10 rounded-lg font-mono text-[10px] md:text-xs text-zinc-300"
-                                placeholder="https://..."
+                                value={studentIdPrefix}
+                                onChange={e => setStudentIdPrefix(e.target.value.toUpperCase())}
+                                className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700 font-mono"
+                                placeholder="e.g. SCS"
                             />
-                        ) : (
-                            <div className="border border-dashed border-zinc-700/50 rounded-xl p-4 flex flex-col items-center justify-center gap-3 bg-zinc-900/30 hover:bg-zinc-900/50 hover:border-indigo-500/30 transition-all relative group h-32 md:h-48 overflow-hidden">
-                                <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:8px_8px] pointer-events-none" />
-
-                                <div className="w-16 h-16 md:w-24 md:h-24 relative flex items-center justify-center bg-zinc-950 rounded-xl border border-white/5 shadow-inner">
-                                    {logoPreview || logoUrl ? (
-                                        <div className="relative w-full h-full p-2">
-                                            <img src={logoPreview || logoUrl} alt="Logo" className="w-full h-full object-contain" />
-                                            {!logoUploading && logoUrl && (
-                                                <div className="absolute -bottom-1 -right-1 bg-emerald-500 rounded-full p-0.5 shadow-lg ring-2 ring-black">
-                                                    <CheckCircle2 className="w-3 h-3 text-white" />
-                                                </div>
-                                            )}
-                                        </div>
-                                    ) : (
-                                        <ImageIcon className="w-8 h-8 md:w-10 md:h-10 text-zinc-800" />
-                                    )}
-                                </div>
-
-                                {logoUploading && (
-                                    <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-xl">
-                                        <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
-                                    </div>
-                                )}
-
-                                {!logoUploading && (
-                                    <Button variant="secondary" size="sm" className="relative pointer-events-none h-7 md:h-9 px-3 text-[10px] md:text-xs bg-zinc-800 text-zinc-300 border border-white/5 shadow-sm">
-                                        <Upload className="w-3 h-3 mr-1.5" />
-                                        <span className="hidden md:inline">Select File</span> <span className="md:hidden">Upload</span>
-                                    </Button>
-                                )}
-
-                                <input
-                                    type="file"
-                                    accept="image/*"
-                                    className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
-                                    onChange={(e) => handleFileChange(e, 'logo')}
-                                    disabled={logoUploading}
-                                />
-                            </div>
-                        )}
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                                Teacher ID Prefix
+                            </Label>
+                            <Input
+                                value={teacherIdPrefix}
+                                onChange={e => setTeacherIdPrefix(e.target.value.toUpperCase())}
+                                className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700 font-mono"
+                                placeholder="e.g. SHST"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                                Student ID Starting Number
+                            </Label>
+                            <Input
+                                type="number"
+                                min="1"
+                                value={studentIdSuffix}
+                                onChange={e => setStudentIdSuffix(parseInt(e.target.value) || 1)}
+                                className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700 font-mono"
+                                placeholder="e.g. 1000"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                                Teacher ID Starting Number
+                            </Label>
+                            <Input
+                                type="number"
+                                min="1"
+                                value={teacherIdSuffix}
+                                onChange={e => setTeacherIdSuffix(parseInt(e.target.value) || 1)}
+                                className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700 font-mono"
+                                placeholder="e.g. 100"
+                            />
+                        </div>
                     </div>
+                )}
+
+                <div className={`grid ${isGlobalOnly ? 'grid-cols-1' : 'grid-cols-2'} gap-4 md:gap-8`}>
+                    {/* Logo Section */}
+                    {isGlobalOnly && (
+                        <div className="space-y-3">
+                            <div className="flex justify-between items-center">
+                                <Label className="text-xs md:text-sm font-semibold text-zinc-300">School Logo</Label>
+                                <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    onClick={() => setManualLogo(!manualLogo)}
+                                    className="text-[10px] font-medium text-zinc-500 hover:text-indigo-400 h-6 px-2 hover:bg-transparent"
+                                >
+                                    {manualLogo ? "Upload File" : "Paste URL"}
+                                </Button>
+                            </div>
+
+                            {manualLogo ? (
+                                <Input
+                                    value={logoUrl}
+                                    onChange={e => setLogoUrl(e.target.value)}
+                                    className="bg-zinc-950/50 border-white/10 h-10 rounded-lg font-mono text-[10px] md:text-xs text-zinc-300"
+                                    placeholder="https://..."
+                                />
+                            ) : (
+                                <div className="border border-dashed border-zinc-700/50 rounded-xl p-4 flex flex-col items-center justify-center gap-3 bg-zinc-900/30 hover:bg-zinc-900/50 hover:border-indigo-500/30 transition-all relative group h-32 md:h-48 overflow-hidden">
+                                    <div className="absolute inset-0 opacity-[0.03] bg-[radial-gradient(#fff_1px,transparent_1px)] [background-size:8px_8px] pointer-events-none" />
+
+                                    <div className="w-16 h-16 md:w-24 md:h-24 relative flex items-center justify-center bg-zinc-950 rounded-xl border border-white/5 shadow-inner">
+                                        {logoPreview || logoUrl ? (
+                                            <div className="relative w-full h-full p-2">
+                                                <img src={logoPreview || logoUrl} alt="Logo" className="w-full h-full object-contain" />
+                                                {!logoUploading && logoUrl && (
+                                                    <div className="absolute -bottom-1 -right-1 bg-emerald-500 rounded-full p-0.5 shadow-lg ring-2 ring-black">
+                                                        <CheckCircle2 className="w-3 h-3 text-white" />
+                                                    </div>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <ImageIcon className="w-8 h-8 md:w-10 md:h-10 text-zinc-800" />
+                                        )}
+                                    </div>
+
+                                    {logoUploading && (
+                                        <div className="absolute inset-0 bg-black/60 backdrop-blur-[2px] z-10 flex items-center justify-center rounded-xl">
+                                            <Loader2 className="w-6 h-6 animate-spin text-indigo-500" />
+                                        </div>
+                                    )}
+
+                                    {!logoUploading && (
+                                        <Button variant="secondary" size="sm" className="relative pointer-events-none h-7 md:h-9 px-3 text-[10px] md:text-xs bg-zinc-800 text-zinc-300 border border-white/5 shadow-sm">
+                                            <Upload className="w-3 h-3 mr-1.5" />
+                                            <span className="hidden md:inline">Select File</span> <span className="md:hidden">Upload</span>
+                                        </Button>
+                                    )}
+
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        className="absolute inset-0 w-full h-full opacity-0 cursor-pointer z-20"
+                                        onChange={(e) => handleFileChange(e, 'logo')}
+                                        disabled={logoUploading}
+                                    />
+                                </div>
+                            )}
+                        </div>
+                    )}
 
                     {/* Signature Section */}
-                    <div className="space-y-3">
+                    {!isGlobalOnly && (
+                        <div className="space-y-3">
                         <div className="flex justify-between items-center">
                             <Label className="text-xs md:text-sm font-semibold text-zinc-300">Principal Signature</Label>
                             <Button
@@ -415,44 +463,47 @@ export function BrandingSettingsV2() {
                             </div>
                         )}
                     </div>
+                    )}
                 </div>
 
                 <div className="flex flex-col md:flex-row justify-between items-center gap-4 pt-4 border-t border-white/5">
                     <div className="flex items-center gap-4 w-full md:w-auto">
-                        {!showMigrateConfirm ? (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                disabled={migrating || saving}
-                                onClick={() => setShowMigrateConfirm(true)}
-                                className="border-indigo-500/20 text-indigo-400 bg-indigo-500/5 hover:bg-indigo-500/10 h-10 px-4 rounded-xl flex items-center justify-center gap-2 group transition-all w-full md:w-auto"
-                            >
-                                <Loader2 className={`w-4 h-4 ${migrating ? "animate-spin" : ""}`} />
-                                <span className="text-[10px] font-bold uppercase tracking-wider">Sync Profiles</span>
-                            </Button>
-                        ) : (
-                            <div className="flex items-center gap-3 bg-amber-500/10 p-2 pl-3 rounded-xl border border-amber-500/20 w-full md:w-auto justify-between">
-                                <span className="text-[10px] font-bold text-amber-500 uppercase tracking-tighter">Sync IDs now?</span>
-                                <div className="flex gap-1.5">
-                                    <Button
-                                        size="sm"
-                                        onClick={handleMigrate}
-                                        disabled={migrating}
-                                        className="bg-amber-500 hover:bg-amber-600 text-black h-7 px-3 text-[10px] font-bold uppercase rounded-lg"
-                                    >
-                                        {migrating ? <Loader2 className="w-3 h-3 animate-spin" /> : "Confirm"}
-                                    </Button>
-                                    <Button
-                                        variant="ghost"
-                                        size="sm"
-                                        onClick={() => setShowMigrateConfirm(false)}
-                                        disabled={migrating}
-                                        className="text-zinc-400 hover:text-white h-7 px-2 text-[10px] font-bold uppercase"
-                                    >
-                                        Cancel
-                                    </Button>
+                        {!isGlobalOnly && (
+                            !showMigrateConfirm ? (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    disabled={migrating || saving}
+                                    onClick={() => setShowMigrateConfirm(true)}
+                                    className="border-indigo-500/20 text-indigo-400 bg-indigo-500/5 hover:bg-indigo-500/10 h-10 px-4 rounded-xl flex items-center justify-center gap-2 group transition-all w-full md:w-auto"
+                                >
+                                    <Loader2 className={`w-4 h-4 ${migrating ? "animate-spin" : ""}`} />
+                                    <span className="text-[10px] font-bold uppercase tracking-wider">Sync Profiles</span>
+                                </Button>
+                            ) : (
+                                <div className="flex items-center gap-3 bg-amber-500/10 p-2 pl-3 rounded-xl border border-amber-500/20 w-full md:w-auto justify-between">
+                                    <span className="text-[10px] font-bold text-amber-500 uppercase tracking-tighter">Sync IDs now?</span>
+                                    <div className="flex gap-1.5">
+                                        <Button
+                                            size="sm"
+                                            onClick={handleMigrate}
+                                            disabled={migrating}
+                                            className="bg-amber-500 hover:bg-amber-600 text-black h-7 px-3 text-[10px] font-bold uppercase rounded-lg"
+                                        >
+                                            {migrating ? <Loader2 className="w-3 h-3 animate-spin" /> : "Confirm"}
+                                        </Button>
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => setShowMigrateConfirm(false)}
+                                            disabled={migrating}
+                                            className="text-zinc-400 hover:text-white h-7 px-2 text-[10px] font-bold uppercase"
+                                        >
+                                            Cancel
+                                        </Button>
+                                    </div>
                                 </div>
-                            </div>
+                            )
                         )}
                     </div>
 

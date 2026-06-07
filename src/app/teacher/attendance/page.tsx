@@ -5,19 +5,15 @@ import { collection, query, where, getDocs, limit } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useMasterData } from "@/context/MasterDataContext";
 import { useAuth } from "@/context/AuthContext";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { Loader2, AlertCircle } from "lucide-react";
+import { Loader2, AlertCircle, ChevronDown, BookOpen } from "lucide-react";
+import { cn } from "@/lib/utils";
 import AttendanceManager from "@/components/attendance/attendance-manager";
 
 /**
- * MarkAttendancePage Component
- * 
- * Provides a dedicated interface for teachers to record student attendance.
- * Dynamically resolves accessible classes by combining explicit "Class Teacher"
- * roles from RTDB and "Subject Teacher" assignments from the master registry.
- * 
- * @returns {JSX.Element} The rendered attendance management view.
+ * MarkAttendancePage — Ultra-compact daily attendance interface.
+ * Header is compressed to ~80px. Class + date selector in a single row.
+ * The AttendanceManager fills all remaining vertical space.
  */
 export default function MarkAttendancePage() {
     const { user, userData } = useAuth();
@@ -25,13 +21,13 @@ export default function MarkAttendancePage() {
     const [teacher, setTeacher] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [selectedClassKey, setSelectedClassKey] = useState("");
+    const [classDropdownOpen, setClassDropdownOpen] = useState(false);
 
     const today = new Date().toISOString().split('T')[0];
+    const todayLabel = new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' });
 
     useEffect(() => {
-        if (user && userData?.schoolId) {
-            fetchTeacher();
-        }
+        if (user && userData?.schoolId) fetchTeacher();
     }, [user, userData]);
 
     const fetchTeacher = async () => {
@@ -40,21 +36,15 @@ export default function MarkAttendancePage() {
         try {
             let q = query(collection(db, "teachers"), where("schoolId", "==", userData.schoolId), limit(1));
             let snap = await getDocs(q);
-
             if (snap.empty && user?.uid) {
                 q = query(collection(db, "teachers"), where("uid", "==", user.uid), limit(1));
                 snap = await getDocs(q);
             }
-
             if (!snap.empty) {
                 const tData = { id: snap.docs[0].id, ...snap.docs[0].data() };
                 setTeacher(tData);
-
-                // Initial Selection
                 const authorized = getAuthorizedClasses(tData);
-                if (authorized.length > 0) {
-                    setSelectedClassKey(authorized[0].key);
-                }
+                if (authorized.length > 0) setSelectedClassKey(authorized[0].key);
             }
         } catch (e: any) {
             console.warn("[Attendance] Teacher fetch error:", e.message);
@@ -63,117 +53,148 @@ export default function MarkAttendancePage() {
         }
     };
 
-    /**
-     * Resolves the set of classes for which the current teacher is authorized
-     * to perform attendance operations.
-     * 
-     * @param {any} tProfile - The base Firestore profile of the teacher.
-     * @returns {Array<{classId: string, sectionId: string, key: string, isClassTeacher: boolean}>} 
-     *          List of authorized class objects.
-     */
     const getAuthorizedClasses = (tProfile: any) => {
         if (!tProfile || !classSections) return [];
         const tId = tProfile.schoolId;
         const tDocId = tProfile.id;
         const set = new Map<string, { classId: string, sectionId: string, key: string, isClassTeacher: boolean }>();
 
-        // 1. Classes where I am Class Teacher (Dynamic from RTDB)
         Object.values(classSections).forEach((cs: any) => {
             if (!cs) return;
             const isMatch = (tId && cs.classTeacherId === tId) || (tDocId && cs.classTeacherId === tDocId);
-            if (isMatch && cs.isActive !== false) {
+            if (isMatch && cs.isActive !== false)
                 set.set(cs.id, { classId: cs.classId || "", sectionId: cs.sectionId || "", key: cs.id, isClassTeacher: true });
-            }
         });
 
-        // 2. Classes where I am Subject Teacher (Dynamic from RTDB)
         if (subjectTeachers) {
             Object.keys(subjectTeachers).forEach(key => {
                 const subjectsObj = subjectTeachers[key];
                 if (!subjectsObj || typeof subjectsObj !== 'object') return;
                 const teacherIds = Object.values(subjectsObj);
                 const isMatch = (tId && teacherIds.includes(tId)) || (tDocId && teacherIds.includes(tDocId));
-
                 if (isMatch) {
-                    // BUG FIX: Don't split by underscore as IDs often contain them (e.g. CLS_01)
                     const cs = classSections?.[key];
                     const cId = cs?.classId || key.split('_')[0];
                     const sId = cs?.sectionId || key.split('_')[1];
-
-                    if (!set.has(key)) {
-                        set.set(key, { classId: cId, sectionId: sId, key, isClassTeacher: false });
-                    }
+                    if (!set.has(key)) set.set(key, { classId: cId, sectionId: sId, key, isClassTeacher: false });
                 }
             });
         }
-
         return Array.from(set.values());
     };
 
     const { loading: masterLoading } = useMasterData();
-    if (loading || masterLoading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin text-accent" /></div>;
+
 
     const authorizedClasses = getAuthorizedClasses(teacher);
 
-    if (authorizedClasses.length === 0) {
+    if (!loading && !masterLoading && authorizedClasses.length === 0) {
         return (
-            <div className="p-10 text-center space-y-4 max-w-md mx-auto mt-20 bg-black/20 border border-white/10 rounded-3xl backdrop-blur-xl">
-                <div className="w-16 h-16 bg-red-500/10 rounded-full flex items-center justify-center mx-auto mb-6 border border-red-500/20 shadow-lg shadow-red-500/20">
-                    <AlertCircle className="w-8 h-8 text-red-500" />
+            <div className="p-6 text-center max-w-sm mx-auto mt-16 space-y-4">
+                <div className="w-14 h-14 bg-red-500/10 rounded-full flex items-center justify-center mx-auto border border-red-500/20">
+                    <AlertCircle className="w-7 h-7 text-red-400" />
                 </div>
-                <h2 className="text-2xl font-display font-bold text-white">No Classes Assigned</h2>
-                <p className="text-muted-foreground text-sm">You are not currently assigned as a Class Teacher or Subject Teacher for any active classes.</p>
-                <p className="text-[10px] text-muted-foreground/30 uppercase tracking-widest pt-4 font-black">Contact Admin for Access</p>
+                <h2 className="text-base font-black text-white uppercase tracking-wider">No Classes Assigned</h2>
+                <p className="text-xs text-white/40 leading-relaxed">
+                    You are not currently assigned as a Class Teacher or Subject Teacher for any active classes. Contact your Admin.
+                </p>
             </div>
         );
     }
 
     const currentSelection = authorizedClasses.find(c => c.key === selectedClassKey) || authorizedClasses[0] || {};
+    const currentClassName = currentSelection?.classId
+        ? `${classes?.[currentSelection.classId]?.name || currentSelection.classId} - ${sections?.[currentSelection.sectionId]?.name || currentSelection.sectionId}`
+        : "Select Class";
+    const isClassTeacher = authorizedClasses.find(c => c.key === selectedClassKey)?.isClassTeacher;
 
     return (
-        <div className="p-6 md:p-10 lg:p-12 space-y-8 max-w-[1600px] mx-auto animate-in fade-in pb-20">
-            <div className="flex flex-col md:flex-row md:items-end justify-between gap-6 border-b border-white/5 pb-8">
-                <div className="space-y-2">
-                    <h1 className="text-3xl md:text-5xl font-display font-bold bg-gradient-to-r from-white to-white/40 bg-clip-text text-transparent italic leading-tight">
-                        Daily Attendance
-                    </h1>
+        <>
+            <style>{`
+                @media (max-width: 1023px) {
+                    main > div.overflow-y-auto {
+                        padding-bottom: calc(3.5rem + env(safe-area-inset-bottom)) !important;
+                    }
+                }
+            `}</style>
+            <div className="flex flex-col h-full w-full text-[#E6F1FF] bg-transparent">
+                {/* ─── ULTRA-COMPACT HEADER ─── */}
+            <div className="px-2 pt-2 pb-1.5 border-b border-white/5 flex-none space-y-1.5">
+
+                {/* Row 1: Title + Date */}
+                <div className="flex items-center justify-between">
                     <div className="flex items-center gap-2">
-                        <div className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
-                        <p className="text-[10px] md:text-xs text-muted-foreground font-black uppercase tracking-widest opacity-60">
-                            Authorized for {authorizedClasses.length} class{authorizedClasses.length > 1 ? 'es' : ''}
-                        </p>
+                        <div className="w-6 h-6 rounded-md bg-[#10B981]/15 border border-[#10B981]/25 flex items-center justify-center shrink-0">
+                            <BookOpen className="w-3 h-3 text-[#10B981]" />
+                        </div>
+                        <div>
+                            <h1 className="text-sm font-black text-white tracking-tight leading-none uppercase">Daily Attendance</h1>
+                            <div className="flex items-center gap-1 mt-0.5">
+                                <div className="w-1.5 h-1.5 rounded-full bg-[#10B981] animate-pulse" />
+                                <span className="text-[8.5px] text-white/35 font-bold uppercase tracking-widest">
+                                    {authorizedClasses.length} class{authorizedClasses.length > 1 ? 'es' : ''} authorized
+                                </span>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Date chip */}
+                    <div className="flex items-center gap-1 bg-white/5 border border-white/8 rounded-lg px-2.5 py-1">
+                        <span className="text-[9px] font-black text-white/50 uppercase tracking-wider">{todayLabel}</span>
                     </div>
                 </div>
 
-                <div className="flex flex-col md:flex-row items-stretch md:items-center gap-3">
-                    <div className="flex flex-col gap-1">
-                        <label className="text-[8px] font-black uppercase tracking-[0.2em] text-muted-foreground ml-1">Select Active Class</label>
-                        <Select value={selectedClassKey} onValueChange={setSelectedClassKey}>
-                            <SelectTrigger className="w-full md:w-[220px] h-12 bg-white/5 border-white/10 rounded-xl font-bold hover:bg-white/10 transition-all">
-                                <SelectValue placeholder="Select Class" />
-                            </SelectTrigger>
-                            <SelectContent className="bg-[#030712] border-white/10 text-white">
-                                {authorizedClasses.map(c => (
-                                    <SelectItem key={c.key} value={c.key} className="focus:bg-accent focus:text-black font-bold py-3">
-                                        <div className="flex items-center justify-between w-full gap-4">
-                                            <span>{(classes?.[c.classId]?.name || c.classId)} - {(sections?.[c.sectionId]?.name || c.sectionId)}</span>
-                                            {c.isClassTeacher && <Badge className="text-[8px] bg-amber-500 text-black">In-charge</Badge>}
-                                        </div>
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
+                {/* Row 2: Class Selector */}
+                <div className="relative">
+                    <button
+                        id="class-selector-btn"
+                        onClick={() => setClassDropdownOpen(v => !v)}
+                        className="w-full h-9 flex items-center justify-between gap-2 px-3 bg-[#0b172c] border border-white/8 rounded-xl text-left transition-all hover:border-[#10B981]/40 focus:outline-none focus:border-[#10B981]/50"
+                    >
+                        <div className="flex items-center gap-2 min-w-0">
+                            <div className="w-5 h-5 rounded-md bg-[#10B981]/10 flex items-center justify-center shrink-0">
+                                <BookOpen className="w-2.5 h-2.5 text-[#10B981]" />
+                            </div>
+                            <span className="text-xs font-black text-white truncate">{currentClassName}</span>
+                            {isClassTeacher && (
+                                <Badge className="bg-amber-500/15 text-amber-400 border border-amber-500/25 text-[7px] px-1 py-0 rounded font-black shrink-0">In-charge</Badge>
+                            )}
+                        </div>
+                        <ChevronDown className={cn("w-3.5 h-3.5 text-white/40 shrink-0 transition-transform", classDropdownOpen && "rotate-180")} />
+                    </button>
 
-                    <div className="px-5 h-12 flex items-center bg-black/40 border border-white/10 rounded-xl backdrop-blur-md">
-                        <span className="text-xs font-black uppercase tracking-widest text-white/40">
-                            {new Date().toLocaleDateString('en-US', { day: 'numeric', month: 'short', year: 'numeric' })}
-                        </span>
-                    </div>
+                    {/* Dropdown */}
+                    {classDropdownOpen && (
+                        <>
+                            <div className="fixed inset-0 z-40" onClick={() => setClassDropdownOpen(false)} />
+                            <div className="absolute top-full left-0 right-0 mt-1 bg-[#080F1E] border border-white/10 rounded-xl overflow-hidden z-50 shadow-2xl shadow-black/60">
+                                {authorizedClasses.map(c => {
+                                    const label = `${classes?.[c.classId]?.name || c.classId} - ${sections?.[c.sectionId]?.name || c.sectionId}`;
+                                    const active = c.key === selectedClassKey;
+                                    return (
+                                        <button
+                                            key={c.key}
+                                            onClick={() => { setSelectedClassKey(c.key); setClassDropdownOpen(false); }}
+                                            className={cn(
+                                                "w-full flex items-center justify-between gap-2 px-3 py-2.5 text-left transition-all text-xs font-bold",
+                                                active ? "bg-[#10B981]/10 text-[#10B981]" : "text-white/70 hover:bg-white/5 hover:text-white"
+                                            )}
+                                        >
+                                            <span className="truncate">{label}</span>
+                                            {c.isClassTeacher && (
+                                                <Badge className="bg-amber-500/15 text-amber-400 border border-amber-500/25 text-[7px] px-1 py-0 rounded font-black shrink-0">In-charge</Badge>
+                                            )}
+                                        </button>
+                                    );
+                                })}
+                            </div>
+                        </>
+                    )}
                 </div>
             </div>
 
-            <div className="bg-black/20 border border-white/10 rounded-3xl p-2 md:p-6 backdrop-blur-xl shadow-2xl">
+            {/* ─── ATTENDANCE MANAGER (fills remaining space) ─── */}
+            <div className="flex-1 min-h-0 overflow-hidden">
                 <AttendanceManager
                     classId={currentSelection?.classId || ""}
                     sectionId={currentSelection?.sectionId || ""}
@@ -181,5 +202,6 @@ export default function MarkAttendancePage() {
                 />
             </div>
         </div>
+        </>
     );
 }

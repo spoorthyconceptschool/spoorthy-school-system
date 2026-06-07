@@ -203,7 +203,7 @@ export default function StudentHallTicketPage({ params }: { params: Promise<{ id
                                         )}
                                     </div>
                                     <div className="flex-1">
-                                        <h1 className="text-[24pt] font-black uppercase tracking-tight text-[#1e3a8a] leading-none mb-1">{branding?.schoolName || "SPOORTHY CONCEPT SCHOOL"}</h1>
+                                        <h1 className="text-[24pt] font-black uppercase tracking-tight text-[#1e3a8a] leading-none mb-1">{branding?.schoolName || "SPOORTHY HIGH SCHOOL"}</h1>
                                         <p className="text-[9pt] font-bold uppercase tracking-[2px] text-blue-900/60 mb-3">Recognition of Govt. of Telangana (Affiliated)</p>
                                         <div className="inline-flex items-center gap-2 bg-[#1e40af] text-white px-6 py-1.5 rounded-sm font-black text-xs uppercase tracking-widest shadow-lg">
                                             {exam.name}

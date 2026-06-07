@@ -25,15 +25,25 @@ let db: Firestore;
 
 // Robust Firestore Initialization with Persistence (Zero-Latency Pillar)
 if (typeof window !== "undefined") {
-    try {
-        db = initializeFirestore(app, {
-            localCache: persistentLocalCache({
-                tabManager: persistentMultipleTabManager()
-            })
-        });
-    } catch (e: any) {
-        // Fallback if already initialized (common in HMR)
-        db = getFirestore(app);
+    // @ts-ignore - Cache db instance on window to survive Next.js HMR
+    if (!window.__fireDb) {
+        try {
+            db = initializeFirestore(app, {
+                localCache: persistentLocalCache({
+                    tabManager: persistentMultipleTabManager()
+                })
+            });
+            // @ts-ignore
+            window.__fireDb = db;
+        } catch (e: any) {
+            // Fallback if already initialized
+            db = getFirestore(app);
+            // @ts-ignore
+            window.__fireDb = db;
+        }
+    } else {
+        // @ts-ignore
+        db = window.__fireDb;
     }
 } else {
     db = getFirestore(app);

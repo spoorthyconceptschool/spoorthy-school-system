@@ -34,7 +34,7 @@ export default function LeaveManagementPage() {
         schoolId: "TCH-2026-042",
         teacherId: "TCH-2026-042",
         status: "ACTIVE",
-        schoolName: "Spoorthy Concept School"
+        schoolName: "Spoorthy High School"
     };
 
     const DEFAULT_LEAVES = [

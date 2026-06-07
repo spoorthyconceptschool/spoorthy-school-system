@@ -40,13 +40,13 @@ const DEFAULT_NOTICES = [
 const formatTimestamp = (ts: any) => {
     if (!ts) return "Just now";
     if (ts.seconds) {
-        return new Date(ts.seconds * 1000).toLocaleDateString();
+        return new Date(ts.seconds * 1000).toLocaleDateString('en-GB');
     }
-    return new Date(ts).toLocaleDateString();
+    return new Date(ts).toLocaleDateString('en-GB');
 };
 
 export default function AdminNoticesPage() {
-    const { user, userData } = useAuth();
+    const { user, userData, role } = useAuth();
     const [notices, setNotices] = useState<any[]>(() => {
         if (typeof window !== 'undefined') {
             const cached = localStorage.getItem(NOTICES_CACHE_KEY);
@@ -67,6 +67,12 @@ export default function AdminNoticesPage() {
     const [target, setTarget] = useState("ALL"); // ALL | TEACHERS | STUDENTS
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
+
+    useEffect(() => {
+        if (role === "MANAGER") {
+            setTarget("STUDENTS");
+        }
+    }, [role]);
 
     useEffect(() => {
         let isMounted = true;
@@ -143,7 +149,7 @@ export default function AdminNoticesPage() {
             setTitle("");
             setContent("");
             setType("REGULAR");
-            setTarget("ALL");
+            setTarget(role === "MANAGER" ? "STUDENTS" : "ALL");
             setStartDate("");
             setEndDate("");
         } catch (e: any) {
@@ -203,7 +209,7 @@ export default function AdminNoticesPage() {
 
                             <div className="space-y-1.5">
                                 <label className="text-[10px] md:text-xs font-black uppercase tracking-tighter text-muted-foreground">Target Audience</label>
-                                <Select onValueChange={setTarget} value={target}>
+                                <Select onValueChange={setTarget} value={target} disabled={role === "MANAGER"}>
                                     <SelectTrigger className="bg-white/5 border-white/10 h-8 md:h-10 text-xs md:text-sm"><SelectValue /></SelectTrigger>
                                     <SelectContent className="bg-[#0A192F] border-white/10">
                                         <SelectItem value="ALL">Everyone</SelectItem>

@@ -111,7 +111,7 @@ export default function HallTicketPrintPage({ params }: { params: Promise<{ id: 
                                             {branding?.schoolLogo ? <img src={branding.schoolLogo} className="w-full h-full object-contain" /> : "LOGO"}
                                         </div>
                                         <div className="center-header">
-                                            <h1 className="school-name">{branding?.schoolName?.toUpperCase() || "SPOORTHY CONCEPT SCHOOL"}</h1>
+                                            <h1 className="school-name">{branding?.schoolName?.toUpperCase() || "SPOORTHY HIGH SCHOOL"}</h1>
                                             <p className="school-motto text-[8px] font-bold tracking-[3px] opacity-60 mb-1">STRIVE FOR EXCELLENCE</p>
                                             <h2 className="exam-title-badge">{exam.name} – HALL TICKET</h2>
                                         </div>

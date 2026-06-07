@@ -19,7 +19,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogT
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
-import Link from "next/link";
+import { useAuth } from "@/context/AuthContext";
 
 // --- Types ---
 interface FeeTerm {
@@ -32,6 +32,27 @@ interface FeeTerm {
 
 // --- Main Page Component ---
 export default function ManageFeesPage() {
+    const { role } = useAuth();
+
+    if (role === "MANAGER") {
+        return (
+            <div className="flex flex-col items-center justify-center min-h-[50vh] space-y-4 text-center p-6">
+                <div className="w-16 h-16 rounded-full bg-red-500/10 flex items-center justify-center border border-red-500/20 text-red-400">
+                    <Settings2 className="w-8 h-8" />
+                </div>
+                <h1 className="text-2xl font-bold tracking-tight text-white">Access Denied</h1>
+                <p className="text-muted-foreground text-sm max-w-md">
+                    Managers do not have permission to manage standard fees, custom fees, or configure structure parameters.
+                </p>
+                <Link href="/admin">
+                    <Button className="bg-white text-black hover:bg-zinc-200">
+                        Back to Dashboard
+                    </Button>
+                </Link>
+            </div>
+        );
+    }
+
     return (
         <div className="space-y-6 md:space-y-10 p-4 md:p-6 animate-in fade-in slide-in-from-bottom-4 duration-700 max-w-7xl mx-auto pb-24">
             <Link 

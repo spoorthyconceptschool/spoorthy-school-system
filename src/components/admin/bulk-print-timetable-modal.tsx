@@ -278,7 +278,7 @@ export function BulkPrintTimetableModal() {
                                 <div class="header-left">
                                     ${branding.schoolLogo ? `<img src="${branding.schoolLogo}" class="logo" />` : ''}
                                     <div class="title-block">
-                                        <h1>${branding.schoolName || 'SPOORTHY CONCEPT SCHOOL'}</h1>
+                                        <h1>${branding.schoolName || 'SPOORTHY HIGH SCHOOL'}</h1>
                                         <p>MASTER TIMETABLE &bull; ${item.className} ${item.sectionName ? ' - ' + item.sectionName : ''}</p>
                                     </div>
                                 </div>
@@ -323,7 +323,7 @@ export function BulkPrintTimetableModal() {
                                 </tbody>
                             </table>
                             <div class="footer">
-                                <p>Official Document &bull; ${branding.schoolName || 'Spoorthy Concept School'}</p>
+                                <p>Official Document &bull; ${branding.schoolName || 'Spoorthy High School'}</p>
                             </div>
                         </div>
                     `).join('')}

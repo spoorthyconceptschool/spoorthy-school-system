@@ -353,7 +353,7 @@ export function SyllabusManager({ examId, role }: SyllabusManagerProps) {
                     
                     <div class="meta">
                         <span>CLASS: ${classes[targetClassId]?.name}</span>
-                        <span>DATE: ${new Date().toLocaleDateString()}</span>
+                        <span>DATE: ${new Date().toLocaleDateString('en-GB')}</span>
                     </div>
 
                     ${data.map(d => `

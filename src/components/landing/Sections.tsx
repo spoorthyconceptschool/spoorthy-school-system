@@ -197,6 +197,7 @@ export function Facilities({ content }: { content?: any[] }) {
                                             fill
                                             className="object-cover"
                                             priority={isFocused}
+                                            sizes="(max-width: 768px) 280px, 520px"
                                         />
                                     ) : (
                                         <div className="absolute inset-0 bg-[#0A192F]" />
@@ -307,6 +308,7 @@ export function Leadership({ content }: { content?: any }) {
                                             alt={leader.name || "Leader"}
                                             fill
                                             className="object-cover transition-all duration-[2s] group-hover:scale-105"
+                                            sizes="(max-width: 768px) 50vw, 500px"
                                         />
                                     ) : (
                                         <div className="absolute inset-0 flex items-center justify-center">
@@ -337,7 +339,7 @@ export function Leadership({ content }: { content?: any }) {
                                 <div className="flex flex-col items-center gap-4 md:gap-6">
                                     <div className="h-[3px] w-12 bg-accent/30 rounded-full group-hover:w-40 group-hover:bg-accent transition-all duration-1000" />
                                     <p className="max-w-xs text-white/50 text-xs md:text-lg font-medium leading-relaxed italic">
-                                        Defining the future of excellence at {branding.schoolName || "Spoorthy Concept School"}.
+                                        Defining the future of excellence at {branding.schoolName || "Spoorthy High School"}.
                                     </p>
                                 </div>
                             </div>
@@ -382,6 +384,7 @@ export function WhyUs() {
                         alt="Philosophy"
                         fill
                         className="object-cover transition-transform duration-[2s] group-hover:scale-105"
+                        sizes="(max-width: 1024px) 100vw, 640px"
                     />
                     <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-transparent to-transparent" />
                     <div className="absolute bottom-12 left-12">
@@ -452,8 +455,8 @@ export function GalleryPreview({ content }: { content?: any[] }) {
                                 src={item.src}
                                 alt={item.title || "Gallery"}
                                 fill
-                                unoptimized
                                 className="object-cover transition-transform duration-700 group-hover:scale-110 opacity-70 group-hover:opacity-100"
+                                sizes={i === 0 ? "(max-width: 768px) 100vw, 50vw" : "(max-width: 768px) 50vw, 25vw"}
                             />
                         )}
 
@@ -560,8 +563,8 @@ export function Footer() {
                     <div className="space-y-8">
                         <Link href="/" className="flex items-center gap-3 group">
                             {branding.schoolLogo && (
-                                <div className="w-12 h-12 rounded-xl bg-white/5 p-1 border border-white/10 group-hover:scale-110 transition-transform">
-                                    <img src={branding.schoolLogo} alt="Logo" className="w-full h-full object-contain" />
+                                <div className="w-12 h-12 rounded-xl bg-white/5 p-1 border border-white/10 group-hover:scale-110 transition-transform relative">
+                                    <Image src={branding.schoolLogo} alt="Logo" width={48} height={48} className="w-full h-full object-contain" />
                                 </div>
                             )}
                             <span className="text-2xl md:text-4xl font-premium tracking-tighter block group-hover:text-accent transition-colors">

@@ -82,7 +82,7 @@ export default function ApplyPage() {
                     </div>
                     <h1 className="font-display text-3xl font-bold">Application Submitted!</h1>
                     <p className="text-muted-foreground">
-                        Thank you for applying to Spoorthy Concept School. We have received your details and will contact you shortly regarding the next steps.
+                        Thank you for applying to Spoorthy High School. We have received your details and will contact you shortly regarding the next steps.
                     </p>
                     <Link href="/">
                         <Button className="w-full bg-accent text-accent-foreground hover:bg-accent/90">
@@ -247,7 +247,11 @@ export default function ApplyPage() {
                                             <h3 className="font-bold text-accent">Student</h3>
                                             <p className="text-sm text-muted-foreground">Name: <span className="text-foreground">{formData.studentName}</span></p>
                                             <p className="text-sm text-muted-foreground">Grade: <span className="text-foreground">{formData.grade}</span></p>
-                                            <p className="text-sm text-muted-foreground">DOB: <span className="text-foreground">{formData.dateOfBirth}</span></p>
+                                            <p className="text-sm text-muted-foreground">DOB: <span className="text-foreground">{(() => {
+                                                if (!formData.dateOfBirth) return "N/A";
+                                                const parts = formData.dateOfBirth.split("-");
+                                                return parts.length === 3 ? `${parts[2]}/${parts[1]}/${parts[0]}` : formData.dateOfBirth;
+                                            })()}</span></p>
                                         </div>
                                         <div className="bg-white/5 p-4 rounded-lg space-y-2">
                                             <h3 className="font-bold text-accent">Contact</h3>

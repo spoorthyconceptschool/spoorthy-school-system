@@ -74,8 +74,12 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
         }
         return [];
     });
-
-    const [notices, setNotices] = useState<any[]>([]);
+    const [notices, setNotices] = useState<any[]>(() => {
+        if (typeof window !== "undefined") {
+            try { return JSON.parse(localStorage.getItem("student_notices_cache") || "[]"); } catch (e) { return []; }
+        }
+        return [];
+    });
     
     const [attendanceMap, setAttendanceMap] = useState<Record<string, "P" | "A">>(() => {
         if (typeof window !== "undefined") {
@@ -91,10 +95,30 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
         return { total: 0, present: 0, absent: 0, percentage: 0 };
     });
 
-    const [schedule, setSchedule] = useState<any>(null);
-    const [substitutions, setSubstitutions] = useState<any[]>([]);
-    const [teacherMap, setTeacherMap] = useState<Record<string, string>>({});
-    const [leaves, setLeaves] = useState<any[]>([]);
+    const [schedule, setSchedule] = useState<any>(() => {
+        if (typeof window !== "undefined") {
+            try { return JSON.parse(localStorage.getItem("student_schedule_cache") || "null"); } catch (e) { return null; }
+        }
+        return null;
+    });
+    const [substitutions, setSubstitutions] = useState<any[]>(() => {
+        if (typeof window !== "undefined") {
+            try { return JSON.parse(localStorage.getItem("student_substitutions_cache") || "[]"); } catch (e) { return []; }
+        }
+        return [];
+    });
+    const [teacherMap, setTeacherMap] = useState<Record<string, string>>(() => {
+        if (typeof window !== "undefined") {
+            try { return JSON.parse(localStorage.getItem("student_teacherMap_cache") || "{}"); } catch (e) { return {}; }
+        }
+        return {};
+    });
+    const [leaves, setLeaves] = useState<any[]>(() => {
+        if (typeof window !== "undefined") {
+            try { return JSON.parse(localStorage.getItem("student_leaves_cache") || "[]"); } catch (e) { return []; }
+        }
+        return [];
+    });
     const [exams, setExams] = useState<any[]>(() => {
         if (typeof window !== "undefined") {
             try { return JSON.parse(localStorage.getItem("student_exams_cache") || "[]"); } catch (e) { return []; }
@@ -107,7 +131,12 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
         }
         return [];
     });
-    const [loading, setLoading] = useState(true);
+    const [loading, setLoading] = useState(() => {
+        if (typeof window !== "undefined") {
+            return !localStorage.getItem("student_profile_cache");
+        }
+        return true;
+    });
 
     // Dynamic refetch helper for Leaves
     const refetchLeaves = useCallback(async () => {
@@ -215,7 +244,7 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
                 if (typeof window !== "undefined") {
                     localStorage.setItem("student_tx_cache", JSON.stringify(sorted));
                 }
-            });
+            }, (err) => console.warn("[StudentCache] Fallback TX error:", err));
         });
 
         // C. Listen to Homework
@@ -247,7 +276,7 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
                 if (typeof window !== "undefined") {
                     localStorage.setItem("student_hw_cache", JSON.stringify(filtered));
                 }
-            });
+            }, (err) => console.warn("[StudentCache] Fallback HW error:", err));
         });
 
         // D. Listen to Notices
@@ -281,7 +310,7 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
                     });
                 list = list.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
                 setNotices(list);
-            });
+            }, (err) => console.warn("[StudentCache] Fallback Notices error:", err));
         });
 
         // E. Listen to Attendance
@@ -428,6 +457,47 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
             unsubSyllabi();
         };
     }, [user, profile]);
+
+    // Persist notices, schedule, substitutions, teacherMap, leaves to cache when updated
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            if (notices && notices.length > 0) {
+                localStorage.setItem("student_notices_cache", JSON.stringify(notices));
+            }
+        }
+    }, [notices]);
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            if (schedule) {
+                localStorage.setItem("student_schedule_cache", JSON.stringify(schedule));
+            }
+        }
+    }, [schedule]);
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            if (substitutions && substitutions.length > 0) {
+                localStorage.setItem("student_substitutions_cache", JSON.stringify(substitutions));
+            }
+        }
+    }, [substitutions]);
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            if (teacherMap && Object.keys(teacherMap).length > 0) {
+                localStorage.setItem("student_teacherMap_cache", JSON.stringify(teacherMap));
+            }
+        }
+    }, [teacherMap]);
+
+    useEffect(() => {
+        if (typeof window !== "undefined") {
+            if (leaves && leaves.length > 0) {
+                localStorage.setItem("student_leaves_cache", JSON.stringify(leaves));
+            }
+        }
+    }, [leaves]);
 
     return (
         <StudentDataContext.Provider

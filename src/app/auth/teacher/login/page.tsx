@@ -139,7 +139,7 @@ export default function TeacherLoginPage() {
                 </div>
 
                 <p className="text-center text-xs text-muted-foreground uppercase tracking-widest opacity-90">
-                    Spoorthy Concept School • Faculty
+                    Spoorthy High School • Faculty
                 </p>
             </div>
         </div>

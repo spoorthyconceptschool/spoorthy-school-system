@@ -51,10 +51,20 @@ export async function GET(req: NextRequest) {
         ]);
 
         // --- IN-MEMORY FILTERING TO AVOID COMPOSITE INDEXES ---
-        const filteredStudents = isGlobal ? studentsSnap.docs : studentsSnap.docs.filter(d => d.data().branchId === schoolId || !d.data().branchId);
-        const filteredTeachers = isGlobal ? teachersSnap.docs : teachersSnap.docs.filter(d => d.data().schoolId === schoolId || !d.data().schoolId);
-        const filteredStaff = isGlobal ? staffSnap.docs : staffSnap.docs.filter(d => d.data().schoolId === schoolId || !d.data().schoolId);
-        const filteredLeaves = isGlobal ? leavesSnap.docs : leavesSnap.docs.filter(d => d.data().schoolId === schoolId || !d.data().schoolId);
+        // To prevent leaking old data to new branches, we consider empty branchId to belong to the HQ/Default branch.
+        const branchDoc = !isGlobal ? await adminDb.collection("branches").doc(schoolId).get() : null;
+        const isOriginalBranch = branchDoc?.exists ? branchDoc.data()?.branchCode === "SHS" : false;
+
+        const matchesBranch = (d: any) => {
+            if (isGlobal) return true;
+            const bId = d.data().branchId;
+            return bId === schoolId || (isOriginalBranch && !bId);
+        };
+
+        const filteredStudents = studentsSnap.docs.filter(matchesBranch);
+        const filteredTeachers = teachersSnap.docs.filter(matchesBranch);
+        const filteredStaff = staffSnap.docs.filter(matchesBranch);
+        const filteredLeaves = leavesSnap.docs.filter(matchesBranch);
 
         const totalClasses = classesSnap.size;
 
@@ -75,7 +85,8 @@ export async function GET(req: NextRequest) {
         let exactTodayCollection = 0;
         paymentsSnap.forEach((doc: any) => {
             const data = doc.data();
-            const matchesSchool = isGlobal || data.branchId === schoolId || !data.branchId;
+            const bId = data.branchId;
+            const matchesSchool = isGlobal || bId === schoolId || (isOriginalBranch && !bId);
             if (matchesSchool && (data.status === "success" || data.status === "SUCCESS" || !data.status)) {
                 exactTodayCollection += Number(data.amount || 0);
             }
@@ -97,7 +108,8 @@ export async function GET(req: NextRequest) {
 
         attendanceSnap.forEach(doc => {
             const data = doc.data();
-            const matchesSchool = isGlobal || data.branchId === schoolId || !data.branchId;
+            const bId = data.branchId;
+            const matchesSchool = isGlobal || bId === schoolId || (isOriginalBranch && !bId);
             if (!matchesSchool) return;
 
             const pCount = data.stats?.present || 0;
@@ -156,7 +168,8 @@ export async function GET(req: NextRequest) {
 
         ledgersSnap.forEach((doc: any) => {
             const data = doc.data();
-            const matchesSchool = isGlobal || data.branchId === schoolId || !data.branchId;
+            const bId = data.branchId;
+            const matchesSchool = isGlobal || bId === schoolId || (isOriginalBranch && !bId);
             if (!matchesSchool) return;
 
             // Apply Filter Intersection

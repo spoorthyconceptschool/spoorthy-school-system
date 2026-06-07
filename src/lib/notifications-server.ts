@@ -65,7 +65,7 @@ export async function createServerNotification(props: {
                         // adminMessaging is a Proxy, so we just call methods on it.
                         
                         // Determine Deep Link URL (Must be Absolute for PWA strict routing)
-                        const baseUrl = "https://spoorthy-16292.web.app";
+                        const baseUrl = process.env.NEXT_PUBLIC_APP_URL || "https://spoorthyhighschool.in";
                         let linkUrl = `${baseUrl}/notifications`;
                         if (props.type === "HOMEWORK") linkUrl = `${baseUrl}/student/homework`;
                         else if (props.type === "FEE") linkUrl = `${baseUrl}/student/fees`;

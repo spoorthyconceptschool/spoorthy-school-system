@@ -27,8 +27,24 @@ export async function uploadImageFromUrl(url: string, path: string, token: strin
     }
 }
 
-export async function uploadFile(file: File, path: string, token: string): Promise<string> {
+export async function uploadFile(file: File, path: string, token: string, oldUrl?: string): Promise<string> {
     try {
+        // Delete old file if provided
+        if (oldUrl) {
+            try {
+                await fetch("/api/admin/media/delete", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    },
+                    body: JSON.stringify({ url: oldUrl })
+                });
+            } catch (err) {
+                console.warn("[image-pipeline] Failed to delete old file:", err);
+            }
+        }
+
         // Bypass Server limits for Videos or large files using Direct Firebase Client Upload
         if (file.type.startsWith('video/') || file.size > 2 * 1024 * 1024) {
             const { storage } = await import('@/lib/firebase');
@@ -47,6 +63,7 @@ export async function uploadFile(file: File, path: string, token: string): Promi
         formData.append("file", file);
         formData.append("path", path);
         formData.append("type", file.type.split('/')[0] || "media");
+        if (oldUrl) formData.append("oldUrl", oldUrl);
 
         const response = await fetch("/api/admin/media/upload", {
             method: "POST",
@@ -65,3 +82,4 @@ export async function uploadFile(file: File, path: string, token: string): Promi
         throw error;
     }
 }
+

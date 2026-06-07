@@ -18,7 +18,7 @@ export default function TeacherDashboardPage() {
     };
 
     return (
-        <div className="min-h-screen bg-black text-white p-8">
+        <div className="min-h-screen bg-transparent text-white p-8">
             <div className="max-w-4xl mx-auto space-y-8">
                 <header className="flex items-center justify-between pb-6 border-b border-white/10">
                     <div>

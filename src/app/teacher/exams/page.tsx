@@ -115,7 +115,7 @@ export default function TeacherExamsPage() {
 
     if (loading && exams.length === 0) {
         return (
-            <div className="w-full min-h-screen text-[#E6F1FF] bg-[#030712] font-sans pb-20 p-4 md:p-8">
+            <div className="w-full min-h-screen text-[#E6F1FF] bg-transparent font-sans pb-20 p-4 md:p-8">
                 <div className="max-w-7xl mx-auto space-y-10 animate-pulse">
                     <div className="flex justify-between items-center border-b border-white/5 pb-6">
                         <div className="flex items-center gap-4">
@@ -137,7 +137,7 @@ export default function TeacherExamsPage() {
     }
 
     return (
-        <div className="w-full min-h-screen text-[#E6F1FF] bg-gradient-to-b from-[#030712] via-[#09152b] to-[#030712] font-sans pb-20 relative overflow-hidden">
+        <div className="w-full min-h-screen text-[#E6F1FF] bg-transparent font-sans pb-20 relative overflow-hidden">
             {/* Ambient Background Glow */}
             <div className="absolute top-[-20%] left-[-10%] w-[60%] h-[60%] bg-[#10B981]/5 rounded-full blur-[120px] pointer-events-none" />
             <div className="absolute bottom-[-10%] right-[-10%] w-[50%] h-[50%] bg-[#3B82F6]/5 rounded-full blur-[120px] pointer-events-none" />
@@ -208,7 +208,7 @@ export default function TeacherExamsPage() {
                                             <h3 className="text-xl font-black text-white leading-tight font-display tracking-wide group-hover:text-[#10B981] transition-colors">{exam.name}</h3>
                                             <div className="flex items-center gap-2 mt-2 text-xs font-mono font-medium text-neutral-400 bg-white/5 px-3 py-1.5 rounded-lg w-fit border border-white/5">
                                                 <Calendar className="w-3.5 h-3.5 text-[#10B981]" />
-                                                {new Date(exam.startDate).toLocaleDateString()} - {new Date(exam.endDate).toLocaleDateString()}
+                                                {new Date(exam.startDate).toLocaleDateString('en-GB')} - {new Date(exam.endDate).toLocaleDateString('en-GB')}
                                             </div>
                                         </div>
                                         

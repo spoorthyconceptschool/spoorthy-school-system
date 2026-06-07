@@ -1,4 +1,4 @@
-﻿"use client";
+"use client";
 
 import { useEffect, useState } from "react";
 import { useAuth } from "@/context/AuthContext";
@@ -14,17 +14,17 @@ import { cn } from "@/lib/utils";
 
 export default function TeacherDashboard() {
     const { user, userData } = useAuth();
-    const [scheduleData, setScheduleData] = useState<any>(null);
-    const [todaySlots, setTodaySlots] = useState<any[]>([]);
-    const [substitutionsToday, setSubstitutionsToday] = useState<any[]>([]);
-    const [upcomingSubs, setUpcomingSubs] = useState<any[]>([]);
+    const [scheduleData, setScheduleData] = useState<any>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_schedule_data_cache") || "null") : null);
+    const [todaySlots, setTodaySlots] = useState<any[]>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_today_slots_cache") || "[]") : []);
+    const [substitutionsToday, setSubstitutionsToday] = useState<any[]>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_substitutions_today_cache") || "[]") : []);
+    const [upcomingSubs, setUpcomingSubs] = useState<any[]>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_upcoming_subs_cache") || "[]") : []);
     
     // Live student stats
-    const [studentStats, setStudentStats] = useState({ total: 0, active: 0, boys: 0, girls: 0 });
+    const [studentStats, setStudentStats] = useState(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_student_stats_cache") || '{"total": 0, "active": 0, "boys": 0, "girls": 0}') : { total: 0, active: 0, boys: 0, girls: 0 });
     
     // Student leaves for inline actions
-    const [studentLeaves, setStudentLeaves] = useState<any[]>([]);
-    const [studentLeavesLoading, setStudentLeavesLoading] = useState(false);
+    const [studentLeaves, setStudentLeaves] = useState<any[]>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_student_leaves_cache") || "[]") : []);
+    const [studentLeavesLoading, setStudentLeavesLoading] = useState(() => typeof window !== 'undefined' ? !localStorage.getItem("teacher_student_leaves_cache") : true);
     const [actioningLeaveId, setActioningLeaveId] = useState<string | null>(null);
 
     // Optimistic Cache Hooks
@@ -33,14 +33,18 @@ export default function TeacherDashboard() {
     const [holidays, setHolidays] = useState<any[]>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_holidays_cache") || "[]") : []);
     const [loading, setLoading] = useState(() => typeof window !== 'undefined' ? !localStorage.getItem("teacher_profile_cache") : true);
     
-    const { classSections, classes, sections, classSubjects, subjects, homeworkSubjects, selectedYear, loading: masterLoading } = useMasterData();
+    const [activeTab, setActiveTab] = useState<"NOTICES" | "SCHEDULE">("NOTICES");
+    const [timetableEntries, setTimetableEntries] = useState<any[]>([]);
+    const [announcements, setAnnouncements] = useState<any[]>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_announcements_cache") || "[]") : []);
+    
+    const { classSections, classes, sections, classSubjects, subjects, homeworkSubjects, subjectTeachers, selectedYear, loading: masterLoading } = useMasterData();
 
     useEffect(() => {
-        if (user) {
+        if (user && userData?.schoolId) {
             fetchDashboardData();
             fetchStudentLeaves();
         }
-    }, [user]);
+    }, [user, userData?.schoolId]);
 
     const fetchDashboardData = async () => {
         try {
@@ -115,7 +119,11 @@ export default function TeacherDashboard() {
             });
             const data = await res.json();
             if (data.success) {
-                setStudentLeaves(data.data || []);
+                const list = data.data || [];
+                setStudentLeaves(list);
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem("teacher_student_leaves_cache", JSON.stringify(list));
+                }
             }
         } catch (e: any) {
             console.warn("[Dashboard] Student leaves fetch error:", e.message);
@@ -159,6 +167,94 @@ export default function TeacherDashboard() {
         );
     };
 
+    const getTeachingAssignments = () => {
+        if (!teacherProfile || !subjectTeachers || !classSections) return [];
+        const tId = teacherProfile.schoolId || teacherProfile.id;
+        
+        const groups: Record<string, {
+            subjectId: string;
+            subjectName: string;
+            classes: {
+                classId: string;
+                sectionId: string;
+                className: string;
+                sectionName: string;
+                key: string;
+            }[];
+        }> = {};
+
+        // 1. Gather from subjectTeachers master mapping
+        Object.keys(subjectTeachers).forEach(classSectionId => {
+            const subjectsObj = subjectTeachers[classSectionId] || {};
+            Object.keys(subjectsObj).forEach(subId => {
+                if (subjectsObj[subId] === tId) {
+                    const cs = classSections[classSectionId];
+                    if (!cs || cs.isActive === false) return;
+                    
+                    const cId = cs.classId;
+                    const sId = cs.sectionId;
+                    const cName = classes?.[cId]?.name || cId;
+                    const sName = sections?.[sId]?.name || sId;
+                    const subName = subjects?.[subId]?.name || subId;
+
+                    if (!groups[subId]) {
+                        groups[subId] = {
+                            subjectId: subId,
+                            subjectName: subName,
+                            classes: []
+                        };
+                    }
+
+                    const exists = groups[subId].classes.some(c => c.key === classSectionId);
+                    if (!exists) {
+                        groups[subId].classes.push({
+                            classId: cId,
+                            sectionId: sId,
+                            className: cName,
+                            sectionName: sName,
+                            key: classSectionId
+                        });
+                    }
+                }
+            });
+        });
+
+        // 2. Supplement from timetableEntries
+        timetableEntries.forEach((entry: any) => {
+            const subId = entry.subjectId;
+            if (!subId) return;
+
+            const cId = entry.classId;
+            const sId = entry.sectionId;
+            const cName = classes?.[cId]?.name || entry.className || cId;
+            const sName = sections?.[sId]?.name || entry.sectionName || sId;
+            const classSectionId = `${cId}_${sId}`;
+
+            const subName = subjects?.[subId]?.name || entry.subjectName || subId;
+            if (!groups[subId]) {
+                groups[subId] = {
+                    subjectId: subId,
+                    subjectName: subName,
+                    classes: []
+                };
+            }
+
+            const exists = groups[subId].classes.some(c => c.key === classSectionId);
+            if (!exists) {
+                groups[subId].classes.push({
+                    classId: cId,
+                    sectionId: sId,
+                    className: cName,
+                    sectionName: sName,
+                    key: classSectionId
+                });
+            }
+        });
+
+        // Sort subjects by name
+        return Object.values(groups).sort((a, b) => a.subjectName.localeCompare(b.subjectName));
+    };
+
     const toggleHomeworkSubject = async (classKey: string, subjectId: string, currentVal: boolean) => {
         try {
             const { ref, set } = await import("firebase/database");
@@ -171,16 +267,17 @@ export default function TeacherDashboard() {
     };
 
     const managedClasses = getManagedClasses();
+    const teachingAssignments = getTeachingAssignments();
 
     // Query active classroom students dynamically
     useEffect(() => {
-        if (managedClasses.length === 0) return;
+        if (managedClasses.length === 0 || !userData?.schoolId) return;
         const classIds = managedClasses.map(c => c.classId);
         
         const q = query(
             collection(db, "students"), 
             where("classId", "in", classIds), 
-            where("schoolId", "==", userData?.schoolId || "global")
+            where("schoolId", "==", userData.schoolId)
         );
         const unsub = onSnapshot(q, (snap) => {
             let total = 0;
@@ -197,15 +294,21 @@ export default function TeacherDashboard() {
                     if (data.gender === "FEMALE" || data.gender === "Girl") girls++;
                 }
             });
-            setStudentStats({ total, active, boys, girls });
+            const statsObj = { total, active, boys, girls };
+            setStudentStats(statsObj);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem("teacher_student_stats_cache", JSON.stringify(statsObj));
+            }
+        }, (err) => {
+            console.warn("[Dashboard] Student stats sync error:", err.message);
         });
         return () => unsub();
-    }, [teacherProfile, classSections]);
+    }, [teacherProfile, classSections, userData?.schoolId]);
 
     // --- HOMEWORK SUBMISSION TRACKER ---
     const [todayHomeworks, setTodayHomeworks] = useState<Record<string, Record<string, boolean>>>({});
     useEffect(() => {
-        if (!managedClasses || managedClasses.length === 0) return;
+        if (!teacherProfile) return;
         const now = new Date();
         now.setHours(0, 0, 0, 0);
 
@@ -224,11 +327,11 @@ export default function TeacherDashboard() {
         }, (err: any) => console.log("Homework error:", err));
 
         return () => unsub();
-    }, [teacherProfile, classSections]);
+    }, [teacherProfile]);
 
     // --- TIMETABLE REAL-TIME LISTENER ---
     useEffect(() => {
-        if (!teacherProfile) return;
+        if (!teacherProfile || !userData?.schoolId) return;
         const currentYear = selectedYear || "2026-2027";
         const possibleIds = [teacherProfile.id, teacherProfile.schoolId, teacherProfile.teacherId].filter(Boolean);
         if (possibleIds.length === 0) return;
@@ -237,17 +340,17 @@ export default function TeacherDashboard() {
             collection(db, "timetable_entries"), 
             where("teacherId", "in", possibleIds),
             where("academicYear", "==", currentYear),
-            where("schoolId", "==", userData?.schoolId || "global")
+            where("schoolId", "==", userData.schoolId)
         );
         const subQuery1 = query(
             collection(db, "substitutions"), 
             where("originalTeacherId", "in", possibleIds),
-            where("schoolId", "==", userData?.schoolId || "global")
+            where("schoolId", "==", userData.schoolId)
         );
         const subQuery2 = query(
             collection(db, "substitutions"), 
             where("substituteTeacherId", "in", possibleIds),
-            where("schoolId", "==", userData?.schoolId || "global")
+            where("schoolId", "==", userData.schoolId)
         );
 
         let lastEntries = [] as any[];
@@ -279,19 +382,20 @@ export default function TeacherDashboard() {
                     ...e
                 };
             });
-            setScheduleData({ weeklySchedule, substitutions: allSubs });
+            const scheduleObj = { weeklySchedule, substitutions: allSubs };
+            setScheduleData(scheduleObj);
 
             const slots = [];
-            for (let i = 1; i <= 8; i++) {
+            for (let i = 1; i <= 10; i++) {
                 const amReplaced = allSubs.find((s: any) => s.date === todayKey && s.slotId === i && s.role === "ORIGINAL");
                 const amSub = allSubs.find((s: any) => s.date === todayKey && s.slotId === i && s.role === "SUBSTITUTE");
 
                 const regularEntry = lastEntries.find(e => e.day === dayName && String(e.period) === String(i));
 
                 if (amSub) {
-                    slots.push({ id: i, type: "SUBSTITUTION", classId: amSub.classId, note: "Sub Assigned", subjectName: "Coverage", time: "" });
+                    slots.push({ id: i, type: "SUBSTITUTION", classId: amSub.classId, note: "Sub Assigned", subjectName: "Coverage", time: getPeriodTiming(i) });
                 } else if (amReplaced) {
-                    slots.push({ id: i, type: "LEAVE", classId: amReplaced.classId, subjectName: "On Leave", time: "" });
+                    slots.push({ id: i, type: "LEAVE", classId: amReplaced.classId, subjectName: "On Leave", time: getPeriodTiming(i) });
                 } else if (regularEntry) {
                     slots.push({
                         id: i,
@@ -299,32 +403,89 @@ export default function TeacherDashboard() {
                         classId: regularEntry.className ? `${regularEntry.className} - ${regularEntry.sectionName}` : `${regularEntry.classId} ${regularEntry.sectionId}`,
                         subjectId: regularEntry.subjectId,
                         subjectName: regularEntry.subjectName || regularEntry.subject,
-                        time: regularEntry.startTime ? `${regularEntry.startTime} - ${regularEntry.endTime}` : ""
+                        time: regularEntry.startTime ? `${regularEntry.startTime} - ${regularEntry.endTime}` : getPeriodTiming(i)
                     });
                 }
             }
-            setTodaySlots(slots.sort((a, b) => a.id - b.id));
-            setSubstitutionsToday(allSubs.filter((s: any) => s.date === todayKey && s.role === "SUBSTITUTE"));
-            setUpcomingSubs(allSubs.filter((s: any) => s.role === "SUBSTITUTE" && s.date > todayKey).sort((a: any, b: any) => String(a.date || "").localeCompare(String(b.date || ""))));
+            const sortedSlots = slots.sort((a, b) => a.id - b.id);
+            setTodaySlots(sortedSlots);
+            const subsTodayList = allSubs.filter((s: any) => s.date === todayKey && s.role === "SUBSTITUTE");
+            setSubstitutionsToday(subsTodayList);
+            const upcomingSubsList = allSubs.filter((s: any) => s.role === "SUBSTITUTE" && s.date > todayKey).sort((a: any, b: any) => String(a.date || "").localeCompare(String(b.date || "")));
+            setUpcomingSubs(upcomingSubsList);
+
+            if (typeof window !== 'undefined') {
+                localStorage.setItem("teacher_schedule_data_cache", JSON.stringify(scheduleObj));
+                localStorage.setItem("teacher_today_slots_cache", JSON.stringify(sortedSlots));
+                localStorage.setItem("teacher_substitutions_today_cache", JSON.stringify(subsTodayList));
+                localStorage.setItem("teacher_upcoming_subs_cache", JSON.stringify(upcomingSubsList));
+            }
         };
 
-        const unsubTT = onSnapshot(ttQuery, (snap: any) => { lastEntries = snap.docs.map((d: any) => d.data()); processData(); }, (e: any) => console.log(e));
-        const unsubSub1 = onSnapshot(subQuery1, (snap: any) => { lastOrig = snap.docs.map((d: any) => d.data()); processData(); });
-        const unsubSub2 = onSnapshot(subQuery2, (snap: any) => { lastSub = snap.docs.map((d: any) => d.data()); processData(); });
+        const unsubTT = onSnapshot(ttQuery, (snap: any) => { 
+            const entries = snap.docs.map((d: any) => d.data());
+            lastEntries = entries; 
+            setTimetableEntries(entries);
+            processData(); 
+        }, (e: any) => console.warn("[Dashboard] Timetable sync error:", e.message));
+        const unsubSub1 = onSnapshot(subQuery1, (snap: any) => { lastOrig = snap.docs.map((d: any) => d.data()); processData(); }, (e: any) => console.warn("[Dashboard] Substitutions (orig) sync error:", e.message));
+        const unsubSub2 = onSnapshot(subQuery2, (snap: any) => { lastSub = snap.docs.map((d: any) => d.data()); processData(); }, (e: any) => console.warn("[Dashboard] Substitutions (sub) sync error:", e.message));
 
         return () => { unsubTT(); unsubSub1(); unsubSub2(); };
-    }, [teacherProfile, selectedYear]);
+    }, [teacherProfile, selectedYear, userData?.schoolId]);
 
-    if ((loading && !teacherProfile) && masterLoading) {
-        return (
-            <div className="min-h-[60vh] flex items-center justify-center">
-                <div className="flex flex-col items-center gap-4">
-                    <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
-                    <p className="text-muted-foreground animate-pulse text-sm uppercase tracking-widest font-bold">Synchronizing Classroom Data...</p>
-                </div>
-            </div>
+    // --- ANNOUNCEMENTS REAL-TIME LISTENER ---
+    useEffect(() => {
+        if (!user?.uid) return;
+        
+        const qInbox = query(
+            collection(db, "notices"), 
+            where("target", "in", ["ALL", "TEACHERS"]), 
+            where("schoolId", "in", [userData?.schoolId || "global", "global"]),
+            orderBy("createdAt", "desc"),
+            limit(10)
         );
-    }
+
+        const unsubInbox = onSnapshot(qInbox, (snap) => {
+            const now = Date.now();
+            const list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                .filter((n: any) => {
+                    if (n.senderId === user.uid) return false;
+                    if (n.expiresAt && n.expiresAt.seconds * 1000 < now) return false;
+                    return true;
+                });
+            setAnnouncements(list);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem("teacher_announcements_cache", JSON.stringify(list));
+            }
+        }, (err) => {
+            console.warn("[Dashboard] Announcements stream error, using fallback query:", err.message);
+            // Fallback without orderBy if index is missing
+            const fallbackQ = query(
+                collection(db, "notices"), 
+                where("target", "in", ["ALL", "TEACHERS"]), 
+                where("schoolId", "in", [userData?.schoolId || "global", "global"])
+            );
+            onSnapshot(fallbackQ, (snap) => {
+                const now = Date.now();
+                let list = snap.docs.map(d => ({ id: d.id, ...d.data() }))
+                    .filter((n: any) => {
+                        if (n.senderId === user.uid) return false;
+                        if (n.expiresAt && n.expiresAt.seconds * 1000 < now) return false;
+                        return true;
+                    });
+                list.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+                setAnnouncements(list.slice(0, 10));
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem("teacher_announcements_cache", JSON.stringify(list.slice(0, 10)));
+                }
+            }, (fallbackErr) => {
+                console.warn("[Dashboard] Announcements fallback stream error:", fallbackErr.message);
+            });
+        });
+
+        return () => unsubInbox();
+    }, [user, userData]);
 
     const DAYS_OF_WEEK = ["MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
     const PERIODS = [1, 2, 3, 4, 5, 6, 7, 8];
@@ -452,9 +613,9 @@ export default function TeacherDashboard() {
             {/* ========================================================================= */}
             {/* MOBILE VIEW (Strictly Optimized for compact, high-density, no scrolling) */}
             {/* ========================================================================= */}
-            <div className="md:hidden block p-3 space-y-3 pb-24 max-w-md mx-auto">
+            <div className="md:hidden flex flex-col h-[calc(100dvh-8.5rem)] p-3 space-y-3 w-full">
                 {/* Compact Welcome Header */}
-                <div className="flex justify-between items-center bg-black/40 border border-white/10 rounded-2xl p-4 backdrop-blur-md shadow-lg">
+                <div className="flex-none flex justify-between items-center bg-black/40 border border-white/10 rounded-2xl p-4 backdrop-blur-md shadow-lg">
                     <div>
                         <p className="text-[10px] uppercase tracking-widest font-black text-[#10B981]/90 flex items-center gap-1">
                             <Activity className="w-3 h-3 text-[#10B981] animate-pulse" /> Live Session
@@ -468,29 +629,9 @@ export default function TeacherDashboard() {
                     </Badge>
                 </div>
 
-                {/* Real-time stats grid (Mobile compact style) */}
-                <div className="grid grid-cols-4 gap-2">
-                    <div className="bg-white/5 border border-white/5 p-2 rounded-xl text-center">
-                        <span className="text-[10px] text-white/40 font-bold block">Students</span>
-                        <span className="text-sm font-black text-white">{studentStats.total || 20}</span>
-                    </div>
-                    <div className="bg-emerald-500/10 border border-emerald-500/20 p-2 rounded-xl text-center">
-                        <span className="text-[10px] text-emerald-400 font-bold block">Present</span>
-                        <span className="text-sm font-black text-emerald-400">{studentStats.active || 19}</span>
-                    </div>
-                    <div className="bg-rose-500/10 border border-rose-500/20 p-2 rounded-xl text-center">
-                        <span className="text-[10px] text-rose-400 font-bold block">Absent</span>
-                        <span className="text-sm font-black text-rose-400">{(studentStats.total - studentStats.active) || 1}</span>
-                    </div>
-                    <div className="bg-amber-500/10 border border-amber-500/20 p-2 rounded-xl text-center">
-                        <span className="text-[10px] text-amber-400 font-bold block">Leaves</span>
-                        <span className="text-sm font-black text-amber-400">{studentLeaves.filter(l => l.status === "PENDING").length || 0}</span>
-                    </div>
-                </div>
-
                 {/* Substitution Alert (Compact Banner) */}
                 {(substitutionsToday.length > 0 || upcomingSubs.length > 0) && (
-                    <div className="bg-blue-500/15 border border-blue-500/30 p-3 rounded-xl flex items-center justify-between gap-2">
+                    <div className="flex-none bg-blue-500/15 border border-blue-500/30 p-3 rounded-xl flex items-center justify-between gap-2">
                         <div className="flex items-center gap-2 min-w-0">
                             <AlertTriangle className="text-blue-400 w-4 h-4 shrink-0 animate-pulse" />
                             <p className="text-[11px] text-blue-300 font-bold truncate">
@@ -503,219 +644,108 @@ export default function TeacherDashboard() {
                     </div>
                 )}
 
-                {/* Class Teacher Desk (Ultra Compact Rows) */}
-                {managedClasses.length > 0 && (
-                    <div className="bg-black/20 border border-white/10 rounded-2xl p-3 backdrop-blur-md space-y-2">
-                        <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                            <h3 className="text-xs font-black uppercase text-amber-400 tracking-wider flex items-center gap-1.5">
-                                <GraduationCap className="w-4 h-4 text-amber-400" /> Class Teacher Desk
-                            </h3>
-                            <Badge className="bg-amber-500/10 text-amber-400 text-[8px] font-bold px-2 py-0.5 border-none">
-                                Nursery - A
-                            </Badge>
-                        </div>
-                        
-                        <div className="space-y-2">
-                            {managedClasses.map((cs: any) => {
-                                const className = classes?.[cs.classId]?.name || cs.classId;
-                                const sectionName = sections?.[cs.sectionId]?.name || cs.sectionId;
-                                const classKey = cs.id;
-                                const assignedSubjects = Object.keys(classSubjects?.[cs.classId] || {})
-                                    .filter(sid => classSubjects?.[cs.classId]?.[sid] && subjects?.[sid]);
+                {/* Notices / Schedule tab switcher section */}
+                <div className="flex-1 flex flex-col min-h-0 bg-black/20 border border-white/10 rounded-2xl p-3 backdrop-blur-md space-y-3">
+                    <div className="flex-none flex bg-black/40 p-1 rounded-xl border border-white/5 shadow-inner">
+                        <button
+                            onClick={() => setActiveTab("NOTICES")}
+                            className={cn(
+                                "flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all duration-200 flex items-center justify-center gap-1.5",
+                                activeTab === "NOTICES"
+                                    ? "bg-[#64FFDA] text-black shadow-md shadow-[#64FFDA]/15"
+                                    : "text-white/60 hover:text-white"
+                            )}
+                        >
+                            <Bell className="w-3.5 h-3.5" /> Notices
+                        </button>
+                        <button
+                            onClick={() => setActiveTab("SCHEDULE")}
+                            className={cn(
+                                "flex-1 py-2 text-xs font-black uppercase tracking-wider rounded-lg transition-all duration-200 flex items-center justify-center gap-1.5",
+                                activeTab === "SCHEDULE"
+                                    ? "bg-[#64FFDA] text-black shadow-md shadow-[#64FFDA]/15"
+                                    : "text-white/60 hover:text-white"
+                            )}
+                        >
+                            <Clock className="w-3.5 h-3.5" /> Schedule
+                        </button>
+                    </div>
 
-                                return (
-                                    <div key={cs.id} className="space-y-2">
-                                        <div className="grid grid-cols-2 gap-1.5">
-                                            {assignedSubjects.map(sid => {
-                                                const isGiving = homeworkSubjects?.[classKey]?.[sid];
-                                                const isSubmitted = todayHomeworks?.[classKey]?.[sid];
-                                                return (
-                                                    <button
-                                                        key={sid}
-                                                        onClick={() => toggleHomeworkSubject(classKey, sid, isGiving)}
-                                                        className={cn(
-                                                            "flex items-center justify-between p-2 rounded-xl border text-left text-[10px] font-black transition-all min-h-[40px]",
-                                                            isSubmitted
-                                                                ? "bg-emerald-500/15 border-emerald-500/35 text-emerald-400"
-                                                                : isGiving
-                                                                    ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
-                                                                    : "bg-black/40 border-white/5 text-white/40"
-                                                        )}
-                                                    >
-                                                        <span className="truncate">{subjects?.[sid]?.name || sid}</span>
-                                                        <div className={cn(
-                                                            "w-1.5 h-1.5 rounded-full shrink-0 ml-1",
-                                                            isSubmitted ? "bg-emerald-400 shadow-[0_0_6px_#10B981]" : isGiving ? "bg-amber-400 animate-pulse shadow-[0_0_6px_#f59e0b]" : "bg-white/10"
-                                                        )} />
-                                                    </button>
-                                                );
-                                            })}
+                    {activeTab === "NOTICES" ? (
+                        <div className="flex-1 space-y-2 overflow-y-auto pr-1 hide-scrollbar">
+                            {announcements.length === 0 ? (
+                                <div className="text-center py-6 text-[10px] text-white/40 italic">
+                                    No active notices.
+                                </div>
+                            ) : (
+                                announcements.map(ann => (
+                                    <div key={ann.id} className="p-2.5 bg-white/5 border border-white/5 rounded-xl space-y-1.5">
+                                        <div className="flex justify-between items-center text-[8px] font-mono text-white/40">
+                                            <span className="text-emerald-400 font-bold uppercase">{ann.type || "ALERT"}</span>
+                                            <span>{ann.createdAt ? new Date(ann.createdAt.seconds * 1000).toLocaleDateString('en-GB') : ""}</span>
+                                        </div>
+                                        <h4 className="text-xs font-bold text-white leading-tight">{ann.title}</h4>
+                                        <p className="text-[10px] text-white/65 leading-relaxed whitespace-pre-wrap">{ann.content}</p>
+                                        <div className="pt-1.5 border-t border-white/5 text-[7px] text-white/30 font-black uppercase tracking-wider flex justify-between">
+                                            <span>From: {ann.senderName || "Admin"}</span>
+                                            <span>To: {ann.target || "All"}</span>
                                         </div>
                                     </div>
-                                );
-                            })}
-                        </div>
-                    </div>
-                )}
-
-                {/* Today's Timetable Rule (Compact Horizontal Schedule Row) */}
-                <div className="bg-black/20 border border-white/10 rounded-2xl p-3 backdrop-blur-md space-y-2">
-                    <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                        <h3 className="text-xs font-black uppercase text-emerald-400 tracking-wider flex items-center gap-1.5">
-                            <Clock className="w-4 h-4 text-emerald-400" /> Today's Periods
-                        </h3>
-                        <Link href="/teacher/timetable" className="text-[9px] uppercase tracking-wider font-black text-white/40 hover:text-white transition-colors">
-                            Full matrix
-                        </Link>
-                    </div>
-
-                    {loading ? (
-                        <div className="flex gap-2 overflow-x-auto py-1">
-                            {Array.from({ length: 4 }).map((_, i) => (
-                                <Skeleton key={i} className="h-12 w-20 rounded-xl bg-white/5 shrink-0" />
-                            ))}
-                        </div>
-                    ) : todaySlots.length === 0 ? (
-                        <div className="text-center py-4 text-[11px] text-muted-foreground bg-white/5 rounded-xl border border-white/5 border-dashed">
-                            No classes scheduled today!
+                                ))
+                            )}
                         </div>
                     ) : (
-                        <div 
-                            className={cn("w-full pt-1", cardStyles.gridClass)}
-                            style={{ gridTemplateColumns: `repeat(${todaySlotCount}, minmax(0, 1fr))` }}
-                        >
-                            {todaySlots.map(slot => {
-                                const subjectName = slot.subjectName || slot.subjectId || "";
-                                const subjectCode = getSubjectCode(subjectName);
-                                const isFree = slot.type === "FREE";
+                        <div className="flex-1 space-y-2 overflow-y-auto pr-1 hide-scrollbar">
+                            {todaySlots.length === 0 || todaySlots.every(s => s.type === "FREE") ? (
+                                <div className="text-center py-8 text-[10px] text-white/40 italic flex flex-col items-center gap-2">
+                                    <Coffee className="w-6 h-6 text-white/20" />
+                                    No classes scheduled today!
+                                </div>
+                            ) : (
+                                todaySlots.filter(s => s.type !== "FREE").map(slot => {
+                                    const isSub = slot.type === "SUBSTITUTION";
+                                    const isLeave = slot.type === "LEAVE";
+                                    return (
+                                        <div key={slot.id} className={cn(
+                                            "relative p-3 rounded-[1.25rem] flex items-center justify-between gap-3 overflow-hidden border backdrop-blur-md group hover:scale-[1.01] transition-transform",
+                                            isSub ? "border-amber-500/30 bg-gradient-to-r from-amber-500/10 to-transparent" :
+                                            isLeave ? "border-rose-500/30 bg-rose-500/5 opacity-60" :
+                                            "border-emerald-500/20 bg-gradient-to-br from-[#0A192F] to-[#040A15]"
+                                        )}>
+                                            {/* Glow Accent */}
+                                            {!isLeave && !isSub && <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-[#10B981] to-[#06B6D4]" />}
+                                            {isSub && <div className="absolute left-0 top-0 bottom-0 w-1 bg-gradient-to-b from-amber-400 to-orange-500" />}
 
-                                return (
-                                    <div
-                                        key={slot.id}
-                                        className={cn(
-                                            "flex flex-col justify-between text-center transition-all hover:scale-[1.02] duration-200 cursor-default border",
-                                            cardStyles.cardClass,
-                                            isFree 
-                                                ? "bg-[#040B16]/50 border-white/5 hover:border-white/10 text-white/20" 
-                                                : slot.type === "SUBSTITUTION" 
-                                                    ? "bg-amber-500/10 border-amber-500/30 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.06)] hover:bg-amber-500/15"
-                                                    : slot.type === "LEAVE"
-                                                        ? "bg-rose-500/10 border-rose-500/30 text-rose-400 opacity-60 line-through hover:opacity-70"
-                                                        : `${getSubjectStyle(subjectName)} shadow-[0_0_12px_rgba(100,255,218,0.04)]`
-                                        )}
-                                    >
-                                        <span className={cn("text-white/30 tracking-widest uppercase font-mono block", cardStyles.periodNum)}>P{slot.id}</span>
-                                        
-                                        <div className="my-1 flex flex-col items-center justify-center min-w-0">
-                                            {isFree ? (
-                                                <span className={cn("font-black uppercase text-white/15 block", cardStyles.mainText)}>FREE</span>
-                                            ) : slot.type === "SUBSTITUTION" ? (
-                                                <>
-                                                    <span className={cn("font-black uppercase tracking-tight text-amber-400 truncate block w-full", cardStyles.mainText)}>SUB</span>
-                                                    <span className={cn("font-bold text-white/50 block truncate w-full", cardStyles.subText)}>{slot.classId}</span>
-                                                </>
-                                            ) : slot.type === "LEAVE" ? (
-                                                <>
-                                                    <span className={cn("font-black uppercase tracking-tight text-rose-400 line-through truncate block w-full", cardStyles.mainText)}>OFF</span>
-                                                    <span className={cn("font-bold text-white/30 block truncate w-full", cardStyles.subText)}>{slot.classId}</span>
-                                                </>
-                                            ) : (
-                                                <>
-                                                    <span className={cn("font-black uppercase tracking-tight truncate block w-full", cardStyles.mainText)}>{subjectCode}</span>
-                                                    <span className={cn("font-bold text-white/50 block truncate w-full", cardStyles.subText)}>({slot.classId})</span>
-                                                </>
-                                            )}
+                                            <div className="flex items-center gap-3 min-w-0 z-10 pl-2">
+                                                <div className={cn(
+                                                    "w-9 h-9 rounded-xl flex flex-col items-center justify-center font-mono font-black text-xs shrink-0 shadow-inner border border-white/10",
+                                                    isSub ? "bg-amber-500/20 text-amber-300" : isLeave ? "bg-white/5 text-white/40" : "bg-emerald-500/20 text-[#64FFDA]"
+                                                )}>
+                                                    <span>P{slot.id}</span>
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <span className={cn(
+                                                        "text-[13px] font-black block truncate leading-tight tracking-wide",
+                                                        isLeave ? "line-through text-white/40" : "text-white"
+                                                    )}>
+                                                        {isLeave ? "On Leave" : slot.subjectName}
+                                                    </span>
+                                                    <span className="text-[10px] text-white/50 block mt-1 font-mono">
+                                                        Class: <span className="font-bold text-white/80">{slot.classId}</span>
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <div className="text-right shrink-0 z-10">
+                                                <span className="text-[9px] font-mono font-bold text-[#64FFDA] block bg-[#64FFDA]/10 px-2 py-0.5 rounded-full border border-[#64FFDA]/20">{slot.time}</span>
+                                                {isSub && <Badge className="bg-amber-500 text-black border-none font-black text-[8px] px-2 py-0.5 rounded-md mt-1.5 shadow-[0_0_8px_#f59e0b]">COVERAGE</Badge>}
+                                                {isLeave && <Badge className="bg-rose-500/20 text-rose-400 border-none font-bold text-[8px] px-2 py-0.5 rounded-md mt-1.5">LEAVE</Badge>}
+                                            </div>
                                         </div>
-
-                                        <span className={cn("font-mono text-white/30 font-semibold tracking-tighter block truncate w-full", cardStyles.timeText)}>
-                                            {slot.time || getPeriodTiming(slot.id)}
-                                        </span>
-                                    </div>
-                                );
-                            })}
+                                    );
+                                })
+                            )}
                         </div>
                     )}
-                </div>
-
-                {/* Quick Actions in 2x2 Mini-Grid (Min touch height 48px) */}
-                <div className="grid grid-cols-2 gap-2">
-                    <Link href="/teacher/homework" className="flex items-center gap-3 p-3 rounded-xl border border-white/10 hover:bg-white/5 bg-black/20 transition-all cursor-pointer min-h-[48px]">
-                        <div className="bg-emerald-500/15 p-2 rounded-lg text-emerald-400 shrink-0">
-                            <Plus className="w-4 h-4" />
-                        </div>
-                        <span className="font-black text-[11px] text-white tracking-wide truncate">Post Homework</span>
-                    </Link>
-
-                    <Link href="/teacher/notices" className="flex items-center gap-3 p-3 rounded-xl border border-white/10 hover:bg-white/5 bg-black/20 transition-all cursor-pointer min-h-[48px]">
-                        <div className="bg-blue-500/15 p-2 rounded-lg text-blue-400 shrink-0">
-                            <FileText className="w-4 h-4" />
-                        </div>
-                        <span className="font-black text-[11px] text-white tracking-wide truncate">Send Notice</span>
-                    </Link>
-
-                    {managedClasses.length > 0 && (
-                        <Link href="/teacher/students" className="flex items-center gap-3 p-3 rounded-xl border border-white/10 hover:bg-white/5 bg-black/20 transition-all cursor-pointer min-h-[48px]">
-                            <div className="bg-cyan-500/15 p-2 rounded-lg text-cyan-400 shrink-0">
-                                <GraduationCap className="w-4 h-4" />
-                            </div>
-                            <span className="font-black text-[11px] text-white tracking-wide truncate">Take Attendance</span>
-                        </Link>
-                    )}
-
-                    <Link href="/teacher/exams" className={cn(
-                        "flex items-center gap-3 p-3 rounded-xl border border-white/10 hover:bg-white/5 bg-black/20 transition-all cursor-pointer min-h-[48px]",
-                        !(managedClasses.length > 0) && "col-span-2"
-                    )}>
-                        <div className="bg-purple-500/15 p-2 rounded-lg text-purple-400 shrink-0">
-                            <FileText className="w-4 h-4" />
-                        </div>
-                        <span className="font-black text-[11px] text-white tracking-wide truncate">Exams & Results</span>
-                    </Link>
-                </div>
-
-                {/* Combined Absences, Leaves, & Holidays (Strict High Density Stack) */}
-                <div className="bg-black/20 border border-white/10 rounded-2xl p-3 backdrop-blur-md space-y-2">
-                    <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                        <h3 className="text-xs font-black uppercase text-accent tracking-wider flex items-center gap-1.5">
-                            <Calendar className="w-4 h-4 text-accent" /> Leave & Holiday Calendar
-                        </h3>
-                        <Link href="/teacher/leaves" className="text-[9px] uppercase tracking-wider font-black text-white/40 hover:text-white">
-                            History
-                        </Link>
-                    </div>
-
-                    <div className="space-y-1.5">
-                        {/* Student Absences Card snippet */}
-                        <div className="flex justify-between items-center p-2 rounded-xl bg-white/5 border border-white/5">
-                            <span className="text-[11px] text-white/70 font-semibold">Active Leaves pending</span>
-                            <Badge className="bg-amber-500/20 text-amber-400 border-none text-[9px] py-0.5 px-2 font-mono">
-                                {studentLeaves.filter(l => l.status === "PENDING").length} pending
-                            </Badge>
-                        </div>
-
-                        {/* Leave Status (Self snippet) */}
-                        {leaves.slice(0, 1).map(l => (
-                            <div key={l.id} className="flex justify-between items-center p-2 rounded-xl bg-white/5 border border-white/5 text-[10px]">
-                                <span className="text-white/70 truncate max-w-[150px]">My Leave Request</span>
-                                <Badge className={cn(
-                                    "text-[8px] uppercase tracking-wider px-1.5 py-0.2 border border-opacity-50",
-                                    l.status === 'APPROVED' ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500' : 'bg-amber-500/10 text-amber-400 border-amber-500'
-                                )}>
-                                    {l.status}
-                                </Badge>
-                            </div>
-                        ))}
-
-                        {/* Upcoming Holidays snippet */}
-                        {holidays.slice(0, 1).map((h: any, i: number) => (
-                            <div key={i} className="flex justify-between items-center p-2 rounded-xl bg-emerald-500/5 border border-emerald-500/10 text-[10px]">
-                                <span className="text-emerald-100 truncate font-semibold max-w-[150px]">{h.title || h.name}</span>
-                                <Badge className="text-[8px] font-mono text-emerald-400 border border-emerald-500/30 bg-emerald-500/10">
-                                    {h.date?.seconds ? new Date(h.date.seconds * 1000).toLocaleDateString([], { month: 'short', day: 'numeric' }) : "Holiday"}
-                                </Badge>
-                            </div>
-                        ))}
-                    </div>
                 </div>
             </div>
 
@@ -749,315 +779,131 @@ export default function TeacherDashboard() {
                     </div>
                 </div>
 
-                {/* Breathtaking Real-time statistics widgets */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
-                    <div className="bg-[#0D1F3D]/30 border border-white/10 rounded-2xl p-5 hover:border-[#64FFDA]/20 transition-all flex items-center justify-between shadow-md">
-                        <div className="space-y-1">
-                            <span className="text-xs text-white/50 font-bold block uppercase tracking-wider">Classroom Students</span>
-                            <span className="text-3xl font-black text-white font-display">{studentStats.total || 20}</span>
-                            <span className="text-[10px] text-[#10B981] font-bold block">Managed Registry</span>
-                        </div>
-                        <div className="h-12 w-12 rounded-xl bg-blue-500/10 flex items-center justify-center text-blue-400 border border-blue-500/20">
-                            <GraduationCap className="w-6 h-6" />
-                        </div>
-                    </div>
-
-                    <div className="bg-[#0D1F3D]/30 border border-white/10 rounded-2xl p-5 hover:border-[#64FFDA]/20 transition-all flex items-center justify-between shadow-md">
-                        <div className="space-y-1">
-                            <span className="text-xs text-white/50 font-bold block uppercase tracking-wider">Present Today</span>
-                            <span className="text-3xl font-black text-emerald-400 font-display">{studentStats.active || 19}</span>
-                            <span className="text-[10px] text-emerald-400/70 font-semibold block">95% attendance rate</span>
-                        </div>
-                        <div className="h-12 w-12 rounded-xl bg-emerald-500/10 flex items-center justify-center text-emerald-400 border border-emerald-500/20">
-                            <Check className="w-6 h-6" />
-                        </div>
-                    </div>
-
-                    <div className="bg-[#0D1F3D]/30 border border-white/10 rounded-2xl p-5 hover:border-[#64FFDA]/20 transition-all flex items-center justify-between shadow-md">
-                        <div className="space-y-1">
-                            <span className="text-xs text-white/50 font-bold block uppercase tracking-wider">Absent Students</span>
-                            <span className="text-3xl font-black text-rose-400 font-display">{(studentStats.total - studentStats.active) || 1}</span>
-                            <span className="text-[10px] text-rose-400/70 font-semibold block">Action required if prolonged</span>
-                        </div>
-                        <div className="h-12 w-12 rounded-xl bg-rose-500/10 flex items-center justify-center text-rose-400 border border-rose-500/20">
-                            <X className="w-6 h-6" />
-                        </div>
-                    </div>
-
-                    <div className="bg-[#0D1F3D]/30 border border-white/10 rounded-2xl p-5 hover:border-[#64FFDA]/20 transition-all flex items-center justify-between shadow-md">
-                        <div className="space-y-1">
-                            <span className="text-xs text-white/50 font-bold block uppercase tracking-wider">Leaves Pending</span>
-                            <span className="text-3xl font-black text-amber-400 font-display">
-                                {studentLeaves.filter(l => l.status === "PENDING").length}
-                            </span>
-                            <span className="text-[10px] text-amber-400/70 font-semibold block">Awaiting inline approval</span>
-                        </div>
-                        <div className="h-12 w-12 rounded-xl bg-amber-500/10 flex items-center justify-center text-amber-400 border border-amber-500/20">
-                            <MessageSquare className="w-6 h-6" />
-                        </div>
-                    </div>
-                </div>
-
-                {/* Main 3-Column Dashboard Layout (Left central block, right sidebar panels) */}
+                {/* Bulletins Panel (Notices display directly on Home page) */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 items-start">
                     
                     {/* Left & Center panels (Occupies col-span-2) */}
                     <div className="lg:col-span-2 space-y-6">
                         
-                        {/* Class Teacher desk Subject homework checkbox matrices */}
-                        {managedClasses.length > 0 && (
-                            <div className="bg-[#0D1D33]/40 border border-white/10 rounded-[2rem] p-6 backdrop-blur-md shadow-2xl space-y-4">
-                                <div className="flex justify-between items-center border-b border-white/5 pb-3">
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-1.5 h-6 bg-amber-500 rounded-full"></div>
-                                        <h3 className="font-display font-black text-lg text-white uppercase tracking-wider">Class Teacher Desk</h3>
-                                    </div>
-                                    <Badge className="bg-amber-500/10 text-amber-400 border border-amber-500/20 font-black uppercase text-[10px] tracking-widest px-3 py-1">
-                                        Classroom: Nursery - A
-                                    </Badge>
+                        <div className="bg-[#0D1F3D]/30 border border-white/10 rounded-[2rem] p-6 backdrop-blur-md shadow-xl space-y-6 w-full animate-in fade-in duration-300">
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-white/5 pb-4">
+                                <div className="flex items-center gap-3">
+                                    <h3 className="font-bold text-lg text-white flex items-center gap-2">
+                                        {activeTab === "NOTICES" ? (
+                                            <>
+                                                <Bell className="w-5 h-5 text-[#64FFDA] animate-swing" /> Recent Notices & Bulletins
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Clock className="w-5 h-5 text-[#64FFDA]" /> Today's Period Schedule
+                                            </>
+                                        )}
+                                    </h3>
                                 </div>
+                                <div className="flex bg-black/40 p-1 rounded-xl border border-white/5 shadow-inner shrink-0">
+                                    <button
+                                        onClick={() => setActiveTab("NOTICES")}
+                                        className={cn(
+                                            "px-4 py-1.5 text-xs font-black uppercase tracking-wider rounded-lg transition-all duration-200 flex items-center gap-2",
+                                            activeTab === "NOTICES"
+                                                ? "bg-[#64FFDA] text-black shadow-md shadow-[#64FFDA]/15"
+                                                : "text-white/60 hover:text-white"
+                                        )}
+                                    >
+                                        <Bell className="w-3.5 h-3.5" /> Notices
+                                    </button>
+                                    <button
+                                        onClick={() => setActiveTab("SCHEDULE")}
+                                        className={cn(
+                                            "px-4 py-1.5 text-xs font-black uppercase tracking-wider rounded-lg transition-all duration-200 flex items-center gap-2",
+                                            activeTab === "SCHEDULE"
+                                                ? "bg-[#64FFDA] text-black shadow-md shadow-[#64FFDA]/15"
+                                                : "text-white/60 hover:text-white"
+                                        )}
+                                    >
+                                        <Clock className="w-3.5 h-3.5" /> Schedule
+                                    </button>
+                                </div>
+                            </div>
 
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                    {managedClasses.map((cs: any) => {
-                                        const className = classes?.[cs.classId]?.name || cs.classId;
-                                        const sectionName = sections?.[cs.sectionId]?.name || cs.sectionId;
-                                        const classKey = cs.id;
-                                        const assignedSubjects = Object.keys(classSubjects?.[cs.classId] || {})
-                                            .filter(sid => classSubjects?.[cs.classId]?.[sid] && subjects?.[sid]);
-
-                                        return (
-                                            <div key={cs.id} className="bg-[#10223D]/50 border border-white/5 rounded-2xl p-5 space-y-4 hover:border-amber-500/20 transition-all group col-span-2">
-                                                <div className="flex justify-between items-center border-b border-white/5 pb-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <GraduationCap className="w-5 h-5 text-amber-400" />
-                                                        <span className="font-bold text-white/95 text-base">{className} - {sectionName}</span>
-                                                    </div>
-                                                    <span className="text-[10px] text-amber-400/60 font-black uppercase tracking-wider">Toggle active daily homework modules</span>
+                            {activeTab === "NOTICES" ? (
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-4 max-h-[500px] overflow-y-auto pr-1">
+                                    {announcements.length === 0 ? (
+                                        <div className="col-span-2 py-12 text-center text-white/40 bg-white/5 rounded-2xl border border-dashed border-white/10">
+                                            No school notices or announcements.
+                                        </div>
+                                    ) : (
+                                        announcements.map(ann => (
+                                            <div key={ann.id} className="p-4 bg-white/5 border border-white/5 rounded-xl space-y-2 hover:bg-white/10 transition-colors">
+                                                <div className="flex justify-between items-center">
+                                                    <span className="text-[10px] font-black text-emerald-400 uppercase tracking-wider">
+                                                        {ann.type || "BROADCAST"}
+                                                    </span>
+                                                    <span className="text-[9px] font-mono text-white/40">
+                                                        {ann.createdAt ? new Date(ann.createdAt.seconds * 1000).toLocaleDateString('en-GB') : ""}
+                                                    </span>
                                                 </div>
-
-                                                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
-                                                    {assignedSubjects.map(sid => {
-                                                        const isGiving = homeworkSubjects?.[classKey]?.[sid];
-                                                        const isSubmitted = todayHomeworks?.[classKey]?.[sid];
-                                                        return (
-                                                            <button
-                                                                key={sid}
-                                                                onClick={() => toggleHomeworkSubject(classKey, sid, isGiving)}
-                                                                className={cn(
-                                                                    "flex items-center justify-between p-3 rounded-xl border text-left text-xs font-bold transition-all hover:scale-[1.01] active:scale-[0.99]",
-                                                                    isSubmitted
-                                                                        ? "bg-emerald-500/20 border-emerald-500/40 text-emerald-400"
-                                                                        : isGiving
-                                                                            ? "bg-amber-500/10 border-amber-500/30 text-amber-400"
-                                                                            : "bg-black/20 border-white/5 text-white/40"
-                                                                )}
-                                                            >
-                                                                <span className="truncate">{subjects?.[sid]?.name || sid}</span>
-                                                                <div className={cn(
-                                                                    "w-2 h-2 rounded-full shrink-0 ml-1.5",
-                                                                    isSubmitted ? "bg-[#10B981] shadow-[0_0_8px_#10B981]" : isGiving ? "bg-amber-400 animate-pulse shadow-[0_0_8px_rgba(245,158,11,0.5)]" : "bg-white/10"
-                                                                )} />
-                                                            </button>
-                                                        );
-                                                    })}
+                                                <h4 className="text-sm font-bold text-white leading-snug">{ann.title}</h4>
+                                                <p className="text-xs text-white/60 leading-relaxed whitespace-pre-wrap">{ann.content}</p>
+                                                <div className="pt-2 border-t border-white/5 text-[9px] text-white/30 font-black uppercase tracking-wider flex justify-between">
+                                                    <span>Sender: {ann.senderName || "School Administration"}</span>
+                                                    <span>Recipient: {ann.target || "All"}</span>
                                                 </div>
                                             </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Today's Schedule timeline */}
-                        <div className="bg-[#0D1F3D]/30 border border-white/10 rounded-[2rem] p-6 backdrop-blur-md shadow-xl space-y-4">
-                            <div className="flex justify-between items-center border-b border-white/5 pb-3">
-                                <h3 className="flex items-center gap-2 font-bold text-lg text-white">
-                                    <Clock className="w-5 h-5 text-[#10B981]" /> Today's Scheduled Lectures
-                                </h3>
-                                <Link href="/teacher/timetable" className="text-xs text-white/50 hover:text-white transition-colors bg-white/5 hover:bg-white/10 px-3 py-1.5 rounded-xl flex items-center gap-1 font-bold border border-white/10">
-                                    Full Timetable <ChevronRight className="w-4 h-4" />
-                                </Link>
-                            </div>
-                            
-                            {loading ? (
-                                <div className="grid grid-cols-4 gap-4">
-                                    {Array.from({ length: 4 }).map((_, i) => (
-                                        <Skeleton key={i} className="h-20 w-full rounded-2xl bg-white/5" />
-                                    ))}
-                                </div>
-                            ) : todaySlots.length === 0 ? (
-                                <div className="text-center py-12 text-white/40 bg-white/5 rounded-2xl border border-dashed border-white/10">
-                                    No scheduled classes assigned for today. Take a break!
+                                        ))
+                                    )}
                                 </div>
                             ) : (
-                                <div 
-                                    className={cn("w-full pt-1", cardStyles.gridClass)}
-                                    style={{ gridTemplateColumns: `repeat(${todaySlotCount}, minmax(0, 1fr))` }}
-                                >
-                                    {todaySlots.map(slot => {
-                                        const subjectName = slot.subjectName || slot.subjectId || "";
-                                        const subjectCode = getSubjectCode(subjectName);
-                                        const isFree = slot.type === "FREE";
-
-                                        return (
-                                            <div 
-                                                key={slot.id} 
-                                                className={cn(
-                                                    "flex flex-col justify-between text-center transition-all hover:scale-[1.02] hover:-translate-y-0.5 duration-200 cursor-default border",
-                                                    cardStyles.cardClass,
-                                                    isFree 
-                                                        ? "bg-[#040B16]/50 border-white/5 hover:border-white/10 text-white/20" 
-                                                        : slot.type === "SUBSTITUTION" 
-                                                            ? "bg-amber-500/10 border-amber-500/30 text-amber-400 shadow-[0_0_12px_rgba(245,158,11,0.06)] hover:bg-amber-500/15"
-                                                            : slot.type === "LEAVE" 
-                                                                ? "bg-rose-500/10 border border-rose-500/20 opacity-80 hover:opacity-95" 
-                                                                : `${getSubjectStyle(subjectName)} shadow-[0_0_12px_rgba(100,255,218,0.04)]`
-                                                )}
-                                            >
-                                                <span className={cn("text-white/30 tracking-widest uppercase font-mono block", cardStyles.periodNum)}>P{slot.id}</span>
-                                                
-                                                <div className="my-1 flex flex-col items-center justify-center min-w-0">
-                                                    {isFree ? (
-                                                        <span className={cn("font-black uppercase text-white/15 block", cardStyles.mainText)}>FREE</span>
-                                                    ) : slot.type === "SUBSTITUTION" ? (
-                                                        <>
-                                                            <span className={cn("font-black uppercase tracking-tight text-amber-400 truncate block w-full", cardStyles.mainText)}>SUB</span>
-                                                            <span className={cn("font-bold text-white/50 block truncate w-full", cardStyles.subText)}>{slot.classId}</span>
-                                                        </>
-                                                    ) : slot.type === "LEAVE" ? (
-                                                        <>
-                                                            <span className={cn("font-black uppercase tracking-tight text-rose-400 line-through truncate block w-full", cardStyles.mainText)}>OFF</span>
-                                                            <span className={cn("font-bold text-white/30 block truncate w-full", cardStyles.subText)}>{slot.classId}</span>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <span className={cn("font-black uppercase tracking-tight truncate block w-full", cardStyles.mainText)}>{subjectCode}</span>
-                                                            <span className={cn("font-bold text-white/50 block truncate w-full", cardStyles.subText)}>({slot.classId})</span>
-                                                        </>
-                                                    )}
+                                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 max-h-[500px] overflow-y-auto pr-1">
+                                    {todaySlots.length === 0 || todaySlots.every(s => s.type === "FREE") ? (
+                                        <div className="col-span-full py-16 text-center text-white/40 bg-white/5 rounded-2xl border border-dashed border-white/10 flex flex-col items-center justify-center gap-3">
+                                            <Coffee className="w-8 h-8 text-white/20" />
+                                            <h4 className="font-bold text-white">No Classes Today</h4>
+                                            <p className="text-xs text-white/40">You have no periods scheduled for today. Enjoy your preparation time!</p>
+                                        </div>
+                                    ) : (
+                                        todaySlots.filter(s => s.type !== "FREE").map(slot => {
+                                            const isSub = slot.type === "SUBSTITUTION";
+                                            const isLeave = slot.type === "LEAVE";
+                                            return (
+                                                <div key={slot.id} className={cn(
+                                                    "p-4 bg-white/5 border rounded-2xl flex flex-col justify-between gap-3 hover:bg-white/10 transition-colors",
+                                                    isSub ? "border-amber-500/25 bg-amber-500/5 text-amber-400" :
+                                                    isLeave ? "border-rose-500/25 bg-rose-500/5 opacity-60 text-rose-400 font-mono" :
+                                                    "border-white/5"
+                                                )}>
+                                                    <div className="flex items-center justify-between">
+                                                        <div className="flex items-center gap-3">
+                                                            <div className="w-8 h-8 rounded-lg bg-white/5 flex items-center justify-center font-mono font-black text-xs text-white/80">
+                                                                P{slot.id}
+                                                            </div>
+                                                            <div>
+                                                                <h4 className={cn(
+                                                                    "text-sm font-bold text-white capitalize leading-none",
+                                                                    isLeave && "line-through text-white/40"
+                                                                )}>
+                                                                    {isLeave ? "On Leave" : slot.subjectName}
+                                                                </h4>
+                                                                <span className="text-[10px] text-white/40 block mt-1.5 font-mono">{slot.time}</span>
+                                                            </div>
+                                                        </div>
+                                                        <div className="flex flex-col items-end gap-1">
+                                                            {isSub && <Badge className="bg-amber-500/25 text-amber-400 border-none font-bold text-[8px] px-1.5 py-0.5 rounded leading-none">SUB</Badge>}
+                                                            {isLeave && <Badge className="bg-rose-500/20 text-rose-400 border-none font-bold text-[8px] px-1.5 py-0.5 rounded leading-none">LEAVE</Badge>}
+                                                        </div>
+                                                    </div>
+                                                    <div className="pt-2 border-t border-white/5 flex justify-between items-center text-[10px]">
+                                                        <span className="text-white/60 font-semibold">Class Assigned</span>
+                                                        <span className="text-[#64FFDA] font-bold">{slot.classId}</span>
+                                                    </div>
                                                 </div>
-
-                                                <span className={cn("font-mono text-white/30 font-semibold tracking-tighter block truncate w-full", cardStyles.timeText)}>
-                                                    {slot.time || getPeriodTiming(slot.id)}
-                                                </span>
-                                            </div>
-                                        );
-                                    })}
+                                            );
+                                        })
+                                    )}
                                 </div>
                             )}
                         </div>
 
-                        {/* Beautiful color-coded Weekly Schedule Matrix */}
-                        <div className="bg-[#0D1F3D]/30 border border-white/10 rounded-[2rem] p-4 md:p-6 backdrop-blur-md shadow-xl space-y-4">
-                            <div className="flex justify-between items-center border-b border-white/5 pb-3">
-                                <h3 className="flex items-center gap-2 font-bold text-lg text-white">
-                                    <CheckSquare className="w-5 h-5 text-blue-400" /> Weekly Timetable Overview
-                                </h3>
-                                <span className="text-[10px] text-white/30 font-mono">{PERIODS.length} Periods System Active</span>
-                            </div>
-
-                            <div className="rounded-2xl border border-white/10 bg-black/10 overflow-hidden">
-                                <table className="w-full text-center border-collapse table-fixed">
-                                    <thead>
-                                        <tr className="bg-white/5 border-b border-white/10 text-white/40 font-black uppercase tracking-widest">
-                                            <th className={cn("text-left text-white/60", tableStyles.cellPadding, tableStyles.dayColWidth)}>Day</th>
-                                            {PERIODS.map(p => (
-                                                <th key={p} className={cn("border-l border-white/5", tableStyles.cellPadding)}>
-                                                    <div className="flex flex-col items-center">
-                                                        <span className={tableStyles.periodTitle}>P{p}</span>
-                                                        <span className={cn("text-white/30 font-mono font-medium mt-0.5 block truncate w-full", tableStyles.periodTime)}>{getPeriodTiming(p)}</span>
-                                                    </div>
-                                                </th>
-                                            ))}
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-white/5">
-                                        {DAYS_OF_WEEK.map(day => (
-                                            <tr key={day} className="hover:bg-white/[0.02] transition-colors">
-                                                <td className={cn("text-left font-black leading-none", tableStyles.cellPadding)}>
-                                                    <span className={cn("uppercase text-purple-400 tracking-wider block", tableStyles.dayTitle)}>{day.substring(0, 3)}</span>
-                                                    <span className={cn("text-white/30 font-semibold font-mono mt-1 block", tableStyles.daySub)}>{getPeriodTiming(1).split(" ")[0]}</span>
-                                                </td>
-                                                {PERIODS.map(period => {
-                                                    const daySchedule = scheduleData?.weeklySchedule?.[day] || {};
-                                                    const slot = daySchedule[period];
-                                                    
-                                                    return (
-                                                        <td key={period} className={cn("border-l border-white/5 text-center", tableStyles.cellPadding)}>
-                                                            {slot ? (
-                                                                <div className={cn(
-                                                                    "text-[10px] font-black tracking-tight flex flex-col justify-center mx-auto w-full",
-                                                                    tableStyles.slotClass,
-                                                                    getSubjectStyle(slot.subjectName || slot.subjectId)
-                                                                )}>
-                                                                    <span className={cn("text-white truncate block w-full", tableStyles.cellText)}>{slot.className}-{slot.sectionName}</span>
-                                                                    <span className={cn("opacity-75 truncate block mt-0.5 w-full", tableStyles.cellSub)}>{getSubjectCode(slot.subjectName || slot.subjectId)}</span>
-                                                                </div>
-                                                            ) : (
-                                                                <div className={cn(
-                                                                    "border border-dashed border-white/5 rounded-lg bg-black/10 flex items-center justify-center font-bold w-full",
-                                                                    tableStyles.slotClass
-                                                                )}>
-                                                                    <span className={cn("text-white/10 font-bold block", tableStyles.cellText)}>FREE</span>
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                    );
-                                                })}
-                                            </tr>
-                                        ))}
-                                    </tbody>
-                                </table>
-                            </div>
-                        </div>
-
-                        {/* Desktop Actions Quick Bar */}
-                        <div className="bg-[#0D1F3D]/30 border border-white/10 rounded-[2rem] p-6 backdrop-blur-md shadow-xl space-y-4">
-                            <h3 className="font-bold text-lg text-white">Quick Classroom Actions</h3>
-                            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
-                                <Link href="/teacher/homework" className="flex flex-col items-center justify-center p-4 bg-emerald-500/5 hover:bg-emerald-500/10 border border-emerald-500/20 rounded-2xl text-center group transition-all">
-                                    <div className="bg-emerald-500/20 p-2.5 rounded-xl text-emerald-400 mb-2 group-hover:scale-105 transition-transform">
-                                        <Plus className="w-5 h-5" />
-                                    </div>
-                                    <span className="font-bold text-xs text-white/90">Post Homework</span>
-                                </Link>
-
-                                <Link href="/teacher/students" className="flex flex-col items-center justify-center p-4 bg-cyan-500/5 hover:bg-cyan-500/10 border border-cyan-500/20 rounded-2xl text-center group transition-all">
-                                    <div className="bg-cyan-500/20 p-2.5 rounded-xl text-cyan-400 mb-2 group-hover:scale-105 transition-transform">
-                                        <Users className="w-5 h-5" />
-                                    </div>
-                                    <span className="font-bold text-xs text-white/90">Take Attendance</span>
-                                </Link>
-
-                                <Link href="/teacher/notices" className="flex flex-col items-center justify-center p-4 bg-blue-500/5 hover:bg-blue-500/10 border border-blue-500/20 rounded-2xl text-center group transition-all">
-                                    <div className="bg-blue-500/20 p-2.5 rounded-xl text-blue-400 mb-2 group-hover:scale-105 transition-transform">
-                                        <FileText className="w-5 h-5" />
-                                    </div>
-                                    <span className="font-bold text-xs text-white/90">Send Notice</span>
-                                </Link>
-
-                                <Link href="/teacher/exams" className="flex flex-col items-center justify-center p-4 bg-purple-500/5 hover:bg-purple-500/10 border border-purple-500/20 rounded-2xl text-center group transition-all">
-                                    <div className="bg-purple-500/20 p-2.5 rounded-xl text-purple-400 mb-2 group-hover:scale-105 transition-transform">
-                                        <Star className="w-5 h-5" />
-                                    </div>
-                                    <span className="font-bold text-xs text-white/90">Exams Portal</span>
-                                </Link>
-
-                                <Link href="/teacher/leaves" className="flex flex-col items-center justify-center p-4 bg-amber-500/5 hover:bg-amber-500/10 border border-amber-500/20 rounded-2xl text-center group transition-all">
-                                    <div className="bg-amber-500/20 p-2.5 rounded-xl text-amber-400 mb-2 group-hover:scale-105 transition-transform">
-                                        <MessageSquare className="w-5 h-5" />
-                                    </div>
-                                    <span className="font-bold text-xs text-white/90">Self Leaves</span>
-                                </Link>
-
-                                <Link href="/teacher/profile" className="flex flex-col items-center justify-center p-4 bg-neutral-500/5 hover:bg-neutral-500/10 border border-white/10 rounded-2xl text-center group transition-all">
-                                    <div className="bg-white/10 p-2.5 rounded-xl text-white mb-2 group-hover:scale-105 transition-transform">
-                                        <User className="w-5 h-5" />
-                                    </div>
-                                    <span className="font-bold text-xs text-white/90">My Profile</span>
-                                </Link>
-                            </div>
-                        </div>
 
                     </div>
 
@@ -1075,7 +921,7 @@ export default function TeacherDashboard() {
                                 </Badge>
                             </div>
 
-                            {studentLeavesLoading ? (
+                            {studentLeavesLoading && studentLeaves.length === 0 ? (
                                 <div className="flex justify-center py-6 text-amber-400"><Loader2 className="animate-spin" /></div>
                             ) : studentLeaves.filter(l => l.status === "PENDING").length === 0 ? (
                                 <p className="text-xs text-white/40 py-8 text-center border border-dashed border-white/5 rounded-xl bg-black/10">
@@ -1137,29 +983,6 @@ export default function TeacherDashboard() {
                                         </div>
                                     ))
                                 )}
-                            </div>
-                        </div>
-
-                        {/* Recent Announcements Widget */}
-                        <div className="bg-[#0D1F3D]/30 border border-white/10 rounded-[2rem] p-6 backdrop-blur-md shadow-xl space-y-4">
-                            <div className="flex justify-between items-center border-b border-white/5 pb-3">
-                                <h3 className="font-bold text-base text-white flex items-center gap-2">
-                                    <Bell className="w-5 h-5 text-purple-400" /> Recent Bulletins
-                                </h3>
-                                <Link href="/teacher/notices" className="text-xs text-purple-400 hover:underline font-bold">
-                                    Bulletins
-                                </Link>
-                            </div>
-
-                            <div className="space-y-3">
-                                <div className="p-3.5 bg-purple-500/5 border border-purple-500/10 rounded-xl space-y-1.5">
-                                    <div className="flex justify-between items-center text-[10px] font-black text-purple-400 uppercase tracking-wide">
-                                        <span>ADMIN BROADCAST</span>
-                                        <span>NEW</span>
-                                    </div>
-                                    <h4 className="text-xs font-bold text-white">Annual Examinations Schedule</h4>
-                                    <p className="text-[10px] text-white/50 leading-relaxed font-semibold">The annual testing timetable for class 1 to class 10 has been published on the registry. Verify your schedules.</p>
-                                </div>
                             </div>
                         </div>
 

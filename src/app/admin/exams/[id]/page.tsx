@@ -338,7 +338,7 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                         <h1 className="text-2xl md:text-3xl font-display font-bold tracking-tight">{exam.name}</h1>
                         <p className="text-[10px] md:text-sm text-muted-foreground flex items-center gap-2 mt-0.5">
                             <Calendar className="w-3 h-3 md:w-4 md:h-4" />
-                            {new Date(exam.startDate).toLocaleDateString()} - {new Date(exam.endDate).toLocaleDateString()}
+                            {new Date(exam.startDate).toLocaleDateString('en-GB')} - {new Date(exam.endDate).toLocaleDateString('en-GB')}
                         </p>
                     </div>
                 </div>

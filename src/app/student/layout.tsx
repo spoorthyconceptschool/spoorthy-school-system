@@ -43,7 +43,7 @@ function StudentContent({ children }: { children: React.ReactNode }) {
     const [checking, setChecking] = useState(true);
     const [mustChangePassword, setMustChangePassword] = useState(false);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const sidebarCollapsed = false;
     const { branding } = useMasterData();
     const [imageError, setImageError] = useState(false);
 
@@ -135,10 +135,10 @@ function StudentContent({ children }: { children: React.ReactNode }) {
             {/* Sidebar (Desktop & Laptop) */}
             <aside className={cn(
                 "hidden lg:flex fixed lg:static inset-y-0 left-0 border-r border-white/[0.04] bg-[#030712]/50 backdrop-blur-2xl flex-col h-full z-50 transition-all duration-300 ease-in-out shrink-0",
-                sidebarCollapsed ? "lg:w-20" : "lg:w-64"
+                "lg:w-64"
             )}>
                 <div className="h-20 flex items-center justify-between px-6 border-b border-white/[0.04]">
-                    <div className={cn("flex items-center gap-3 w-full", sidebarCollapsed ? "justify-center" : "")}>
+                    <div className="flex items-center gap-3 w-full">
                         <div className="w-9 h-9 rounded-xl bg-white/[0.02] flex items-center justify-center border border-white/10 shadow-sm shrink-0 overflow-hidden transition-all duration-300 hover:border-white/20">
                             {!imageError ? (
                                 <img
@@ -151,15 +151,9 @@ function StudentContent({ children }: { children: React.ReactNode }) {
                                 <div className="w-full h-full bg-blue-500/10 flex items-center justify-center text-blue-400 font-bold font-mono text-sm">S</div>
                             )}
                         </div>
-                        {!sidebarCollapsed && (
-                            <h1 className="font-bold text-base text-white tracking-tight truncate max-w-[150px] transition-opacity duration-300">
-                                {branding?.schoolName ? (
-                                    <span className="text-white text-sm font-semibold">{branding.schoolName}</span>
-                                ) : (
-                                    <>Student<span className="text-blue-500">.Panel</span></>
-                                )}
-                            </h1>
-                        )}
+                        <h1 className="font-bold text-base text-white tracking-tight truncate max-w-[150px] transition-opacity duration-300">
+                            <span className="text-blue-400 text-xs font-black uppercase tracking-widest font-mono">Student Panel</span>
+                        </h1>
                     </div>
                 </div>
 
@@ -171,42 +165,28 @@ function StudentContent({ children }: { children: React.ReactNode }) {
                                 key={item.href}
                                 href={item.href}
                                 className={cn(
-                                    "flex items-center gap-3 rounded-xl transition-all duration-300 text-sm font-medium border border-transparent",
+                                    "flex items-center gap-3 rounded-xl transition-all duration-300 text-sm font-medium border border-transparent px-4 py-3",
                                     isActive
                                         ? "bg-white/[0.04] text-white border-white/[0.05] shadow-lg shadow-black/20"
-                                        : "text-white/60 hover:text-white hover:bg-white/[0.02]",
-                                    sidebarCollapsed ? "justify-center p-2.5 w-10 h-10 mx-auto" : "px-4 py-3"
+                                        : "text-white/60 hover:text-white hover:bg-white/[0.02]"
                                 )}
-                                title={sidebarCollapsed ? item.label : ""}
                             >
                                 <item.icon size={18} className={cn("shrink-0 transition-transform duration-300", isActive ? "text-blue-400" : "text-white/60")} />
-                                {!sidebarCollapsed && <span>{item.label}</span>}
+                                <span>{item.label}</span>
                             </Link>
                         );
                     })}
                 </nav>
 
                 <div className="p-4 border-t border-white/[0.04] space-y-1.5">
-                    <button
-                        onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
-                        className="hidden lg:flex items-center gap-3 px-4 py-3 text-sm font-medium text-white/50 hover:text-white hover:bg-white/[0.02] w-full rounded-xl transition-all duration-300"
-                    >
-                        <ChevronLeft className={cn("w-4 h-4 transition-transform duration-300", sidebarCollapsed && "rotate-180")} />
-                        {!sidebarCollapsed && <span>Collapse</span>}
-                    </button>
-
                     <button 
                         onClick={signOut} 
-                        className={cn(
-                            "flex items-center gap-3 text-sm font-medium text-white/50 hover:text-[#ff4d4d] hover:bg-[#ff4d4d]/10 w-full rounded-xl transition-colors",
-                            sidebarCollapsed ? "justify-center p-2.5 w-10 h-10 mx-auto" : "px-4 py-3"
-                        )}
-                        title={sidebarCollapsed ? "Sign Out" : ""}
+                        className="flex items-center gap-3 text-sm font-medium text-white/50 hover:text-[#ff4d4d] hover:bg-[#ff4d4d]/10 w-full rounded-xl transition-colors px-4 py-3"
                     >
                         <LogOut size={18} className="shrink-0" />
-                        {!sidebarCollapsed && <span>Sign Out</span>}
+                        <span>Sign Out</span>
                     </button>
-                    {!sidebarCollapsed && <div className="mt-2 text-[10px] text-center text-white/20 font-mono">v1.3.0</div>}
+                    <div className="mt-2 text-[10px] text-center text-white/20 font-mono">v1.3.0</div>
                 </div>
             </aside>
 

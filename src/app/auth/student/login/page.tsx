@@ -134,7 +134,7 @@ export default function StudentLoginPage() {
                 </div>
 
                 <p className="text-center text-xs text-muted-foreground uppercase tracking-widest opacity-90">
-                    Spoorthy Concept School
+                    Spoorthy High School
                 </p>
             </div>
         </div>

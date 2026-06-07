@@ -274,7 +274,7 @@ export default function StudentTimetablePage() {
         };
     };
 
-    if (loading) {
+    if (loading && !schedule) {
         return (
             <div className="flex h-[80vh] items-center justify-center bg-[#070F1E]">
                 <div className="flex flex-col items-center gap-3">

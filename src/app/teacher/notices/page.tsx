@@ -15,9 +15,9 @@ import Link from "next/link";
 
 export default function NoticesPage() {
     const { user, userData } = useAuth();
-    const [sentNotices, setSentNotices] = useState<any[]>([]);
-    const [receivedNotices, setReceivedNotices] = useState<any[]>([]);
-    const [classes, setClasses] = useState<string[]>([]);
+    const [sentNotices, setSentNotices] = useState<any[]>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_sent_notices_cache") || "[]") : []);
+    const [receivedNotices, setReceivedNotices] = useState<any[]>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_received_notices_cache") || "[]") : []);
+    const [classes, setClasses] = useState<string[]>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_classes_list_cache") || "[]") : []);
     const [submitting, setSubmitting] = useState(false);
     const [useSentFallback, setUseSentFallback] = useState(false);
     const [useInboxFallback, setUseInboxFallback] = useState(false);
@@ -58,6 +58,9 @@ export default function NoticesPage() {
                 list = list.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
             }
             setSentNotices(list);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem("teacher_sent_notices_cache", JSON.stringify(list));
+            }
         }, (err) => {
             if (!isMounted) return;
             if (err.message.includes("index") && !useSentFallback) {
@@ -105,6 +108,9 @@ export default function NoticesPage() {
                 list = list.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
             }
             setReceivedNotices(list);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem("teacher_received_notices_cache", JSON.stringify(list));
+            }
         }, (err) => {
             if (!isMounted) return;
             if (err.message.includes("index") && !useInboxFallback) {
@@ -136,7 +142,11 @@ export default function NoticesPage() {
                         if (typeof slot === 'object') cls.add(slot.classId);
                     });
                 });
-                setClasses(Array.from(cls));
+                const classList = Array.from(cls);
+                setClasses(classList);
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem("teacher_classes_list_cache", JSON.stringify(classList));
+                }
             }
         } catch (e) { }
     };
@@ -268,7 +278,7 @@ export default function NoticesPage() {
                                         <p className="text-[10px] text-white/70 leading-normal">{n.content}</p>
                                         <div className="pt-2 border-t border-white/5 text-[8px] text-white/30 font-black uppercase tracking-wider flex justify-between">
                                             <span>To: Class {n.target || n.targetClassId}</span>
-                                            <span>Expires: {n.expiresAt ? new Date(n.expiresAt.seconds * 1000).toLocaleDateString() : 'N/A'}</span>
+                                            <span>Expires: {n.expiresAt ? new Date(n.expiresAt.seconds * 1000).toLocaleDateString('en-GB') : 'N/A'}</span>
                                         </div>
                                     </CardContent>
                                 </Card>
@@ -313,7 +323,7 @@ export default function NoticesPage() {
                                                 <h3 className="font-bold text-xl text-white group-hover:text-emerald-400 transition-colors leading-tight">{n.title}</h3>
                                                 {n.type === "HOLIDAY" && <span className="text-[10px] bg-yellow-500/20 text-yellow-500 px-3 py-1 rounded-full font-black uppercase tracking-wider">Holiday Notification</span>}
                                             </div>
-                                            <span className="text-xs text-muted-foreground font-mono">{n.createdAt ? new Date(n.createdAt.seconds * 1000).toLocaleDateString() : "Just now"}</span>
+                                            <span className="text-xs text-muted-foreground font-mono">{n.createdAt ? new Date(n.createdAt.seconds * 1000).toLocaleDateString('en-GB') : "Just now"}</span>
                                         </div>
                                         <p className="text-sm leading-relaxed text-white/70 whitespace-pre-wrap">{n.content}</p>
                                         <div className="pt-4 border-t border-white/5 flex justify-between items-center text-[10px] text-muted-foreground uppercase tracking-widest font-black">
@@ -371,7 +381,7 @@ export default function NoticesPage() {
                                         <p className="text-sm text-white/70 leading-relaxed">{n.content}</p>
                                         <div className="pt-4 border-t border-white/5 text-xs text-muted-foreground font-black uppercase tracking-wider flex justify-between">
                                             <span>Recipient: Class {n.target || n.targetClassId}</span>
-                                            <span>Expires: {n.expiresAt ? new Date(n.expiresAt.seconds * 1000).toLocaleDateString() : 'N/A'}</span>
+                                            <span>Expires: {n.expiresAt ? new Date(n.expiresAt.seconds * 1000).toLocaleDateString('en-GB') : 'N/A'}</span>
                                         </div>
                                     </CardContent>
                                 </Card>

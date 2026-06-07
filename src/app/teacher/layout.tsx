@@ -45,7 +45,7 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
 
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+    const sidebarCollapsed = false;
     const { branding } = useMasterData();
     const [imageError, setImageError] = useState(false);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
@@ -119,9 +119,6 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
         );
     }
 
-    if (loading) {
-        return <div className="h-screen w-full flex items-center justify-center bg-[#0A192F] text-[#10B981]"><Loader2 className="animate-spin" /></div>;
-    }
 
     const userRole = userData?.role || "Teacher";
 
@@ -133,13 +130,11 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
 
 
     return (
-        <div className="flex h-screen bg-gradient-to-b from-[#030712] via-[#09152b] to-[#030712] text-[#E6F1FF] font-sans overflow-hidden">
+        <div className="flex h-screen bg-gradient-to-br from-[#0B132B] via-[#0D1630] to-[#060A14] text-[#E6F1FF] font-sans overflow-hidden">
             {/* Sidebar (Desktop & Laptop) */}
             <aside className={cn(
-                "hidden lg:flex fixed lg:static inset-y-0 left-0 border-r border-white/5 bg-[#030712]/80 backdrop-blur-xl flex-col h-full z-50 transition-all duration-300 shrink-0",
-                sidebarCollapsed 
-                    ? "lg:w-20 xl:w-20" 
-                    : "lg:w-20 xl:w-64" // Collapsed on laptop (lg), expanded on desktop (xl)
+                "hidden lg:flex fixed lg:static inset-y-0 left-0 border-r border-white/5 bg-[#070F1E]/80 backdrop-blur-xl flex-col h-full z-50 transition-all duration-300 shrink-0",
+                "lg:w-64"
             )}>
                 {/* Brand Header */}
                 <div className="h-20 flex items-center justify-between px-4 border-b border-[#10B981]/10 select-none">
@@ -158,15 +153,8 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
                         </div>
                         
                         {/* Hide text completely on collapsed tablet/desktop sidebars */}
-                        <h1 className={cn(
-                            "font-display font-bold text-xl text-white tracking-tight truncate transition-all duration-200",
-                            sidebarCollapsed ? "hidden" : "hidden xl:block"
-                        )}>
-                            {branding?.schoolName ? (
-                                <span className="text-white text-sm md:text-base font-black">{branding.schoolName}</span>
-                            ) : (
-                                <>Teacher<span className="text-[#10B981]">.Panel</span></>
-                            )}
+                        <h1 className="font-display font-bold text-xl text-white tracking-tight truncate transition-all duration-200 block">
+                            <span className="text-[#10B981] text-xs font-black uppercase tracking-widest font-mono">Teacher Panel</span>
                         </h1>
                     </div>
                 </div>
@@ -185,26 +173,14 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
                                     isActive
                                         ? "bg-[#10B981]/10 text-[#10B981] border-[#10B981]/20 shadow-[0_0_15px_-5px_#10B981]"
                                         : "text-[#8892B0] hover:text-[#E6F1FF] hover:bg-white/5",
-                                    "lg:justify-center xl:justify-start",
-                                    isCollapsed && "xl:justify-center"
+                                    "justify-start"
                                 )}
                             >
                                 <item.icon size={18} className="shrink-0" />
                                 
-                                <span className={cn(
-                                    "transition-all duration-200",
-                                    isCollapsed ? "hidden" : "hidden xl:inline"
-                                )}>
+                                <span className="transition-all duration-200 inline">
                                     {item.label}
                                 </span>
-
-                                {/* Hover tooltip on collapsed sidebars */}
-                                <div className={cn(
-                                    "absolute left-16 hidden group-hover:block bg-[#0A192F] border border-[#10B981]/25 text-white font-bold text-xs px-2.5 py-1.5 rounded shadow-lg z-50 whitespace-nowrap pointer-events-none",
-                                    isCollapsed ? "block" : "xl:hidden"
-                                )}>
-                                    {item.label}
-                                </div>
                             </Link>
                         );
                     })}
@@ -216,32 +192,14 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
                         onClick={signOut} 
                         className={cn(
                             "flex items-center gap-3 px-3 py-3 text-sm font-medium text-[#8892B0] hover:text-[#FF5555] hover:bg-[#FF5555]/10 w-full rounded-md transition-colors relative group",
-                            "lg:justify-center xl:justify-start",
-                            sidebarCollapsed && "xl:justify-center"
+                            "justify-start"
                         )}
                     >
                         <LogOut size={18} className="shrink-0" />
-                        <span className={cn(sidebarCollapsed ? "hidden" : "hidden xl:inline")}>Sign Out</span>
-                        <div className={cn(
-                            "absolute left-16 hidden group-hover:block bg-[#0A192F] border border-red-500/20 text-[#FF5555] font-bold text-xs px-2.5 py-1.5 rounded shadow-lg z-50 whitespace-nowrap pointer-events-none",
-                            sidebarCollapsed ? "block" : "xl:hidden"
-                        )}>
-                            Sign Out
-                        </div>
+                        <span>Sign Out</span>
                     </button>
 
-                    {/* Desktop Sidebar Collapse Arrow Trigger */}
-                    <button
-                        onClick={toggleSidebar}
-                        className="hidden xl:flex w-full mt-3 items-center justify-center p-2 rounded bg-white/5 border border-white/5 text-neutral-400 hover:text-white hover:bg-white/10 transition-all"
-                    >
-                        {sidebarCollapsed ? <ChevronRight size={16} /> : <ChevronLeft size={16} />}
-                    </button>
-                    
-                    <div className={cn(
-                        "mt-2 text-center text-[#8892B0]/50 font-mono text-[10px] transition-all",
-                        (sidebarCollapsed) ? "hidden" : "hidden xl:block"
-                    )}>
+                    <div className="mt-2 text-center text-[#8892B0]/50 font-mono text-[10px] block">
                         v1.2.0
                     </div>
                 </div>

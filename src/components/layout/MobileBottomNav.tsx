@@ -18,7 +18,7 @@ interface MobileBottomNavProps {
 
 export function MobileBottomNav({ items }: MobileBottomNavProps) {
     return (
-        <nav className="fixed bottom-0 left-0 right-0 h-14 bg-[#030712]/90 backdrop-blur-lg flex items-center px-1 z-45 shadow-[0_-5px_30px_rgba(0,0,0,0.5)] pb-[env(safe-area-inset-bottom)] shrink-0 lg:hidden">
+        <nav className="fixed bottom-0 left-0 right-0 h-14 bg-[#030712]/90 backdrop-blur-lg flex items-center px-1 z-45 shadow-[0_-5px_30px_rgba(0,0,0,0.5)] pb-[env(safe-area-inset-bottom)] shrink-0 md:hidden">
             {/* Glowing Top Border */}
             <div className="absolute top-0 left-0 right-0 h-[1px] bg-gradient-to-r from-[#00b4ec] via-[#6366f1] to-[#a855f7]" />
             <div className="absolute top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-[#00b4ec] via-[#6366f1] to-[#a855f7] opacity-40 blur-[2px]" />
@@ -34,13 +34,13 @@ export function MobileBottomNav({ items }: MobileBottomNavProps) {
                             size={18}
                             className={cn(
                                 "transition-transform duration-200",
-                                isItemActive ? "text-[#00b4ec] scale-105 stroke-[2.5px]" : "text-white/60"
+                                isItemActive ? "text-accent scale-105 stroke-[2.5px]" : "text-white/60"
                             )}
                         />
                         <span
                             className={cn(
                                 "text-[9px] font-black uppercase tracking-wider mt-0.5 select-none",
-                                isItemActive ? "text-[#00b4ec]" : "text-white/60"
+                                isItemActive ? "text-accent" : "text-white/60"
                             )}
                         >
                             {item.label}
@@ -48,7 +48,7 @@ export function MobileBottomNav({ items }: MobileBottomNavProps) {
 
                         {/* Active bar or Inactive dot */}
                         {isItemActive ? (
-                            <div className="absolute bottom-[3px] w-5 h-[3px] bg-[#00b4ec] rounded-full shadow-[0_0_8px_#00b4ec]" />
+                            <div className="absolute bottom-[3px] w-5 h-[3px] bg-accent rounded-full shadow-[0_0_8px_#64FFDA]" />
                         ) : (
                             <div className="absolute bottom-[4px] w-[3px] h-[3px] bg-white/20 rounded-full" />
                         )}

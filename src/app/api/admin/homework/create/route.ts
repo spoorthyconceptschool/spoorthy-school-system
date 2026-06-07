@@ -11,16 +11,16 @@ export async function POST(req: NextRequest) {
         const token = authHeader.split("Bearer ")[1];
         const decodedToken = await adminAuth.verifyIdToken(token);
 
-        // Verify Admin Role
-        const hasAdminRole = decodedToken.role === "SUPER_ADMIN" || decodedToken.role === "ADMIN" || decodedToken.role === "admin";
+        // Verify Admin/Manager Role
+        const hasAdminRole = decodedToken.role === "SUPER_ADMIN" || decodedToken.role === "ADMIN" || decodedToken.role === "admin" || decodedToken.role === "MANAGER";
         const hasAdminEmail = decodedToken.email?.includes("admin") || decodedToken.email?.endsWith("@spoorthy.edu");
 
         if (!hasAdminRole && !hasAdminEmail) {
             // Check Firestore as final fallback
             const userDoc = await adminDb.collection("users").doc(decodedToken.uid).get();
             const firestoreRole = userDoc.data()?.role;
-            if (firestoreRole !== "ADMIN" && firestoreRole !== "SUPER_ADMIN") {
-                return NextResponse.json({ error: "Forbidden: Admin access required" }, { status: 403 });
+            if (firestoreRole !== "ADMIN" && firestoreRole !== "SUPER_ADMIN" && firestoreRole !== "MANAGER") {
+                return NextResponse.json({ error: "Forbidden: Admin or Manager access required" }, { status: 403 });
             }
         }
 
@@ -128,7 +128,7 @@ export async function POST(req: NextRequest) {
                         },
                         webpush: {
                             fcmOptions: {
-                                link: "https://spoorthy-16292.web.app/student/homework"
+                                link: `${process.env.NEXT_PUBLIC_APP_URL || "https://spoorthyhighschool.in"}/student/homework`
                             },
                             notification: {
                                 icon: "https://firebasestorage.googleapis.com/v0/b/spoorthy-16292.firebasestorage.app/o/demo%2Flogo.png?alt=media"
@@ -138,7 +138,7 @@ export async function POST(req: NextRequest) {
                             type: "HOMEWORK",
                             homeworkId: hwId,
                             subjectId: subjectId,
-                            click_action: "https://spoorthy-16292.web.app/student/homework"
+                            click_action: `${process.env.NEXT_PUBLIC_APP_URL || "https://spoorthyhighschool.in"}/student/homework`
                         },
                         tokens: uniqueTokens
                     };

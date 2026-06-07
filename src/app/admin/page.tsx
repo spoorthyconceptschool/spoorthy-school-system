@@ -15,8 +15,10 @@ import {
     Calendar, Clock, AlertTriangle, Layers, GraduationCap,
     BookOpen, Bell, Briefcase, FileText, ClipboardList,
     TrendingUp, CheckCircle, ArrowRight, BarChart3,
-    PieChart, Wallet, Bus, Home, Settings2, Filter, X
+    PieChart, Wallet, Bus, Home, Settings2, Filter, X,
+    Loader2
 } from "lucide-react";
+import { PieChart as RePieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer } from "recharts";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AddStudentModal } from "@/components/admin/add-student-modal";
@@ -195,16 +197,43 @@ export default function AdminDashboard() {
     const [filterSection, setFilterSection] = useState<string>("");
     const [filterVillage, setFilterVillage] = useState<string>("");
 
-    const [recentStudents, setRecentStudents] = useState<Student[]>([]);
+    const [recentStudents, setRecentStudents] = useState<Student[]>(() => {
+        if (typeof window !== 'undefined' && selectedYear) {
+            const cached = localStorage.getItem(`spoorthy_dashboard_cache_${selectedYear}_students`);
+            if (cached) {
+                try { return JSON.parse(cached); } catch (e) {}
+            }
+        }
+        return [];
+    });
     const [pendingLeavesList, setPendingLeavesList] = useState<LeaveRequest[]>([]);
-    const [stats, setStats] = useState<DashboardStats>({
-        totalStudents: 0,
-        pendingFees: 0,
-        leaveRequests: 0,
-        totalLeaves: 0,
-        todayCollection: 0,
-        totalStaff: 0,
-        staffPresent: 0
+    const [stats, setStats] = useState<DashboardStats>(() => {
+        if (typeof window !== 'undefined' && selectedYear) {
+            const cached = localStorage.getItem(`spoorthy_dashboard_cache_${selectedYear}_stats`);
+            if (cached) {
+                try {
+                    return {
+                        totalStudents: 0,
+                        pendingFees: 0,
+                        leaveRequests: 0,
+                        totalLeaves: 0,
+                        todayCollection: 0,
+                        totalStaff: 0,
+                        staffPresent: 0,
+                        ...JSON.parse(cached)
+                    };
+                } catch (e) {}
+            }
+        }
+        return {
+            totalStudents: 0,
+            pendingFees: 0,
+            leaveRequests: 0,
+            totalLeaves: 0,
+            todayCollection: 0,
+            totalStaff: 0,
+            staffPresent: 0
+        };
     });
 
     const [loading, setLoading] = useState(false);
@@ -301,17 +330,19 @@ export default function AdminDashboard() {
 
         // Only register real-time listeners for the global (unfiltered) view
         if (!isFiltered) {
-            // --- REAL-TIME COUNTERS SYNC ---
-            unsubCounters = onSnapshot(collection(db, "counters"), (snap) => {
-                const counts: any = {};
-                snap.forEach(doc => { counts[doc.id] = doc.data().current || 0; });
-                setStats(prev => ({
-                    ...prev,
-                    totalStudents: counts.students || prev.totalStudents,
-                    totalTeachers: counts.teachers || (prev as any).totalTeachers,
-                    totalStaff: counts.staff || prev.totalStaff
-                }));
-            });
+            // --- REAL-TIME COUNTERS SYNC (ONLY FOR GLOBAL ADMIN) ---
+            if (user?.schoolId === "global") {
+                unsubCounters = onSnapshot(collection(db, "counters"), (snap) => {
+                    const counts: any = {};
+                    snap.forEach(doc => { counts[doc.id] = doc.data().current || 0; });
+                    setStats(prev => ({
+                        ...prev,
+                        totalStudents: counts.students || prev.totalStudents,
+                        totalTeachers: counts.teachers || (prev as any).totalTeachers,
+                        totalStaff: counts.staff || prev.totalStaff
+                    }));
+                });
+            }
 
             // --- REAL-TIME PAYMENTS SYNC (TODAY) ---
             const todayStart = new Date();
@@ -321,6 +352,7 @@ export default function AdminDashboard() {
                 let total = 0;
                 snap.forEach(doc => {
                     const data = doc.data();
+                    if (user?.schoolId && user.schoolId !== "global" && data.branchId !== user.schoolId) return;
                     if (data.status === "success" || data.status === "SUCCESS" || !data.status) {
                         total += Number(data.amount || 0);
                     }
@@ -338,6 +370,7 @@ export default function AdminDashboard() {
 
                 snap.docs.forEach(doc => {
                     const data = doc.data();
+                    if (user?.schoolId && user.schoolId !== "global" && data.branchId !== user.schoolId) return;
                     if (data.type === "TEACHERS") {
                         presentTeachers += data.stats?.present || 0;
                         absentTeachers += data.stats?.absent || 0;
@@ -376,22 +409,36 @@ export default function AdminDashboard() {
 
     useEffect(() => {
         if (!user) return;
-        const qLeaves = query(collection(db, "leave_requests"), where("status", "==", "PENDING"), limit(5));
+        const qLeaves = query(collection(db, "leave_requests"), where("status", "==", "PENDING"), limit(20));
         const unsubLeaves = onSnapshot(qLeaves, (snap) => {
-            const leaves = snap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveRequest));
+            let leaves = snap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveRequest));
+            if (user?.schoolId && user.schoolId !== "global") {
+                leaves = leaves.filter((l: any) => l.branchId === user.schoolId || l.schoolId === user.schoolId);
+            }
             leaves.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-            setPendingLeavesList(leaves);
+            setPendingLeavesList(leaves.slice(0, 5));
         });
         return () => unsubLeaves();
     }, [user, selectedYear]);
 
     useEffect(() => {
         if (!user || authRole === "TIMETABLE_EDITOR") return;
-        const studentsQ = query(collection(db, "students"), orderBy("createdAt", "desc"), limit(10));
+        
+        let baseConstraints: any[] = [orderBy("createdAt", "desc"), limit(20)];
+        if (user.schoolId && user.schoolId !== "global") {
+            // Need composite index if we use where + orderBy. To avoid, we fetch more and filter in memory.
+            // Or since we only care about recent, we can filter in memory.
+        }
+        
+        const studentsQ = query(collection(db, "students"), ...baseConstraints);
         const unsubscribe = onSnapshot(studentsQ, (snapshot) => {
-            const list = snapshot.docs.map(doc => ({ id: doc.id, schoolId: doc.id, ...doc.data() } as Student));
-            setRecentStudents(list);
-            localStorage.setItem(`${DASHBOARD_CACHE_KEY}_students`, JSON.stringify(list));
+            let list = snapshot.docs.map(doc => ({ id: doc.id, schoolId: doc.id, ...doc.data() } as Student));
+            if (user.schoolId && user.schoolId !== "global") {
+                list = list.filter((s: any) => s.branchId === user.schoolId);
+            }
+            const finalRecent = list.slice(0, 10);
+            setRecentStudents(finalRecent);
+            localStorage.setItem(`${DASHBOARD_CACHE_KEY}_students`, JSON.stringify(finalRecent));
         });
         return () => unsubscribe();
     }, [user, authRole]);
@@ -423,11 +470,19 @@ export default function AdminDashboard() {
             header: "Enrolled On",
             render: (s: Student) => (
                 <span className="text-xs text-white/40 font-mono">
-                    {s.createdAt?.seconds ? new Date(s.createdAt.seconds * 1000).toLocaleDateString() : "—"}
+                    {s.createdAt?.seconds ? new Date(s.createdAt.seconds * 1000).toLocaleDateString('en-GB') : "—"}
                 </span>
             )
         }
     ], [classes]);
+
+    if (!mounted) {
+        return (
+            <div className="w-full min-h-[60vh] flex items-center justify-center">
+                <Loader2 className="w-8 h-8 animate-spin text-[#64FFDA]" />
+            </div>
+        );
+    }
 
     if (authRole === "MANAGER") {
         return (
@@ -439,8 +494,6 @@ export default function AdminDashboard() {
                         </h1>
                         <div className="flex items-center gap-2">
                             <div className="flex flex-wrap items-center gap-x-2 gap-y-1 text-muted-foreground text-[8px] md:text-sm tracking-wider uppercase font-black opacity-60 leading-tight md:leading-relaxed">
-                                <span>Financial Health</span>
-                                <span className="text-blue-500">•</span>
                                 <span>Operational Efficiency</span>
                                 <span className="text-blue-500">•</span>
                                 <span>Growth Analytics</span>
@@ -452,23 +505,7 @@ export default function AdminDashboard() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 px-2 md:px-0">
-                    <KPICard
-                        title="Today's Revenue"
-                        value={`₹${calculatedStats.todayCollection.toLocaleString()}`}
-                        icon={<IndianRupee className="w-4 h-4 text-emerald-400" />}
-                        trend="Real-time Flow"
-                        className="bg-emerald-500/5 border-emerald-500/10 cursor-pointer hover:bg-emerald-500/10 transition-all"
-                        onClick={() => router.push("/admin/payments")}
-                    />
-                    <KPICard
-                        title="Outstanding Fee Payment"
-                        value={`₹${((calculatedStats.finance?.totalFee || 0) - (calculatedStats.finance?.totalPaid || 0)).toLocaleString()}`}
-                        icon={<Database className="w-4 h-4 text-rose-400" />}
-                        trend="Fee Payment Recovery"
-                        className="bg-rose-500/5 border-rose-500/10 cursor-pointer hover:bg-rose-500/10 transition-all"
-                        onClick={() => router.push("/admin/fees/pending")}
-                    />
+                <div className="grid grid-cols-2 gap-4 px-2 md:px-0 max-w-2xl">
                     <KPICard
                         title="Active Faculty"
                         value={calculatedStats.totalStaff}
@@ -661,51 +698,87 @@ export default function AdminDashboard() {
                     </div>
                 </div>
 
-                {/* Redesigned Fee Collection Overview Card */}
-                <div className="bg-gradient-to-br from-[#1a2b4b] via-[#101b33] to-[#0a1122] border border-[#3b82f6]/20 rounded-2xl p-3.5 shrink-0 flex flex-col justify-between shadow-2xl">
-                    <div className="flex justify-between items-center mb-3">
-                        <div className="flex items-center gap-2">
-                            <div className="p-1.5 rounded-lg bg-blue-500/10 text-blue-400">
-                                <Wallet size={14} />
-                            </div>
-                            <span className="text-xs font-bold text-white uppercase tracking-wider">Fee Collection Overview</span>
+                {/* Redesigned Fee Collection Overview Card (Mobile World Class) */}
+                <div className="p-4 rounded-[1.5rem] bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#020617] border border-indigo-500/30 shadow-[0_0_30px_-10px_rgba(79,70,229,0.3)] ring-1 ring-white/5 relative overflow-hidden shrink-0">
+                    {/* Intricate Background Elements */}
+                    <div className="absolute top-0 right-0 w-32 h-32 bg-indigo-500/20 rounded-full blur-[40px] -mr-10 -mt-10 pointer-events-none" />
+                    <div className="absolute bottom-0 left-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-[30px] -ml-8 -mb-8 pointer-events-none" />
+                    
+                    <div className="flex justify-between items-center mb-4 relative z-10">
+                        <div className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-full bg-indigo-500/10 border border-indigo-500/20">
+                            <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                            <span className="text-[8px] font-black uppercase tracking-[0.2em] text-indigo-300">Live Financial Status</span>
                         </div>
-                        <div className="p-1.5 rounded-full bg-white/5 text-zinc-400">
-                            <Filter size={10} />
-                        </div>
-                    </div>
-                    <div className="grid grid-cols-2 gap-3">
-                        <div>
-                            <div className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Pending Fees</div>
-                            <div className="text-lg font-bold text-white font-mono mt-1">
-                                ₹{((calculatedStats.finance?.totalFee || 0) - (calculatedStats.finance?.totalPaid || 0)).toLocaleString()}
-                            </div>
-                            <div className="text-[8px] text-zinc-500 italic mt-0.5">From all fee categories</div>
-                        </div>
-                        <div className="text-right">
-                            <div className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Collection Progress</div>
-                            <div className="text-lg font-bold text-[#64FFDA] font-mono mt-1">
-                                {calculatedStats.finance?.totalFee ? Math.round((calculatedStats.finance.totalPaid / calculatedStats.finance.totalFee) * 100) : 0}%
-                            </div>
-                            <div className="text-[8px] text-zinc-500 italic mt-0.5">
-                                ₹{(calculatedStats.finance?.totalPaid || 0).toLocaleString()} of ₹{(calculatedStats.finance?.totalFee || 0).toLocaleString()}
-                            </div>
-                        </div>
-                        <div className="col-span-2 w-full h-1.5 bg-white/5 rounded-full mt-1.5 overflow-hidden">
-                            <div 
-                                className="h-full bg-gradient-to-r from-blue-500 to-[#64FFDA] transition-all duration-1000" 
-                                style={{ width: `${calculatedStats.finance?.totalFee ? (calculatedStats.finance.totalPaid / calculatedStats.finance.totalFee) * 100 : 0}%` }}
+                        <div className="scale-90 origin-right">
+                            <CardFilter 
+                                villages={villages} classes={classes} sections={sections}
+                                filterVillage={filterVillage} setFilterVillage={setFilterVillage}
+                                filterClass={filterClass} setFilterClass={setFilterClass}
+                                filterSection={filterSection} setFilterSection={setFilterSection} size="xs"
                             />
                         </div>
-                        <div className="mt-1">
-                            <div className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Expected Collection</div>
-                            <div className="text-xs font-bold text-purple-300 font-mono mt-1">
-                                ₹{(calculatedStats.finance?.totalFee || 0).toLocaleString()}
+                    </div>
+                    
+                    <div className="flex flex-row items-center gap-4 relative z-10">
+                        {/* Left side Pie Chart */}
+                        <div className="h-[100px] w-[100px] shrink-0 relative flex justify-center items-center">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <RePieChart>
+                                    <Pie
+                                        data={[
+                                            { name: 'PAID FEE', value: calculatedStats.finance?.totalPaid || 0 },
+                                            { name: 'PENDING FEE', value: Math.max(0, (calculatedStats.finance?.totalFee || 0) - (calculatedStats.finance?.totalPaid || 0)) }
+                                        ]}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={35}
+                                        outerRadius={50}
+                                        paddingAngle={5}
+                                        dataKey="value"
+                                        stroke="rgba(255,255,255,0.05)"
+                                        strokeWidth={1}
+                                        cornerRadius={4}
+                                    >
+                                        <Cell fill="url(#colorPaidMob)" />
+                                        <Cell fill="url(#colorPendingMob)" />
+                                    </Pie>
+                                    <defs>
+                                        <linearGradient id="colorPaidMob" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="#34d399" stopOpacity={1}/>
+                                            <stop offset="100%" stopColor="#059669" stopOpacity={1}/>
+                                        </linearGradient>
+                                        <linearGradient id="colorPendingMob" x1="0" y1="0" x2="0" y2="1">
+                                            <stop offset="0%" stopColor="#fb7185" stopOpacity={1}/>
+                                            <stop offset="100%" stopColor="#e11d48" stopOpacity={1}/>
+                                        </linearGradient>
+                                    </defs>
+                                </RePieChart>
+                            </ResponsiveContainer>
+                            <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                <span className="text-[14px] font-black font-display text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70">
+                                    {calculatedStats.finance?.totalFee ? Math.round((calculatedStats.finance.totalPaid / calculatedStats.finance.totalFee) * 100) : 0}%
+                                </span>
                             </div>
                         </div>
-                        <div className="text-right mt-1">
-                            <div className="text-[10px] text-zinc-400 font-bold uppercase tracking-wider">Academic Year</div>
-                            <div className="text-xs font-bold text-blue-300 font-mono mt-1">{selectedYear}</div>
+                        
+                        {/* Right side Stats */}
+                        <div className="flex-1 flex flex-col justify-center gap-2.5">
+                            <div>
+                                <p className="text-[8px] font-black uppercase tracking-[0.2em] text-blue-400/80">TOTAL EXPECTED</p>
+                                <h3 className="text-xl font-display font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-indigo-100 to-indigo-300 tracking-tight">
+                                    ₹{(calculatedStats.finance?.totalFee || 0).toLocaleString()}
+                                </h3>
+                            </div>
+                            <div className="grid grid-cols-2 gap-2">
+                                <div>
+                                    <p className="text-[7px] font-black uppercase tracking-[0.1em] text-emerald-400">PAID FEE</p>
+                                    <p className="text-sm font-display font-bold text-white leading-none mt-0.5">₹{(calculatedStats.finance?.totalPaid || 0).toLocaleString()}</p>
+                                </div>
+                                <div>
+                                    <p className="text-[7px] font-black uppercase tracking-[0.1em] text-rose-400">PENDING FEE</p>
+                                    <p className="text-sm font-display font-bold text-white leading-none mt-0.5">₹{Math.max(0, (calculatedStats.finance?.totalFee || 0) - (calculatedStats.finance?.totalPaid || 0)).toLocaleString()}</p>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
@@ -737,17 +810,17 @@ export default function AdminDashboard() {
                                             </div>
                                             {/* Details */}
                                             <div className="flex-1 min-w-0 space-y-0.5 text-[8px]">
-                                                <div className="flex justify-between items-center text-zinc-500 font-semibold">
-                                                    <span>TOTAL</span>
-                                                    <span className="text-white font-mono">₹{data.total.toLocaleString()}</span>
+                                                <div className="flex justify-between items-center text-blue-400 font-semibold">
+                                                    <span>TOTAL FEE:</span>
+                                                    <span className="text-white font-mono font-bold">₹{data.total.toLocaleString()}</span>
                                                 </div>
                                                 <div className="flex justify-between items-center text-emerald-400 font-semibold">
-                                                    <span>PAID</span>
-                                                    <span className="text-white font-mono">₹{data.paid.toLocaleString()}</span>
+                                                    <span>PAID FEE:</span>
+                                                    <span className="text-white font-mono font-bold">₹{data.paid.toLocaleString()}</span>
                                                 </div>
                                                 <div className="flex justify-between items-center text-rose-400 font-semibold">
-                                                    <span>PENDING</span>
-                                                    <span className="text-white font-mono">₹{(data.total - data.paid).toLocaleString()}</span>
+                                                    <span>PENDING FEE:</span>
+                                                    <span className="text-white font-mono font-bold">₹{(data.total - data.paid).toLocaleString()}</span>
                                                 </div>
                                             </div>
                                         </div>
@@ -798,17 +871,17 @@ export default function AdminDashboard() {
                                         </div>
                                         {/* Details */}
                                         <div className="flex-1 min-w-0 space-y-0.5 text-[8px]">
-                                            <div className="flex justify-between items-center text-zinc-500 font-semibold">
-                                                <span>TOTAL</span>
-                                                <span className="text-white font-mono">₹{fee.total.toLocaleString()}</span>
+                                            <div className="flex justify-between items-center text-blue-400 font-semibold">
+                                                <span>TOTAL FEE:</span>
+                                                <span className="text-white font-mono font-bold">₹{fee.total.toLocaleString()}</span>
                                             </div>
                                             <div className="flex justify-between items-center text-emerald-400 font-semibold">
-                                                <span>PAID</span>
-                                                <span className="text-white font-mono">₹{fee.paid.toLocaleString()}</span>
+                                                <span>PAID FEE:</span>
+                                                <span className="text-white font-mono font-bold">₹{fee.paid.toLocaleString()}</span>
                                             </div>
                                             <div className="flex justify-between items-center text-rose-400 font-semibold">
-                                                <span>PENDING</span>
-                                                <span className="text-white font-mono">₹{(fee.total - fee.paid).toLocaleString()}</span>
+                                                <span>PENDING FEE:</span>
+                                                <span className="text-white font-mono font-bold">₹{(fee.total - fee.paid).toLocaleString()}</span>
                                             </div>
                                         </div>
                                     </div>
@@ -1006,9 +1079,12 @@ export default function AdminDashboard() {
 
                         <div className="space-y-6">
                             {/* MASTER SUMMARY CARD */}
-                            <div className="p-8 rounded-[2rem] bg-gradient-to-br from-indigo-600/20 via-blue-600/10 to-transparent border border-indigo-500/20 relative overflow-hidden group/master">
-                                <div className="absolute top-0 right-0 w-64 h-64 bg-indigo-500/5 rounded-full -mr-32 -mt-32 blur-3xl group-hover/master:bg-indigo-500/10 transition-all duration-1000" />
-                                <div className="absolute top-6 right-6 z-20">
+                            <div className="p-6 md:p-8 rounded-[2rem] bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#020617] border border-indigo-500/30 shadow-[0_0_60px_-15px_rgba(79,70,229,0.3)] ring-1 ring-white/5 relative overflow-hidden group/master backdrop-blur-2xl">
+                                {/* Intricate Background Elements */}
+                                <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500/20 rounded-full blur-[100px] -mr-48 -mt-48 transition-all duration-1000 group-hover/master:bg-indigo-500/30 mix-blend-screen pointer-events-none" />
+                                <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-emerald-500/10 rounded-full blur-[100px] -ml-32 -mb-32 mix-blend-screen pointer-events-none" />
+                                
+                                <div className="absolute top-6 right-8 z-20">
                                     <CardFilter 
                                         villages={villages} classes={classes} sections={sections}
                                         filterVillage={filterVillage} setFilterVillage={setFilterVillage}
@@ -1016,29 +1092,96 @@ export default function AdminDashboard() {
                                         filterSection={filterSection} setFilterSection={setFilterSection}
                                     />
                                 </div>
-                                <div className="grid grid-cols-1 md:grid-cols-2 gap-8 relative z-10">
-                                    <div className="space-y-2">
-                                        <div className="flex items-center gap-2 text-indigo-400">
-                                            <div className="w-1.5 h-6 bg-indigo-500 rounded-full" />
-                                            <span className="text-[10px] font-black uppercase tracking-[0.2em]">Total Outstanding Revenue</span>
+                                
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 relative z-10 items-center">
+                                    {/* Left side Pie Chart */}
+                                    <div className="lg:col-span-5 h-[200px] w-full relative flex justify-center items-center">
+                                        <div className="absolute inset-0 bg-white/5 rounded-full blur-3xl" />
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <RePieChart>
+                                                <Pie
+                                                    data={[
+                                                        { name: 'PAID FEE', value: calculatedStats.finance?.totalPaid || 0 },
+                                                        { name: 'PENDING FEE', value: Math.max(0, (calculatedStats.finance?.totalFee || 0) - (calculatedStats.finance?.totalPaid || 0)) }
+                                                    ]}
+                                                    cx="50%"
+                                                    cy="50%"
+                                                    innerRadius={80}
+                                                    outerRadius={110}
+                                                    paddingAngle={8}
+                                                    dataKey="value"
+                                                    stroke="rgba(255,255,255,0.1)"
+                                                    strokeWidth={2}
+                                                    cornerRadius={8}
+                                                >
+                                                    <Cell fill="url(#colorPaid)" filter="drop-shadow(0px 0px 8px rgba(16,185,129,0.5))" />
+                                                    <Cell fill="url(#colorPending)" filter="drop-shadow(0px 0px 8px rgba(244,63,94,0.5))" />
+                                                </Pie>
+                                                <defs>
+                                                    <linearGradient id="colorPaid" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="0%" stopColor="#34d399" stopOpacity={1}/>
+                                                        <stop offset="100%" stopColor="#059669" stopOpacity={1}/>
+                                                    </linearGradient>
+                                                    <linearGradient id="colorPending" x1="0" y1="0" x2="0" y2="1">
+                                                        <stop offset="0%" stopColor="#fb7185" stopOpacity={1}/>
+                                                        <stop offset="100%" stopColor="#e11d48" stopOpacity={1}/>
+                                                    </linearGradient>
+                                                </defs>
+                                                <ReTooltip 
+                                                    formatter={(value: number) => `₹${value.toLocaleString()}`}
+                                                    contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)' }}
+                                                    itemStyle={{ color: '#fff', fontSize: '14px', fontWeight: 'bold' }}
+                                                />
+                                            </RePieChart>
+                                        </ResponsiveContainer>
+                                        <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
+                                            <span className="text-[10px] font-black uppercase text-indigo-200/60 tracking-[0.2em] mb-0.5">Collection</span>
+                                            <span className="text-3xl font-black font-display text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70 tracking-tighter filter drop-shadow-[0_2px_10px_rgba(255,255,255,0.2)]">
+                                                {calculatedStats.finance?.totalFee ? Math.round((calculatedStats.finance.totalPaid / calculatedStats.finance.totalFee) * 100) : 0}%
+                                            </span>
                                         </div>
-                                        <h3 className="text-4xl md:text-6xl font-display font-bold text-white italic tracking-tighter">
-                                            ₹{((calculatedStats.finance?.totalFee || 0) - (calculatedStats.finance?.totalPaid || 0)).toLocaleString()}
-                                        </h3>
-                                        <p className="text-xs text-muted-foreground italic">Combined Outstanding: School + Transport + Custom Fees</p>
                                     </div>
-                                    <div className="flex flex-col justify-end md:items-end gap-1">
-                                        <p className="text-[10px] font-black uppercase tracking-widest text-muted-foreground">Total Combined Target</p>
-                                        <p className="text-2xl md:text-3xl font-display font-bold text-indigo-300/80 italic">₹{(calculatedStats.finance?.totalFee || 0).toLocaleString()}</p>
-                                        <div className="w-full md:w-48 h-1 bg-white/5 rounded-full mt-2 overflow-hidden">
-                                            <div 
-                                                className="h-full bg-indigo-500 transition-all duration-1000" 
-                                                style={{ width: `${calculatedStats.finance?.totalFee ? (calculatedStats.finance.totalPaid / calculatedStats.finance.totalFee) * 100 : 0}%` }}
-                                            />
+                                    
+                                    {/* Right side Stats */}
+                                    <div className="lg:col-span-7 flex flex-col gap-6">
+                                        <div className="space-y-1">
+                                            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 mb-1">
+                                                <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
+                                                <span className="text-[9px] font-black uppercase tracking-[0.2em] text-indigo-300">Live Financial Status</span>
+                                            </div>
+                                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-400/80 pl-1">TOTAL FEE EXPECTED</p>
+                                            <h3 className="text-4xl md:text-5xl font-display font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-indigo-100 to-indigo-300 tracking-tight filter drop-shadow-lg">
+                                                ₹{(calculatedStats.finance?.totalFee || 0).toLocaleString()}
+                                            </h3>
                                         </div>
-                                        <p className="text-[10px] text-indigo-400/60 font-mono mt-1">
-                                            Collection Progress: {calculatedStats.finance?.totalFee ? Math.round((calculatedStats.finance.totalPaid / calculatedStats.finance.totalFee) * 100) : 0}%
-                                        </p>
+                                        
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                            <div className="relative overflow-hidden group/stat p-5 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-emerald-900/10 border border-emerald-500/20 backdrop-blur-md shadow-lg transition-all hover:border-emerald-400/40">
+                                                <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl -mr-12 -mt-12 transition-all group-hover/stat:bg-emerald-500/20" />
+                                                <div className="relative z-10 space-y-1.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400"><TrendingUp size={12} /></div>
+                                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">PAID FEE</p>
+                                                    </div>
+                                                    <p className="text-2xl md:text-3xl font-display font-bold text-white tracking-tight">
+                                                        ₹{(calculatedStats.finance?.totalPaid || 0).toLocaleString()}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            
+                                            <div className="relative overflow-hidden group/stat p-5 rounded-2xl bg-gradient-to-br from-rose-500/10 to-rose-900/10 border border-rose-500/20 backdrop-blur-md shadow-lg transition-all hover:border-rose-400/40">
+                                                <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/10 rounded-full blur-xl -mr-12 -mt-12 transition-all group-hover/stat:bg-rose-500/20" />
+                                                <div className="relative z-10 space-y-1.5">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="p-1 rounded-lg bg-rose-500/20 text-rose-400"><AlertTriangle size={12} /></div>
+                                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-400">PENDING FEE</p>
+                                                    </div>
+                                                    <p className="text-2xl md:text-3xl font-display font-bold text-white tracking-tight">
+                                                        ₹{Math.max(0, (calculatedStats.finance?.totalFee || 0) - (calculatedStats.finance?.totalPaid || 0)).toLocaleString()}
+                                                    </p>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 </div>
                             </div>
@@ -1075,34 +1218,34 @@ export default function AdminDashboard() {
                                         };
                                     })
                                 ].map((fee, idx) => (
-                                    <div key={idx} className="p-6 rounded-3xl bg-black/40 border border-white/5 flex flex-col items-center justify-center text-center gap-4 group/item hover:border-white/20 transition-all relative min-h-[260px]">
+                                    <div key={idx} className="p-5 rounded-2xl bg-[#131e35]/80 border border-white/10 flex flex-col items-center justify-center text-center gap-3 group/item hover:border-[#64FFDA]/30 transition-all relative min-h-[220px] shadow-xl">
                                         <div className="absolute top-4 right-4 z-20 opacity-0 group-hover/item:opacity-100 transition-opacity"><CardFilter villages={villages} classes={classes} sections={sections} filterVillage={filterVillage} setFilterVillage={setFilterVillage} filterClass={filterClass} setFilterClass={setFilterClass} filterSection={filterSection} setFilterSection={setFilterSection} size="xs" /></div>
                                         
-                                        <div className="relative w-16 h-16 md:w-20 md:h-20">
+                                        <div className="relative w-14 h-14 md:w-16 md:h-16">
                                             <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
                                                 <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(255,255,255,0.05)" strokeWidth="3" />
                                                 <circle cx="18" cy="18" r="16" fill="none" stroke={fee.color} strokeWidth="3" strokeDasharray={`${fee.total > 0 ? (fee.paid / fee.total) * 100 : 0} 100`} strokeDashoffset="0" className="transition-all duration-1000 ease-out" />
                                             </svg>
-                                            <div className="absolute inset-0 flex items-center justify-center"><fee.icon className="w-6 h-6 text-white/20" /></div>
+                                            <div className="absolute inset-0 flex items-center justify-center"><fee.icon className="w-6 h-6 text-white/50" /></div>
                                         </div>
                                         
-                                        <div className="w-full space-y-1">
-                                            <p className="text-[10px] font-black uppercase text-muted-foreground tracking-widest">{fee.label}</p>
-                                            <div className="flex flex-col gap-1">
-                                                <div className="flex justify-between items-center text-[10px] md:text-xs">
-                                                    <span className="text-emerald-400 font-bold">Paid:</span>
-                                                    <span className="text-white font-mono">₹{fee.paid.toLocaleString()}</span>
+                                        <div className="w-full space-y-2">
+                                            <p className="text-xs font-black uppercase text-white tracking-widest">{fee.label}</p>
+                                            <div className="flex flex-col gap-1.5 bg-black/20 p-3 rounded-xl border border-white/5">
+                                                <div className="flex justify-between items-center text-xs md:text-sm">
+                                                    <span className="text-blue-400 font-bold">TOTAL FEE:</span>
+                                                    <span className="text-white font-mono font-bold">₹{fee.total.toLocaleString()}</span>
                                                 </div>
-                                                <div className="flex justify-between items-center text-[10px] md:text-xs">
-                                                    <span className="text-rose-400 font-bold">Pending:</span>
-                                                    <span className="text-white font-mono">₹{(fee.total - fee.paid).toLocaleString()}</span>
+                                                <div className="flex justify-between items-center text-xs md:text-sm">
+                                                    <span className="text-emerald-400 font-bold">PAID FEE:</span>
+                                                    <span className="text-white font-mono font-bold">₹{fee.paid.toLocaleString()}</span>
                                                 </div>
-                                                <div className="flex justify-between items-center text-[10px] md:text-xs border-t border-white/5 pt-1 mt-1">
-                                                    <span className="text-blue-400 font-bold">Total:</span>
-                                                    <span className="text-white font-mono">₹{fee.total.toLocaleString()}</span>
+                                                <div className="flex justify-between items-center text-xs md:text-sm border-t border-white/10 pt-1.5 mt-0.5">
+                                                    <span className="text-rose-400 font-bold">PENDING FEE:</span>
+                                                    <span className="text-white font-mono font-bold">₹{(fee.total - fee.paid).toLocaleString()}</span>
                                                 </div>
                                             </div>
-                                            <div className="mt-2 text-[8px] font-black uppercase text-white/40 tracking-tighter pt-2 italic">
+                                            <div className="mt-2 text-[10px] font-black uppercase text-white/40 tracking-tighter pt-2 italic">
                                                 Progress: {fee.total > 0 ? Math.round((fee.paid / fee.total) * 100) : 0}%
                                             </div>
                                         </div>
@@ -1112,28 +1255,28 @@ export default function AdminDashboard() {
 
                             <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
                                 {Object.entries(calculatedStats.finance?.terms || {}).sort().map(([name, data]) => (
-                                    <div key={name} className="p-4 rounded-2xl bg-blue-500/5 border border-blue-500/10 flex flex-col items-center text-center gap-3">
+                                    <div key={name} className="p-4 rounded-2xl bg-[#131e35]/80 border border-white/10 hover:border-[#64FFDA]/30 flex flex-col items-center text-center gap-3 transition-all shadow-xl">
                                         <div className="relative w-12 h-12">
                                             <svg viewBox="0 0 36 36" className="w-full h-full transform -rotate-90">
                                                 <circle cx="18" cy="18" r="16" fill="none" stroke="rgba(59, 130, 246, 0.1)" strokeWidth="3" />
                                                 <circle cx="18" cy="18" r="16" fill="none" stroke="#60a5fa" strokeWidth="3" strokeDasharray={`${data.total > 0 ? (data.paid / data.total) * 100 : 0} 100`} strokeDashoffset="0" />
                                             </svg>
-                                            <div className="absolute inset-0 flex items-center justify-center"><BookOpen className="w-4 h-4 text-blue-500/30" /></div>
+                                            <div className="absolute inset-0 flex items-center justify-center"><BookOpen className="w-4 h-4 text-blue-500/50" /></div>
                                         </div>
                                         <div className="w-full space-y-2">
-                                            <p className="text-[9px] font-black uppercase text-blue-400 tracking-widest">{name}</p>
-                                            <div className="flex flex-col gap-0.5">
-                                                <div className="flex justify-between text-[8px] md:text-[10px]">
-                                                    <span className="text-emerald-400/80">Paid:</span>
-                                                    <span className="text-white/60 font-mono">₹{data.paid.toLocaleString()}</span>
+                                            <p className="text-xs font-black uppercase text-white tracking-widest">{name}</p>
+                                            <div className="flex flex-col gap-1.5 bg-black/20 p-2 rounded-xl border border-white/5">
+                                                <div className="flex justify-between text-xs md:text-sm">
+                                                    <span className="text-blue-400 font-bold">TOTAL FEE:</span>
+                                                    <span className="text-white font-mono font-bold">₹{data.total.toLocaleString()}</span>
                                                 </div>
-                                                <div className="flex justify-between text-[8px] md:text-[10px]">
-                                                    <span className="text-rose-400/80">Left:</span>
-                                                    <span className="text-white/60 font-mono">₹{(data.total - data.paid).toLocaleString()}</span>
+                                                <div className="flex justify-between text-xs md:text-sm">
+                                                    <span className="text-emerald-400 font-bold">PAID FEE:</span>
+                                                    <span className="text-white font-mono font-bold">₹{data.paid.toLocaleString()}</span>
                                                 </div>
-                                                <div className="flex justify-between text-[8px] md:text-[10px] border-t border-white/5 pt-0.5">
-                                                    <span className="text-blue-400/80">Total:</span>
-                                                    <span className="text-white/60 font-mono">₹{data.total.toLocaleString()}</span>
+                                                <div className="flex justify-between text-xs md:text-sm border-t border-white/10 pt-1 mt-0.5">
+                                                    <span className="text-rose-400 font-bold">PENDING FEE:</span>
+                                                    <span className="text-white font-mono font-bold">₹{(data.total - data.paid).toLocaleString()}</span>
                                                 </div>
                                             </div>
                                         </div>

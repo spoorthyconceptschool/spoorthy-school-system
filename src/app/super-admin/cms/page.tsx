@@ -16,7 +16,7 @@ import { useAuth } from "@/context/AuthContext";
 const CMS_CACHE_KEY = "spoorthy_cms_cache";
 const DEFAULT_CMS_DATA = {
     hero: {
-        title: "Welcome to Spoorthy Concept School",
+        title: "Welcome to Spoorthy High School",
         subtitle: "Nurturing Minds, Shaping Futures with Academic Excellence",
         videoUrl: "",
         tourVideoUrl: ""
@@ -141,7 +141,7 @@ export default function CMSPage() {
         }
     };
 
-    const handleLocalUpload = async (file: File, pathPrefix: string, onUpload: (url: string) => void) => {
+    const handleLocalUpload = async (file: File, pathPrefix: string, onUpload: (url: string) => void, oldUrl?: string) => {
         try {
             // Check file size (set to max 200MB as requested)
             const MAX_FILE_SIZE = 200 * 1024 * 1024; // 200 MB
@@ -154,7 +154,7 @@ export default function CMSPage() {
             const token = await user?.getIdToken();
             if (!token) throw new Error("Not authenticated");
 
-            const url = await uploadFile(file, `siteMedia/home/${pathPrefix}`, token);
+            const url = await uploadFile(file, `siteMedia/home/${pathPrefix}`, token, oldUrl);
             onUpload(url);
         } catch (e: any) {
             console.error(e);
@@ -276,7 +276,7 @@ export default function CMSPage() {
                                                     id="hero-video-upload"
                                                     onChange={(e) => {
                                                         const file = e.target.files?.[0];
-                                                        if (file) handleLocalUpload(file, 'hero', (url) => setData((prev: any) => ({ ...prev, hero: { ...prev.hero, videoUrl: url } })));
+                                                        if (file) handleLocalUpload(file, 'hero', (url) => setData((prev: any) => ({ ...prev, hero: { ...prev.hero, videoUrl: url } })), data.hero?.videoUrl);
                                                     }}
                                                 />
                                                 <Label htmlFor="hero-video-upload" className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl cursor-pointer text-xs font-bold shadow-xl active:scale-95 transition-all flex items-center gap-2">
@@ -314,7 +314,7 @@ export default function CMSPage() {
                                                     id="hero-mobile-video-upload"
                                                     onChange={(e) => {
                                                         const file = e.target.files?.[0];
-                                                        if (file) handleLocalUpload(file, 'hero-mobile', (url) => setData((prev: any) => ({ ...prev, hero: { ...prev.hero, mobileVideoUrl: url } })));
+                                                        if (file) handleLocalUpload(file, 'hero-mobile', (url) => setData((prev: any) => ({ ...prev, hero: { ...prev.hero, mobileVideoUrl: url } })), data.hero?.mobileVideoUrl);
                                                     }}
                                                 />
                                                 <Label htmlFor="hero-mobile-video-upload" className="bg-indigo-600 hover:bg-indigo-500 text-white px-5 py-2.5 rounded-xl cursor-pointer text-xs font-bold shadow-xl active:scale-95 transition-all flex items-center gap-2">
@@ -458,7 +458,7 @@ export default function CMSPage() {
                                                                         [key]: { ...prev.facilities[key], image: url }
                                                                     }
                                                                 }));
-                                                            });
+                                                            }, item.image);
                                                         }}
                                                     />
                                                     <Upload className="w-4 h-4 text-white" />
@@ -506,7 +506,7 @@ export default function CMSPage() {
                                                                 ...prev.leadership,
                                                                 [role]: { ...prev.leadership[role], photo: url }
                                                             }
-                                                        })));
+                                                        })), data.leadership?.[role]?.photo);
                                                     }}
                                                 />
                                                 <Upload className="w-5 h-5 text-white mb-1" />
@@ -626,8 +626,24 @@ export default function CMSPage() {
 
                                     {/* Remove Button */}
                                     <div
-                                        onClick={(e) => {
+                                        onClick={async (e) => {
                                             e.stopPropagation();
+                                            const targetUrl = url;
+                                            if (targetUrl) {
+                                                try {
+                                                    const token = await user?.getIdToken();
+                                                    await fetch("/api/admin/media/delete", {
+                                                        method: "POST",
+                                                        headers: {
+                                                            "Content-Type": "application/json",
+                                                            "Authorization": `Bearer ${token}`
+                                                        },
+                                                        body: JSON.stringify({ url: targetUrl })
+                                                    });
+                                                } catch (err) {
+                                                    console.warn("Failed to delete gallery image from storage:", err);
+                                                }
+                                            }
                                             const newGallery = [...(data.gallery || [])];
                                             newGallery.splice(idx, 1);
                                             setData({ ...data, gallery: newGallery });
@@ -654,7 +670,7 @@ export default function CMSPage() {
                                                             newGallery[idx] = url;
                                                             return { ...prev, gallery: newGallery };
                                                         });
-                                                    });
+                                                    }, url);
                                                 }}
                                             />
                                             <Label

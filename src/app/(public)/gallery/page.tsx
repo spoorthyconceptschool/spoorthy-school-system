@@ -89,7 +89,7 @@ export default function SmoothParallaxGallery() {
                         transition={{ delay: 0.2 }}
                         className="text-zinc-400 max-w-xl text-lg font-light leading-relaxed border-l-2 border-indigo-500 pl-6"
                     >
-                        Explore the vibrant tapestry of school life. From academic breakthroughs to championship wins, witness the journey of Spoorthy Concept School.
+                        Explore the vibrant tapestry of school life. From academic breakthroughs to championship wins, witness the journey of Spoorthy High School.
                     </motion.p>
                 </div>
 
@@ -169,7 +169,6 @@ function ParallaxImage({ item, index, onClick, speed, priority = false }: { item
                             src={item.src}
                             alt={item.title || "Gallery Image"}
                             fill
-                            unoptimized
                             className="object-cover transition-transform duration-700 will-change-transform group-hover:scale-110 opacity-90 group-hover:opacity-100"
                             sizes="(max-width: 768px) 100vw, 33vw"
                             priority={priority}

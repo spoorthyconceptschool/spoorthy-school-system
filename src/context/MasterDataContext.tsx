@@ -130,7 +130,7 @@ const initialState: MasterDataState = {
     homeworkSubjects: {},
     roles: {},
     branding: {
-        schoolName: "Spoorthy Concept School",
+        schoolName: "Spoorthy High School",
         address: "Miyapur, Hyderabad",
         schoolLogo: "",
         principalSignature: "",
@@ -227,12 +227,9 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
     // Helper to persist data
     useEffect(() => {
         if (typeof window !== "undefined" && !data.loading) {
-            // WE REMOVE BRANDING FROM CACHE TO PREVENT STALE LOGO FLICKER ("No Footprints")
-            const cacheData = { ...data };
-            delete (cacheData as any).branding;
-            localStorage.setItem(MASTER_CACHE_KEY, JSON.stringify(cacheData));
+            localStorage.setItem(MASTER_CACHE_KEY, JSON.stringify(data));
         }
-    }, [data.classes, data.sections, data.villages, data.subjects]);
+    }, [data.classes, data.sections, data.villages, data.subjects, data.branding]);
 
     // 1. RTDB Sync for Master Data & Branding
     useEffect(() => {
@@ -412,6 +409,15 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
         return () => unsub();
     }, []);
 
+    useEffect(() => {
+        if (typeof window !== 'undefined' && data.branding?.schoolLogo) {
+            const links = document.querySelectorAll("link[rel*='icon']");
+            links.forEach((link) => {
+                (link as HTMLLinkElement).href = data.branding!.schoolLogo;
+            });
+        }
+    }, [data.branding?.schoolLogo]);
+
     // 4. Authenticated Real-time Sync for Core Directories
     const { role, user, userData } = useAuth();
     useEffect(() => {
@@ -482,14 +488,14 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
             if (snap.exists()) {
                 setData(prev => ({ ...prev, feeConfig: snap.data() as any }));
             }
-        });
+        }, (err) => console.warn("[MasterData] Fee Config Sync Error:", err.message));
 
         // Sync Custom Fees
         const customFeesQ = query(collection(db, "custom_fees"), where("status", "==", "ACTIVE"));
         const customFeesUnsub = onSnapshot(customFeesQ, (snap) => {
             const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             setData(prev => ({ ...prev, customFees: list }));
-        });
+        }, (err) => console.warn("[MasterData] Custom Fees Sync Error:", err.message));
 
         return () => {
             feeConfigUnsub();

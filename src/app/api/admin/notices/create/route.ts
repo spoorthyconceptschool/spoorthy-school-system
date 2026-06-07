@@ -41,7 +41,11 @@ export async function POST(req: NextRequest) {
 
         // Validate Type
         const noticeType = type === "HOLIDAY" ? "HOLIDAY" : "REGULAR";
-        const audience = target || (noticeType === "HOLIDAY" ? "ALL" : "ALL");
+        let audience = target || (noticeType === "HOLIDAY" ? "ALL" : "ALL");
+        
+        if (actorRole === "MANAGER") {
+            audience = "STUDENTS";
+        }
         const actorSchoolId = userDoc.data()?.schoolId || "global";
         
         const noticeRef = adminDb.collection("notices").doc();
@@ -153,7 +157,7 @@ export async function POST(req: NextRequest) {
                     },
                     webpush: {
                         fcmOptions: {
-                            link: "https://spoorthy-16292.web.app/notifications"
+                            link: `${process.env.NEXT_PUBLIC_APP_URL || "https://spoorthyhighschool.in"}/notifications`
                         },
                         notification: {
                             icon: "https://firebasestorage.googleapis.com/v0/b/spoorthy-16292.firebasestorage.app/o/demo%2Flogo.png?alt=media"
@@ -161,7 +165,7 @@ export async function POST(req: NextRequest) {
                     },
                     data: {
                         type: "NOTICE",
-                        click_action: "https://spoorthy-16292.web.app/notifications"
+                        click_action: `${process.env.NEXT_PUBLIC_APP_URL || "https://spoorthyhighschool.in"}/notifications`
                     },
                     tokens: [] as string[]
                 };

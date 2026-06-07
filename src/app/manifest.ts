@@ -3,7 +3,7 @@ import { MetadataRoute } from 'next'
 export const dynamic = 'force-dynamic';
 
 export default async function manifest(): Promise<MetadataRoute.Manifest> {
-    let schoolName = 'Spoorthy Concept School';
+    let schoolName = 'Spoorthy High School';
     let shortName = 'Spoorthy';
     let iconUrl = '/icons/icon-192x192.png';
     let iconUrl512 = '/icons/icon-512x512.png';

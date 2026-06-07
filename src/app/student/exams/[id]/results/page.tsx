@@ -144,7 +144,7 @@ export default function ExamResultsPage({ params }: { params: Promise<{ id: stri
                             <Trophy className="w-16 h-16 text-yellow-500" />
                         )}
                         <div>
-                            <h1 className="text-3xl font-serif font-bold uppercase tracking-wide mb-2">Spoorthy Concept School</h1>
+                            <h1 className="text-3xl font-serif font-bold uppercase tracking-wide mb-2">Spoorthy High School</h1>
                             <p className="text-sm text-gray-500 font-medium tracking-widest uppercase">Excellence in Education</p>
                         </div>
                     </div>

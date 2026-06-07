@@ -215,7 +215,7 @@ export default function StudentHomeworkPage() {
                     </div>
                 </div>
 
-                {loading ? (
+                {loading && homework.length === 0 ? (
                     <div className="h-[40vh] w-full flex flex-col items-center justify-center gap-4 text-amber-400">
                         <Loader2 className="w-10 h-10 animate-spin" />
                         <p className="text-xs font-black uppercase tracking-widest text-[#8892B0] font-mono animate-pulse">
@@ -390,7 +390,7 @@ export default function StudentHomeworkPage() {
                                     <Check className="w-3.5 h-3.5" /> 
                                     <span>Faculty Checked</span>
                                 </div>
-                                <span>Spoorthy Concept School v2.5</span>
+                                <span>Spoorthy High School v2.5</span>
                             </div>
                         </div>
                     </div>
@@ -426,7 +426,7 @@ export default function StudentHomeworkPage() {
                     </div>
                 </div>
 
-                {loading ? (
+                {loading && homework.length === 0 ? (
                     <div className="flex-1 flex flex-col items-center justify-center py-20 gap-2">
                         <Loader2 className="w-8 h-8 text-amber-400 animate-spin" />
                         <p className="text-[9px] font-black uppercase tracking-widest text-neutral-500 animate-pulse">Unlocking Diary...</p>

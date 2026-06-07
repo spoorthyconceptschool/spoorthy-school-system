@@ -30,7 +30,7 @@ export function NotificationManager() {
                     if (holidayDate) {
                         toast({
                             title: "🎉 Holiday Declared!",
-                            description: `${data.title} on ${holidayDate.toLocaleDateString()}`,
+                            description: `${data.title} on ${holidayDate.toLocaleDateString('en-GB')}`,
                             type: "info",
                             duration: 10000
                         });

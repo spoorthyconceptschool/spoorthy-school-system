@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import { adminAuth, adminDb, FieldValue } from "@/lib/firebase-admin";
 
 export async function POST(req: NextRequest) {
     try {
@@ -136,6 +136,23 @@ export async function POST(req: NextRequest) {
             targetSchoolId: schoolId || "N/A",
             timestamp: new Date().toISOString()
         });
+
+        // Write targeted notification if the user is a STUDENT
+        if (role === "STUDENT" && resolvedUid) {
+            const actorDoc = await adminDb.collection("users").doc(decodedToken.uid).get();
+            const actorName = actorDoc.data()?.name || decodedToken.name || "Administrator";
+            
+            const notifRef = adminDb.collection("notifications").doc();
+            batch.set(notifRef, {
+                userId: resolvedUid,
+                title: "Password Changed 🔑",
+                message: `${actorName} changed your password.`,
+                type: "SECURITY",
+                status: "UNREAD",
+                target: "student",
+                createdAt: FieldValue.serverTimestamp()
+            });
+        }
 
         await batch.commit();
 

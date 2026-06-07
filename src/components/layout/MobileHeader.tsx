@@ -16,11 +16,27 @@ interface MobileHeaderProps {
 export function MobileHeader({ role, portalTitle, profileHref, leftTrigger }: MobileHeaderProps) {
     const { user, userData } = useAuth();
     const { branding } = useMasterData();
+    const [logoUrl, setLogoUrl] = useState("https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png");
     const [imageError, setImageError] = useState(false);
 
     useEffect(() => {
-        setImageError(false);
+        if (branding?.schoolLogo) {
+            setLogoUrl(branding.schoolLogo);
+            setImageError(false);
+        } else {
+            setLogoUrl("https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png");
+            setImageError(false);
+        }
     }, [branding?.schoolLogo]);
+
+    const handleImageError = () => {
+        const defaultLogo = "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png";
+        if (logoUrl !== defaultLogo) {
+            setLogoUrl(defaultLogo);
+        } else {
+            setImageError(true);
+        }
+    };
 
     // Extract first name and capitalize
     const name = userData?.name || user?.email?.split("@")[0] || "User";
@@ -38,12 +54,12 @@ export function MobileHeader({ role, portalTitle, profileHref, leftTrigger }: Mo
                 
                 {/* School Logo */}
                 <div className="w-8 h-8 rounded-full border border-white/20 bg-[#030712]/50 flex items-center justify-center p-0.5 overflow-hidden shrink-0 shadow-[0_0_10px_rgba(255,255,255,0.05)]">
-                    {!imageError && branding?.schoolLogo ? (
+                    {!imageError ? (
                         <img
-                            src={branding.schoolLogo}
+                            src={logoUrl}
                             alt="Logo"
                             className="w-full h-full object-contain filter drop-shadow-sm"
-                            onError={() => setImageError(true)}
+                            onError={handleImageError}
                         />
                     ) : (
                         <div className="w-full h-full bg-blue-500/10 flex items-center justify-center text-blue-400 font-bold font-display text-[10px]">

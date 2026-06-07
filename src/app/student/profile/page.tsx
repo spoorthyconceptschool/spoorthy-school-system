@@ -36,7 +36,7 @@ export default function StudentProfilePage() {
     const mappedSection = sections?.[profile?.sectionId]?.name || profile?.sectionName || "";
     const studentClass = mappedSection ? `${mappedClass} (${mappedSection})` : mappedClass;
     
-    const dob = profile?.dateOfBirth || "Not Specified";
+    const dob = profile?.dateOfBirth ? new Date(profile.dateOfBirth).toLocaleDateString('en-GB') : "Not Specified";
     const gender = profile?.gender || "Not Specified";
     const transport = profile?.transportRequired ? "Opted (Route Assigned)" : "Not Required";
     const parentMobile = profile?.parentMobile || profile?.phone || "Not Specified";
@@ -104,10 +104,14 @@ export default function StudentProfilePage() {
                                 {/* Divider line */}
                                 <div className="h-px bg-white/5 my-5" />
 
-                                <div className="grid grid-cols-2 gap-3 text-left select-none">
+                                <div className="grid grid-cols-3 gap-3 text-left select-none">
                                     <div className="space-y-0.5">
                                         <span className="text-[10px] font-black uppercase text-blue-200/50 tracking-wider font-sans">Academic Year</span>
                                         <p className="text-sm font-extrabold text-white">{academicYear}</p>
+                                    </div>
+                                    <div className="space-y-0.5">
+                                        <span className="text-[10px] font-black uppercase text-blue-200/50 tracking-wider font-sans">Roll No</span>
+                                        <p className="text-sm font-extrabold text-white">{profile?.rollNumber || "Not Assigned"}</p>
                                     </div>
                                     <div className="space-y-0.5">
                                         <span className="text-[10px] font-black uppercase text-blue-200/50 tracking-wider font-sans">Admission No</span>
@@ -318,6 +322,14 @@ export default function StudentProfilePage() {
                                         <div className="space-y-0.5">
                                             <label className="text-[10px] font-bold text-blue-200/70 uppercase tracking-widest block">Student ID</label>
                                             <div className="text-xs font-bold text-emerald-400 font-mono tracking-wider">{studentId}</div>
+                                        </div>
+                                        <div className="space-y-0.5">
+                                            <label className="text-[10px] font-bold text-blue-200/70 uppercase tracking-widest block">Roll No</label>
+                                            <div className="text-xs font-bold text-white truncate">{profile?.rollNumber || "Not Assigned"}</div>
+                                        </div>
+                                        <div className="space-y-0.5">
+                                            <label className="text-[10px] font-bold text-blue-200/70 uppercase tracking-widest block">Admission No</label>
+                                            <div className="text-xs font-bold text-white truncate">{admissionNo}</div>
                                         </div>
                                         <div className="space-y-0.5">
                                             <label className="text-[10px] font-bold text-blue-200/70 uppercase tracking-widest block">Class & Section</label>

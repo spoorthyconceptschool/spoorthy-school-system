@@ -16,6 +16,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { createNotification } from "@/lib/notifications";
 import { useMasterData } from "@/context/MasterDataContext";
+import { useAuth } from "@/context/AuthContext";
 
 const EXAMS_CACHE_KEY = "spoorthy_exams_cache";
 const DEFAULT_EXAMS = [
@@ -41,6 +42,7 @@ const DEFAULT_EXAMS = [
 
 export default function ExamsListPage() {
     const { selectedYear, classes: classesData } = useMasterData();
+    const { role } = useAuth();
     const [exams, setExams] = useState<any[]>(() => {
         if (typeof window !== 'undefined') {
             const cached = localStorage.getItem(EXAMS_CACHE_KEY);
@@ -121,7 +123,7 @@ export default function ExamsListPage() {
             await createNotification({
                 target: "ALL_FACULTY",
                 title: "New Examination Announced",
-                message: `The ${form.name} session has been scheduled from ${new Date(form.startDate).toLocaleDateString()} to ${new Date(form.endDate).toLocaleDateString()}. Please prepare your subject syllabus.`,
+                message: `The ${form.name} session has been scheduled from ${new Date(form.startDate).toLocaleDateString('en-GB')} to ${new Date(form.endDate).toLocaleDateString('en-GB')}. Please prepare your subject syllabus.`,
                 type: "NOTICE"
             });
 
@@ -130,7 +132,7 @@ export default function ExamsListPage() {
                 createNotification({
                     target: `class_${classId}`,
                     title: `New Exam Scheduled: ${form.name}`,
-                    message: `The ${form.name} has been scheduled from ${new Date(form.startDate).toLocaleDateString()} to ${new Date(form.endDate).toLocaleDateString()}. Please check your exam portal.`,
+                    message: `The ${form.name} has been scheduled from ${new Date(form.startDate).toLocaleDateString('en-GB')} to ${new Date(form.endDate).toLocaleDateString('en-GB')}. Please check your exam portal.`,
                     type: "NOTICE"
                 }).catch(err => console.error(`Failed notifying class_${classId}:`, err));
             });
@@ -175,12 +177,14 @@ export default function ExamsListPage() {
                                 <ClipboardCheck className="mr-2 h-4 w-4 stroke-[3px]" /> Academic Results
                             </Button>
                         </Link>
-                        <Button
-                            onClick={() => setCreateOpen(true)}
-                            className="bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest text-[9px] md:text-[10px] h-12 px-6 md:px-8 rounded-xl shadow-[0_0_20px_-5px_theme(colors.emerald.500/0.5)] transition-all hover:scale-[1.02] active:scale-[0.98]"
-                        >
-                            <Plus className="mr-2 h-4 w-4 stroke-[3px]" /> Create New Exam
-                        </Button>
+                        {role !== "MANAGER" && (
+                            <Button
+                                onClick={() => setCreateOpen(true)}
+                                className="bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest text-[9px] md:text-[10px] h-12 px-6 md:px-8 rounded-xl shadow-[0_0_20px_-5px_theme(colors.emerald.500/0.5)] transition-all hover:scale-[1.02] active:scale-[0.98]"
+                            >
+                                <Plus className="mr-2 h-4 w-4 stroke-[3px]" /> Create New Exam
+                            </Button>
+                        )}
                     </div>
                 </div>
             </div>
@@ -268,12 +272,14 @@ export default function ExamsListPage() {
                                     <p className="text-[#8892B0] max-w-sm mx-auto font-medium text-sm leading-relaxed mb-8">
                                         There are currently no active examinations in the system. Launch a new assessment to begin tracking academic progress.
                                     </p>
-                                    <Button
-                                        onClick={() => setCreateOpen(true)}
-                                        className="bg-white text-black hover:bg-blue-400 hover:text-white font-black uppercase tracking-[0.2em] text-[10px] h-11 px-8 rounded-xl shadow-2xl transition-all"
-                                    >
-                                        Schedule Exam
-                                    </Button>
+                                    {role !== "MANAGER" && (
+                                        <Button
+                                            onClick={() => setCreateOpen(true)}
+                                            className="bg-white text-black hover:bg-blue-400 hover:text-white font-black uppercase tracking-[0.2em] text-[10px] h-11 px-8 rounded-xl shadow-2xl transition-all"
+                                        >
+                                            Schedule Exam
+                                        </Button>
+                                    )}
                                 </div>
                             </div>
                         </div>

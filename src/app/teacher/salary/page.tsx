@@ -12,8 +12,8 @@ import { Button } from "@/components/ui/button";
 
 export default function SalaryPage() {
     const { user } = useAuth();
-    const [payments, setPayments] = useState<any[]>([]);
-    const [loading, setLoading] = useState(true);
+    const [payments, setPayments] = useState<any[]>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_salary_payments_cache") || "[]") : []);
+    const [loading, setLoading] = useState(() => typeof window !== 'undefined' ? !localStorage.getItem("teacher_salary_payments_cache") : true);
 
     useEffect(() => {
         if (user) fetchSalary();
@@ -45,7 +45,11 @@ export default function SalaryPage() {
             // Step 2: Fetch Payments
             const q = query(collection(db, "salary_payments"), where("teacherId", "==", teacherId), orderBy("paymentDate", "desc"));
             const snap = await getDocs(q);
-            setPayments(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            const paymentList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+            setPayments(paymentList);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem("teacher_salary_payments_cache", JSON.stringify(paymentList));
+            }
 
         } catch (e: any) {
             // Suppress Firestore index errors - expected during development
@@ -56,7 +60,7 @@ export default function SalaryPage() {
         finally { setLoading(false); }
     };
 
-    if (loading) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin" /></div>;
+    if (loading && payments.length === 0) return <div className="p-10 flex justify-center"><Loader2 className="animate-spin" /></div>;
 
     return (
         <div className="max-w-4xl mx-auto p-6 space-y-6 animate-in fade-in">
@@ -93,7 +97,7 @@ export default function SalaryPage() {
                                 <CardContent className="p-4 flex justify-between items-center">
                                     <div>
                                         <div className="font-bold">₹ {p.amount.toLocaleString()}</div>
-                                        <div className="text-sm text-muted-foreground">{new Date(p.paymentDate.seconds * 1000).toLocaleDateString()} • {p.month}</div>
+                                        <div className="text-sm text-muted-foreground">{new Date(p.paymentDate.seconds * 1000).toLocaleDateString('en-GB')} • {p.month}</div>
                                     </div>
                                     <div className="flex items-center gap-3">
                                         <Badge variant="outline">{p.method}</Badge>

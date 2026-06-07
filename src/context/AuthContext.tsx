@@ -18,7 +18,9 @@ interface AuthContextType {
     user: User | null;
     userData: any | null;
     role: string;
+    branchId: string | null;
     isAdmin: boolean;
+    isSuperAdmin: boolean;
     loading: boolean;
     signIn: (email: string, pass: string) => Promise<void>;
     signOut: () => Promise<void>;
@@ -26,10 +28,22 @@ interface AuthContextType {
     callApi: (url: string, options?: RequestInit) => Promise<Response>;
 }
 
-const AuthContext = createContext<AuthContextType>({ isAdmin: false } as AuthContextType);
+const AuthContext = createContext<AuthContextType>({ isAdmin: false, isSuperAdmin: false, branchId: null } as AuthContextType);
 
 const STORAGE_KEY = "spoorthy_user_cache";
 const SESSION_KEY = "local_session_id";
+
+function safeRandomUUID(): string {
+    if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+        return crypto.randomUUID();
+    }
+    return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, (c) => {
+        const r = (Math.random() * 16) | 0;
+        const v = c === "x" ? r : (r & 0x3) | 0x8;
+        return v.toString(16);
+    });
+}
+
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
@@ -80,7 +94,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 firebaseSignOut(auth);
                 setUser(null);
                 setUserData(null);
-                router.push("/login?error=session_expired");
+                router.push("/");
             }
         };
         window.addEventListener("storage", syncLogout);
@@ -100,7 +114,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     const tokenResult = await authUser.getIdTokenResult(false);
                     const claimRole = tokenResult.claims.role as string;
                     
-                    let dataToStore = null;
+                    let dataToStore: any = null;
                     const userDoc = await getDoc(doc(db, "users", authUser.uid));
                     if (userDoc.exists()) {
                         const data = userDoc.data();
@@ -174,10 +188,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         localStorage.removeItem(SESSION_KEY);
                         setUser(null);
                         setUserData(null);
-                        router.push("/login?error=session_expired");
+                        router.push("/");
                     }
                 }
             }
+        }, (err) => {
+            console.warn("[Auth] Session monitor error:", err.message);
         });
 
         return () => unsub();
@@ -193,7 +209,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 
                 if (userData && userData.role) {
                     const r = String(userData.role).toUpperCase();
-                    if (["ADMIN", "SUPER_ADMIN", "MANAGER", "DEVELOPER", "OWNER", "SUPERADMIN"].includes(r)) {
+                    if (["SUPER_ADMIN", "SUPERADMIN"].includes(r)) {
+                        router.replace("/super-admin");
+                    } else if (["ADMIN", "MANAGER", "DEVELOPER", "OWNER"].includes(r)) {
                         router.replace("/admin");
                     } else if (r === "TEACHER") {
                         router.replace("/teacher");
@@ -214,14 +232,25 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     setUserData(null);
                     setUser(null);
                 }
-            } else if (!user && pathname !== "/login" && pathname !== "/" && !pathname.startsWith("/admissions")) {
-                console.log("[Auth] Public user at protected path, forcing login.");
-                router.replace("/login");
+            } else if (!user) {
+                const isProtectedRoute = 
+                    pathname.startsWith("/super-admin") ||
+                    pathname.startsWith("/admin") ||
+                    pathname.startsWith("/teacher") ||
+                    pathname.startsWith("/student") ||
+                    pathname.startsWith("/dashboard") ||
+                    pathname.startsWith("/notifications");
+                
+                if (isProtectedRoute && !window.localStorage.getItem("spoorthy_logging_out")) {
+                    console.log("[Auth] Public user at protected path, forcing login.");
+                    router.replace("/login");
+                }
             }
         }
     }, [user, userData, loading, isInitialized, pathname, router]);
 
-    const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'SUPERADMIN', 'OWNER', 'DEVELOPER', 'MANAGER'].includes(String(userData?.role || "").toUpperCase());
+    const isAdmin = ['ADMIN', 'MANAGER', 'DEVELOPER', 'OWNER'].includes(String(userData?.role || "").toUpperCase());
+    const isSuperAdmin = ['SUPER_ADMIN', 'SUPERADMIN'].includes(String(userData?.role || "").toUpperCase());
 
     // 4. Listen for Pending Leaves (Admins)
     useEffect(() => {
@@ -231,7 +260,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 where("status", "==", "PENDING"),
                 where("schoolId", "==", userData?.schoolId || "global")
             );
-            const unsubStudentLeaves = onSnapshot(studentLeavesQ, (snap) => setPendingStudentLeaves(snap.size));
+            const unsubStudentLeaves = onSnapshot(studentLeavesQ, (snap) => setPendingStudentLeaves(snap.size), (err) => console.warn("[Auth] Student leaves sync error:", err.message));
             return () => unsubStudentLeaves();
         }
     }, [isAdmin]);
@@ -240,7 +269,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         const result = await signInWithEmailAndPassword(auth, email, pass);
         if (result.user) {
             // 1. Establish session identity FIRST (Before UI re-renders or listeners fire)
-            const newSessionId = crypto.randomUUID();
+            const newSessionId = safeRandomUUID();
             localStorage.setItem(SESSION_KEY, newSessionId);
             
             await setDoc(doc(db, "user_sessions", result.user.uid), {
@@ -253,7 +282,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const tokenResult = await result.user.getIdTokenResult(true);
             const claimRole = tokenResult.claims.role as string;
             
-            let dataToStore = null;
+            let dataToStore: any = null;
             const userDoc = await getDoc(doc(db, "users", result.user.uid));
             if (userDoc.exists()) {
                 const data = userDoc.data();
@@ -294,12 +323,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     };
 
     const signOut = async () => {
+        if (typeof window !== "undefined") {
+            window.localStorage.setItem("spoorthy_logging_out", "true");
+        }
         await firebaseSignOut(auth);
         setUserData(null);
         localStorage.removeItem(STORAGE_KEY);
         localStorage.removeItem(SESSION_KEY);
         localStorage.setItem("spoorthy_logout_sync", Date.now().toString());
-        router.push("/login");
+        window.location.href = "/";
+        
+        // Cleanup after navigation is likely complete
+        setTimeout(() => {
+            if (typeof window !== "undefined") {
+                window.localStorage.removeItem("spoorthy_logging_out");
+            }
+        }, 2000);
     };
 
     const [warmedToken, setWarmedToken] = useState<{ token: string; expiry: number } | null>(null);
@@ -380,7 +419,19 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }
 
     return (
-        <AuthContext.Provider value={{ user, userData, role: userData?.role || "", isAdmin, loading, signIn, signOut, getFreshToken, callApi }}>
+        <AuthContext.Provider value={{ 
+            user, 
+            userData, 
+            role: userData?.role || "", 
+            branchId: userData?.branchId || null,
+            isAdmin, 
+            isSuperAdmin,
+            loading, 
+            signIn, 
+            signOut, 
+            getFreshToken, 
+            callApi 
+        }}>
             {children}
             <div className="hidden">{pendingStudentLeaves}</div>
         </AuthContext.Provider>

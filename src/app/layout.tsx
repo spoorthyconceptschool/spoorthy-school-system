@@ -3,6 +3,7 @@ import { Inter, Outfit } from 'next/font/google';
 import './globals.css';
 import { cn } from '@/lib/utils';
 import { AuthProvider } from "@/context/AuthContext";
+import { BranchProvider } from "@/context/BranchContext";
 import { MasterDataProvider } from "@/context/MasterDataContext";
 import { Toaster } from "@/components/ui/toaster";
 import { NotificationManager } from "@/components/notification-manager";
@@ -24,13 +25,35 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: 'Spoorthy Concept School',
-  description: 'A premium educational institution.',
+  title: 'Spoorthy High School | Spoorthy Concept School (Kanagal, Nalgonda)',
+  description: 'Welcome to the official website of Spoorthy High School and Spoorthy Concept School, located at Kanagal X Road, Nalgonda. Renowned as one of the best concept schools and top high schools in the Nalgonda district, Telangana. Offering high-quality secondary education, modern facilities, digital school management systems, and premium student development. Explore admissions for the 2026-2027 academic session.',
+  keywords: [
+    'spoorthy school',
+    'spoorthy high school',
+    'spoorthy concept school',
+    'spoorthy school kanagal',
+    'spoorthy high school nalgonda',
+    'spoorthy concept school nalgonda',
+    'best schools in nalgonda',
+    'top schools in nalgonda',
+    'best high schools in nalgonda',
+    'top 10 schools in nalgonda',
+    'schools in kanagal',
+    'concept schools in nalgonda',
+    'best schools in telangana',
+    'spoorthy school kanagal x road',
+    'spoorthy educational institutions',
+    'spoorthy high school admission',
+    'best non-residential schools nalgonda',
+    'school management system nalgonda',
+    'nakkala alivelu spoorthy school',
+    'secondary schools in budamarpally'
+  ],
   manifest: '/manifest.webmanifest',
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Spoorthy School',
+    title: 'Spoorthy High School | Spoorthy Concept School (Kanagal, Nalgonda)',
   },
   icons: {
     icon: [
@@ -63,7 +86,7 @@ export default function RootLayout({
   return (
     <html lang="en" className={cn(inter.variable, outfit.variable, "dark")} suppressHydrationWarning>
       <body className={`font-body antialiased bg-background text-foreground overflow-x-hidden`} suppressHydrationWarning>
-        <div id="global-loader" className="fixed top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-accent via-emerald-400 to-accent z-[9999] transform -translate-x-full transition-transform duration-500 ease-out opacity-0" />
+        <div id="global-loader" suppressHydrationWarning className="fixed top-0 left-0 right-0 h-[2px] bg-gradient-to-r from-accent via-emerald-400 to-accent z-[9999] transform -translate-x-full transition-transform duration-500 ease-out opacity-0" />
         <script
           dangerouslySetInnerHTML={{
             __html: `
@@ -141,11 +164,13 @@ export default function RootLayout({
           }}
         />
         <AuthProvider>
-          <MasterDataProvider>
-            {children}
-            <SpeculativeLoader />
-            <Toaster />
-          </MasterDataProvider>
+          <BranchProvider>
+            <MasterDataProvider>
+              {children}
+              <SpeculativeLoader />
+              <Toaster />
+            </MasterDataProvider>
+          </BranchProvider>
         </AuthProvider>
       </body>
     </html>

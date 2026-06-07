@@ -287,7 +287,7 @@ export default function TimetableManagePage() {
                 <body>
                     <div class="header">
                         ${branding.schoolLogo ? `<img src="${branding.schoolLogo}" style="height: 60px; margin-bottom: 10px;" />` : ''}
-                        <h1>${branding.schoolName || 'SPOORTHY CONCEPT SCHOOL'}</h1>
+                        <h1>${branding.schoolName || 'SPOORTHY HIGH SCHOOL'}</h1>
                         <p>Academic Timetable: ${currentClass?.name} - ${currentSection?.name}</p>
                     </div>
                     <table>

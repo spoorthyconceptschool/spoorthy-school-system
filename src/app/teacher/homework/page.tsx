@@ -19,9 +19,18 @@ import { cn } from "@/lib/utils";
 export default function TeacherHomeworkPage() {
     const { user } = useAuth();
     const { subjects, classes, sections, classSections, subjectTeachers } = useMasterData();
-    const [homeworkHistory, setHomeworkHistory] = useState<any[]>([]);
+    const [homeworkHistory, setHomeworkHistory] = useState<any[]>(() => typeof window !== 'undefined' ? JSON.parse(localStorage.getItem("teacher_homework_history_cache") || "[]") : []);
     const [loading, setLoading] = useState(false);
-    const [teacherId, setTeacherId] = useState<string | null>(null);
+    const [teacherId, setTeacherId] = useState<string | null>(() => {
+        if (typeof window !== 'undefined') {
+            const cachedProfile = localStorage.getItem("teacher_profile_cache");
+            if (cachedProfile) {
+                const profileObj = JSON.parse(cachedProfile);
+                return profileObj.schoolId || profileObj.id;
+            }
+        }
+        return null;
+    });
     const [useFallback, setUseFallback] = useState(false);
     const [activeMobileTab, setActiveMobileTab] = useState<"assign" | "history">("assign");
 
@@ -60,6 +69,9 @@ export default function TeacherHomeworkPage() {
                 list = [...list].sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
             }
             setHomeworkHistory(list);
+            if (typeof window !== 'undefined') {
+                localStorage.setItem("teacher_homework_history_cache", JSON.stringify(list));
+            }
         }, (err) => {
             if (!isMounted) return;
             if (err.message.includes('index') && !useFallback) {
@@ -189,14 +201,14 @@ export default function TeacherHomeworkPage() {
                 </div>
 
                 {/* Switcher Tab header on Mobile */}
-                <div className="grid grid-cols-2 gap-1 bg-black/20 p-1 rounded-xl border border-white/10">
+                <div className="flex bg-[#060d1a] border border-white/6 rounded-lg p-0.5 flex-none h-9 mb-1">
                     <button
                         onClick={() => setActiveMobileTab("assign")}
                         className={cn(
-                            "py-2.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all",
+                            "flex-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-200",
                             activeMobileTab === "assign"
-                                ? "bg-[#10B981] text-black shadow-lg shadow-emerald-500/10 font-black"
-                                : "text-white/60 hover:text-white"
+                                ? "bg-[#10B981] text-black shadow-sm"
+                                : "text-white/40 hover:text-white hover:bg-white/5"
                         )}
                     >
                         Assign Tasks
@@ -204,19 +216,20 @@ export default function TeacherHomeworkPage() {
                     <button
                         onClick={() => setActiveMobileTab("history")}
                         className={cn(
-                            "py-2.5 rounded-lg text-[9px] font-black uppercase tracking-wider transition-all",
+                            "flex-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1.5",
                             activeMobileTab === "history"
-                                ? "bg-[#10B981] text-black shadow-lg shadow-emerald-500/10 font-black"
-                                : "text-white/60 hover:text-white"
+                                ? "bg-[#10B981] text-black shadow-sm"
+                                : "text-white/40 hover:text-white hover:bg-white/5"
                         )}
                     >
+                        <History className="w-3 h-3" />
                         View History
                     </button>
                 </div>
 
                 {activeMobileTab === "assign" ? (
                     /* Mobile Assign Form Card */
-                    <Card className="bg-black/20 border-white/10 rounded-2xl overflow-hidden p-3.5 space-y-4">
+                    <Card className="bg-[#0a1628]/80 border-white/10 rounded-2xl overflow-hidden p-3.5 space-y-4">
                         <div className="border-b border-white/5 pb-2">
                             <div className="text-xs font-black uppercase tracking-wider text-white">New Homework Task</div>
                             <p className="text-[8px] text-white/40 uppercase font-bold tracking-widest mt-0.5">Assign duties by subject for active courses</p>
@@ -227,10 +240,10 @@ export default function TeacherHomeworkPage() {
                                 <div className="space-y-1">
                                     <label className="text-[8px] font-black uppercase tracking-wider text-white/40 ml-0.5">Class & Section</label>
                                     <Select onValueChange={setTargetClassId} value={targetClassId} required>
-                                        <SelectTrigger className="h-9 bg-black/40 border-white/10 rounded-lg text-xs font-bold">
+                                        <SelectTrigger className="h-9 bg-[#0d1b2a] border-white/10 rounded-lg text-xs font-bold">
                                             <SelectValue placeholder="Select" />
                                         </SelectTrigger>
-                                        <SelectContent className="bg-[#030712] border-white/10 text-white">
+                                        <SelectContent className="bg-[#0a1628] border-white/10 text-white">
                                             {authorized.map(c => (
                                                 <SelectItem key={c.key} value={c.key} className="focus:bg-accent focus:text-black font-bold py-2">
                                                     {classes[c.classId]?.name || c.classId} - {sections[c.sectionId]?.name || c.sectionId}
@@ -245,7 +258,7 @@ export default function TeacherHomeworkPage() {
                                     <Input
                                         type="date"
                                         required
-                                        className="h-9 bg-black/40 border-white/10 rounded-lg text-xs font-bold text-white"
+                                        className="h-9 bg-[#0d1b2a] border-white/10 rounded-lg text-xs font-bold text-white"
                                         value={dueDate}
                                         onChange={e => setDueDate(e.target.value)}
                                     />
@@ -257,7 +270,7 @@ export default function TeacherHomeworkPage() {
                                 <div className="space-y-2 max-h-[35vh] overflow-y-auto pr-1">
                                     <div className="text-[9px] uppercase tracking-widest font-black text-white/30 mb-1">Assigned Subjects Tasks</div>
                                     {getMySubjects(targetClassId).map((sid: string) => (
-                                        <div key={sid} className="bg-black/40 border border-white/5 p-2 rounded-xl space-y-1">
+                                        <div key={sid} className="bg-[#0d1b2a] border border-white/5 p-2 rounded-xl space-y-1">
                                             <div className="text-[10px] font-bold text-emerald-400">{subjects[sid]?.name || sid}</div>
                                             <Textarea
                                                 placeholder={`Type assignment for ${subjects[sid]?.name || "this subject"}...`}
@@ -302,7 +315,7 @@ export default function TeacherHomeworkPage() {
                         ) : (
                             <div className="space-y-2">
                                 {homeworkHistory.map(hw => (
-                                    <div key={hw.id} className="relative bg-black/20 border border-white/5 rounded-xl p-3.5 space-y-2.5 overflow-hidden">
+                                    <div key={hw.id} className="relative bg-[#0a1628]/80 border border-white/5 rounded-xl p-3.5 space-y-2.5 overflow-hidden">
                                         <div className="flex justify-between items-start">
                                             <div className="flex flex-wrap gap-1">
                                                 <Badge className="bg-emerald-500 text-black border-none text-[8px] uppercase font-black tracking-wider px-2 py-0.5">

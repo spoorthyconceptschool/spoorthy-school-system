@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger } from "@/components/ui/dialog";
-import { ArrowLeft, Edit, Trash2, Save, X, Loader2, CreditCard, ShieldAlert, History, Settings2, Lock, RefreshCw, Download, Printer, FileText, CheckCircle2, Calendar, GraduationCap, ClipboardCheck } from "lucide-react";
+import { ArrowLeft, Edit, Trash2, Save, X, Loader2, CreditCard, ShieldAlert, History, Settings2, Lock, RefreshCw, Download, Printer, FileText, CheckCircle2, Calendar, GraduationCap, ClipboardCheck, User, MapPin, Phone, MoreHorizontal, File, MoreVertical } from "lucide-react";
 import Link from "next/link";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { cn } from "@/lib/utils";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Textarea } from "@/components/ui/textarea";
@@ -24,6 +25,13 @@ import { useMasterData } from "@/context/MasterDataContext";
 import { useAuth } from "@/context/AuthContext";
 import { notifyManagerAction } from "@/lib/notifications";
 import { SingleReportCardButton } from "@/components/admin/SingleReportCardButton";
+
+import { ProfileTab } from "@/components/admin/student-profile/ProfileTab";
+import { FeesTab } from "@/components/admin/student-profile/FeesTab";
+import { AttendanceTab } from "@/components/admin/student-profile/AttendanceTab";
+import { AcademicsTab } from "@/components/admin/student-profile/AcademicsTab";
+import { HistoryTab } from "@/components/admin/student-profile/HistoryTab";
+import { DocumentsTab } from "@/components/admin/student-profile/DocumentsTab";
 
 /**
  * Safely parses a Date object or Firestore Timestamp into a number (milliseconds).
@@ -47,7 +55,7 @@ const safeDateString = (d: any): string => {
     try {
         const time = safeDateParse(d);
         if (time === 0) return "N/A";
-        return new Date(time).toLocaleDateString();
+        return new Date(time).toLocaleDateString('en-GB');
     } catch {
         return "N/A";
     }
@@ -122,7 +130,7 @@ export default function StudentDetailsPage() {
     const [ledger, setLedger] = useState<FeeLedger | null>(null);
     const [loading, setLoading] = useState(true);
     const [role, setRole] = useState<string>("");
-    const { user, role: authRole } = useAuth();
+    const { user, userData, role: authRole } = useAuth();
 
     const normalizedRole = role?.toUpperCase();
     const isManager = normalizedRole === "MANAGER";
@@ -331,7 +339,11 @@ export default function StudentDetailsPage() {
                 // Filter payments specifically for the viewing academic year
                 const currentYearId = viewingYear || "2025-2026";
                 const filteredPayments = loadedPayments.filter(p => (p.academicYear || "2025-2026") === currentYearId);
-                setPayments(filteredPayments.sort((a, b) => safeDateParse(b.date) - safeDateParse(a.date)));
+                setPayments(filteredPayments.sort((a, b) => {
+                    const dateDiff = safeDateParse(b.date) - safeDateParse(a.date);
+                    if (dateDiff !== 0) return dateDiff;
+                    return safeDateParse((b as any).createdAt) - safeDateParse((a as any).createdAt);
+                }));
 
                 // 3. Auto-Sync Fee Ledger (Uses Centralized Config)
                 const ledgerRef = doc(db, "student_fee_ledgers", `${sData.schoolId}_${currentYearId}`);
@@ -491,8 +503,7 @@ export default function StudentDetailsPage() {
             if (amount <= 0) throw new Error("Invalid Amount");
 
             const now = new Date();
-            const timestampStr = `${now.toLocaleDateString()} ${now.toLocaleTimeString()}`;
-            const managerRemark = isManager ? ` | Collected by manager: ${user?.displayName || "Manager"} at ${timestampStr}` : "";
+            const managerRemark = isManager ? ` [Collected by Manager: ${userData?.schoolId || user?.email}]` : "";
 
             const newPayment = {
                 studentId: student.schoolId,
@@ -501,10 +512,10 @@ export default function StudentDetailsPage() {
                 method: feeForm.method,
                 date: Timestamp.fromDate(new Date(feeForm.date)),
                 status: "success",
-                remarks: (feeForm.remarks || "") + managerRemark,
+                remarks: feeForm.remarks ? `${feeForm.remarks}${managerRemark}` : (managerRemark ? managerRemark.trim() : ""),
                 academicYear: selectedYear || "2025-2026",
                 createdAt: Timestamp.now(),
-                verifiedBy: isManager ? `manager:${user?.displayName || 'Manager'}` : "admin"
+                verifiedBy: isManager ? `manager:${userData?.schoolId || user?.email}` : "admin"
             };
 
             const batch = writeBatch(db);
@@ -697,957 +708,209 @@ export default function StudentDetailsPage() {
 
 
     return (
-        <div className="space-y-3 md:space-y-6 max-w-7xl mx-auto pb-20 animate-in fade-in duration-200 p-1 md:p-0">
-            {/* Password Reset Modal */}
+        <div className="min-h-[calc(100vh-88px)] bg-[#0A192F] text-white pb-24 md:pb-8 animate-in fade-in duration-300">
+            {/* Modal Components */}
             <AdminChangePasswordModal
                 isOpen={isResetModalOpen}
                 onClose={() => setIsResetModalOpen(false)}
-                user={{
-                    uid: student?.uid || "",
-                    schoolId: student?.schoolId || "",
-                    name: student?.studentName || "",
-                    role: "STUDENT"
-                }}
+                user={{ uid: student?.uid || "", schoolId: student?.schoolId || "", name: student?.studentName || "", role: "STUDENT" }}
             />
-
-            {/* Historical Warning Banner */}
-            {isHistoricalMode && (
-                <div className="bg-red-500/10 border border-red-500/20 text-red-400 p-4 rounded-2xl flex items-center gap-3 backdrop-blur-md shadow-2xl mx-1 md:mx-0">
-                    <ShieldAlert className="w-5 h-5 text-red-400 shrink-0" />
-                    <p className="text-xs md:text-sm font-medium">
-                        Viewing Archived Records for <span className="font-bold underline">{viewingYear}</span> (Read-Only). Payment collections, structure adjustments, deactivations, password resets, and details editing are locked.
-                    </p>
-                </div>
+            {student && (
+                <DeleteUserModal
+                    isOpen={isDeleteModalOpen}
+                    onClose={() => setIsDeleteModalOpen(false)}
+                    user={{ id: student.schoolId, schoolId: student.schoolId, name: student.studentName, role: "student" }}
+                    checkEligibility={async () => { return { canDelete: true }; }}
+                    onDeactivate={async () => {}}
+                    onDelete={async () => {}}
+                />
+            )}
+            {student && ledger && (
+                <AdjustFeesModal
+                    isOpen={isAdjustModalOpen}
+                    onClose={() => setIsAdjustModalOpen(false)}
+                    studentId={student.schoolId}
+                    academicYearId={selectedYear}
+                    ledgerItems={ledger.items || []}
+                    onSuccess={() => window.location.reload()}
+                />
             )}
 
-            {/* Header - Partial shell visible during loading */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pt-2 md:pt-4">
-                <div className="flex items-center gap-2 md:gap-4">
-                    <Link href="/admin/students">
-                        <Button variant="outline" size="icon" className="h-8 w-8 md:h-9 md:w-9 border-white/10 hover:bg-white/10">
-                            <ArrowLeft className="w-3.5 h-3.5 md:w-4 md:h-4 text-muted-foreground" />
+            {/* Mobile-First Header / Hero Section */}
+            <div className="sticky top-0 z-40 bg-[#0A192F]/90 backdrop-blur-xl border-b border-white/5 py-2 px-3 shadow-sm">
+                <div className="flex items-center justify-between">
+                    <div className="flex items-center gap-2 flex-1 min-w-0">
+                        <Button variant="ghost" size="icon" onClick={() => router.push('/admin/students')} className="w-8 h-8 rounded-full bg-white/5 hover:bg-white/10 shrink-0 text-white">
+                            <ArrowLeft className="w-4 h-4" />
                         </Button>
-                    </Link>
-                    <div>
                         {loading ? (
-                            <div className="space-y-2">
-                                <div className="h-8 w-48 bg-white/5 animate-pulse rounded-lg" />
-                                <div className="h-4 w-32 bg-white/5 animate-pulse rounded-md" />
-                            </div>
+                            <div className="h-5 w-24 bg-white/10 animate-pulse rounded" />
                         ) : student ? (
-                            <>
-                                <div className="flex flex-wrap items-center gap-2 md:gap-3">
-                                    <h1 className="text-lg md:text-3xl font-display font-bold text-white leading-tight">{student.studentName}</h1>
-                                    <Badge variant={student.status === 'ACTIVE' ? 'default' : 'destructive'} className="uppercase text-[7px] md:text-[10px] h-4 md:h-5 px-1 py-0">
-                                        {student.status}
-                                    </Badge>
-                                    
-                                    {/* Local Academic Year Selector */}
-                                    <Select value={viewingYear} onValueChange={setViewingYear}>
-                                        <SelectTrigger className="h-7 bg-white/5 border-white/10 rounded-lg text-[10px] md:text-xs text-accent font-bold px-2 py-0 w-[140px] md:w-[160px] focus:ring-0">
-                                            <SelectValue placeholder="Academic Year" />
-                                        </SelectTrigger>
-                                        <SelectContent className="bg-zinc-900 border-white/10 text-white font-semibold">
-                                            {Object.keys(academicYears || {}).map(year => (
-                                                <SelectItem key={year} value={year}>
-                                                    Session: {year} {year === student.academicYear ? "(Active)" : "(Archived)"}
-                                                </SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                <p className="text-[9px] md:text-sm text-muted-foreground font-mono flex items-center gap-1.5 md:gap-2 mt-1">
-                                    <span className="text-accent font-bold">{student.schoolId}</span>
-                                    <span>•</span>
-                                    <span className="truncate max-w-[100px] md:max-w-none">
-                                        {(classesData || {})[student.classId]?.name || student.className || "Class"}
-                                    </span>
-                                </p>
-                            </>
+                            <div className="flex-1 min-w-0 flex items-center gap-2">
+                                <h1 className="text-[15px] font-bold tracking-tight text-white line-clamp-1">{student.studentName}</h1>
+                                <Badge variant={student.status === 'ACTIVE' ? 'default' : 'destructive'} className="uppercase text-[8px] h-3 px-1.5 shrink-0 bg-emerald-500/20 text-emerald-400 border-emerald-500/20">
+                                    {student.status}
+                                </Badge>
+                            </div>
                         ) : null}
                     </div>
-                </div>
 
-                {!loading && student && (
-                    <div className="flex flex-wrap items-center gap-1.5 md:gap-2">
-                        {canEdit && !isHistoricalMode && (
+                    <div className="flex items-center gap-1.5 shrink-0 ml-2">
+                        {!loading && student && canEdit && !isHistoricalMode && (
                             <Dialog open={isFeeModalOpen} onOpenChange={setIsFeeModalOpen}>
                                 <DialogTrigger asChild>
-                                    <Button size="sm" className="h-8 md:h-11 bg-emerald-600 hover:bg-emerald-700 text-white shadow-lg text-[10px] md:text-sm font-bold flex-1 md:flex-none">
-                                        <CreditCard className="w-3 md:w-4 h-3 md:h-4 mr-1 md:mr-2" /> Collect Fee
+                                    <Button className="h-7 bg-[#00E676] hover:bg-[#00C853] text-black font-bold text-[10px] px-3 rounded-lg shadow-[0_0_15px_-3px_rgba(0,230,118,0.4)]">
+                                        Collect Fee
                                     </Button>
                                 </DialogTrigger>
-                                <DialogContent className="bg-[#0A192F] text-white border-white/10 sm:max-w-md">
-                                    <DialogHeader>
-                                        <DialogTitle>Collect Payment</DialogTitle>
-                                    </DialogHeader>
-                                    <form onSubmit={handleCollectFee} className="space-y-4 pt-4">
-                                        <div className="bg-emerald-500/10 border border-emerald-500/20 p-3 rounded-xl flex items-center justify-between">
-                                            <span className="text-emerald-400 font-bold text-sm">Total Due Balance:</span>
-                                            <span className="text-emerald-400 font-black">₹{dueAmount.toLocaleString()}</span>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <Label>Select Terms to Auto-fill Amount</Label>
-                                            <div className="space-y-2 max-h-48 overflow-y-auto custom-scrollbar pr-1">
-                                                {breakdown.pending.length > 0 ? (
-                                                    (() => {
-                                                        const pendingItems = breakdown.items.filter((i: any) => i.distributedDue > 0);
-                                                        const userAmount = Number(feeForm.amount) || 0;
-                                                        let remainingAllocation = userAmount;
-
-                                                        return pendingItems.map((item: any, index: number) => {
-                                                            // Calculate how much of the user's entered amount applies to this term
-                                                            const allocatedToThisTerm = Math.min(remainingAllocation, item.distributedDue);
-                                                            remainingAllocation = Math.max(0, remainingAllocation - allocatedToThisTerm);
-
-                                                            // Calculate cumulative sum up to this term for the click-to-fill action
-                                                            const sumUpToHere = pendingItems.slice(0, index + 1).reduce((sum: number, i: any) => sum + i.distributedDue, 0);
-
-                                                            const isFullyCovered = allocatedToThisTerm === item.distributedDue;
-                                                            const isPartiallyCovered = allocatedToThisTerm > 0 && allocatedToThisTerm < item.distributedDue;
-
-                                                            return (
-                                                                <button
-                                                                    type="button"
-                                                                    key={item.id}
-                                                                    onClick={() => setFeeForm({ ...feeForm, amount: sumUpToHere.toString() })}
-                                                                    className={cn(
-                                                                        "w-full flex items-center justify-between p-3 border rounded-xl cursor-pointer transition-all",
-                                                                        isFullyCovered ? "border-emerald-500 bg-emerald-500/10" :
-                                                                            isPartiallyCovered ? "border-amber-500 bg-amber-500/10" : "border-white/10 bg-white/5 hover:border-white/30"
-                                                                    )}
-                                                                >
-                                                                    <div className="flex flex-col items-start gap-1">
-                                                                        <div className="flex items-center gap-2">
-                                                                            <div className={cn(
-                                                                                "w-4 h-4 rounded-full border flex items-center justify-center transition-colors",
-                                                                                isFullyCovered ? "border-emerald-500 bg-emerald-500/20" :
-                                                                                    isPartiallyCovered ? "border-amber-500 bg-amber-500/20" : "border-white/20"
-                                                                            )}>
-                                                                                {isFullyCovered && <div className="w-2 h-2 rounded-full bg-emerald-500" />}
-                                                                                {isPartiallyCovered && <div className="w-2 h-2 rounded-full bg-amber-500" />}
-                                                                            </div>
-                                                                            <div className="font-bold text-sm text-left">{item.name}</div>
-                                                                        </div>
-                                                                        {(isFullyCovered || isPartiallyCovered) && (
-                                                                            <div className="text-[10px] pl-6 text-emerald-400 font-medium">
-                                                                                paying ₹{allocatedToThisTerm.toLocaleString()}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="text-right">
-                                                                        <div className="font-black text-emerald-400">₹{item.distributedDue.toLocaleString()}</div>
-                                                                        {allocatedToThisTerm > 0 && (
-                                                                            <div className="text-[10px] text-muted-foreground mr-1">
-                                                                                rem: ₹{(item.distributedDue - allocatedToThisTerm).toLocaleString()}
-                                                                            </div>
-                                                                        )}
-                                                                    </div>
-                                                                </button>
-                                                            );
-                                                        });
-                                                    })()
-                                                ) : (
-                                                    <div className="text-center p-4 border border-white/10 bg-white/5 rounded-xl text-muted-foreground text-sm">
-                                                        No pending fees.
-                                                    </div>
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <Label className="flex items-center gap-1.5 text-red-500">Amount Received (₹) <span className="font-black text-lg">*</span></Label>
-                                            <Input
-                                                required
-                                                min="1"
-                                                max={dueAmount}
-                                                type="number"
-                                                placeholder="Enter amount..."
-                                                className="bg-white/5 border-white/10 h-10"
-                                                value={feeForm.amount}
-                                                onChange={e => {
-                                                    const val = Number(e.target.value);
-                                                    if (val > dueAmount) {
-                                                        setFeeForm({ ...feeForm, amount: dueAmount.toString() });
-                                                    } else {
-                                                        setFeeForm({ ...feeForm, amount: e.target.value });
-                                                    }
-                                                }}
-                                            />
-                                        </div>
-                                        <div className="grid grid-cols-2 gap-4">
+                                <DialogContent className="bg-[#0A192F] text-white border-white/10 sm:max-w-md w-[95vw] rounded-2xl">
+                                    <DialogHeader><DialogTitle className="text-xl">Collect Fee</DialogTitle></DialogHeader>
+                                    <form onSubmit={handleCollectFee}>
+                                        <div className="space-y-4 pt-4">
                                             <div className="space-y-2">
-                                                <Label>Mode</Label>
-                                                <Select value={feeForm.method} onValueChange={v => setFeeForm({ ...feeForm, method: v })}>
-                                                    <SelectTrigger className="bg-white/5 border-white/10 h-10"><SelectValue /></SelectTrigger>
-                                                    <SelectContent className="bg-[#0A192F] border-white/10 text-white">
-                                                        <SelectItem value="cash">Cash</SelectItem>
-                                                        <SelectItem value="upi">UPI / GPay</SelectItem>
-                                                        <SelectItem value="cheque">Cheque</SelectItem>
-                                                        <SelectItem value="bank_transfer">Transfer</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
+                                                <Label className="text-white/70">Amount Received (₹)</Label>
+                                                <Input required min="1" type="number" value={feeForm.amount} onChange={e => setFeeForm({...feeForm, amount: e.target.value})} className="bg-white/5 border-white/10 h-12 text-lg" placeholder="0" />
                                             </div>
-                                            <div className="space-y-2">
-                                                <Label>Date</Label>
-                                                <Input type="date" required className="bg-white/5 border-white/10 h-10" value={feeForm.date} onChange={e => setFeeForm({ ...feeForm, date: e.target.value })} />
-                                            </div>
+                                            <Button type="submit" disabled={collectingFee} className="w-full h-12 bg-[#00E676] text-black font-bold text-lg rounded-xl">Confirm Payment</Button>
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label>Remarks</Label>
-                                            <Input placeholder="Note..." className="bg-white/5 border-white/10 h-10" value={feeForm.remarks} onChange={e => setFeeForm({ ...feeForm, remarks: e.target.value })} />
-                                        </div>
-                                        <DialogFooter>
-                                            <Button type="submit" disabled={collectingFee} className="w-full bg-emerald-600 hover:bg-emerald-700">
-                                                {collectingFee ? <Loader2 className="animate-spin" /> : "Confirm Payment"}
-                                            </Button>
-                                        </DialogFooter>
                                     </form>
                                 </DialogContent>
                             </Dialog>
                         )}
 
-                        <Dialog open={!!receiptData} onOpenChange={(open) => !open && setReceiptData(null)}>
-                            <DialogContent className="bg-[#0A192F] text-white border-white/10 sm:max-w-md print:bg-white print:text-black print:border-none print:shadow-none print:max-w-full">
-                                <DialogHeader className="print:hidden">
-                                    <DialogTitle className="text-emerald-400 flex items-center gap-2"><CheckCircle2 className="w-5 h-5" /> Payment Successful</DialogTitle>
-                                </DialogHeader>
-                                {receiptData && (
-                                    <div className="space-y-6 pt-4 print:p-0">
-                                        <div className="text-center space-y-2 border-b border-white/10 pb-6 print:border-black/10">
-                                            {branding.schoolLogo && <img src={branding.schoolLogo} alt="School Logo" className="w-16 h-16 mx-auto object-contain hidden print:block mb-4" />}
-                                            <h2 className="text-2xl font-bold font-display uppercase tracking-widest print:text-black">{branding.schoolName || "SPOORTHY CONCEPT SCHOOL"}</h2>
-                                            <p className="text-xs text-muted-foreground uppercase tracking-widest font-bold print:text-black/60">Fee Receipt</p>
-                                        </div>
-                                        
-                                        <div className="grid grid-cols-2 gap-4 text-sm print:text-black">
-                                            <div>
-                                                <p className="text-[10px] text-muted-foreground uppercase font-black print:text-black/60">Receipt No</p>
-                                                <p className="font-mono font-bold text-accent print:text-black">{receiptData.id?.slice(-8).toUpperCase() || "N/A"}</p>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-[10px] text-muted-foreground uppercase font-black print:text-black/60">Date</p>
-                                                <p className="font-mono font-bold print:text-black">{new Date(receiptData.createdAt?.seconds * 1000 || Date.now()).toLocaleString()}</p>
-                                            </div>
-                                            <div className="col-span-2 bg-white/5 p-4 rounded-xl print:bg-black/5">
-                                                <p className="text-[10px] text-muted-foreground uppercase font-black mb-1 print:text-black/60">Received From</p>
-                                                <p className="font-bold text-lg print:text-black">{receiptData.studentName}</p>
-                                                <p className="text-xs font-mono text-muted-foreground print:text-black/60">ID: {receiptData.studentId}</p>
-                                            </div>
-                                            <div className="col-span-2 flex justify-between items-center border-y border-white/10 py-4 print:border-black/10">
-                                                <p className="text-[10px] text-muted-foreground uppercase font-black print:text-black/60">Amount Received</p>
-                                                <p className="text-2xl font-black text-emerald-400 print:text-black">₹{Number(receiptData.amount).toLocaleString()}</p>
-                                            </div>
-                                            <div>
-                                                <p className="text-[10px] text-muted-foreground uppercase font-black print:text-black/60">Payment Mode</p>
-                                                <p className="font-bold uppercase print:text-black">{receiptData.method}</p>
-                                            </div>
-                                            <div className="text-right">
-                                                <p className="text-[10px] text-muted-foreground uppercase font-black print:text-black/60">Cashier</p>
-                                                <p className="font-bold print:text-black">{receiptData.verifiedBy}</p>
-                                            </div>
-                                            {receiptData.remarks && (
-                                                <div className="col-span-2">
-                                                    <p className="text-[10px] text-muted-foreground uppercase font-black print:text-black/60">Remarks</p>
-                                                    <p className="text-xs italic text-white/70 print:text-black/80">{receiptData.remarks}</p>
-                                                </div>
-                                            )}
-                                        </div>
-
-                                        <DialogFooter className="print:hidden sm:justify-between pt-4 border-t border-white/10">
-                                            <Button variant="outline" onClick={() => setReceiptData(null)} className="bg-white/5 border-white/10 hover:bg-white/10">
-                                                Done
-                                            </Button>
-                                            <Button onClick={() => window.print()} className="bg-blue-600 hover:bg-blue-700 text-white gap-2">
-                                                <Printer className="w-4 h-4" /> Print Receipt
-                                            </Button>
-                                        </DialogFooter>
-                                    </div>
-                                )}
-                            </DialogContent>
-                        </Dialog>
-
-                        {isEditing ? (
-                            <div className="flex items-center gap-1.5 md:gap-2">
-                                <Button variant="ghost" size="sm" onClick={() => setIsEditing(false)} className="h-8 text-[10px] md:text-xs">Cancel</Button>
-                                <Button size="sm" onClick={handleUpdate} className="h-8 bg-blue-600 hover:bg-blue-700 text-white text-[10px] md:text-xs px-3">Save</Button>
-                            </div>
-                        ) : (
-                            canEdit && (
-                                <div className="flex items-center gap-1.5 md:gap-2">
-                                    <Button type="button" variant="outline" size="sm" onClick={() => window.print()} className="h-8 md:h-9 border-white/10 bg-white/5 text-[9px] md:text-sm px-1.5 md:px-4">
-                                        <FileText className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> <span className="hidden sm:inline">Print Profile</span>
+                        {!loading && student && canEdit && (
+                            <DropdownMenu>
+                                <DropdownMenuTrigger asChild>
+                                    <Button variant="ghost" size="icon" className="w-7 h-7 text-white hover:bg-white/10 rounded-lg">
+                                        <MoreVertical className="w-4 h-4" />
                                     </Button>
-                                    {!isHistoricalMode && (
-                                        <>
-                                            <Button type="button" variant="outline" size="sm" onClick={() => setIsResetModalOpen(true)} className="h-8 md:h-9 border-white/10 bg-white/5 text-[9px] md:text-sm px-1.5 md:px-4">
-                                                <Lock className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> <span className="hidden sm:inline">Reset</span>
-                                            </Button>
-                                            <Button type="button" variant="outline" size="sm" onClick={() => setIsEditing(true)} className="h-8 md:h-9 border-white/10 bg-white/5 text-[9px] md:text-sm px-1.5 md:px-4">
-                                                <Edit className="w-3 h-3 md:w-3.5 md:h-3.5 mr-1" /> Edit
-                                            </Button>
-                                        </>
-                                    )}
-                                    {isAdmin && !isHistoricalMode && (
-                                        <Button type="button" variant="destructive" size="sm" onClick={() => setIsDeleteModalOpen(true)} className="h-8 md:h-9 bg-red-500/10 border-red-500/20 text-red-500 hover:bg-red-500/20 px-1.5 md:px-3">
-                                            <ShieldAlert className="w-3 h-3 md:w-3.5 md:h-3.5" />
-                                        </Button>
-                                    )}
-                                </div>
-                            )
-                        )
-                        }
-                    </div >
+                                </DropdownMenuTrigger>
+                                <DropdownMenuContent align="end" className="bg-[#0f172a] border-white/10 text-white rounded-xl min-w-[160px]">
+                                    <DropdownMenuItem onClick={() => { setActiveTab('profile'); setIsEditing(true); }} className="gap-2 cursor-pointer focus:bg-white/10 focus:text-white">
+                                        <Edit className="w-4 h-4 text-indigo-400" />
+                                        <span>Edit Profile</span>
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem onClick={() => setIsResetModalOpen(true)} className="gap-2 cursor-pointer focus:bg-rose-500/20 focus:text-rose-400 text-rose-400">
+                                        <ShieldAlert className="w-4 h-4" />
+                                        <span>Reset Password</span>
+                                    </DropdownMenuItem>
+                                </DropdownMenuContent>
+                            </DropdownMenu>
+                        )}
+                    </div>
+                </div>
+
+                {!loading && student && (
+                    <div className="flex items-center gap-1.5 mt-1.5">
+                        <span className="text-[10px] text-[#8892B0] font-mono bg-white/5 px-2 py-0.5 rounded-md border border-white/5 truncate max-w-[180px]">
+                            {student.schoolId} • {(classesData || {})[student.classId]?.name || student.className || "Class"}-{(sectionsData || {})[student.sectionId]?.name || student.sectionName || "Section"}
+                        </span>
+                        
+                        <Select value={viewingYear} onValueChange={setViewingYear}>
+                            <SelectTrigger className="h-5 py-0 border-white/10 bg-white/5 text-[9px] font-bold w-auto min-w-[80px] focus:ring-0 rounded-md text-white ml-auto">
+                                <SelectValue placeholder="Session" />
+                            </SelectTrigger>
+                            <SelectContent className="bg-[#0A192F] border-white/10 text-white font-semibold">
+                                {Object.keys(academicYears || {}).map(year => (
+                                    <SelectItem key={year} value={year} className="text-[11px]">
+                                        {year}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
                 )}
-            </div >
+            </div>
 
-            {/* Custom Tab Slider Navigation */}
-            {!loading && student && (
-                <div className="flex border-b border-white/10 p-1 bg-white/5 rounded-2xl backdrop-blur-md mx-1 md:mx-0">
-                    <button
-                        onClick={() => setActiveTab('profile')}
-                        className={cn(
-                            "flex-1 py-2 md:py-3 px-2 md:px-4 rounded-xl text-[10px] sm:text-xs md:text-sm font-bold uppercase tracking-tighter xs:tracking-normal sm:tracking-widest transition-all duration-300 flex items-center justify-center gap-1.5 md:gap-2",
-                            activeTab === 'profile'
-                                ? "bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-xl scale-[1.01]"
-                                : "text-[#8892B0] hover:text-white hover:bg-white/5"
-                        )}
-                    >
-                        <FileText className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" />
-                        <span className="hidden sm:inline">Profile & Ledger</span>
-                        <span className="sm:hidden">Profile</span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('academic')}
-                        className={cn(
-                            "flex-1 py-2 md:py-3 px-2 md:px-4 rounded-xl text-[10px] sm:text-xs md:text-sm font-bold uppercase tracking-tighter xs:tracking-normal sm:tracking-widest transition-all duration-300 flex items-center justify-center gap-1.5 md:gap-2",
-                            activeTab === 'academic'
-                                ? "bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-xl scale-[1.01]"
-                                : "text-[#8892B0] hover:text-white hover:bg-white/5"
-                        )}
-                    >
-                        <GraduationCap className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" />
-                        <span className="hidden sm:inline">Academic Performance</span>
-                        <span className="sm:hidden">Academics</span>
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('attendance')}
-                        className={cn(
-                            "flex-1 py-2 md:py-3 px-2 md:px-4 rounded-xl text-[10px] sm:text-xs md:text-sm font-bold uppercase tracking-tighter xs:tracking-normal sm:tracking-widest transition-all duration-300 flex items-center justify-center gap-1.5 md:gap-2",
-                            activeTab === 'attendance'
-                                ? "bg-gradient-to-r from-blue-600 to-blue-800 text-white shadow-xl scale-[1.01]"
-                                : "text-[#8892B0] hover:text-white hover:bg-white/5"
-                        )}
-                    >
-                        <Calendar className="w-3.5 h-3.5 md:w-4 md:h-4 shrink-0" />
-                        <span className="hidden sm:inline">Attendance Logs</span>
-                        <span className="sm:hidden">Attendance</span>
-                    </button>
+            {/* Compact Segmented Control Tabs */}
+            <div className="bg-[#0A192F] border-b border-white/5">
+                <div className="flex overflow-x-auto px-2 py-1.5 custom-scrollbar snap-x gap-1">
+                    {[
+                        { id: 'profile', label: 'Profile' },
+                        { id: 'academic', label: 'Academics' },
+                        { id: 'attendance', label: 'Attendance' },
+                        { id: 'fees', label: 'Fees' },
+                        { id: 'documents', label: 'Documents' },
+                        { id: 'history', label: 'History' },
+                    ].map(tab => (
+                        <button
+                            key={tab.id}
+                            onClick={() => setActiveTab(tab.id as any)}
+                            className={`flex-none h-7 px-3.5 rounded-md flex items-center justify-center transition-all duration-300 border snap-center ${
+                                activeTab === tab.id 
+                                ? 'bg-indigo-500/20 border-indigo-500/30 text-indigo-300' 
+                                : 'bg-transparent border-transparent hover:bg-white/5 text-[#8892B0]'
+                            }`}
+                        >
+                            <span className={`text-[11px] font-bold tracking-wide`}>{tab.label}</span>
+                        </button>
+                    ))}
                 </div>
-            )}
+            </div>
 
-            {activeTab === 'profile' && (
-                <div className="grid grid-cols-1 lg:grid-cols-3 gap-3 md:gap-4">
-                    {/* Left Column */}
-                    <div className="lg:col-span-2 space-y-3 md:space-y-4">
-                        <Card className="bg-black/20 border-white/10 backdrop-blur-sm">
-                            <CardHeader className="py-2 md:py-3 px-1.5 md:px-6">
-                                <CardTitle className="text-xs md:text-xl font-bold text-accent italic">Personal Information</CardTitle>
-                            </CardHeader>
-                            <CardContent className="grid grid-cols-2 gap-x-2 md:gap-x-3 gap-y-2 md:gap-y-3 px-1.5 md:px-6 pb-3 md:pb-6">
-                                {loading ? (
-                                    <div className="col-span-2 space-y-4">
-                                        <div className="grid grid-cols-2 gap-4">
-                                            <div className="h-10 bg-white/5 animate-pulse rounded-lg" />
-                                            <div className="h-10 bg-white/5 animate-pulse rounded-lg" />
-                                        </div>
-                                        <div className="h-10 bg-white/5 animate-pulse rounded-lg" />
-                                    </div>
-                                ) : (
-                                    <>
-                                        <div className="space-y-0.5 md:space-y-1 col-span-2 md:col-span-1">
-                                            <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Student Name</Label>
-                                            <Input disabled={!isEditing} className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm font-bold disabled:opacity-100" value={editForm.studentName} onChange={e => setEditForm({ ...editForm, studentName: e.target.value })} />
-                                        </div>
-                                        <div className="space-y-0.5 md:space-y-1 col-span-2 md:col-span-1">
-                                            <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">First Name</Label>
-                                            <Input disabled={!isEditing} className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm disabled:opacity-100" value={editForm.firstName || ""} onChange={e => setEditForm({ ...editForm, firstName: e.target.value })} />
-                                        </div>
-                                        <div className="space-y-0.5 md:space-y-1 col-span-2 md:col-span-1">
-                                            <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Last Name</Label>
-                                            <Input disabled={!isEditing} className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm disabled:opacity-100" value={editForm.lastName || ""} onChange={e => setEditForm({ ...editForm, lastName: e.target.value })} />
-                                        </div>
-                                        <div className="space-y-0.5 md:space-y-1 col-span-2 md:col-span-1">
-                                            <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Parent Name</Label>
-                                            <Input disabled={!isEditing} className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm disabled:opacity-100" value={editForm.parentName} onChange={e => setEditForm({ ...editForm, parentName: e.target.value })} />
-                                        </div>
-                                        <div className="space-y-0.5 md:space-y-1 col-span-2 md:col-span-1">
-                                            <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Mobile / Password</Label>
-                                            <Input disabled={!isEditing} className="bg-white/5 border-white/10 font-mono h-8 md:h-10 text-[12px] md:text-sm disabled:opacity-100" value={editForm.parentMobile} onChange={e => setEditForm({ ...editForm, parentMobile: e.target.value })} />
-                                        </div>
-                                        <div className="space-y-0.5 md:space-y-1 col-span-2 md:col-span-1">
-                                            <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Admission Number</Label>
-                                            <Input disabled={!isEditing} className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm font-bold disabled:opacity-100" value={editForm.admissionNumber || ""} onChange={e => setEditForm({ ...editForm, admissionNumber: e.target.value })} />
-                                        </div>
-                                        <div className="space-y-0.5 md:space-y-1 col-span-2 md:col-span-1">
-                                            <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Academic Year</Label>
-                                            <Input disabled={!isEditing} className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm disabled:opacity-100" value={editForm.academicYear || ""} onChange={e => setEditForm({ ...editForm, academicYear: e.target.value })} />
-                                        </div>
-                                        <div className="space-y-0.5 md:space-y-1 col-span-2">
-                                            <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Address</Label>
-                                            <Textarea rows={2} disabled={!isEditing} className="bg-white/5 border-white/10 text-[12px] md:text-sm disabled:opacity-100 min-h-[60px]" value={editForm.address || ""} onChange={e => setEditForm({ ...editForm, address: e.target.value })} />
-                                        </div>
-                                        <div className="space-y-0.5 md:space-y-1">
-                                            <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Village</Label>
-                                            <Select disabled={!isEditing} value={editForm.villageId} onValueChange={v => setEditForm({ ...editForm, villageId: v })}>
-                                                <SelectTrigger className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm px-2 disabled:opacity-100"><SelectValue placeholder="Village" /></SelectTrigger>
-                                                <SelectContent className="bg-[#0A192F] border-white/10">{villages.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}</SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-0.5 md:space-y-1">
-                                            <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Class</Label>
-                                            <Select disabled={!isEditing} value={editForm.classId} onValueChange={v => setEditForm({ ...editForm, classId: v })}>
-                                                <SelectTrigger className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm px-2 disabled:opacity-100"><SelectValue placeholder="Class" /></SelectTrigger>
-                                                <SelectContent className="bg-[#0A192F] border-white/10">{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-0.5 md:space-y-1">
-                                            <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Section</Label>
-                                            <Select disabled={!isEditing} value={editForm.sectionId} onValueChange={v => setEditForm({ ...editForm, sectionId: v })}>
-                                                <SelectTrigger className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm px-2 disabled:opacity-100"><SelectValue placeholder="Section" /></SelectTrigger>
-                                                <SelectContent className="bg-[#0A192F] border-white/10">{sections.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-0.5 md:space-y-1">
-                                            <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Status</Label>
-                                            <Select disabled={!isEditing} value={editForm.status} onValueChange={v => setEditForm({ ...editForm, status: v })}>
-                                                <SelectTrigger className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm px-2 disabled:opacity-100"><SelectValue /></SelectTrigger>
-                                                <SelectContent className="bg-[#0A192F] border-white/10">
-                                                    <SelectItem value="ACTIVE">Active</SelectItem>
-                                                    <SelectItem value="PROMOTED">Promoted</SelectItem>
-                                                    <SelectItem value="DETAINED">Detained</SelectItem>
-                                                    <SelectItem value="INACTIVE">Inactive</SelectItem>
-                                                    <SelectItem value="ALUMNI">Alumni</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-0.5 md:space-y-1">
-                                            <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Date of Birth</Label>
-                                            <Input type="date" disabled={!isEditing} className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] md:text-sm disabled:opacity-100 block w-full" value={editForm.dateOfBirth || ""} onChange={e => setEditForm({ ...editForm, dateOfBirth: e.target.value })} />
-                                        </div>
-                                        <div className="space-y-0.5 md:space-y-1">
-                                            <Label className="text-[8px] md:text-xs text-muted-foreground uppercase font-black tracking-tighter">Gender</Label>
-                                            <Select disabled={!isEditing} value={editForm.gender || "select"} onValueChange={v => setEditForm({ ...editForm, gender: v })}>
-                                                <SelectTrigger className="bg-white/5 border-white/10 h-8 md:h-10 text-[12px] text-sm px-2 disabled:opacity-100"><SelectValue placeholder="Gender" /></SelectTrigger>
-                                                <SelectContent className="bg-[#0A192F] border-white/10">
-                                                    <SelectItem value="select" disabled>Select Gender</SelectItem>
-                                                    <SelectItem value="male">Male</SelectItem>
-                                                    <SelectItem value="female">Female</SelectItem>
-                                                    <SelectItem value="other">Other</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="space-y-0.5 md:space-y-1 col-span-2">
-                                            <div className="flex items-center space-x-2 pt-2 md:pt-4">
-                                                <input
-                                                    type="checkbox"
-                                                    id="transport"
-                                                    className="w-4 h-4 rounded border-white/20 bg-black/50 accent-emerald-500"
-                                                    checked={editForm.transportRequired || false}
-                                                    disabled={!isEditing}
-                                                    onChange={e => setEditForm({ ...editForm, transportRequired: e.target.checked })}
-                                                />
-                                                <Label htmlFor="transport" className="text-[10px] md:text-sm text-foreground cursor-pointer font-bold">Transport Required?</Label>
-                                            </div>
-                                        </div>
-                                    </>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        <Card className="bg-black/20 border-white/10">
-                            <CardHeader className="flex flex-row items-center justify-between py-2 md:py-3 px-1.5 md:px-6">
-                                <CardTitle className="text-xs md:xl font-bold text-accent italic">Fee Structure</CardTitle>
-                                {!loading && (
-                                    <div className="flex gap-1">
-                                        <Button variant="outline" size="sm" className="h-6 px-1.5 md:h-7 md:px-2 border-emerald-500/20 bg-emerald-500/10 text-emerald-400 text-[8px] md:text-[9px] font-bold" onClick={() => ledger && student && printStudentFeeStructure({ studentName: student.studentName, schoolId: student.schoolId, className: student.className, items: ledger.items || [], totalPaid: ledger.totalPaid || 0, schoolLogo: branding?.schoolLogo, schoolName: branding?.schoolName })}>
-                                            <Printer className="w-2.5 h-2.5 md:w-3 md:h-3 mr-1" />
-                                        </Button>
-                                        {canEdit && !isHistoricalMode && (
-                                            <Button variant="outline" size="sm" className="h-6 px-1.5 md:h-7 md:px-2 border-white/10 bg-white/5 text-[8px] md:text-[9px] font-bold" onClick={() => setIsAdjustModalOpen(true)}>
-                                                <Settings2 className="w-2.5 h-2.5 md:w-3 md:h-3 mr-1" /> Adjust
-                                            </Button>
-                                        )}
-                                    </div>
-                                )}
-                            </CardHeader>
-                            <CardContent className="px-1.5 md:px-6 pb-3">
-                                {loading ? (
-                                    <div className="space-y-2 py-4">
-                                        <div className="h-10 bg-white/5 animate-pulse rounded-lg" />
-                                        <div className="h-10 bg-white/5 animate-pulse rounded-lg" />
-                                        <div className="h-10 bg-white/5 animate-pulse rounded-lg" />
-                                    </div>
-                                ) : !ledger || !ledger.items || ledger.items.length === 0 ? (
-                                    <div className="text-center py-6 text-muted-foreground border border-dashed border-white/10 rounded-lg text-xs bg-white/5">
-                                        No fee structure assigned. Please update details.
-                                    </div>
-                                ) : (
-                                    <div className="w-full overflow-x-auto custom-scrollbar">
-                                        <table className="w-full border-collapse min-w-[600px]">
-                                            <thead>
-                                                <tr className="text-[8px] md:text-[10px] text-muted-foreground uppercase font-black border-b border-white/10 italic">
-                                                    <th className="px-1 md:px-3 py-2 text-left">Fee Item</th>
-                                                    <th className="px-1 md:px-2 py-2 text-right">Total</th>
-                                                    <th className="px-1 md:px-2 py-2 text-right">Paid</th>
-                                                    <th className="px-1 md:px-2 py-2 text-right">Due</th>
-                                                    <th className="px-1 md:px-3 py-2 text-right">Status</th>
-                                                </tr>
-                                            </thead>
-                                            <tbody>
-                                                {breakdown.items.map((item) => (
-                                                    <tr key={item.id} className="border-b border-white/5 hover:bg-white/5 transition-colors group">
-                                                        <td className="px-1 md:px-3 py-2">
-                                                            <div className="flex flex-col">
-                                                                <span className="text-[11px] md:text-sm font-bold text-white group-hover:text-accent transition-colors leading-tight">{item.name}</span>
-                                                                <span className="text-[7px] md:text-[9px] text-white/30 uppercase font-black tracking-tighter">{item.type}</span>
-                                                            </div>
-                                                        </td>
-                                                        <td className="px-1 md:px-2 py-2 text-right font-mono text-[9px] md:text-xs text-white/70">₹{item.amount.toLocaleString()}</td>
-                                                        <td className="px-1 md:px-2 py-2 text-right font-mono text-[9px] md:text-xs text-emerald-400">₹{item.distributedPaid.toLocaleString()}</td>
-                                                        <td className="px-1 md:px-2 py-2 text-right font-mono text-[10px] md:text-xs text-red-400 font-bold">₹{item.distributedDue.toLocaleString()}</td>
-                                                        <td className="px-1 md:px-3 py-2 text-right">
-                                                            <span className={cn(
-                                                                "inline-flex px-1 py-0.5 md:px-1.5 rounded-[4px] text-[7px] md:text-[9px] font-black uppercase tracking-tighter",
-                                                                item.distributedStatus === "PAID" ? "bg-emerald-500/10 text-emerald-400" :
-                                                                    item.distributedStatus === "PARTIAL" ? "bg-amber-500/10 text-amber-500" :
-                                                                        "bg-red-500/10 text-red-500"
-                                                            )}>
-                                                                {item.distributedStatus}
-                                                            </span>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                            </tbody>
-                                        </table>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        <Card className="bg-black/20 border-white/10">
-                            <CardHeader className="flex flex-row items-center justify-between py-2 md:py-3 px-1.5 md:px-6">
-                                <CardTitle className="text-xs md:text-xl font-bold text-accent italic">History</CardTitle>
-                                <History className="w-3.5 h-3.5 md:w-4 md:h-4 text-muted-foreground" />
-                            </CardHeader>
-                            <CardContent className="px-1.5 md:px-6 pb-3">
-                                {loading ? (
-                                    <div className="space-y-2 py-2">
-                                        <div className="h-8 bg-white/5 animate-pulse rounded-lg" />
-                                        <div className="h-8 bg-white/5 animate-pulse rounded-lg" />
-                                    </div>
-                                ) : payments.length === 0 ? (
-                                    <div className="text-center py-4 text-muted-foreground border border-dashed border-white/10 rounded-lg text-[10px]">No payments.</div>
-                                ) : (
-                                    <div className="space-y-1">
-                                        {payments.map((p) => (
-                                            <div key={p.id} className="flex items-center justify-between p-2 rounded-lg bg-white/5 border border-white/5 hover:border-accent/10 transition-colors">
-                                                <div className="flex flex-col">
-                                                    <span className="text-[10px] md:text-sm font-bold text-emerald-400">₹{p.amount?.toLocaleString()}</span>
-                                                    <span className="text-[8px] md:text-[10px] text-white/40 uppercase font-black">{p.method} • {safeDateString(p.date)}</span>
-                                                </div>
-                                                <Button variant="ghost" size="sm" className="h-6 w-6 p-0 hover:bg-emerald-500/10 text-emerald-400/60" onClick={() => student && printPaymentReceipt({ payment: p, student: student, ledger: ledger, schoolLogo: branding?.schoolLogo, schoolName: branding?.schoolName })}>
-                                                    <Printer className="w-3 h-3" />
-                                                </Button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </div>
-
-                    {/* Right Column */}
-                    <div className="space-y-3 md:space-y-4">
-                        <Card className="bg-black/20 border-white/10 overflow-hidden relative group">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-emerald-500/5 blur-[50px] rounded-full -mr-16 -mt-16 group-hover:bg-emerald-500/10 transition-all duration-1000" />
-                            <CardHeader className="py-2 md:py-3 px-1.5 md:px-6 pb-0">
-                                <CardTitle className="text-[10px] md:text-sm font-black uppercase tracking-widest text-[#8892B0]">Collection Progress</CardTitle>
-                            </CardHeader>
-                            <CardContent className="px-1.5 md:px-6 py-4 md:py-8 space-y-4 md:space-y-6 relative z-10">
-                                {loading ? (
-                                    <div className="space-y-6">
-                                        <div className="h-16 bg-white/5 animate-pulse rounded-2xl" />
-                                        <div className="h-8 bg-white/5 animate-pulse rounded-xl" />
-                                    </div>
-                                ) : (
-                                    <>
-                                        <div className="text-center space-y-1 md:space-y-2">
-                                            <div className="text-3xl md:text-6xl font-display font-black text-white leading-none italic">
-                                                {Math.round(paymentProgress)}%
-                                            </div>
-                                            <p className="text-[8px] md:text-[10px] font-black uppercase tracking-[0.2em] text-accent/60">Cleared Pipeline</p>
-                                        </div>
-
-                                        <div className="w-full h-1.5 md:h-3 bg-white/5 rounded-full overflow-hidden border border-white/5">
-                                            <motion.div
-                                                initial={{ width: 0 }}
-                                                animate={{ width: `${paymentProgress}%` }}
-                                                transition={{ duration: 1, ease: "easeOut" }}
-                                                className={cn(
-                                                    "h-full relative",
-                                                    paymentProgress >= 100 ? "bg-emerald-500" :
-                                                        paymentProgress >= 50 ? "bg-blue-500" :
-                                                            "bg-amber-500"
-                                                )}
-                                            >
-                                                <div className="absolute inset-0 bg-white/20 animate-pulse" />
-                                            </motion.div>
-                                        </div>
-
-                                        <div className="grid grid-cols-2 gap-2 md:gap-4">
-                                            <div className="p-3 md:p-4 rounded-2xl bg-white/5 border border-white/5 backdrop-blur-md">
-                                                <div className="text-[8px] md:text-[10px] font-black text-muted-foreground uppercase mb-1">Total Fee</div>
-                                                <div className="text-sm md:text-xl font-mono font-bold text-white">₹{totalFee.toLocaleString()}</div>
-                                            </div>
-                                            <div className="p-3 md:p-4 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 backdrop-blur-md">
-                                                <div className="text-[8px] md:text-[10px] font-black text-emerald-500/60 uppercase mb-1">Total Paid</div>
-                                                <div className="text-sm md:text-xl font-mono font-bold text-emerald-400">₹{totalPaid.toLocaleString()}</div>
-                                            </div>
-                                        </div>
-
-                                        <div className="p-3 md:p-4 rounded-2xl bg-rose-500/5 border border-rose-500/10 backdrop-blur-md flex items-center justify-between">
-                                            <div>
-                                                <div className="text-[8px] md:text-[10px] font-black text-rose-500/60 uppercase mb-1">Due Balance</div>
-                                                <div className="text-sm md:text-2xl font-mono font-bold text-red-500">₹{dueAmount.toLocaleString()}</div>
-                                            </div>
-                                            <Button variant="ghost" size="icon" className="h-8 w-8 text-rose-400 hover:bg-rose-500/10" onClick={() => printPendingFeeReport({ studentName: student?.studentName || 'Student', schoolId: student?.schoolId || '', className: student?.className || '', items: breakdown.items, totalPaid: totalPaid, schoolLogo: branding?.schoolLogo, schoolName: branding?.schoolName })}>
-                                                <Download className="w-4 h-4" />
-                                            </Button>
-                                        </div>
-                                    </>
-                                )}
-                            </CardContent>
-                        </Card>
-
-                        {!loading && student && (
-                            <div className="p-4 md:p-6 rounded-3xl bg-black/40 border border-white/10 space-y-4">
-                                <h3 className="text-[10px] font-black uppercase tracking-[0.2em] text-blue-400 flex items-center gap-2">
-                                    <FileText size={14} /> Documentation
-                                </h3>
-                                <div className="grid gap-2">
-                                    <Button variant="outline" className="w-full justify-start h-12 rounded-xl border-white/5 bg-white/5 hover:bg-white/10 font-bold gap-3 text-xs" onClick={() => ledger && student && exportSingleStudentFee({ studentName: student.studentName, schoolId: student.schoolId, className: student.className, items: breakdown.items, totalPaid })}>
-                                        <Download size={14} className="text-blue-400" /> Export Excel
-                                    </Button>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
-            )}
-
-            {/* Tab 2: Academic Performance */}
-            {activeTab === 'academic' && (
-                <div className="space-y-4 md:space-y-6">
-                    {loadingExams ? (
-                        <div className="space-y-4 py-8">
-                            <div className="h-32 bg-white/5 animate-pulse rounded-3xl" />
-                            <div className="h-32 bg-white/5 animate-pulse rounded-3xl" />
-                        </div>
-                    ) : exams.length === 0 ? (
-                        <div className="text-center py-16 text-muted-foreground border border-dashed border-white/10 rounded-3xl bg-black/20 backdrop-blur-sm mx-1 md:mx-0">
-                            <GraduationCap className="w-12 h-12 text-[#8892B0] mx-auto mb-4 opacity-40 animate-pulse" />
-                            <h3 className="text-white font-bold text-lg mb-1">No Scheduled Exams Found</h3>
-                            <p className="text-sm">No exam sessions have been scheduled for academic year {viewingYear}.</p>
-                        </div>
-                    ) : (
-                        <div className="grid grid-cols-1 gap-4 mx-1 md:mx-0">
-                            {exams.map((exam) => {
-                                const result = examResults[exam.id];
-                                return (
-                                    <Card key={exam.id} className="bg-black/20 border-white/10 backdrop-blur-md overflow-hidden relative group">
-                                        <CardHeader className="flex flex-row items-center justify-between border-b border-white/5 py-4 px-6">
-                                            <div className="space-y-1">
-                                                <CardTitle className="text-lg font-bold text-white group-hover:text-accent transition-colors">{exam.name}</CardTitle>
-                                                <CardDescription className="text-xs text-[#8892B0]">
-                                                    Scheduled: {new Date(exam.startDate).toLocaleDateString()} to {new Date(exam.endDate).toLocaleDateString()}
-                                                </CardDescription>
-                                            </div>
-                                            {result && student && (
-                                                <SingleReportCardButton
-                                                    examId={exam.id}
-                                                    studentId={student.schoolId}
-                                                />
-                                            )}
-                                        </CardHeader>
-                                        <CardContent className="p-6">
-                                            {result ? (
-                                                <div className="space-y-4">
-                                                    <div className="w-full overflow-x-auto custom-scrollbar">
-                                                        <table className="w-full border-collapse">
-                                                            <thead>
-                                                                <tr className="text-[10px] text-muted-foreground uppercase font-black border-b border-white/10 pb-2">
-                                                                    <th className="py-2 text-left">Subject</th>
-                                                                    <th className="py-2 text-right">Marks Obtained</th>
-                                                                    <th className="py-2 text-right">Max Marks</th>
-                                                                    <th className="py-2 text-right">Remarks</th>
-                                                                </tr>
-                                                            </thead>
-                                                            <tbody>
-                                                                {Object.entries(result.subjects || {}).map(([subjectId, data]: [string, any]) => (
-                                                                    <tr key={subjectId} className="border-b border-white/5 py-2">
-                                                                        <td className="py-3 font-bold text-white text-sm">{subjectId}</td>
-                                                                        <td className="py-3 text-right font-mono text-emerald-400 font-bold text-sm">{data.obtained}</td>
-                                                                        <td className="py-3 text-right font-mono text-white/50 text-sm">{data.maxMarks || 100}</td>
-                                                                        <td className="py-3 text-right text-xs text-white/70 italic">{data.remarks || "-"}</td>
-                                                                    </tr>
-                                                                ))}
-                                                            </tbody>
-                                                        </table>
-                                                    </div>
-                                                </div>
-                                            ) : (
-                                                <div className="text-center py-6 text-muted-foreground border border-dashed border-white/10 rounded-2xl bg-white/5 text-sm flex flex-col justify-center items-center">
-                                                    <ClipboardCheck className="w-8 h-8 text-white/30 mb-2" />
-                                                    No results compiled or released for this exam yet.
-                                                </div>
-                                            )}
-                                        </CardContent>
-                                    </Card>
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-            )}
-
-            {/* Tab 3: Attendance Logs */}
-            {activeTab === 'attendance' && (
-                <div className="space-y-4 md:space-y-6 mx-1 md:mx-0">
-                    <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
-                        {/* Stats Ring Card */}
-                        <Card className="bg-black/20 border-white/10 overflow-hidden relative group p-6 flex flex-col justify-between">
-                            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 blur-[50px] rounded-full -mr-16 -mt-16 group-hover:bg-blue-500/10 transition-all duration-1000" />
-                            <div className="relative z-10 space-y-4">
-                                <h3 className="text-[10px] font-black uppercase tracking-widest text-[#8892B0]">Attendance Progress</h3>
-                                
-                                <div className="flex flex-col items-center justify-center py-4 space-y-2">
-                                    <div className="relative w-32 h-32 flex items-center justify-center">
-                                        <svg className="w-full h-full transform -rotate-90" viewBox="0 0 100 100">
-                                            {/* Background circle */}
-                                            <circle
-                                                cx="50"
-                                                cy="50"
-                                                r="40"
-                                                stroke="rgba(255,255,255,0.05)"
-                                                strokeWidth="8"
-                                                fill="transparent"
-                                            />
-                                            {/* Progress circle */}
-                                            <motion.circle
-                                                cx="50"
-                                                cy="50"
-                                                r="40"
-                                                stroke={attendanceStats.percentage >= 75 ? "#10B981" : attendanceStats.percentage >= 50 ? "#3B82F6" : "#F59E0B"}
-                                                strokeWidth="8"
-                                                fill="transparent"
-                                                strokeDasharray="251.2"
-                                                initial={{ strokeDashoffset: 251.2 }}
-                                                animate={{ strokeDashoffset: 251.2 - (251.2 * attendanceStats.percentage) / 100 }}
-                                                transition={{ duration: 1.2, ease: "easeOut" }}
-                                            />
-                                        </svg>
-                                        <span className="absolute text-2xl font-black text-white italic">{attendanceStats.percentage}%</span>
-                                    </div>
-                                    <p className="text-[9px] font-black uppercase tracking-widest text-accent/60">Annual Percentage</p>
-                                </div>
-                            </div>
-                            
-                            <div className="grid grid-cols-3 gap-2 mt-4 relative z-10">
-                                <div className="p-3 rounded-2xl bg-white/5 border border-white/5 text-center">
-                                    <div className="text-[8px] font-black text-muted-foreground uppercase mb-0.5">Total</div>
-                                    <div className="text-sm font-mono font-black text-white">{attendanceStats.total}</div>
-                                </div>
-                                <div className="p-3 rounded-2xl bg-emerald-500/5 border border-emerald-500/10 text-center">
-                                    <div className="text-[8px] font-black text-emerald-500/60 uppercase mb-0.5">Present</div>
-                                    <div className="text-sm font-mono font-black text-emerald-400">{attendanceStats.present}</div>
-                                </div>
-                                <div className="p-3 rounded-2xl bg-rose-500/5 border border-rose-500/10 text-center">
-                                    <div className="text-[8px] font-black text-rose-500/60 uppercase mb-0.5">Absent</div>
-                                    <div className="text-sm font-mono font-black text-red-400">{attendanceStats.absent}</div>
-                                </div>
-                            </div>
-                        </Card>
-
-                        {/* Calendar Grid Card */}
-                        <Card className="lg:col-span-2 bg-black/20 border-white/10 backdrop-blur-md p-6 space-y-4">
-                            <div className="flex flex-row items-center justify-between border-b border-white/5 pb-4">
-                                <div className="space-y-1">
-                                    <CardTitle className="text-lg font-bold text-white flex items-center gap-2">
-                                        <Calendar className="w-5 h-5 text-accent" /> Calendar Log
-                                    </CardTitle>
-                                    <CardDescription className="text-xs text-[#8892B0]">
-                                        Month-by-month attendance markings
-                                    </CardDescription>
-                                </div>
-                                
-                                {/* Month selector dropdown */}
-                                <Select
-                                    value={academicMonths.findIndex(m => m.month === viewingMonth && m.yearOffset === (viewingMonthYear - Number(viewingYear.split("-")[0]))).toString()}
-                                    onValueChange={(valIndexStr) => {
-                                        const idx = Number(valIndexStr);
-                                        const selection = academicMonths[idx];
-                                        const [startYear] = viewingYear.split("-");
-                                        setViewingMonth(selection.month);
-                                        setViewingMonthYear(Number(startYear) + selection.yearOffset);
-                                    }}
-                                >
-                                    <SelectTrigger className="h-9 bg-white/5 border-white/10 rounded-xl text-xs text-white w-[140px] focus:ring-0">
-                                        <SelectValue placeholder="Select Month" />
-                                    </SelectTrigger>
-                                    <SelectContent className="bg-zinc-900 border-white/10 text-white font-semibold">
-                                        {academicMonths.map((m, idx) => (
-                                            <SelectItem key={idx} value={idx.toString()}>
-                                                {m.name} {Number(viewingYear.split("-")[0]) + m.yearOffset}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-
-                            {loadingAttendance ? (
-                                <div className="h-64 flex items-center justify-center">
-                                    <Loader2 className="w-8 h-8 animate-spin text-accent" />
-                                </div>
-                            ) : (
-                                <div className="space-y-4">
-                                    {/* Legend */}
-                                    <div className="flex items-center gap-4 text-xs font-bold text-muted-foreground pb-2">
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="w-2.5 h-2.5 rounded-full bg-emerald-500" /> Present
-                                        </div>
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="w-2.5 h-2.5 rounded-full bg-rose-500" /> Absent
-                                        </div>
-                                        <div className="flex items-center gap-1.5">
-                                            <span className="w-2.5 h-2.5 rounded-full bg-white/10" /> Not Marked
-                                        </div>
-                                    </div>
-
-                                    {/* Days Grid */}
-                                    <div className="grid grid-cols-7 gap-1.5 text-center">
-                                        {/* Weekday headers */}
-                                        {["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"].map(day => (
-                                            <div key={day} className="text-[10px] font-black text-[#8892B0] uppercase py-1">{day}</div>
-                                        ))}
-
-                                        {/* Padding before month start */}
-                                        {Array.from({ length: getFirstDayOfMonth(viewingMonth, viewingMonthYear) }).map((_, i) => (
-                                            <div key={`pad-${i}`} className="aspect-square rounded-lg bg-transparent" />
-                                        ))}
-
-                                        {/* Actual Days */}
-                                        {Array.from({ length: getDaysInMonth(viewingMonth, viewingMonthYear) }).map((_, i) => {
-                                            const day = i + 1;
-                                            const dateStr = `${viewingMonthYear}-${String(viewingMonth + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-                                            const status = attendanceMap[dateStr];
-                                            
-                                            return (
-                                                <div
-                                                    key={`day-${day}`}
-                                                    className={cn(
-                                                        "aspect-square rounded-lg flex flex-col items-center justify-center text-xs font-bold transition-all relative",
-                                                        status === 'P' ? "bg-emerald-500/10 border border-emerald-500/20 text-emerald-400" :
-                                                        status === 'A' ? "bg-rose-500/10 border border-rose-500/20 text-red-400" :
-                                                        "bg-white/5 border border-white/5 text-muted-foreground hover:bg-white/10"
-                                                    )}
-                                                >
-                                                    <span>{day}</span>
-                                                    {status && (
-                                                        <span className={cn(
-                                                            "w-1 h-1 rounded-full absolute bottom-1",
-                                                            status === 'P' ? "bg-emerald-400" : "bg-rose-400"
-                                                        )} />
-                                                    )}
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                </div>
-                            )}
-                        </Card>
-                    </div>
-                </div>
-            )}
-
-            {
-                student && (
-                    <DeleteUserModal
-                        isOpen={isDeleteModalOpen}
-                        onClose={() => setIsDeleteModalOpen(false)}
-                        user={{
-                            id: student.schoolId,
-                            schoolId: student.schoolId,
-                            name: student.studentName,
-                            role: "student"
-                        }}
-                        checkEligibility={async () => {
-                            const pQ = query(collection(db, "payments"), where("studentId", "==", student.schoolId), limit(1));
-                            const caps = await getDocs(pQ);
-                            if (!caps.empty) return { canDelete: false, reason: "Payments exist. Use Deactivate instead." };
-                            return { canDelete: true };
-                        }}
-                        onDeactivate={async (reason) => {
-                            await updateDoc(doc(db, "students", student.id), {
-                                status: "INACTIVE",
-                                deactivationReason: reason,
-                                updatedAt: new Date().toISOString()
-                            });
-                            setStudent({ ...student, status: "INACTIVE" });
-                        }}
-                        onDelete={async (reason) => {
-                            if (!user) { alert("You are not authenticated"); return; }
-                            const token = await user.getIdToken();
-                            const res = await fetch("/api/admin/users/delete", {
-                                method: "POST",
-                                headers: {
-                                    "Content-Type": "application/json",
-                                    "Authorization": `Bearer ${token}`
-                                },
-                                body: JSON.stringify({
-                                    targetUid: student.uid,
-                                    schoolId: student.schoolId,
-                                    role: "STUDENT",
-                                    collectionName: "students"
-                                })
-                            });
-
-                            const data = await res.json();
-                            if (data.success) {
-                                router.push("/admin/students");
-                            } else {
-                                throw new Error(data.error || "Delete failed");
-                            }
-                        }}
+            {/* Main Content Container */}
+            <div className="p-3 mx-auto max-w-5xl">
+                {activeTab === 'profile' && (
+                    <ProfileTab 
+                        student={student} 
+                        editForm={editForm} 
+                        setEditForm={setEditForm} 
+                        isEditing={isEditing} 
+                        setIsEditing={setIsEditing} 
+                        handleUpdate={handleUpdate} 
+                        canEdit={canEdit} 
+                        villages={villages} 
+                        classes={classes} 
+                        sections={sections} 
+                        loading={loading}
+                        setIsResetModalOpen={setIsResetModalOpen}
                     />
-                )
-            }
-
-            {
-                student && ledger && (
-                    <AdjustFeesModal
-                        isOpen={isAdjustModalOpen}
-                        onClose={() => setIsAdjustModalOpen(false)}
-                        studentId={student.schoolId}
-                        academicYearId={selectedYear}
-                        ledgerItems={ledger.items || []}
-                        onSuccess={() => {
-                            window.location.reload();
-                        }}
+                )}
+                {activeTab === 'fees' && (
+                    <FeesTab 
+                        student={student}
+                        ledger={ledger}
+                        totalFee={totalFee}
+                        totalPaid={totalPaid}
+                        dueAmount={dueAmount}
+                        breakdown={breakdown}
+                        canEdit={canEdit && role !== "MANAGER"}
+                        isHistoricalMode={isHistoricalMode}
+                        setIsAdjustModalOpen={setIsAdjustModalOpen}
+                        printStudentFeeStructure={printStudentFeeStructure}
+                        branding={branding}
+                        loading={loading}
                     />
-                )
-            }
-        </div >
+                )}
+                {activeTab === 'attendance' && (
+                    <AttendanceTab 
+                        attendanceMap={attendanceMap}
+                        attendanceStats={attendanceStats}
+                        viewingYear={viewingYear}
+                        loading={loadingAttendance || loading}
+                    />
+                )}
+                {activeTab === 'academic' && (
+                    <AcademicsTab 
+                        student={student}
+                        exams={exams}
+                        examResults={examResults}
+                        loading={loadingExams || loading}
+                    />
+                )}
+                {activeTab === 'history' && (
+                    <HistoryTab 
+                        payments={payments}
+                        loading={loading}
+                    />
+                )}
+                {activeTab === 'documents' && (
+                    <DocumentsTab 
+                        student={student}
+                        loading={loading}
+                    />
+                )}
+            </div>
+        </div>
     );
 }

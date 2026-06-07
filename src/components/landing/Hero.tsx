@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from "react";
 import { motion, useScroll, useTransform, useSpring, useInView } from "framer-motion";
 import { ArrowRight, Play, ChevronDown } from "lucide-react";
 import Link from "next/link";
+import Image from "next/image";
 import { ref, onValue } from "firebase/database";
 import { rtdb } from "@/lib/firebase";
 import { cn } from "@/lib/utils";
@@ -18,8 +19,10 @@ export function Hero({ initialContent }: { initialContent?: any }) {
     });
 
     const [isMobile, setIsMobile] = useState(false);
+    const [mounted, setMounted] = useState(false);
 
     useEffect(() => {
+        setMounted(true);
         const unsub = onValue(ref(rtdb, 'siteContent/home/hero'), (snap) => {
             if (snap.exists()) {
                 const data = snap.val();
@@ -42,7 +45,7 @@ export function Hero({ initialContent }: { initialContent?: any }) {
         };
     }, []);
 
-    const activeVideoUrl = (isMobile && content.mobileVideoUrl) ? content.mobileVideoUrl : content.videoUrl;
+    const activeVideoUrl = mounted && ((isMobile && content.mobileVideoUrl) ? content.mobileVideoUrl : (isMobile ? null : content.videoUrl));
 
     const containerRef = useRef<HTMLDivElement>(null);
     const { scrollY } = useScroll();
@@ -90,12 +93,20 @@ export function Hero({ initialContent }: { initialContent?: any }) {
                 style={{
                     opacity: opacityVideo,
                     y: yVideo,
-                    backgroundImage: content.posterUrl ? `url(${content.posterUrl})` : 'none',
-                    backgroundSize: 'cover',
-                    backgroundPosition: 'center'
                 }}
                 className="absolute inset-0 z-0 bg-[#0A192F]"
             >
+                {content.posterUrl && (
+                    <Image
+                        src={content.posterUrl}
+                        alt="Hero Poster"
+                        fill
+                        priority
+                        sizes="100vw"
+                        className="object-cover pointer-events-none select-none z-0"
+                    />
+                )}
+
                 {/* 
                   Video Layer - High priority rendering.
                 */}
@@ -103,17 +114,17 @@ export function Hero({ initialContent }: { initialContent?: any }) {
                     <video
                         key={activeVideoUrl}
                         src={activeVideoUrl}
-                        className="absolute inset-0 w-full h-full object-cover select-none"
+                        className="absolute inset-0 w-full h-full object-cover select-none z-10"
                         autoPlay
                         muted
                         loop
                         playsInline
-                        preload="auto"
+                        preload="metadata"
                     />
                 )}
 
-                <div className="absolute inset-0 bg-[#0A192F]/40 z-10 mix-blend-multiply pointer-events-none" /> {/* Darken video */}
-                <div className="absolute inset-0 bg-gradient-to-t from-[#0A192F] via-transparent to-transparent z-10 opacity-90 pointer-events-none" /> {/* Bottom fade */}
+                <div className="absolute inset-0 bg-[#0A192F]/40 z-20 mix-blend-multiply pointer-events-none" /> {/* Darken video */}
+                <div className="absolute inset-0 bg-gradient-to-t from-[#0A192F] via-transparent to-transparent z-20 opacity-90 pointer-events-none" /> {/* Bottom fade */}
             </motion.div>
 
             {/* Content Layer - Centered & Bold */}

@@ -22,7 +22,7 @@ export class EnterpriseStudentService {
      * @param payload Validated student payload
      * @param createdBy Admin user ID creating the student
      */
-    static async createStudent(payload: CreateStudentPayload, createdBy: string) {
+    static async createStudent(payload: CreateStudentPayload, createdBy: string, branchId: string = "global") {
         let userRecord: any = null;
         try {
             const academicYear = payload.academicYear || "2026-2027";
@@ -32,7 +32,7 @@ export class EnterpriseStudentService {
 
             // --- ZERO-LATENCY HYPER-PARALLEL FETCH ---
             // We fetch everything independent in one go to kill sequential waterfalls including duplicate check
-            const [settingsSnap, configSnap, customFeesSnap, classesSnap, duplicateSnap] = await Promise.all([
+            const [settingsSnap, configSnap, customFeesSnap, classesSnap, duplicateSnap, branchSnap] = await Promise.all([
                 adminDb.collection("settings").doc("branding").get(),
                 adminDb.collection("config").doc("fees").get(),
                 adminDb.collection("custom_fees").where("status", "==", "ACTIVE").where("academicYearId", "==", ledgerYear).get(),
@@ -43,7 +43,8 @@ export class EnterpriseStudentService {
                     .where("classId", "==", payload.classId)
                     .where("academicYear", "==", academicYear)
                     .limit(1)
-                    .get()
+                    .get(),
+                branchId !== "global" ? adminDb.collection("branches").doc(branchId).get() : null
             ]);
 
             // If a duplicate student exists and was created recently (within last 1 minute), reuse their record
@@ -65,8 +66,9 @@ export class EnterpriseStudentService {
             }
 
             const brandingData = settingsSnap.data() || {};
-            const prefix = brandingData.studentIdPrefix || "SCS";
-            const startingNumber = brandingData.studentIdSuffix ? Number(brandingData.studentIdSuffix) : 1;
+            const branchData = branchSnap?.exists ? branchSnap.data() : null;
+            const prefix = branchData?.studentIdPrefix || brandingData.studentIdPrefix || "SCS";
+            const startingNumber = branchData?.studentIdSuffix ? Number(branchData.studentIdSuffix) : (brandingData.studentIdSuffix ? Number(brandingData.studentIdSuffix) : 1);
 
             const feeConfig = configSnap.exists ? configSnap.data() : { terms: [], transportFees: {} };
             const activeCustomFees = customFeesSnap.docs.map((d: any) => ({ id: d.id, ...d.data() } as any));
@@ -123,6 +125,7 @@ export class EnterpriseStudentService {
                 ...payload,
                 studentName,
                 schoolId: studentRecord.newSchoolId,
+                branchId,
                 admissionNumber: resolvedAdmissionNumber,
                 uid: userRecord.uid,
                 role: "STUDENT",

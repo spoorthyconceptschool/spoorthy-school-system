@@ -5,21 +5,67 @@ export async function POST(req: NextRequest) {
     try {
         // 1. Verify Auth
         const authHeader = req.headers.get("Authorization");
+        console.log("[Media Upload Route] received Authorization header:", authHeader ? authHeader.substring(0, 30) + "..." : "null/undefined");
         if (!authHeader?.startsWith("Bearer ")) {
+            console.log("[Media Upload Route] Authorization header does not start with Bearer");
             return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
         }
         const token = authHeader.split("Bearer ")[1];
-        await adminAuth.verifyIdToken(token);
+        console.log("[Media Upload Route] Token value: '" + token + "' (length: " + (token ? token.length : 0) + ")");
+        let decodedToken;
+        try {
+            decodedToken = await adminAuth.verifyIdToken(token);
+            console.log("[Media Upload Route] Token verified successfully. UID:", decodedToken.uid);
+        } catch (authError: any) {
+            console.error("[Media Upload Route] Token verification failed:", authError.message || authError);
+            return NextResponse.json({ success: false, error: "Unauthorized: " + authError.message }, { status: 401 });
+        }
 
         // 2. Parse File
         const formData = await req.formData();
         const file = formData.get("file") as File;
         const type = formData.get("type") as string || "media";
         const customPath = formData.get("path") as string; // NEW: Allow custom path from CMS
+        const oldUrl = formData.get("oldUrl") as string;
 
         if (!file) {
             return NextResponse.json({ success: false, error: "No file provided" }, { status: 400 });
         }
+
+        // Clean up previous file if oldUrl is provided
+        if (oldUrl && oldUrl.includes("firebasestorage.googleapis.com")) {
+            try {
+                const decodedUrl = decodeURIComponent(oldUrl);
+                const oIndex = decodedUrl.indexOf("/o/");
+                if (oIndex !== -1) {
+                    let pathWithParams = decodedUrl.substring(oIndex + 3);
+                    const qIndex = pathWithParams.indexOf("?");
+                    const filePath = qIndex !== -1 ? pathWithParams.substring(0, qIndex) : pathWithParams;
+                    
+                    const bIndex = decodedUrl.indexOf("/b/");
+                    let bucketName = "";
+                    if (bIndex !== -1) {
+                        const afterB = decodedUrl.substring(bIndex + 3);
+                        const nextSlash = afterB.indexOf("/");
+                        if (nextSlash !== -1) {
+                            bucketName = afterB.substring(0, nextSlash);
+                        }
+                    }
+
+                    console.log(`[Upload API] Cleaning up old file: ${filePath}`);
+                    const bucket = adminStorage.bucket(bucketName || undefined);
+                    const fileObj = bucket.file(filePath);
+                    const [exists] = await fileObj.exists();
+                    if (exists) {
+                        await fileObj.delete();
+                        console.log(`[Upload API] Old file deleted successfully: ${filePath}`);
+                    }
+                }
+            } catch (err: any) {
+                console.warn("[Upload API] Failed to delete old file:", err.message);
+            }
+        }
+
 
         // --- NEW: MediaVault Integration (Updated for vault123.lovable.app) ---
         const mediaVaultUrl = process.env.NEXT_PUBLIC_MEDIA_VAULT_URL || "https://vault123.lovable.app/api/media/upload";
@@ -98,17 +144,19 @@ export async function POST(req: NextRequest) {
                 const bucket = adminStorage.bucket(bucketName);
                 const blob = bucket.file(filePath);
 
+                const downloadToken = Date.now().toString();
                 await blob.save(buffer, {
                     contentType: file.type,
-                    public: true,
                     metadata: {
-                        firebaseStorageDownloadTokens: Date.now().toString(),
+                        metadata: {
+                            firebaseStorageDownloadTokens: downloadToken,
+                        }
                     }
                 });
 
                 successfulBucket = bucketName;
                 const encodedPath = encodeURIComponent(filePath);
-                publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media`;
+                publicUrl = `https://firebasestorage.googleapis.com/v0/b/${bucketName}/o/${encodedPath}?alt=media&token=${downloadToken}`;
                 console.log(`[Upload API] SUCCESS with bucket: ${bucketName}`);
                 break;
             } catch (err: any) {

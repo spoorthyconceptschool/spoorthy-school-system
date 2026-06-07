@@ -90,7 +90,8 @@ export async function POST(req: NextRequest) {
             }
 
             // 3. Execution via strict Enterprise Service (Atomics, DB versioning, Auditing)
-            const result = await EnterpriseStudentService.createStudent(data, user.uid);
+            const branchId = user.schoolId || "global";
+            const result = await EnterpriseStudentService.createStudent(data, user.uid, branchId);
 
             return NextResponse.json({
                 success: true,

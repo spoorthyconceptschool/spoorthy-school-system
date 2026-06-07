@@ -456,57 +456,57 @@ export default function AttendanceManager({
     };
 
     return (
-        <div className="w-full text-[#E6F1FF]">
+        <div className="w-full h-full text-[#E6F1FF] flex flex-col">
             {/* ========================================================================= */}
-            {/* MOBILE VIEWPORT (Optimized, High-density, Touch-ready list & dual buttons) */}
+            {/* MOBILE VIEWPORT — Ultra-compact, 10-12 students visible simultaneously     */}
             {/* ========================================================================= */}
-            <div className="lg:hidden block space-y-4">
-                {/* 3-Column Stats Grid */}
-                <div className="grid grid-cols-3 gap-3">
-                    <Card className="bg-[#0b172c] border-[#1e293b] p-3 rounded-2xl flex flex-col justify-center shadow-none relative overflow-hidden">
-                        <div className="text-[9px] uppercase tracking-widest text-white/50 font-bold mb-1">Total</div>
-                        <div className="text-2xl font-black text-blue-500">
-                            {loading ? <span className="text-xs opacity-50">...</span> : stats.total}
-                        </div>
-                        <div className="absolute right-3 top-3 text-blue-500">
-                            <Users className="w-5 h-5" />
-                        </div>
-                    </Card>
-                    <Card className="bg-[#0b172c] border-[#1e293b] p-3 rounded-2xl flex flex-col justify-center shadow-none relative overflow-hidden">
-                        <div className="text-[9px] uppercase tracking-widest text-white/50 font-bold mb-1">Present</div>
-                        <div className="text-2xl font-black text-[#10B981]">
-                            {loading ? <span className="text-xs opacity-50">...</span> : stats.present}
-                        </div>
-                        <div className="absolute right-3 top-3 text-[#10B981]">
-                            <Check className="w-5 h-5" />
-                        </div>
-                    </Card>
-                    <Card className="bg-[#0b172c] border-[#1e293b] p-3 rounded-2xl flex flex-col justify-center shadow-none relative overflow-hidden">
-                        <div className="text-[9px] uppercase tracking-widest text-white/50 font-bold mb-1">Absent</div>
-                        <div className="text-2xl font-black text-red-500">
-                            {loading ? <span className="text-xs opacity-50">...</span> : stats.absent}
-                        </div>
-                        <div className="absolute right-3 top-3 text-red-500">
-                            <User className="w-5 h-5" />
-                        </div>
-                    </Card>
+            <div className="lg:hidden flex flex-col h-full">
+
+                {/* ── KPI CHIPS ROW (52px) ── */}
+                <div className="flex items-center gap-1.5 px-2 pt-2 pb-1.5 flex-none">
+                    <div className="flex-1 flex items-center gap-1.5 h-10 bg-[#0b1525] border border-white/6 rounded-xl px-2.5">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-blue-400/70">Total</span>
+                        <span className="text-sm font-black text-blue-400 ml-auto">{loading ? "—" : stats.total}</span>
+                    </div>
+                    <div className="flex-1 flex items-center gap-1.5 h-10 bg-[#0b1525] border border-[#10B981]/15 rounded-xl px-2.5">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-[#10B981]/70">Present</span>
+                        <span className="text-sm font-black text-[#10B981] ml-auto">{loading ? "—" : stats.present}</span>
+                    </div>
+                    <div className="flex-1 flex items-center gap-1.5 h-10 bg-[#0b1525] border border-red-500/15 rounded-xl px-2.5">
+                        <span className="text-[9px] font-black uppercase tracking-wider text-red-400/70">Absent</span>
+                        <span className="text-sm font-black text-red-400 ml-auto">{loading ? "—" : stats.absent}</span>
+                    </div>
+                    {/* Attendance % chip */}
+                    <div className="h-10 flex items-center bg-[#0b1525] border border-white/6 rounded-xl px-2.5 shrink-0">
+                        <span className={cn(
+                            "text-sm font-black",
+                            stats.total > 0 && ((stats.present / stats.total) * 100) >= 75 ? "text-[#10B981]" : "text-amber-400"
+                        )}>
+                            {stats.total > 0 ? `${Math.round((stats.present / stats.total) * 100)}%` : "—"}
+                        </span>
+                    </div>
                 </div>
 
                 {isHoliday && !viewStats ? (
-                    <div className="bg-amber-500/10 border border-amber-500/20 text-amber-500 p-8 rounded-2xl text-center space-y-2 mt-4">
-                        <CalendarDays className="w-8 h-8 mx-auto text-amber-400" />
-                        <h4 className="text-sm font-bold uppercase tracking-wider">Official School Holiday</h4>
-                        <p className="text-[10px] text-amber-400/60 leading-normal">Attendance is locked for today.</p>
+                    <div className="mx-2 mt-2 bg-amber-500/8 border border-amber-500/20 rounded-xl p-4 flex items-center gap-3">
+                        <CalendarDays className="w-5 h-5 text-amber-400 shrink-0" />
+                        <div>
+                            <div className="text-xs font-black text-amber-400 uppercase tracking-wider">School Holiday</div>
+                            <div className="text-[10px] text-amber-400/50 mt-0.5">Attendance locked for today</div>
+                        </div>
                     </div>
                 ) : (
-                    <div className="space-y-4">
-                        {/* Tab Switcher */}
-                        <div className="flex bg-[#0b172c] p-1 rounded-xl border border-[#1e293b]">
+                    <div className="flex flex-col flex-1 min-h-0">
+
+                        {/* ── TABS (40px) ── */}
+                        <div className="flex mx-2 mb-1.5 mt-1 bg-[#060d1a] border border-white/6 rounded-lg p-0.5 flex-none h-9">
                             <button
                                 onClick={() => setViewStats(false)}
                                 className={cn(
-                                    "flex-1 py-2 rounded-lg text-xs font-bold transition-all",
-                                    !viewStats ? "bg-[#10B981] text-white shadow-md" : "text-white/50 hover:text-white"
+                                    "flex-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-200",
+                                    !viewStats
+                                        ? "bg-[#10B981] text-black shadow-sm"
+                                        : "text-white/35 hover:text-white/70"
                                 )}
                             >
                                 Daily Roll Call
@@ -514,153 +514,229 @@ export default function AttendanceManager({
                             <button
                                 onClick={() => setViewStats(true)}
                                 className={cn(
-                                    "flex-1 py-2 rounded-lg text-xs font-bold transition-all",
-                                    viewStats ? "bg-[#10B981] text-white shadow-md" : "text-white/50 hover:text-white"
+                                    "flex-1 rounded-md text-[10px] font-black uppercase tracking-wider transition-all duration-200 flex items-center justify-center gap-1",
+                                    viewStats
+                                        ? "bg-blue-500 text-white shadow-sm"
+                                        : "text-white/35 hover:text-white/70"
                                 )}
                             >
-                                Overall Stats
+                                <BarChart3 className="w-3 h-3" />
+                                Stats
                             </button>
                         </div>
 
-                        {/* Search / Filters Row */}
-                        {viewStats ? (
-                            <div className="flex items-center gap-2">
-                                <Select value={statsMonth} onValueChange={setStatsMonth}>
-                                    <SelectTrigger className="flex-1 h-10 bg-[#0b172c] border-[#1e293b] text-xs font-bold rounded-xl shadow-none">
-                                        <SelectValue placeholder="Select Month" />
-                                    </SelectTrigger>
-                                    <SelectContent className="bg-[#0b172c] border-[#1e293b] text-white rounded-2xl">
-                                        <SelectItem value="ALL" className="font-bold text-xs py-2">Full Academic Year</SelectItem>
-                                        {["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"].map(m => (
-                                            <SelectItem key={m} value={m} className="font-bold text-xs py-2">
-                                                {new Date(2000, Number(m) - 1).toLocaleString('default', { month: 'long' })}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="h-10 bg-[#0b172c] border-[#1e293b] text-white text-xs font-bold rounded-xl shadow-none"
-                                    onClick={handlePrint}
-                                >
-                                    <Printer className="w-4 h-4 mr-1" /> Print
-                                </Button>
-                            </div>
-                        ) : (
-                            <div className="relative">
-                                <Search className="absolute left-3 top-3 w-4 h-4 text-white/30" />
-                                <Input
-                                    placeholder="Quick search student name..."
-                                    value={searchQuery}
-                                    onChange={(e) => setSearchQuery(e.target.value)}
-                                    className="pl-9 h-10 bg-[#0b172c] border-[#1e293b] text-sm font-medium text-white rounded-xl shadow-none placeholder:text-white/30"
-                                />
-                            </div>
-                        )}
-
-                        {/* List Area */}
-                        {loading ? (
-                            <div className="py-12 flex justify-center"><Loader2 className="animate-spin text-[#10B981] w-8 h-8" /></div>
-                        ) : viewStats ? (
-                            /* Mobile Stats List */
-                            <div className="space-y-2 pb-24">
-                                {statsData.length === 0 ? (
-                                    <div className="text-center py-8 text-xs text-white/40 italic">No historical stats found.</div>
-                                ) : (
-                                    statsData.map((s: any, idx: number) => (
-                                        <div key={s.id} className="p-3 bg-[#0b172c] border border-[#1e293b] rounded-2xl flex items-center justify-between gap-3">
-                                            <div className="flex items-center gap-3 min-w-0">
-                                                <div className="w-8 h-8 flex items-center justify-center rounded-lg bg-[#053d2c] text-[#10B981] font-mono font-black text-xs shrink-0">
-                                                    #{s.rollNumber || idx + 1}
-                                                </div>
-                                                <div className="min-w-0">
-                                                    <div className="font-bold text-white truncate text-sm">{s.studentName}</div>
-                                                    <div className="text-[10px] font-mono text-white/40 mt-0.5 tracking-wider">{s.schoolId}</div>
-                                                </div>
-                                            </div>
-                                            <div className="text-right shrink-0">
-                                                <div className={cn(
-                                                    "text-sm font-black",
-                                                    Number(s.percentage) < 75 ? "text-red-500" : "text-[#10B981]"
-                                                )}>
-                                                    {s.percentage}%
-                                                </div>
-                                                <div className="text-[9px] text-white/40 font-bold uppercase mt-0.5">{s.presentDays}/{s.totalDays} Days</div>
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                            </div>
-                        ) : (
-                            /* Mobile Daily Attendance List */
-                            <div className="space-y-2 pb-6">
-                                {filteredStudents.length === 0 ? (
-                                    <div className="text-center py-8 text-xs text-white/40 italic">No matching students found.</div>
-                                ) : (
-                                    filteredStudents.map((s: any, idx: number) => {
-                                        const isPresent = (attendance[s.id] || 'P') === 'P';
-                                        return (
-                                            <div
-                                                key={s.id}
-                                                className="p-3 rounded-2xl bg-[#0b172c] border border-[#1e293b] flex items-center justify-between gap-3"
-                                            >
-                                                <div className="flex items-center gap-3 min-w-0">
-                                                    <div className="text-[#10B981] font-black text-xs shrink-0 w-5 text-center">
-                                                        #{s.rollNumber || idx + 1}
-                                                    </div>
-                                                    <div className="w-8 h-8 rounded-full bg-[#1e293b] border border-white/5 flex items-center justify-center text-white font-black text-[10px] uppercase shrink-0">
-                                                        {(s.studentName || "S").split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase()}
-                                                    </div>
-                                                    <div className="min-w-0">
-                                                        <div className="font-bold text-white text-sm truncate">{s.studentName}</div>
-                                                        <div className="text-[10px] text-white/40 font-mono mt-0.5">{s.schoolId || "PENDING"}</div>
-                                                    </div>
-                                                </div>
-
-                                                <div className="flex items-center gap-1.5 shrink-0 bg-[#070F1E] p-1 rounded-xl">
-                                                    <button
-                                                        onClick={() => (attendance[s.id] || 'P') !== 'P' && toggleStatus(s.id)}
-                                                        className={cn(
-                                                            "w-9 h-8 rounded-lg font-black text-xs transition-all flex items-center justify-center",
-                                                            isPresent
-                                                                ? "bg-[#10B981] text-white shadow-lg shadow-emerald-500/25"
-                                                                : "text-white/30 hover:text-white"
-                                                        )}
-                                                    >
-                                                        P
-                                                    </button>
-                                                    <button
-                                                        onClick={() => (attendance[s.id] || 'P') !== 'A' && toggleStatus(s.id)}
-                                                        className={cn(
-                                                            "w-9 h-8 rounded-lg font-black text-xs transition-all flex items-center justify-center",
-                                                            !isPresent
-                                                                ? "bg-[#EF4444] text-white shadow-lg shadow-red-500/25"
-                                                                : "text-white/30 hover:text-white"
-                                                        )}
-                                                    >
-                                                        A
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        );
-                                    })
-                                )}
-
-                                {/* Static inline save row at the bottom of the list for mobile */}
-                                <div className="mt-4 p-3 bg-[#0b172c] border border-white/5 rounded-2xl flex items-center justify-between shadow-none animate-in fade-in duration-300">
-                                    <span className="text-xs font-bold text-white/60">
-                                        {!alreadyMarked ? "Daily Roll Call" : (isModified ? "Changes pending" : "All saved")}
-                                    </span>
+                        {/* ── SEARCH / FILTER ROW (40px) ── */}
+                        <div className="flex items-center gap-1.5 px-2 mb-1.5 flex-none">
+                            {viewStats ? (
+                                <>
+                                    <Select value={statsMonth} onValueChange={setStatsMonth}>
+                                        <SelectTrigger className="flex-1 h-9 bg-[#060d1a] border-white/8 text-[10px] font-black rounded-lg shadow-none focus:ring-0">
+                                            <SelectValue placeholder="Month" />
+                                        </SelectTrigger>
+                                        <SelectContent className="bg-[#0b172c] border-white/10 text-white rounded-xl">
+                                            <SelectItem value="ALL" className="font-bold text-xs py-2">Full Year</SelectItem>
+                                            {["01","02","03","04","05","06","07","08","09","10","11","12"].map(m => (
+                                                <SelectItem key={m} value={m} className="font-bold text-xs py-2">
+                                                    {new Date(2000, Number(m) - 1).toLocaleString('default', { month: 'long' })}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
                                     <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="h-9 w-9 p-0 bg-[#060d1a] border-white/8 text-white rounded-lg shadow-none flex items-center justify-center"
+                                        onClick={handlePrint}
+                                    >
+                                        <Printer className="w-3.5 h-3.5" />
+                                    </Button>
+                                </>
+                            ) : (
+                                <div className="relative flex-1">
+                                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/25 pointer-events-none" />
+                                    <input
+                                        type="text"
+                                        placeholder="Search student, ID, roll…"
+                                        value={searchQuery}
+                                        onChange={e => setSearchQuery(e.target.value)}
+                                        className="w-full h-9 pl-8 pr-3 bg-[#060d1a] border border-white/8 rounded-lg text-[11px] font-medium text-white placeholder:text-white/25 focus:outline-none focus:border-[#10B981]/40 transition-colors"
+                                    />
+                                </div>
+                            )}
+                        </div>
+
+                        {/* ── STUDENT LIST (Scrollable, fills remaining space) ── */}
+                        <div className="flex-1 min-h-0 overflow-y-auto px-2 pb-1" style={{ scrollbarWidth: 'none' }}>
+                            {loading ? (
+                                <div className="py-10 flex justify-center">
+                                    <Loader2 className="animate-spin text-[#10B981] w-6 h-6" />
+                                </div>
+                            ) : viewStats ? (
+                                /* ─ Stats View ─ */
+                                <div className="space-y-[3px]">
+                                    {statsData.length === 0 ? (
+                                        <div className="text-center py-8 text-[10px] text-white/30 italic">No historical stats found.</div>
+                                    ) : (
+                                        statsData.map((s: any, idx: number) => {
+                                            const pct = Number(s.percentage);
+                                            const isGood = pct >= 75;
+                                            return (
+                                                <div
+                                                    key={s.id}
+                                                    className="flex items-center gap-2 px-2 py-2 bg-[#07111f] border border-white/[0.04] rounded-lg hover:bg-[#0a1628] transition-colors"
+                                                >
+                                                    {/* Roll badge */}
+                                                    <div className="text-[9px] font-black font-mono text-white/30 w-5 text-center shrink-0">
+                                                        {s.rollNumber || idx + 1}
+                                                    </div>
+                                                    {/* Avatar */}
+                                                    <div className="w-7 h-7 rounded-full bg-[#10B981]/10 border border-[#10B981]/15 flex items-center justify-center text-[9px] font-black text-[#10B981] shrink-0 uppercase">
+                                                        {(s.studentName || "S").split(' ').map((n: string) => n[0]).join('').substring(0, 2)}
+                                                    </div>
+                                                    {/* Name + ID */}
+                                                    <div className="flex-1 min-w-0">
+                                                        <div className="text-[11px] font-bold text-white truncate leading-tight">{s.studentName}</div>
+                                                        <div className="text-[9px] font-mono text-white/30 leading-none mt-0.5">{s.schoolId}</div>
+                                                    </div>
+                                                    {/* Stats */}
+                                                    <div className="text-right shrink-0">
+                                                        <div className={cn("text-xs font-black", isGood ? "text-[#10B981]" : "text-red-400")}>
+                                                            {s.percentage}%
+                                                        </div>
+                                                        <div className="text-[8.5px] text-white/25 font-bold">{s.presentDays}/{s.totalDays}d</div>
+                                                    </div>
+                                                    {/* Progress bar */}
+                                                    <div className="w-10 h-1 bg-white/8 rounded-full overflow-hidden shrink-0">
+                                                        <div
+                                                            className={cn("h-full rounded-full", isGood ? "bg-[#10B981]" : "bg-red-500")}
+                                                            style={{ width: `${Math.min(100, pct)}%` }}
+                                                        />
+                                                    </div>
+                                                </div>
+                                            );
+                                        })
+                                    )}
+                                </div>
+                            ) : (
+                                /* ─ Daily Roll Call View ─ */
+                                <>
+                                    {filteredStudents.length === 0 ? (
+                                        <div className="text-center py-8 text-[10px] text-white/30 italic">No matching students found.</div>
+                                    ) : (
+                                        <div className="space-y-[3px]">
+                                            {filteredStudents.map((s: any, idx: number) => {
+                                                const isPresent = (attendance[s.id] || 'P') === 'P';
+                                                const isTouched = touched.has(s.id);
+                                                const initials = (s.studentName || "S").split(' ').map((n: string) => n[0]).join('').substring(0, 2).toUpperCase();
+
+                                                return (
+                                                    <div
+                                                        key={s.id}
+                                                        className={cn(
+                                                            "flex items-center gap-2 px-2 py-1.5 rounded-lg border transition-all duration-150",
+                                                            isPresent
+                                                                ? "bg-[#07111f] border-white/[0.04] hover:bg-[#0a1628]"
+                                                                : "bg-red-950/20 border-red-500/10 hover:bg-red-950/30",
+                                                            isTouched && "ring-1 ring-inset ring-[#10B981]/20"
+                                                        )}
+                                                    >
+                                                        {/* Roll number */}
+                                                        <div className="text-[9px] font-black font-mono text-white/25 w-5 text-center shrink-0">
+                                                            {s.rollNumber || idx + 1}
+                                                        </div>
+
+                                                        {/* Avatar */}
+                                                        <div className={cn(
+                                                            "w-7 h-7 rounded-full flex items-center justify-center text-[9px] font-black shrink-0 uppercase border",
+                                                            isPresent
+                                                                ? "bg-[#10B981]/10 border-[#10B981]/20 text-[#10B981]"
+                                                                : "bg-red-500/10 border-red-500/20 text-red-400"
+                                                        )}>
+                                                            {initials}
+                                                        </div>
+
+                                                        {/* Name + ID */}
+                                                        <div className="flex-1 min-w-0">
+                                                            <div className="text-[11px] font-bold text-white truncate leading-tight">{s.studentName}</div>
+                                                            <div className="text-[9px] font-mono text-white/30 leading-none mt-0.5">{s.schoolId || "PENDING"}</div>
+                                                        </div>
+
+                                                        {/* P / A segmented control */}
+                                                        <div className="flex items-center gap-[3px] shrink-0">
+                                                            <button
+                                                                id={`btn-p-${s.id}`}
+                                                                onClick={() => !isPresent && toggleStatus(s.id)}
+                                                                className={cn(
+                                                                    "w-9 h-8 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-150 flex items-center justify-center",
+                                                                    isPresent
+                                                                        ? "bg-[#10B981] text-black shadow-sm shadow-emerald-500/20"
+                                                                        : "bg-white/[0.04] text-white/25 hover:bg-white/8 hover:text-white/50"
+                                                                )}
+                                                            >
+                                                                P
+                                                            </button>
+                                                            <button
+                                                                id={`btn-a-${s.id}`}
+                                                                onClick={() => isPresent && toggleStatus(s.id)}
+                                                                className={cn(
+                                                                    "w-9 h-8 rounded-lg text-[10px] font-black uppercase tracking-wider transition-all duration-150 flex items-center justify-center",
+                                                                    !isPresent
+                                                                        ? "bg-[#EF4444] text-white shadow-sm shadow-red-500/20"
+                                                                        : "bg-white/[0.04] text-white/25 hover:bg-white/8 hover:text-white/50"
+                                                                )}
+                                                            >
+                                                                A
+                                                            </button>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </>
+                            )}
+                        </div>
+
+                        {/* ── STICKY ACTION BAR (56px) ── */}
+                        {!viewStats && (
+                            <div className="flex-none px-2 pt-1.5 pb-2 border-t border-white/[0.05] bg-[#040b16]/90 backdrop-blur-md">
+                                <div className="flex items-center gap-2 h-11">
+                                    <div className="flex-1 flex items-center gap-1.5">
+                                        {isModified ? (
+                                            <>
+                                                <div className="w-1.5 h-1.5 rounded-full bg-amber-400 animate-pulse" />
+                                                <span className="text-[10px] font-bold text-amber-400">{touched.size} change{touched.size !== 1 ? 's' : ''} pending</span>
+                                            </>
+                                        ) : alreadyMarked ? (
+                                            <>
+                                                <div className="w-1.5 h-1.5 rounded-full bg-[#10B981]" />
+                                                <span className="text-[10px] font-bold text-[#10B981]/70">All saved</span>
+                                            </>
+                                        ) : (
+                                            <>
+                                                <div className="w-1.5 h-1.5 rounded-full bg-white/25" />
+                                                <span className="text-[10px] font-bold text-white/35">Not submitted</span>
+                                            </>
+                                        )}
+                                    </div>
+                                    <button
+                                        id="submit-attendance-btn"
                                         onClick={handleSubmit}
                                         disabled={submitting || (alreadyMarked && !isModified)}
-                                        className="bg-[#10B981] hover:bg-emerald-600 text-black text-xs font-black uppercase tracking-widest px-6 h-10 rounded-xl transition-all"
+                                        className={cn(
+                                            "h-11 px-5 rounded-xl text-[11px] font-black uppercase tracking-wider transition-all duration-200 flex items-center gap-1.5",
+                                            alreadyMarked && !isModified
+                                                ? "bg-white/5 text-white/25 cursor-not-allowed"
+                                                : "bg-[#10B981] text-black hover:bg-emerald-400 active:scale-[0.97] shadow-lg shadow-emerald-500/20"
+                                        )}
                                     >
-                                        {submitting ? <Loader2 className="w-4 h-4 animate-spin mr-2" /> : <Save className="w-4 h-4 mr-2" />}
+                                        {submitting ? (
+                                            <Loader2 className="w-3.5 h-3.5 animate-spin" />
+                                        ) : (
+                                            <Save className="w-3.5 h-3.5" />
+                                        )}
                                         {alreadyMarked ? "Update" : "Save"}
-                                    </Button>
+                                    </button>
                                 </div>
                             </div>
                         )}

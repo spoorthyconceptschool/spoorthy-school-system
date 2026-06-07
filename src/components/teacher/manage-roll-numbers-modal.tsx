@@ -132,13 +132,13 @@ export function ManageRollNumbersModal({ students, classId, sectionId, className
                 </DialogHeader>
 
                 {/* Toolbar */}
-                <div className="p-4 bg-white/[0.02] border-b border-white/5 shrink-0 flex flex-col gap-3">
+                <div className="p-3 bg-white/[0.02] border-b border-white/5 shrink-0 flex flex-col gap-2">
                     <Button
                         onClick={handleAutoAssign}
                         variant="ghost"
-                        className="w-full bg-[#10B981]/10 hover:bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/20 rounded-xl h-11 font-black tracking-wide shadow-none"
+                        className="w-full bg-[#10B981]/10 hover:bg-[#10B981]/20 text-[#10B981] border border-[#10B981]/20 rounded-lg h-9 text-xs font-black tracking-wide shadow-none"
                     >
-                        <Wand2 className="w-4 h-4 mr-2" /> AUTO-ASSIGN BY ID
+                        <Wand2 className="w-3.5 h-3.5 mr-1.5" /> AUTO-ASSIGN BY ID
                     </Button>
                     
                     {duplicateRolls.length > 0 && (
@@ -157,27 +157,27 @@ export function ManageRollNumbersModal({ students, classId, sectionId, className
                         return (
                             <div 
                                 key={student.id} 
-                                className="flex items-center justify-between p-3.5 bg-black/20 rounded-2xl border border-white/5 hover:border-white/15 transition-all group"
+                                className="flex items-center justify-between p-2 bg-black/20 rounded-xl border border-white/5 hover:border-white/10 transition-all group"
                             >
-                                <div className="flex items-center gap-3.5 min-w-0 flex-1">
-                                    <div className="w-8 h-8 rounded-full bg-white/5 flex items-center justify-center text-white/30 font-black text-xs shrink-0 border border-white/5">
+                                <div className="flex items-center gap-2.5 min-w-0 flex-1">
+                                    <div className="w-6 h-6 rounded-lg bg-white/5 flex items-center justify-center text-white/30 font-bold text-[10px] shrink-0 border border-white/5">
                                         {idx + 1}
                                     </div>
                                     <div className="flex flex-col min-w-0">
-                                        <span className="font-bold text-sm text-white truncate pr-2">{student.studentName}</span>
-                                        <span className="font-mono text-[10px] text-white/30 tracking-wider truncate mt-0.5">{student.schoolId}</span>
+                                        <span className="font-bold text-xs text-white truncate pr-2">{student.studentName}</span>
+                                        <span className="font-mono text-[9px] text-white/30 tracking-wider truncate mt-0.5">{student.schoolId}</span>
                                     </div>
                                 </div>
                                 
-                                <div className="shrink-0 flex items-center gap-2">
-                                    <span className="text-[9px] font-black text-white/20 uppercase tracking-widest hidden sm:inline-block">Roll</span>
+                                <div className="shrink-0 flex items-center gap-1.5">
+                                    <span className="text-[8px] font-black text-white/20 uppercase tracking-widest hidden sm:inline-block">Roll</span>
                                     <Input
                                         type="number"
                                         min="1"
                                         value={student.rollNumber}
                                         onChange={(e) => handleRollChange(student.id, e.target.value)}
                                         className={cn(
-                                            "w-[60px] h-10 text-center rounded-xl font-black text-sm shadow-inner transition-all",
+                                            "w-[50px] h-8 text-center rounded-lg font-black text-xs shadow-inner transition-all",
                                             isDuplicate
                                                 ? "border-rose-500/50 text-rose-400 focus:border-rose-500 bg-rose-500/10 focus:ring-rose-500/20"
                                                 : "bg-[#040810] border-white/10 text-white focus:border-[#38bdf8] focus:bg-white/5 focus:ring-[#38bdf8]/20"
@@ -200,21 +200,21 @@ export function ManageRollNumbersModal({ students, classId, sectionId, className
                 </div>
 
                 {/* Footer Actions */}
-                <div className="p-4 sm:p-5 border-t border-white/5 bg-[#050C16] shrink-0 grid grid-cols-2 gap-3 z-10 relative">
+                <div className="p-3 sm:p-4 border-t border-white/5 bg-[#050C16] shrink-0 grid grid-cols-2 gap-2.5 z-10 relative">
                     <Button 
                         variant="ghost" 
                         onClick={onClose} 
                         disabled={submitting} 
-                        className="w-full h-12 rounded-xl text-white/50 hover:text-white hover:bg-white/5 font-bold text-xs uppercase tracking-widest"
+                        className="w-full h-9 rounded-lg text-white/50 hover:text-white hover:bg-white/5 font-bold text-xs uppercase tracking-widest"
                     >
                         Cancel
                     </Button>
                     <Button 
                         onClick={handleSubmit} 
                         disabled={submitting} 
-                        className="w-full h-12 rounded-xl bg-[#38bdf8] hover:bg-[#38bdf8]/90 text-black font-black text-xs uppercase tracking-widest shadow-[0_0_20px_rgba(56,189,248,0.2)]"
+                        className="w-full h-9 rounded-lg bg-[#38bdf8] hover:bg-[#38bdf8]/90 text-black font-black text-xs uppercase tracking-widest shadow-[0_0_20px_rgba(56,189,248,0.15)]"
                     >
-                        {submitting ? <Loader2 className="w-4 h-4 animate-spin" /> : "Save"}
+                        {submitting ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : "Save"}
                     </Button>
                 </div>
             </DialogContent>

@@ -11,9 +11,10 @@ import { useMasterData } from "@/context/MasterDataContext";
 
 interface FeeSlipGeneratorProps {
     students: any[];
+    buttonClassName?: string;
 }
 
-export function FeeSlipGenerator({ students }: FeeSlipGeneratorProps) {
+export function FeeSlipGenerator({ students, buttonClassName }: FeeSlipGeneratorProps) {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [slips, setSlips] = useState<any[]>([]);
@@ -307,7 +308,7 @@ export function FeeSlipGenerator({ students }: FeeSlipGeneratorProps) {
             <DialogTrigger asChild>
                 <Button
                     variant="outline"
-                    className="h-11 gap-2 border-white/10 bg-white/5 text-white/70 hover:bg-white/10 rounded-xl px-4 md:px-6 transition-all"
+                    className={buttonClassName || "h-11 gap-2 border-white/10 bg-white/5 text-white/70 hover:bg-white/10 rounded-xl px-4 md:px-6 transition-all"}
                 >
                     <FileText className="w-4 h-4" /> <span className="hidden sm:inline">Fee Slips</span><span className="sm:hidden">Slips</span>
                 </Button>

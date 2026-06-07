@@ -54,6 +54,8 @@ export default function AdminSettingsPage() {
         </div>
     );
 
+    const isBranchAdmin = activeRole === "ADMIN";
+
     return (
         <div className="flex flex-col gap-4 md:gap-8 p-3 md:p-8 max-w-7xl mx-auto pb-20">
             <div className="flex-none">
@@ -64,16 +66,22 @@ export default function AdminSettingsPage() {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 md:gap-8 items-start">
                 {/* Left Panel: Branding */}
                 <div className="w-full space-y-4 md:space-y-8">
-                    <BrandingSettings />
-                    <SystemUsersManager />
-                    <InactiveUsersManager />
+                    <BrandingSettings branchAdminMode={isBranchAdmin} />
+                    {!isBranchAdmin && (
+                        <>
+                            <SystemUsersManager />
+                            <InactiveUsersManager />
+                        </>
+                    )}
                 </div>
 
                 {/* Right Panel: Academic Years & System Control */}
-                <div className="w-full space-y-4 md:space-y-8">
-                    <SystemToggles />
-                    <AcademicYearManager />
-                </div>
+                {!isBranchAdmin && (
+                    <div className="w-full space-y-4 md:space-y-8">
+                        <SystemToggles />
+                        <AcademicYearManager />
+                    </div>
+                )}
             </div>
         </div>
     );

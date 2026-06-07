@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Plus, User, Briefcase, Search, MoreVertical, Key, Trash2, DollarSign, MapPin, Phone, ArrowRight } from "lucide-react";
+import { Plus, User, Briefcase, Search, MoreVertical, Key, Trash2, DollarSign, MapPin, Phone, ArrowRight, Shield } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { collection, query, orderBy, getDocs, where, doc, updateDoc, onSnapshot, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -21,6 +21,7 @@ import { Loader2 } from "lucide-react";
 import { Badge } from "@/components/ui/badge";
 import { DataTable } from "@/components/ui/data-table";
 import { useMasterData } from "@/context/MasterDataContext";
+import { toast } from "@/lib/toast-store";
 
 /**
  * Base representation of a Teacher object fetched from master data collections.
@@ -104,6 +105,63 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
 
     // Master Data for filters
     const [roles, setRoles] = useState<any[]>([]);
+
+    // User system roles mapping
+    const [userRoles, setUserRoles] = useState<Record<string, string>>({});
+
+    useEffect(() => {
+        const q = query(collection(db, "users"));
+        const unsubscribe = onSnapshot(q, (snap) => {
+            const mapping: Record<string, string> = {};
+            snap.docs.forEach(doc => {
+                const data = doc.data();
+                if (data.schoolId && data.role) {
+                    mapping[data.schoolId] = data.role;
+                }
+                if (doc.id && data.role) {
+                    mapping[doc.id] = data.role;
+                }
+            });
+            setUserRoles(mapping);
+        }, (err) => {
+            console.warn("Error syncing user roles:", err);
+        });
+        return () => unsubscribe();
+    }, []);
+
+    const handleUpdateRole = async (targetUid: string, schoolId: string, targetRole: string) => {
+        if (!targetUid) {
+            toast({ title: "Error", description: "Teacher does not have an active user account yet.", type: "error" });
+            return;
+        }
+        try {
+            if (!user) {
+                toast({ title: "Error", description: "Not authenticated", type: "error" });
+                return;
+            }
+            const token = await user.getIdToken();
+            const res = await fetch("/api/admin/users/update-role", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({
+                    targetUid,
+                    schoolId,
+                    role: targetRole
+                })
+            });
+            const data = await res.json();
+            if (res.ok && data.success) {
+                toast({ title: "Success", description: data.message || `Successfully updated role to ${targetRole}`, type: "success" });
+            } else {
+                toast({ title: "Error", description: data.error || "Failed to update role", type: "error" });
+            }
+        } catch (error: any) {
+            toast({ title: "Error", description: error.message || "An unexpected error occurred", type: "error" });
+        }
+    };
 
     /**
      * Bootstraps real-time active filters metadata (like roles).
@@ -258,17 +316,28 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                             {
                                 key: "name",
                                 header: "STAFF INFO",
-                                render: (t: Teacher) => (
-                                    <div className="flex items-center gap-3">
-                                        <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center border border-white/5 group-hover:border-accent/30 transition-colors">
-                                            <User size={16} className="text-white/40 group-hover:text-accent transition-colors" />
+                                render: (t: Teacher) => {
+                                    const teacherRole = userRoles[t.schoolId] || (t.uid ? userRoles[t.uid] : "");
+                                    const isTeacherManager = teacherRole === "MANAGER";
+                                    return (
+                                        <div className="flex items-center gap-3">
+                                            <div className="w-9 h-9 rounded-xl bg-white/5 flex items-center justify-center border border-white/5 group-hover:border-accent/30 transition-colors">
+                                                <User size={16} className="text-white/40 group-hover:text-accent transition-colors" />
+                                            </div>
+                                            <div className="flex flex-col">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-sm text-white group-hover:text-accent transition-colors leading-tight">{t.name}</span>
+                                                    {isTeacherManager && (
+                                                        <Badge className="text-[9px] font-black uppercase tracking-tighter py-0 h-4 bg-amber-500/10 text-amber-400 border border-amber-500/20 flex items-center gap-0.5">
+                                                            <Shield className="w-2.5 h-2.5" /> Manager
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                <span className="text-[10px] font-mono text-white/40 tracking-tighter uppercase">{t.schoolId}</span>
+                                            </div>
                                         </div>
-                                        <div className="flex flex-col">
-                                            <span className="font-bold text-sm text-white group-hover:text-accent transition-colors leading-tight">{t.name}</span>
-                                            <span className="text-[10px] font-mono text-white/40 tracking-tighter uppercase">{t.schoolId}</span>
-                                        </div>
-                                    </div>
-                                )
+                                    );
+                                }
                             },
                             {
                                 key: "mobile",
@@ -337,6 +406,19 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                                 </DropdownMenuItem>
                                 {role !== "MANAGER" && (
                                     <>
+                                        {(() => {
+                                            const teacherRole = userRoles[t.schoolId] || (t.uid ? userRoles[t.uid] : "");
+                                            const isTeacherManager = teacherRole === "MANAGER";
+                                            return isTeacherManager ? (
+                                                <DropdownMenuItem onClick={() => handleUpdateRole(t.uid || "", t.schoolId, "TEACHER")} className="rounded-lg gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors">
+                                                    <Shield size={14} /> Demote to Teacher
+                                                </DropdownMenuItem>
+                                            ) : (
+                                                <DropdownMenuItem onClick={() => handleUpdateRole(t.uid || "", t.schoolId, "MANAGER")} className="rounded-lg gap-2 text-xs font-bold text-blue-500 hover:text-blue-400 transition-colors">
+                                                    <Shield size={14} /> Promote to Manager
+                                                </DropdownMenuItem>
+                                            );
+                                        })()}
                                         <DropdownMenuItem onClick={() => {
                                             setSalaryUser({
                                                 id: t.id,

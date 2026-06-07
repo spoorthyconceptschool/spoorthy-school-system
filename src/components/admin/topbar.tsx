@@ -14,7 +14,7 @@ import {
 
 import { useToastStore } from "@/lib/toast-store";
 import { SeedDataButton } from "@/components/admin/seed-data-button";
-import { MobileSidebar } from "./MobileSidebar";
+import { HeaderSidebar } from "./HeaderSidebar";
 import { UniversalSearch } from "./UniversalSearch";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { useEffect, useState } from "react";
@@ -56,14 +56,11 @@ export function TopBar() {
 
     return (
         <header
-            className={`h-16 sticky top-0 z-40 transition-all duration-300 flex items-center justify-between px-2 md:px-4 ${scrolled
-                ? "bg-[#0A192F]/80 backdrop-blur-md border-b border-[#64FFDA]/10 shadow-lg"
-                : "bg-[#0A192F] md:bg-transparent"
-                }`}
+            className="h-16 sticky top-0 z-40 flex items-center justify-between px-2 md:px-6 bg-[#0A192F] border-b border-[#64FFDA]/10 shadow-lg"
         >
             <div className="flex items-center gap-2 shrink-0">
-                <MobileSidebar />
-                <div className="md:hidden flex items-center gap-2 shrink-0">
+                <HeaderSidebar />
+                <div className="flex items-center gap-2 shrink-0">
                     <div className="w-8 h-8 rounded-lg bg-transparent flex items-center justify-center border border-white/20 overflow-hidden shrink-0 shadow-md">
                         {!imageError ? (
                             <img
@@ -77,7 +74,7 @@ export function TopBar() {
                         )}
                     </div>
                     {/* Hide name on tiny/medium screens to make room for Search and dev tools */}
-                    <span className="font-display font-black text-white text-[10px] xs:text-sm tracking-tight truncate max-w-[80px] sm:max-w-[150px] hidden xs:block">
+                    <span className="font-display font-black text-white text-[10px] xs:text-sm tracking-tight truncate max-w-[80px] sm:max-w-[150px] md:max-w-[250px] hidden xs:block">
                         {branding?.schoolName || "Spoorthy School"}
                     </span>
                 </div>

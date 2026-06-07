@@ -2,6 +2,9 @@ import { getPublicBranding } from "@/lib/services/public-data";
 import { PublicNavbar } from "@/components/public/PublicNavbar";
 import { SmoothScroll } from "@/components/public/SmoothScroll";
 
+export const revalidate = 0;
+export const dynamic = "force-dynamic";
+
 export default async function PublicLayout({ children }: { children: React.ReactNode }) {
     const branding = await getPublicBranding();
 

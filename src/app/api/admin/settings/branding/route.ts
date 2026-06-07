@@ -5,27 +5,41 @@ export async function POST(req: NextRequest) {
     try {
         // 1. Verify Authentication
         const authHeader = req.headers.get("Authorization");
+        console.log("[Branding Route] received Authorization header:", authHeader ? authHeader.substring(0, 30) + "..." : "null/undefined");
         if (!authHeader?.startsWith("Bearer ")) {
+            console.log("[Branding Route] Authorization header does not start with Bearer");
             return NextResponse.json({ success: false, error: "Unauthorized" }, { status: 401 });
         }
         const token = authHeader.split("Bearer ")[1];
-        const decodedToken = await adminAuth.verifyIdToken(token);
+        console.log("[Branding Route] Token value: '" + token + "' (length: " + (token ? token.length : 0) + ")");
+        let decodedToken;
+        try {
+            decodedToken = await adminAuth.verifyIdToken(token);
+            console.log("[Branding Route] Token verified successfully. UID:", decodedToken.uid, "Role:", decodedToken.role);
+        } catch (authError: any) {
+            console.error("[Branding Route] Token verification failed:", authError.message || authError);
+            return NextResponse.json({ success: false, error: "Unauthorized: " + authError.message }, { status: 401 });
+        }
 
         // Role check
         if (decodedToken.role !== "SUPER_ADMIN" && decodedToken.role !== "ADMIN" && !decodedToken.email?.includes("admin")) {
+            console.log("[Branding Route] Role forbidden:", decodedToken.role, decodedToken.email);
             return NextResponse.json({ success: false, error: "Forbidden" }, { status: 403 });
         }
 
         const body = await req.json();
-        const { schoolName, address, schoolLogo, principalSignature, studentIdPrefix, teacherIdPrefix, studentIdSuffix, teacherIdSuffix } = body;
+        const { schoolName, address, schoolLogo, principalSignature, studentIdPrefix, teacherIdPrefix, studentIdSuffix, teacherIdSuffix, branchId: providedBranchId } = body;
+
+        // Determine target branch
+        let targetBranchId = "global";
+        if (decodedToken.role === "ADMIN") {
+            targetBranchId = decodedToken.schoolId;
+        } else if (decodedToken.role === "SUPER_ADMIN" && providedBranchId) {
+            targetBranchId = providedBranchId;
+        }
 
         // --- FOOTPRINT CLEANUP: IDENTIFY AND DELETE OLD ASSETS ---
-        const existingRef = adminDb.collection("settings").doc("branding");
-        const existingSnap = await existingRef.get();
-        const existingData = existingSnap.data() || {};
         const storageCleanupTasks: Promise<any>[] = [];
-
-        // helper to extract relative path from firebase storage URL
         const extractPath = (url: string) => {
             if (!url || !url.includes("firebasestorage.googleapis.com")) return null;
             try {
@@ -34,61 +48,70 @@ export async function POST(req: NextRequest) {
             } catch (e) { return null; }
         };
 
-        // If logo changed and old one was a firebase file, nuke it
-        if (schoolLogo && existingData.schoolLogo && schoolLogo !== existingData.schoolLogo) {
-            const oldPath = extractPath(existingData.schoolLogo);
+        const globalBrandingRef = adminDb.collection("settings").doc("branding");
+        const globalSnap = await globalBrandingRef.get();
+        const globalData = globalSnap.data() || {};
+
+        if (schoolLogo && globalData.schoolLogo && schoolLogo !== globalData.schoolLogo) {
+            const oldPath = extractPath(globalData.schoolLogo);
             if (oldPath) {
-                console.log(`[Branding] Nuking old logo footprint: ${oldPath}`);
-                // Try to delete from several possible buckets just in case
-                const buckets = [
-                    adminStorage.bucket(), // Default
-                    adminStorage.bucket("spoorthy-16292.firebasestorage.app"),
-                    adminStorage.bucket("spoorthy-16292.appspot.com")
-                ];
+                const buckets = [adminStorage.bucket(), adminStorage.bucket("spoorthy-16292.firebasestorage.app"), adminStorage.bucket("spoorthy-16292.appspot.com")];
                 buckets.forEach(b => storageCleanupTasks.push(b.file(oldPath).delete().catch(() => { })));
             }
         }
 
-        // Same for signature
-        if (principalSignature && existingData.principalSignature && principalSignature !== existingData.principalSignature) {
-            const oldPath = extractPath(existingData.principalSignature);
-            if (oldPath) {
-                console.log(`[Branding] Nuking old signature footprint: ${oldPath}`);
-                const buckets = [
-                    adminStorage.bucket(),
-                    adminStorage.bucket("spoorthy-16292.firebasestorage.app"),
-                    adminStorage.bucket("spoorthy-16292.appspot.com")
-                ];
-                buckets.forEach(b => storageCleanupTasks.push(b.file(oldPath).delete().catch(() => { })));
+        // Branch update logic
+        let branchData: any = {};
+        if (targetBranchId && targetBranchId !== "global") {
+            const branchRef = adminDb.collection("branches").doc(targetBranchId);
+            const branchSnap = await branchRef.get();
+            branchData = branchSnap.exists ? branchSnap.data() : {};
+
+            if (principalSignature && branchData.principalSignature && principalSignature !== branchData.principalSignature) {
+                const oldPath = extractPath(branchData.principalSignature);
+                if (oldPath) {
+                    const buckets = [adminStorage.bucket(), adminStorage.bucket("spoorthy-16292.firebasestorage.app"), adminStorage.bucket("spoorthy-16292.appspot.com")];
+                    buckets.forEach(b => storageCleanupTasks.push(b.file(oldPath).delete().catch(() => { })));
+                }
             }
+            
+            const branchUpdate = {
+                schoolName: schoolName || branchData.schoolName || "",
+                address: address || branchData.address || "",
+                principalSignature: principalSignature || branchData.principalSignature || "",
+                studentIdPrefix: studentIdPrefix || branchData.studentIdPrefix || "SCS",
+                teacherIdPrefix: teacherIdPrefix || branchData.teacherIdPrefix || "SHST",
+                studentIdSuffix: studentIdSuffix ? Number(studentIdSuffix) : (branchData.studentIdSuffix || 1),
+                teacherIdSuffix: teacherIdSuffix ? Number(teacherIdSuffix) : (branchData.teacherIdSuffix || 1),
+                updatedAt: new Date().toISOString()
+            };
+            await branchRef.set(branchUpdate, { merge: true });
         }
 
-        const updateData = {
-            schoolName: schoolName || "",
-            address: address || "",
-            schoolLogo: schoolLogo || "",
-            principalSignature: principalSignature || "",
-            studentIdPrefix: studentIdPrefix || "SCS",
-            teacherIdPrefix: teacherIdPrefix || "SHST",
-            studentIdSuffix: studentIdSuffix ? Number(studentIdSuffix) : 1,
-            teacherIdSuffix: teacherIdSuffix ? Number(teacherIdSuffix) : 1,
-            updatedAt: new Date().toISOString()
-        };
+        const globalUpdate: any = { updatedAt: new Date().toISOString() };
+        if (schoolLogo) globalUpdate.schoolLogo = schoolLogo;
+        
+        // If it's global edit or fallback
+        if (targetBranchId === "global") {
+            if (schoolName) globalUpdate.schoolName = schoolName;
+            if (address) globalUpdate.address = address;
+            if (principalSignature) globalUpdate.principalSignature = principalSignature;
+            if (studentIdPrefix) globalUpdate.studentIdPrefix = studentIdPrefix;
+            if (teacherIdPrefix) globalUpdate.teacherIdPrefix = teacherIdPrefix;
+            if (studentIdSuffix) globalUpdate.studentIdSuffix = Number(studentIdSuffix);
+            if (teacherIdSuffix) globalUpdate.teacherIdSuffix = Number(teacherIdSuffix);
+        }
 
-        // 2. Write to both Firestore (Audit/Source) and RTDB (Broadcast)
-        // Parallelizing for speed
         const promises = [
-            // Firestore
-            adminDb.collection("settings").doc("branding").set(updateData, { merge: true }),
-            // RTDB - Sync to both legacy and new locations
-            adminRtdb.ref("master/branding").set(updateData),
-            adminRtdb.ref("siteContent/branding").set(updateData),
+            globalBrandingRef.set(globalUpdate, { merge: true }),
+            adminRtdb.ref("master/branding").update(globalUpdate),
+            adminRtdb.ref("siteContent/branding").update(globalUpdate),
             ...storageCleanupTasks
         ];
 
         await Promise.all(promises);
 
-        return NextResponse.json({ success: true, message: "Branding updated successfully" });
+        return NextResponse.json({ success: true, message: "Settings updated successfully" });
 
     } catch (error: any) {
         console.error("[API Branding Update] Error:", error);

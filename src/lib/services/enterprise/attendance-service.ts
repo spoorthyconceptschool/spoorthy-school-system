@@ -163,7 +163,7 @@ export class EnterpriseAttendanceService {
                         title: "Attendance Updated",
                         body: `Attendance for ${date} has been marked for your class.`
                     },
-                    { type: "ATTENDANCE", date, url: "https://spoorthy-16292.web.app/student/attendance" }
+                    { type: "ATTENDANCE", date, url: `${process.env.NEXT_PUBLIC_APP_URL || "https://spoorthyhighschool.in"}/student/attendance` }
                 ).catch(e => console.error("[Attendance Push] Failed to dispatch:", e));
             }
         } catch (e) {

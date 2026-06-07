@@ -9,6 +9,7 @@ body {
   @apply overflow-x-hidden;
   touch-action: manipulation;
   -webkit-tap-highlight-color: transparent;
+  color-scheme: dark;
 }
 
 @theme {
@@ -182,24 +183,24 @@ body {
   --font-body: var(--font-sans), system-ui, -apple-system, sans-serif;
 
   /* Core Theme Colors with Hex for maximum compatibility */
-  --color-background: #050505;
+  --color-background: #070F1E;
   --color-foreground: #FAFAFA;
-  --color-card: #0D0D0E;
+  --color-card: #0E172B;
   --color-card-foreground: #FAFAFA;
-  --color-popover: #0D0D0E;
+  --color-popover: #0E172B;
   --color-popover-foreground: #FAFAFA;
   --color-primary: #64FFDA;
   --color-primary-foreground: #0A0A0B;
-  --color-secondary: #2D2D30;
+  --color-secondary: #1E293B;
   --color-secondary-foreground: #FAFAFA;
-  --color-muted: #2D2D30;
-  --color-muted-foreground: #A8B2D1;
+  --color-muted: #1E293B;
+  --color-muted-foreground: #8892B0;
   --color-accent: #64FFDA;
   --color-accent-foreground: #0A0A0B;
   --color-destructive: #FF5555;
   --color-destructive-foreground: #FAFAFA;
-  --color-border: #2D2D30;
-  --color-input: #2D2D30;
+  --color-border: #1E293B;
+  --color-input: #1E293B;
   --color-ring: #64FFDA;
 
   /* Aliases for shadcn/ui */

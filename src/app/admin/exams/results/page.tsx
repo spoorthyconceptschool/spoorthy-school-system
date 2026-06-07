@@ -266,7 +266,7 @@ export default function AcademicResultsDashboard() {
 
             {/* Print Header */}
             <div className="hidden print:block text-center space-y-2 border-b-2 border-black pb-4 mb-6">
-                <h1 className="text-3xl font-black uppercase tracking-tight">Spoorthy Concept School</h1>
+                <h1 className="text-3xl font-black uppercase tracking-tight">Spoorthy High School</h1>
                 <h2 className="text-xl font-bold uppercase tracking-widest">Academic Results Spreadsheet Summary</h2>
                 <div className="flex justify-center gap-6 text-sm font-mono mt-1">
                     <span><b>Exam:</b> {exams.find(e => e.id === selectedExamId)?.name}</span>

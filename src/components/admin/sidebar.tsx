@@ -26,7 +26,8 @@ import {
     UserCheck,
     ClipboardCheck,
     Trash2,
-    CalendarOff
+    CalendarOff,
+    X
 } from "lucide-react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
@@ -59,7 +60,6 @@ const NAV_ITEMS = [
     { label: "Settings", icon: Settings, href: "/admin/settings" },
     { label: "Notices", icon: Bell, href: "/admin/notices" },
     { label: "Holidays", icon: CalendarOff, href: "/admin/holidays" },
-    { label: "Content", icon: FileText, href: "/admin/cms" },
     { label: "Purge Data", icon: Trash2, href: "/admin/purge-data" },
 ];
 
@@ -70,7 +70,7 @@ interface SidebarProps {
 
 export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
     const pathname = usePathname();
-    const [collapsed, setCollapsed] = useState(false);
+    const collapsed = false;
     const { user, userData, role, signOut } = useAuth();
     const { branding } = useMasterData();
     const [imageError, setImageError] = useState(false);
@@ -112,7 +112,7 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
     const filteredNav = useMemo(() => {
         return NAV_ITEMS.filter(item => {
             const allowedPaths = (role === "MANAGER")
-                ? ["/admin", "/admin/students", "/admin/attendance", "/admin/fees", "/admin/exams", "/admin/faculty", "/admin/master-data", "/admin/timetable/manage", "/admin/leaves", "/admin/holidays"]
+                ? ["/admin", "/admin/students", "/admin/attendance", "/admin/fees", "/admin/exams", "/admin/faculty", "/admin/master-data", "/admin/timetable/manage", "/admin/leaves", "/admin/holidays", "/admin/homework", "/admin/notices"]
                 : (role === "TIMETABLE_EDITOR")
                     ? ["/admin", "/admin/timetable/manage", "/admin/faculty", "/admin/master-data/subjects", "/admin/master-data/classes-sections"]
                     : null;
@@ -135,61 +135,45 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
     return (
         <motion.aside
             initial={false}
-            animate={{ width: mobile ? "100%" : (collapsed ? "80px" : "260px") }}
+            animate={{ width: mobile ? "100%" : (collapsed ? "80px" : "190px") }}
             className={cn(
                 "flex flex-col h-full bg-[#0A192F]/40 backdrop-blur-xl border-r border-[#64FFDA]/10 z-50 text-white transition-all duration-300 shadow-xl",
                 !mobile && "sticky top-0"
             )}
         >
-            {/* Header - Real-time Branding */}
-            <div className={cn(
-                "h-24 flex items-center border-b border-[#64FFDA]/5 px-4 pt-4",
-                (collapsed && !mobile) ? "justify-center" : "justify-between"
-            )}>
-                {(collapsed && !mobile) ? (
-                    <button
-                        onClick={() => setCollapsed(!collapsed)}
-                        className="p-2 hover:bg-[#64FFDA]/10 rounded text-[#64FFDA] transition-colors cursor-pointer"
-                        title="Expand Menu"
-                    >
-                        <Menu size={18} />
-                    </button>
-                ) : (
-                    <>
-                        <div className="flex items-center gap-3 select-none overflow-hidden">
-                            <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 rounded-xl bg-transparent flex items-center justify-center border border-white/20 shadow-lg relative overflow-hidden">
-                                {!imageError ? (
-                                    <img
-                                        src={branding.schoolLogo || "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png"}
-                                        alt="Logo"
-                                        className="w-full h-full object-contain"
-                                        onError={() => setImageError(true)}
-                                    />
-                                ) : (
-                                    <div className="absolute inset-0 w-full h-full bg-[#64FFDA]/10 flex items-center justify-center text-[#64FFDA] font-bold font-mono text-xl">S</div>
-                                )}
-                            </div>
-                            <div className="flex flex-col min-w-0">
-                                <span className="font-black text-[10px] tracking-[0.2em] text-[#64FFDA] uppercase truncate leading-none mb-1">
-                                    Management
-                                </span>
-                                <span className="font-display font-black text-sm tracking-tight text-white leading-tight">
-                                    {branding.schoolName || "Spoorthy School"}
-                                </span>
-                            </div>
+            {/* Header - Real-time Branding - Only on Mobile */}
+            {mobile && (
+                <div className="h-20 flex items-center justify-between border-b border-[#64FFDA]/5 px-4 pt-4 shrink-0">
+                    <div className="flex items-center gap-3 select-none overflow-hidden">
+                        <div className="w-10 h-10 shrink-0 rounded-xl bg-transparent flex items-center justify-center border border-white/20 shadow-lg relative overflow-hidden">
+                            {!imageError ? (
+                                <img
+                                    src={branding.schoolLogo || "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png"}
+                                    alt="Logo"
+                                    className="w-full h-full object-contain"
+                                    onError={() => setImageError(true)}
+                                />
+                            ) : (
+                                <div className="absolute inset-0 w-full h-full bg-[#64FFDA]/10 flex items-center justify-center text-[#64FFDA] font-bold font-mono text-xl">S</div>
+                            )}
                         </div>
-                        {!mobile && (
-                            <button
-                                onClick={() => setCollapsed(!collapsed)}
-                                className="p-2 hover:bg-[#64FFDA]/10 rounded text-[#64FFDA]/50 hover:text-[#64FFDA] transition-colors cursor-pointer"
-                                title="Collapse Menu"
-                            >
-                                <Menu size={18} />
-                            </button>
-                        )}
-                    </>
-                )}
-            </div>
+                        <div className="flex flex-col min-w-0">
+                            <span className="font-black text-[10px] tracking-[0.2em] text-[#64FFDA] uppercase truncate leading-none">
+                                Management
+                            </span>
+                        </div>
+                    </div>
+                    {onItemClick && (
+                        <button
+                            onClick={onItemClick}
+                            className="p-2 hover:bg-[#64FFDA]/10 rounded text-[#64FFDA]/70 hover:text-[#64FFDA] transition-colors cursor-pointer shrink-0 ml-1"
+                            title="Close Menu"
+                        >
+                            <X size={20} />
+                        </button>
+                    )}
+                </div>
+            )}
 
             {/* Navigation */}
             <nav className="flex-1 overflow-y-auto py-6 px-3 space-y-1 scrollbar-thin scrollbar-thumb-[#64FFDA]/10 hover:scrollbar-thumb-[#64FFDA]/30">
@@ -208,7 +192,7 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
                         : (item.href && pathname.startsWith(item.href));
 
                     return (
-                        <Link key={item.href} href={item.href!} prefetch={true} onClick={() => onItemClick?.()}>
+                        <Link key={item.href} href={item.href!} prefetch={true}>
                             <div className={cn(
                                 "flex items-center gap-4 px-3 py-3 rounded-md transition-all duration-200 group relative font-medium text-sm border border-transparent",
                                 isActive
@@ -256,7 +240,16 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
             </nav>
 
             {/* Footer */}
-            <div className="p-4 border-t border-[#64FFDA]/10 bg-transparent">
+            <div className="p-4 border-t border-[#64FFDA]/10 bg-transparent space-y-2">
+                <button
+                    className={cn(
+                        "flex items-center gap-3 px-3 py-3 rounded-md transition-colors w-full text-left text-[#A8B2D1] hover:text-[#64FFDA] hover:bg-[#64FFDA]/10",
+                        (collapsed && !mobile) ? "justify-center px-0" : ""
+                    )}
+                >
+                    <Settings size={18} className="shrink-0" />
+                    {(!collapsed || mobile) && <span className="text-xs font-bold font-mono uppercase">My Account</span>}
+                </button>
                 <button
                     onClick={signOut}
                     className={cn(

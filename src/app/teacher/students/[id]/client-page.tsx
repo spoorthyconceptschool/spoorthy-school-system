@@ -126,7 +126,7 @@ export default function TeacherStudentClientPage({ id }: { id: string }) {
                     <CardContent className="p-0">
                         <div className="divide-y divide-white/5">
                             <InfoRow label="Full Name" value={student.studentName} />
-                            <InfoRow label="Date of Birth" value={student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString() : 'N/A'} />
+                            <InfoRow label="Date of Birth" value={student.dateOfBirth ? new Date(student.dateOfBirth).toLocaleDateString('en-GB') : 'N/A'} />
                             <InfoRow label="Gender" value={student.gender || 'N/A'} />
                             {student.aadhaarNumber && student.aadhaarNumber !== 'N/A' && <InfoRow label="Aadhaar Number" value={student.aadhaarNumber} />}
                             {student.bloodGroup && student.bloodGroup !== 'N/A' && <InfoRow label="Blood Group" value={student.bloodGroup} />}

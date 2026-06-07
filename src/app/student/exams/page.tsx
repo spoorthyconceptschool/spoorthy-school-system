@@ -146,7 +146,7 @@ export default function StudentExamsPage() {
         return { allowed: true, due: 0, reason: "" };
     };
 
-    if (loading) {
+    if (loading && cachedExams.length === 0) {
         return (
             <div className="w-full min-h-screen text-[#E6F1FF] bg-[#030712] font-sans pb-20 p-4 md:p-8">
                 <div className="max-w-7xl mx-auto space-y-10 animate-pulse">
@@ -260,7 +260,7 @@ export default function StudentExamsPage() {
                                         <h3 className="text-xl font-black text-white leading-tight font-display tracking-wide">{exam.name}</h3>
                                         <div className="flex items-center gap-2 mt-2 text-xs font-mono font-medium text-neutral-400 bg-white/5 px-3 py-1.5 rounded-lg w-fit border border-white/5">
                                             <Calendar className="w-3.5 h-3.5" />
-                                            {new Date(exam.startDate).toLocaleDateString()} - {new Date(exam.endDate).toLocaleDateString()}
+                                            {new Date(exam.startDate).toLocaleDateString('en-GB')} - {new Date(exam.endDate).toLocaleDateString('en-GB')}
                                         </div>
                                     </div>
 

@@ -84,7 +84,7 @@ export async function getPublicSectionsContent() {
 export async function getPublicBranding() {
     if (process.env.NEXT_PHASE === "phase-production-build") {
         return {
-            schoolName: "Spoorthy Concept School",
+            schoolName: "Spoorthy High School",
             schoolLogo: null
         };
     }

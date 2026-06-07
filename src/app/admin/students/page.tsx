@@ -7,7 +7,7 @@ import { db } from "@/lib/firebase";
 import { AddStudentModal } from "@/components/admin/add-student-modal";
 import { DeleteUserModal } from "@/components/admin/delete-user-modal";
 import { AdminChangePasswordModal } from "@/components/admin/admin-change-password-modal";
-import { Filter, Search as SearchIcon, Plus, Download, IndianRupee, Users, MoreHorizontal, MoreVertical, ArrowUpDown, User, Key, Trash2, CreditCard, Loader2, CheckCircle2, MapPin, Phone, BookOpen, RefreshCw, ArrowRight, Lock, GraduationCap, Clock, FileSpreadsheet, FileText } from "lucide-react";
+import { Filter, Search as SearchIcon, Plus, Download, IndianRupee, Users, MoreHorizontal, MoreVertical, ArrowUpDown, User, Key, Trash2, CreditCard, Loader2, CheckCircle2, MapPin, Phone, BookOpen, RefreshCw, ArrowRight, Lock, GraduationCap, Clock, FileSpreadsheet, FileText, Calendar } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { StudentImportModal } from "@/components/admin/student-import-modal";
 import { DataTable } from "@/components/ui/data-table";
@@ -47,6 +47,8 @@ interface Student {
     dateOfBirth?: string;
     gender?: string;
     transportRequired?: boolean;
+    rollNumber?: string;
+    admissionNumber?: string;
 }
 
 
@@ -86,6 +88,77 @@ const DEFAULT_STUDENTS = [
 export default function StudentsPage() {
     const router = useRouter();
     const { user, role, isAdmin } = useAuth();
+
+    const renderDropdownItems = (s: Student) => {
+        const canEditProfile = isAdmin || role === "MANAGER";
+        const canCollectFee = isAdmin || role === "MANAGER";
+        const canResetPassword = isAdmin || role === "MANAGER";
+        const canToggleStatus = isAdmin; 
+        const canDelete = isAdmin && s.status === "INACTIVE";
+
+        return (
+            <>
+                {canEditProfile && (
+                    <DropdownMenuItem onClick={() => router.push(`/admin/students/${s.schoolId}`)} className="rounded-lg gap-2 text-xs font-bold text-white hover:text-cyan-400 transition-colors">
+                        <User size={14} /> Edit Profile
+                    </DropdownMenuItem>
+                )}
+                {canCollectFee && (
+                    <DropdownMenuItem onClick={() => router.push(`/admin/students/${s.schoolId}?action=collect-fee`)} className="rounded-lg gap-2 text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors">
+                        <CreditCard size={14} /> Collect Fee
+                    </DropdownMenuItem>
+                )}
+                {canResetPassword && (
+                    <DropdownMenuItem onClick={() => {
+                        setResetUser({ uid: s.uid || "", schoolId: s.schoolId, name: s.studentName, role: "STUDENT" });
+                        setIsResetModalOpen(true);
+                    }} className="rounded-lg gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors">
+                        <Key size={14} /> Reset Password
+                    </DropdownMenuItem>
+                )}
+                {canToggleStatus && (
+                    <DropdownMenuItem 
+                        onClick={async () => {
+                            const nextStatus = s.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
+                            if (!confirm(`Are you sure you want to set status to ${nextStatus}?`)) return;
+                            try {
+                                const studentDocId = s.studentDocId || s.schoolId;
+                                await updateDoc(doc(db, "students", studentDocId), {
+                                    status: nextStatus,
+                                    updatedAt: new Date().toISOString()
+                                });
+                                toast({ title: "Updated", description: `${s.studentName} is now ${nextStatus.toLowerCase()}.`, type: "success" });
+                            } catch (err: any) {
+                                toast({ title: "Error", description: err.message, type: "error" });
+                            }
+                        }}
+                        className={cn(
+                            "rounded-lg gap-2 text-xs font-bold transition-colors",
+                            s.status === 'ACTIVE' ? "text-red-400 hover:text-red-300" : "text-emerald-400 hover:text-emerald-300"
+                        )}
+                    >
+                        {s.status === 'ACTIVE' ? (
+                            <><Lock size={14} /> Deactivate</>
+                        ) : (
+                            <><CheckCircle2 size={14} /> Activate</>
+                        )}
+                    </DropdownMenuItem>
+                )}
+                {canDelete && (
+                    <DropdownMenuItem 
+                        onClick={() => {
+                            setSelectedStudent(s);
+                            setIsDeleteModalOpen(true);
+                        }}
+                        className="rounded-lg gap-2 text-xs font-bold text-red-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
+                    >
+                        <Trash2 size={14} /> Delete Account
+                    </DropdownMenuItem>
+                )}
+            </>
+        );
+    };
+
     const { villages: villagesData, classes: classesData, loading: masterLoading, selectedYear } = useMasterData();
     const STUDENT_CACHE_KEY = `spoorthy_students_cache_${selectedYear}`;
     const [students, setStudents] = useState<Student[]>(() => {
@@ -110,7 +183,7 @@ export default function StudentsPage() {
     const [sortOrder, setSortOrder] = useState<"asc" | "desc">("desc");
 
     // Unified loading state
-    const isTableLoading = (masterLoading && students.length === 0) || localLoading;
+    const isTableLoading = students.length === 0 && (masterLoading || localLoading);
 
     // Watchdog for master data
     useEffect(() => {
@@ -167,6 +240,10 @@ export default function StudentsPage() {
         let baseConstraints: any[] = [
             where("academicYear", "==", selectedYear),
         ];
+
+        if (user && user.schoolId && user.schoolId !== "global") {
+            baseConstraints.push(where("branchId", "==", user.schoolId));
+        }
 
         if (statusFilter !== "all") baseConstraints.push(where("status", "==", statusFilter));
         if (classFilter !== "all") baseConstraints.push(where("classId", "==", classFilter));
@@ -237,13 +314,34 @@ export default function StudentsPage() {
         : (sortOrder === "asc" ? "ID (Low to High)" : "ID (High to Low)");
 
     return (
-        <div className="space-y-4 md:space-y-6 w-full pb-20 px-0">
+        <div className="space-y-4 md:space-y-6 w-full pb-20 px-2 md:px-6">
             {/* Header */}
-            <div className="flex flex-col md:flex-row md:items-center md:justify-between pt-2 md:pt-4 gap-4 md:gap-6 px-1 md:px-0">
-                <div className="space-y-0.5 md:space-y-1">
-                    <h1 className="text-2xl md:text-3xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent leading-tight flex items-center gap-3">
-                        Student Center
-                    </h1>
+            <div className="flex flex-col md:flex-row md:items-center md:justify-between pt-2 md:pt-4 gap-4 md:gap-6 px-0">
+                <div className="space-y-0.5 md:space-y-1 w-full">
+                    <div className="flex items-center justify-between w-full pr-2 md:pr-0">
+                        <h1 className="text-2xl md:text-3xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent leading-tight flex items-center gap-3">
+                            Student Center
+                        </h1>
+                        {isAdmin && (
+                            <AddStudentModal 
+                                onSuccess={(finalData) => {
+                                    if (finalData?.schoolId) {
+                                        setPendingStudents(prev => prev.map(ps => 
+                                            (ps.schoolId === "PENDING..." && ps.studentName === finalData.studentName) 
+                                            ? { ...ps, ...finalData } : ps
+                                        ));
+                                    }
+                                }} 
+                                onOptimisticUpdate={(newStudent) => {
+                                    setPendingStudents(prev => [newStudent, ...prev]);
+                                }}
+                            >
+                                <Button size="sm" className="bg-[#00E5FF] hover:bg-[#00E5FF]/80 text-black font-bold h-7 px-3 text-[10px] sm:text-xs rounded shadow-[0_0_15px_rgba(0,229,255,0.3)] transition-all">
+                                    <Plus size={14} className="mr-1 hidden sm:block" /> Add Student
+                                </Button>
+                            </AddStudentModal>
+                        )}
+                    </div>
                     <div className="flex items-center gap-1 mt-3">
                         <button
                             onClick={() => setActiveTab("directory")}
@@ -286,23 +384,6 @@ export default function StudentsPage() {
                                         <FileSpreadsheet size={13} className="shrink-0 text-emerald-400" /> Bulk Import
                                     </Button>
                                 </StudentImportModal>
-                                <AddStudentModal 
-                                    onSuccess={(finalData) => {
-                                        if (finalData?.schoolId) {
-                                            setPendingStudents(prev => prev.map(ps => 
-                                                (ps.schoolId === "PENDING..." && ps.studentName === finalData.studentName) 
-                                                ? { ...ps, ...finalData } : ps
-                                            ));
-                                        }
-                                    }} 
-                                    onOptimisticUpdate={(newStudent) => {
-                                        setPendingStudents(prev => [newStudent, ...prev]);
-                                    }}
-                                >
-                                    <Button className="h-8 gap-1.5 bg-[#00E5FF] text-black hover:bg-[#00E5FF]/90 rounded-lg text-xs font-bold px-3">
-                                        <Plus size={13} className="shrink-0 animate-pulse" /> Add Student
-                                    </Button>
-                                </AddStudentModal>
                             </>
                         )}
                     </div>
@@ -429,121 +510,165 @@ export default function StudentsPage() {
                             </div>
                         ) : (
                             <div className="rounded-2xl border border-white/[0.06] bg-[#050D1A]/40 backdrop-blur-xl overflow-hidden shadow-2xl">
-                                <div className="divide-y divide-white/[0.04]">
+                                {/* Table Header Row (Desktop Only) */}
+                                <div className="hidden md:flex items-stretch bg-black/40 border-b border-white/[0.06] text-[10px] font-black text-cyan-400 uppercase tracking-widest gap-0 rounded-t-2xl">
+                                    <div className="w-[15%] pl-4 pr-2 py-3 flex items-center border-r border-white/[0.06]">Name</div>
+                                    <div className="w-[10%] px-3 py-3 flex items-center border-r border-white/[0.06]">School ID</div>
+                                    <div className="w-[10%] px-3 py-3 flex items-center border-r border-white/[0.06]">Class</div>
+                                    <div className="w-[10%] px-3 py-3 flex items-center border-r border-white/[0.06]">Location</div>
+                                    <div className="w-[12%] px-3 py-3 flex items-center border-r border-white/[0.06]">Parent Name</div>
+                                    <div className="w-[11%] px-3 py-3 flex items-center border-r border-white/[0.06]">Parent Mobile</div>
+                                    <div className="w-[8%] px-3 py-3 flex items-center border-r border-white/[0.06]">Gender</div>
+                                    <div className="w-[9%] px-3 py-3 flex items-center border-r border-white/[0.06]">DOB</div>
+                                    <div className="w-[10%] px-3 py-3 flex items-center border-r border-white/[0.06]">Login Key</div>
+                                    <div className="w-[5%] pr-4 py-3 flex items-center justify-end">Actions</div>
+                                </div>
+                                <div className="flex flex-col gap-2.5 md:gap-0 md:divide-y md:divide-white/[0.04] p-0 md:p-0">
                                     {allStudents.map((s, idx) => {
                                         const pending = s.recoveryPassword || s.parentMobile;
                                         const isFemale = s.gender?.toLowerCase() === "female" || s.gender?.toLowerCase() === "f";
+                                        const colors = [
+                                            { border: "border-cyan-500", text: "text-cyan-400" },
+                                            { border: "border-purple-500", text: "text-purple-400" },
+                                            { border: "border-emerald-500", text: "text-emerald-400" },
+                                            { border: "border-amber-500", text: "text-amber-400" },
+                                            { border: "border-rose-500", text: "text-rose-400" },
+                                            { border: "border-blue-500", text: "border-blue-400" }
+                                        ];
+                                        const color = colors[idx % colors.length];
+                                        const formattedNum = idx < 9 ? `0${idx + 1}` : `${idx + 1}`;
+                                        
                                         return (
                                             <div 
                                                 key={s.schoolId} 
                                                 onClick={() => router.push(`/admin/students/${s.schoolId}`)}
-                                                className="flex items-center justify-between py-2.5 px-3 sm:px-4 bg-white/[0.01] hover:bg-white/[0.04] transition-all cursor-pointer gap-2 relative group"
+                                                className="flex flex-col md:flex-row md:items-stretch justify-between py-3 md:py-0 px-2 sm:px-4 md:px-0 bg-[#0B1524]/60 md:bg-white/[0.01] hover:bg-white/[0.04] transition-all cursor-pointer gap-3 md:gap-0 relative group rounded-xl md:rounded-none border border-white/[0.04] md:border-none overflow-hidden"
                                             >
-                                                {/* Col 1: Student info with Avatar */}
-                                                <div className="flex items-center gap-2 w-[30%] min-w-0">
-                                                    <div className="flex flex-col min-w-0">
-                                                        <span className="font-bold text-[10px] sm:text-xs text-white group-hover:text-cyan-400 transition-colors leading-tight truncate">
-                                                            {s.studentName}
-                                                        </span>
-                                                        <span className="text-[8px] sm:text-[9px] text-white/40 tracking-wider mt-0.5 font-mono">
-                                                            ID: {s.schoolId}
-                                                        </span>
+                                                {/* Colored Border for mobile */}
+                                                <div className={cn("md:hidden absolute left-0 top-0 bottom-0 w-1", color.border, "border-l-2")} />
+ 
+                                                {/* ================================== */}
+                                                {/* MOBILE VIEW                        */}
+                                                {/* ================================== */}
+                                                <div className="flex md:hidden flex-col w-full gap-2 pl-2">
+                                                    <div className="flex items-start justify-between w-full">
+                                                         <div className="flex items-center gap-3 min-w-0 pr-2">
+                                                            <span className={cn("text-sm font-mono font-black", color.text)}>
+                                                                {formattedNum}
+                                                            </span>
+                                                            <div className="flex flex-col gap-0.5 min-w-0">
+                                                                <div className="flex items-center gap-2">
+                                                                    <span className="font-bold text-sm text-white leading-tight truncate uppercase tracking-wide">
+                                                                        {s.studentName}
+                                                                    </span>
+                                                                </div>
+                                                                <div className="flex items-center gap-3 mt-1">
+                                                                    <span className="text-[10px] text-white/40 tracking-wider font-mono">
+                                                                        ID: {s.schoolId}
+                                                                    </span>
+                                                                    <div className="flex items-center gap-1 text-[10px] text-white/50 font-mono">
+                                                                        <Phone size={9} className="text-white/30" />
+                                                                        {s.parentMobile}
+                                                                    </div>
+                                                                </div>
+                                                            </div>
+                                                        </div>
+                                                        
+                                                        <div className="flex items-center gap-2 shrink-0">
+                                                            <div className="flex flex-col items-end gap-2 shrink-0">
+                                                                <span className="bg-[#00E5FF]/10 text-[#00E5FF] px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wide uppercase border border-[#00E5FF]/20 leading-none">
+                                                                    {s.className} {s.sectionName && `- ${s.sectionName}`}
+                                                                </span>
+                                                                <a href={`tel:${s.parentMobile}`} className="bg-emerald-500/10 hover:bg-emerald-500/20 text-emerald-400 border border-emerald-500/20 px-3 py-1 rounded-lg text-[10px] font-bold flex items-center gap-1.5 transition-colors" onClick={e => e.stopPropagation()}>
+                                                                    <Phone size={10} /> Call
+                                                                </a>
+                                                            </div>
+                                                            {/* Mobile Actions Dropdown */}
+                                                            <div className="pl-1 flex items-center justify-center shrink-0" onClick={e => e.stopPropagation()}>
+                                                                <DropdownMenu>
+                                                                    <DropdownMenuTrigger asChild>
+                                                                        <Button variant="ghost" size="icon" className="h-7 w-5 hover:bg-white/10 text-white/40 shrink-0">
+                                                                            <MoreVertical size={16} />
+                                                                        </Button>
+                                                                    </DropdownMenuTrigger>
+                                                                    <DropdownMenuContent align="end" className="bg-[#0B1524] border border-white/10 text-white min-w-[160px] p-1.5 rounded-xl shadow-2xl">
+                                                                        {renderDropdownItems(s)}
+                                                                    </DropdownMenuContent>
+                                                                </DropdownMenu>
+                                                            </div>
+                                                        </div>
                                                     </div>
                                                 </div>
-
-                                                {/* Col 2: Class & Location */}
-                                                <div className="flex flex-col w-[20%] min-w-0">
-                                                    <span className="bg-[#00E5FF]/10 text-[#00E5FF] px-1.5 py-0.5 rounded text-[8px] font-bold tracking-wide uppercase border border-[#00E5FF]/20 w-fit leading-none">
-                                                        {s.className}
+ 
+                                                {/* ================================== */}
+                                                {/* DESKTOP VIEW                       */}
+                                                {/* ================================== */}
+                                                {/* Col 1: Student Name */}
+                                                <div className="hidden md:flex items-center gap-2 w-[15%] min-w-0 pl-4 pr-2 py-3.5 border-r border-white/[0.06]">
+                                                    <span className="font-bold text-sm text-white group-hover:text-cyan-400 transition-colors leading-tight truncate">
+                                                        {s.studentName}
                                                     </span>
-                                                    <div className="flex items-center gap-1 text-[8px] sm:text-[9px] text-white/50 mt-1 truncate">
-                                                        <MapPin size={9} className="text-white/30 shrink-0" />
-                                                        <span className="truncate">{s.villageName}</span>
-                                                    </div>
                                                 </div>
-
-                                                {/* Col 3: Parent details */}
-                                                <div className="flex flex-col w-[22%] min-w-0">
-                                                    <span className="font-semibold text-[9px] sm:text-[11px] text-white/80 truncate leading-none">{s.parentName}</span>
-                                                    <div className="flex items-center gap-1 text-[8px] sm:text-[9px] text-white/50 mt-1.5 truncate font-mono">
-                                                        <Phone size={9} className="text-white/30 shrink-0" />
-                                                        <span className="truncate">{s.parentMobile}</span>
-                                                    </div>
+ 
+                                                {/* Col 2: School ID */}
+                                                <div className="hidden md:flex items-center w-[10%] min-w-0 px-3 py-3.5 border-r border-white/[0.06]">
+                                                    <span className="text-xs text-zinc-200 tracking-wider font-mono truncate">
+                                                        {s.schoolId}
+                                                    </span>
                                                 </div>
-
-                                                {/* Col 4: Credentials */}
-                                                <div className="flex flex-col w-[20%] min-w-0">
-                                                    <div className="flex items-center gap-1 text-amber-400 font-bold uppercase tracking-wider text-[8px] leading-none">
-                                                        <span>{isFemale ? "♀" : "♂"} PASS:</span>
-                                                    </div>
-                                                    <span className="font-black text-amber-400 font-mono tracking-wide text-[8px] sm:text-[9px] mt-1.5 truncate">
+ 
+                                                {/* Col 3: Class */}
+                                                <div className="hidden md:flex items-center w-[10%] min-w-0 px-3 py-3.5 border-r border-white/[0.06]">
+                                                    <span className="bg-[#00E5FF]/10 text-[#00E5FF] px-2 py-0.5 rounded text-[10px] font-bold tracking-wide uppercase border border-[#00E5FF]/20 w-fit leading-none truncate">
+                                                        {s.className} {s.sectionName && `- ${s.sectionName}`}
+                                                    </span>
+                                                </div>
+ 
+                                                {/* Col 4: Location */}
+                                                <div className="hidden md:flex items-center w-[10%] min-w-0 px-3 py-3.5 border-r border-white/[0.06]">
+                                                    <span className="text-xs text-zinc-200 truncate">
+                                                        {s.villageName}
+                                                    </span>
+                                                </div>
+ 
+                                                {/* Col 5: Parent Name */}
+                                                <div className="hidden md:flex items-center w-[12%] min-w-0 px-3 py-3.5 border-r border-white/[0.06]">
+                                                    <span className="font-semibold text-xs text-white truncate">{s.parentName}</span>
+                                                </div>
+ 
+                                                {/* Col 6: Parent Mobile */}
+                                                <div className="hidden md:flex items-center w-[11%] min-w-0 font-mono text-xs text-zinc-200 px-3 py-3.5 border-r border-white/[0.06]">
+                                                    {s.parentMobile}
+                                                </div>
+ 
+                                                {/* Col 7: Gender */}
+                                                <div className="hidden md:flex items-center w-[8%] min-w-0 text-xs text-zinc-200 px-3 py-3.5 border-r border-white/[0.06]">
+                                                    <span className={isFemale ? "text-pink-400" : "text-blue-400"}>{isFemale ? "Female" : "Male"}</span>
+                                                </div>
+ 
+                                                {/* Col 8: DOB */}
+                                                <div className="hidden md:flex items-center w-[9%] min-w-0 font-mono text-xs text-zinc-200 px-3 py-3.5 border-r border-white/[0.06]">
+                                                    {s.dateOfBirth ? new Date(s.dateOfBirth).toLocaleDateString('en-GB') : "—"}
+                                                </div>
+ 
+                                                {/* Col 9: Login Key */}
+                                                <div className="hidden md:flex items-center w-[10%] min-w-0 px-3 py-3.5 border-r border-white/[0.06]">
+                                                    <span className="font-black text-amber-400 font-mono tracking-wide text-xs truncate">
                                                         {pending}
                                                     </span>
                                                 </div>
-
-                                                {/* Col 5: Actions */}
-                                                <div className="flex items-center justify-end w-[8%] shrink-0 gap-1" onClick={e => e.stopPropagation()}>
+ 
+                                                {/* Col 10: Actions */}
+                                                <div className="hidden md:flex items-center justify-end w-[5%] shrink-0 gap-1 pr-4 py-3.5" onClick={e => e.stopPropagation()}>
                                                     <DropdownMenu>
                                                         <DropdownMenuTrigger asChild>
-                                                            <Button variant="ghost" size="icon" className="h-7 w-7 rounded-lg hover:bg-white/10 text-white/50 hover:text-white">
-                                                                <MoreVertical size={14} />
+                                                            <Button variant="ghost" size="icon" className="h-8 w-8 rounded-lg hover:bg-white/10 text-white/50 hover:text-white">
+                                                                <MoreVertical size={16} />
                                                             </Button>
                                                         </DropdownMenuTrigger>
                                                         <DropdownMenuContent align="end" className="bg-[#0B1524] border border-white/10 text-white min-w-[160px] p-1.5 rounded-xl shadow-2xl">
-                                                            <DropdownMenuItem onClick={() => router.push(`/admin/students/${s.schoolId}`)} className="rounded-lg gap-2 text-xs font-bold text-white hover:text-cyan-400 transition-colors">
-                                                                <User size={14} /> Edit Profile
-                                                            </DropdownMenuItem>
-                                                            {isAdmin && (
-                                                                <>
-                                                                    <DropdownMenuItem onClick={() => router.push(`/admin/students/${s.schoolId}?action=collect-fee`)} className="rounded-lg gap-2 text-xs font-bold text-emerald-400 hover:text-emerald-300 transition-colors">
-                                                                        <CreditCard size={14} /> Collect Fee
-                                                                    </DropdownMenuItem>
-                                                                    <DropdownMenuItem onClick={() => {
-                                                                        setResetUser({ uid: s.uid || "", schoolId: s.schoolId, name: s.studentName, role: "STUDENT" });
-                                                                        setIsResetModalOpen(true);
-                                                                    }} className="rounded-lg gap-2 text-xs font-bold text-amber-500 hover:text-amber-400 transition-colors">
-                                                                        <Key size={14} /> Reset Password
-                                                                    </DropdownMenuItem>
-                                                                    <DropdownMenuItem 
-                                                                        onClick={async () => {
-                                                                            const nextStatus = s.status === 'ACTIVE' ? 'INACTIVE' : 'ACTIVE';
-                                                                            if (!confirm(`Are you sure you want to set status to ${nextStatus}?`)) return;
-                                                                            try {
-                                                                                const studentDocId = s.studentDocId || s.schoolId;
-                                                                                await updateDoc(doc(db, "students", studentDocId), {
-                                                                                    status: nextStatus,
-                                                                                    updatedAt: new Date().toISOString()
-                                                                                });
-                                                                                toast({ title: "Updated", description: `${s.studentName} is now ${nextStatus.toLowerCase()}.`, type: "success" });
-                                                                            } catch (err: any) {
-                                                                                toast({ title: "Error", description: err.message, type: "error" });
-                                                                            }
-                                                                        }}
-                                                                        className={cn(
-                                                                            "rounded-lg gap-2 text-xs font-bold transition-colors",
-                                                                            s.status === 'ACTIVE' ? "text-red-400 hover:text-red-300" : "text-emerald-400 hover:text-emerald-300"
-                                                                        )}
-                                                                    >
-                                                                        {s.status === 'ACTIVE' ? (
-                                                                            <><Lock size={14} /> Deactivate</>
-                                                                        ) : (
-                                                                            <><CheckCircle2 size={14} /> Activate</>
-                                                                        )}
-                                                                    </DropdownMenuItem>
-                                                                    {s.status === "INACTIVE" && (
-                                                                        <DropdownMenuItem 
-                                                                            onClick={() => {
-                                                                                setSelectedStudent(s);
-                                                                                setIsDeleteModalOpen(true);
-                                                                            }}
-                                                                            className="rounded-lg gap-2 text-xs font-bold text-red-500 hover:text-red-400 hover:bg-red-500/10 transition-colors"
-                                                                        >
-                                                                            <Trash2 size={14} /> Delete Account
-                                                                        </DropdownMenuItem>
-                                                                    )}
-                                                                </>
-                                                            )}
-                                                        </DropdownMenuContent>
+                                                                                            {renderDropdownItems(s)}
+                                                                                        </DropdownMenuContent>
                                                     </DropdownMenu>
                                                 </div>
                                             </div>

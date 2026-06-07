@@ -8,6 +8,18 @@ service firebase.storage {
     match /public/{allPaths=**} {
       allow read: if true;
     }
+    match /settings/{allPaths=**} {
+      allow read: if true;
+    }
+    match /siteMedia/{allPaths=**} {
+      allow read: if true;
+    }
+    match /groups/{allPaths=**} {
+      allow read: if true;
+    }
+    match /gallery/{allPaths=**} {
+      allow read: if true;
+    }
     
     // User-specific files
     match /users/{userId}/{allPaths=**} {
