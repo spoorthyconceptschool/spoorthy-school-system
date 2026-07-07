@@ -364,6 +364,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 if (sessionData.deviceId !== currentDeviceId) {
                     console.warn("[Auth] Device mismatch on boot! Remote:", sessionData.deviceId, "Local:", currentDeviceId);
                     console.warn("[Auth] Another device holds the active session. Gracefully logging out local memory.");
+                    setDeviceKickedOut(true);
                     await executeForcedLogout(false, false);
                     return;
                 }
@@ -513,6 +514,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             const data = snapshot.val();
             if (data.deviceId !== currentDeviceId) {
                 console.warn("[Auth] Remote device ID changed! Mismatch detected. Remote:", data.deviceId, "Local:", currentDeviceId);
+                setDeviceKickedOut(true);
                 await executeForcedLogout(false, false);
             }
         }, (err) => {
@@ -961,7 +963,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         );
     }
 
-    if (deviceKickedOut) {
+    if (deviceKickedOut || tabKickedOut) {
         return (
             <div className="fixed inset-0 z-[9999] bg-[#0A192F] flex flex-col items-center justify-center text-white space-y-6 p-4">
                 <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center border border-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
@@ -971,14 +973,23 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 </div>
                 <div className="text-center space-y-2">
                     <h2 className="text-2xl font-bold text-[#E6F1FF]">Session Expired</h2>
-                    <p className="text-[#8892B0] max-w-md">Your account was logged in from another device. For your security, this session has been terminated.</p>
+                    <p className="text-[#8892B0] max-w-md">Your account was logged in from another {tabKickedOut ? 'tab' : 'device'}. For your security, this session has been terminated.</p>
                 </div>
-                <button 
-                    onClick={() => window.location.href = "/login"}
-                    className="px-6 py-3 bg-red-500 text-white rounded-lg font-bold text-sm hover:bg-red-600 transition-colors"
-                >
-                    RETURN TO LOGIN PAGE
-                </button>
+                {tabKickedOut ? (
+                    <button 
+                        onClick={takeOverTab}
+                        className="px-6 py-3 bg-blue-500 text-white rounded-lg font-bold text-sm hover:bg-blue-600 transition-colors"
+                    >
+                        USE HERE INSTEAD
+                    </button>
+                ) : (
+                    <button 
+                        onClick={() => window.location.href = "/login"}
+                        className="px-6 py-3 bg-red-500 text-white rounded-lg font-bold text-sm hover:bg-red-600 transition-colors"
+                    >
+                        RETURN TO LOGIN PAGE
+                    </button>
+                )}
             </div>
         );
     }
