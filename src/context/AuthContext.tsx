@@ -354,23 +354,50 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     await new Promise(resolve => setTimeout(resolve, 1000));
                     snapshot = await get(sessionRef);
                     if (!snapshot.exists()) {
-                        console.warn("[Auth] No session record exists in RTDB after grace period. Triggering forced logout.");
-                        await executeForcedLogout(false, false);
-                        return;
+                        console.warn("[Auth] No session record exists in RTDB after grace period. Self-healing session...");
+                        
+                        // Self-Heal: Write a new session to RTDB with the current device ID
+                        const newSessionId = storedSessionId || safeRandomUUID();
+                        const { browser, platform } = getBrowserAndPlatform();
+                        
+                        const sessionPayload: any = {
+                            sessionId: newSessionId,
+                            userId: authUser.uid,
+                            deviceId: currentDeviceId,
+                            browser: browser,
+                            platform: platform,
+                            loginTime: serverTimestamp(),
+                            lastHeartbeat: serverTimestamp(),
+                            status: "active",
+                            appVersion: "1.2.6"
+                        };
+                        
+                        await set(sessionRef, sessionPayload);
+                        if (!storedSessionId) {
+                            if (typeof window !== "undefined") localStorage.setItem(SESSION_KEY, newSessionId);
+                        }
                     }
                 }
 
-                const sessionData = snapshot.val();
-                if (sessionData.deviceId !== currentDeviceId) {
-                    console.warn("[Auth] Device mismatch on boot! Remote:", sessionData.deviceId, "Local:", currentDeviceId);
-                    console.warn("[Auth] Another device holds the active session. Gracefully logging out local memory.");
-                    setDeviceKickedOut(true);
-                    await executeForcedLogout(false, false);
+                // Verify the snapshot again (it might have been newly created above, so we fetch fresh if we healed)
+                snapshot = await get(sessionRef);
+                if (snapshot.exists()) {
+                    const sessionData = snapshot.val();
+                    if (sessionData.deviceId !== currentDeviceId) {
+                        console.warn("[Auth] Device mismatch on boot! Remote:", sessionData.deviceId, "Local:", currentDeviceId);
+                        console.warn("[Auth] Another device holds the active session. Gracefully logging out local memory.");
+                        setDeviceKickedOut(true);
+                        await executeForcedLogout(false, false);
+                        return;
+                    }
+                } else {
+                    console.warn("[Auth] Self-healing failed or session completely broken. Forcing logout.");
+                    await executeForcedLogout(false, true);
                     return;
                 }
 
                 // Valid session on boot!
-                setLocalSessionId(storedSessionId);
+                setLocalSessionId(storedSessionId || localStorage.getItem(SESSION_KEY));
                 await fetchAndSetUserProfile(authUser);
 
                 setUser(authUser);
@@ -507,7 +534,32 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             if (!snapshot.exists()) {
                 console.warn("[Auth] Session record disappeared from database.");
-                await executeForcedLogout(false, true);
+                // Give it a chance to recover (in case of momentary network drop or self-healing race)
+                setTimeout(async () => {
+                    const freshSnap = await get(sessionRef);
+                    if (!freshSnap.exists()) {
+                        console.warn("[Auth] Session record permanently disappeared. Self-healing...");
+                        
+                        const newSessionId = localSessionId || safeRandomUUID();
+                        const { browser, platform } = getBrowserAndPlatform();
+                        
+                        const sessionPayload: any = {
+                            sessionId: newSessionId,
+                            userId: user.uid,
+                            deviceId: currentDeviceId,
+                            browser: browser,
+                            platform: platform,
+                            loginTime: serverTimestamp(),
+                            lastHeartbeat: serverTimestamp(),
+                            status: "active",
+                            appVersion: "1.2.6"
+                        };
+                        
+                        await set(sessionRef, sessionPayload).catch(e => {
+                            console.warn("[Auth] Self-heal write failed. User might be truly disconnected.", e);
+                        });
+                    }
+                }, 2000);
                 return;
             }
 
