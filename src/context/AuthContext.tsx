@@ -83,6 +83,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // Tab Lock State
     const [tabKickedOut, setTabKickedOut] = useState(false);
+    const [deviceKickedOut, setDeviceKickedOut] = useState(false);
     const myTabIdRef = useRef<string | null>(null);
     if (!myTabIdRef.current && typeof window !== "undefined") {
         myTabIdRef.current = safeRandomUUID();
@@ -168,18 +169,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             if (currentUid && isManualLogout === true) {
                 const sessionRef = ref(rtdb, `sessions/${currentUid}`);
                 const snapshot = await get(sessionRef);
-                if (snapshot.exists() && snapshot.val().sessionId === localSessionId) {
+                const currentDeviceId = getOrCreateDeviceId();
+                if (snapshot.exists() && snapshot.val().deviceId === currentDeviceId) {
                     await remove(sessionRef).catch(e => console.warn("Failed to remove session node:", e));
                 }
             }
 
-            // 4. Clear storage synchronously (Instant)
+            // 5. Clear storage synchronously (Instant)
             let clearedSharedStorage = false;
             if (typeof window !== "undefined") {
                 const storedSessionId = localStorage.getItem(SESSION_KEY);
                 
                 if (isManualLogout === true || forceClear === true || !storedSessionId || storedSessionId === localSessionId) {
+                    const savedDeviceId = localStorage.getItem("spoorthy_device_id");
                     localStorage.clear();
+                    if (savedDeviceId) localStorage.setItem("spoorthy_device_id", savedDeviceId);
                     sessionStorage.clear();
                     clearedSharedStorage = true;
 
@@ -201,18 +205,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
             }
 
-            // 5. Perform Firebase SignOut ONLY if we cleared shared storage
+            // 6. Perform Firebase SignOut ONLY if we cleared shared storage
             if (clearedSharedStorage) {
                 await firebaseSignOut(auth).catch(e => console.warn("Firebase signOut failed:", e));
             }
 
-            // 6. Clear application memory
+            // 7. Clear application memory
             setUserData(null);
             setUser(null);
             setLocalSessionId(null);
 
             if (typeof window !== "undefined") {
-                window.location.href = "/";
+                if (isManualLogout) {
+                    window.location.href = "/login";
+                }
             }
         } catch (error) {
             console.error("[Auth] Error in forced logout pipeline:", error);
@@ -329,8 +335,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
             setStatus("VALIDATING_SESSION");
 
-            try {
+            try {                
                 const storedSessionId = typeof window !== "undefined" ? localStorage.getItem(SESSION_KEY) : null;
+                const currentDeviceId = getOrCreateDeviceId();
                 
                 if (!storedSessionId) {
                     console.warn("[Auth] No local sessionId found for logged-in user. Triggering forced logout.");
@@ -338,20 +345,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     return;
                 }
 
-                // Check RTDB session
+                // Verify session against RTDB
                 const sessionRef = ref(rtdb, `sessions/${authUser.uid}`);
-                const snapshot = await get(sessionRef);
-
+                let snapshot = await get(sessionRef);
+                
                 if (!snapshot.exists()) {
-                    console.warn("[Auth] No session record exists in RTDB. Triggering forced logout.");
-                    await executeForcedLogout(false, true);
-                    return;
+                    console.warn("[Auth] No session record exists in RTDB after boot. Waiting 1000ms grace period.");
+                    await new Promise(resolve => setTimeout(resolve, 1000));
+                    snapshot = await get(sessionRef);
+                    if (!snapshot.exists()) {
+                        console.warn("[Auth] No session record exists in RTDB after grace period. Triggering forced logout.");
+                        await executeForcedLogout(false, false);
+                        return;
+                    }
                 }
 
                 const sessionData = snapshot.val();
-                if (sessionData.sessionId !== storedSessionId) {
-                    console.warn("[Auth] Session mismatch on boot! Remote:", sessionData.sessionId, "Local:", storedSessionId);
-                    await executeForcedLogout(false, true);
+                if (sessionData.deviceId !== currentDeviceId) {
+                    console.warn("[Auth] Device mismatch on boot! Remote:", sessionData.deviceId, "Local:", currentDeviceId);
+                    console.warn("[Auth] Another device holds the active session. Gracefully logging out local memory.");
+                    await executeForcedLogout(false, false);
                     return;
                 }
 
@@ -486,7 +499,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
 
         const sessionRef = ref(rtdb, `sessions/${user.uid}`);
-        console.log(`[Auth] Subscribing to session updates for ${user.uid}`);
+        const currentDeviceId = getOrCreateDeviceId();
         
         const unsub = onValue(sessionRef, async (snapshot) => {
             if (isLoggingOutRef.current || isAuthenticatingRef.current) return;
@@ -498,9 +511,9 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
 
             const data = snapshot.val();
-            if (data.sessionId !== localSessionId) {
-                console.warn("[Auth] Remote session ID changed! Mismatch detected. Remote:", data.sessionId, "Local:", localSessionId);
-                await executeForcedLogout();
+            if (data.deviceId !== currentDeviceId) {
+                console.warn("[Auth] Remote device ID changed! Mismatch detected. Remote:", data.deviceId, "Local:", currentDeviceId);
+                await executeForcedLogout(false, false);
             }
         }, (err) => {
             console.warn("[Auth] Session listener error:", err);
@@ -565,8 +578,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     const snapshot = await get(sessionRef);
                     
                     if (snapshot.exists()) {
-                        const data = snapshot.val();
-                        if (data.sessionId === currentSession) {
+                        const currentDeviceId = getOrCreateDeviceId();
+                        if (data.deviceId === currentDeviceId) {
                             console.log("[Auth] Session still valid after network recovery.");
                             return;
                         }
@@ -664,6 +677,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     // 4. Smart Redirect Logic
     useEffect(() => {
+        if (deviceKickedOut || tabKickedOut || isLoggingOutRef.current) return;
+
         if (isInitialized && !loading) {
             if (user && pathname === "/login") {
                 console.log("[Auth] Logged-in user at /login. Checking profile data...");
@@ -701,7 +716,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
             }
         }
-    }, [user, userData, loading, isInitialized, pathname, router, executeForcedLogout]);
+    }, [user, userData, loading, isInitialized, pathname, router, executeForcedLogout, deviceKickedOut, tabKickedOut]);
 
     const isAdmin = ['ADMIN', 'MANAGER', 'DEVELOPER', 'OWNER'].includes(String(userData?.role || "").toUpperCase());
     const isSuperAdmin = ['SUPER_ADMIN', 'SUPERADMIN'].includes(String(userData?.role || "").toUpperCase());
@@ -941,6 +956,28 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     className="px-6 py-3 bg-transparent border border-[#64FFDA] text-[#64FFDA] rounded-lg font-mono text-sm hover:bg-[#64FFDA]/10 transition-colors"
                 >
                     USE HERE INSTEAD
+                </button>
+            </div>
+        );
+    }
+
+    if (deviceKickedOut) {
+        return (
+            <div className="fixed inset-0 z-[9999] bg-[#0A192F] flex flex-col items-center justify-center text-white space-y-6 p-4">
+                <div className="w-16 h-16 bg-red-500/10 rounded-2xl flex items-center justify-center border border-red-500/30 shadow-[0_0_15px_rgba(239,68,68,0.2)]">
+                    <svg className="w-8 h-8 text-red-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
+                    </svg>
+                </div>
+                <div className="text-center space-y-2">
+                    <h2 className="text-2xl font-bold text-[#E6F1FF]">Session Expired</h2>
+                    <p className="text-[#8892B0] max-w-md">Your account was logged in from another device. For your security, this session has been terminated.</p>
+                </div>
+                <button 
+                    onClick={() => window.location.href = "/login"}
+                    className="px-6 py-3 bg-red-500 text-white rounded-lg font-bold text-sm hover:bg-red-600 transition-colors"
+                >
+                    RETURN TO LOGIN PAGE
                 </button>
             </div>
         );
