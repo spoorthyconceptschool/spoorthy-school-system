@@ -44,7 +44,17 @@ export default function PurgeDataPage() {
                     description: "The system is being wiped in the background.",
                     type: "success"
                 });
-                if (mode === 'FULL_SYSTEM') localStorage.clear();
+                if (mode === 'FULL_SYSTEM') {
+                    import("@/lib/cache-utils").then(({ fullSystemWipe }) => {
+                        fullSystemWipe();
+                        setTimeout(() => window.location.reload(), 2000);
+                    });
+                } else {
+                    import("@/lib/cache-utils").then(({ clearTenantCache }) => {
+                        clearTenantCache(null);
+                        setTimeout(() => window.location.reload(), 2000);
+                    });
+                }
 
                 // Final log after simulated delay or just leave it running
                 setTimeout(() => addLog("Process backgrounded. Check server logs for full completion.", 'info'), 2000);

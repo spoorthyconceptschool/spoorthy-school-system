@@ -18,13 +18,13 @@ import { HeaderSidebar } from "./HeaderSidebar";
 import { UniversalSearch } from "./UniversalSearch";
 import { NotificationCenter } from "@/components/NotificationCenter";
 import { useEffect, useState } from "react";
-import { doc, onSnapshot } from "firebase/firestore";
+import { doc, getDoc, onSnapshot } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useMasterData } from "@/context/MasterDataContext";
 import { cn } from "@/lib/utils";
 
 export function TopBar() {
-    const { user, signOut } = useAuth();
+    const { user, signOut, userData } = useAuth();
     const { academicYears, selectedYear, setSelectedYear, branding, systemConfig } = useMasterData();
     const { history, clearHistory, removeFromHistory } = useToastStore();
     const [scrolled, setScrolled] = useState(false);
@@ -54,6 +54,8 @@ export function TopBar() {
         return () => main.removeEventListener('scroll', handleScroll);
     }, []);
 
+    const effectiveLogo = branding?.schoolLogo || "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png";
+
     return (
         <header
             className="h-16 sticky top-0 z-40 flex items-center justify-between px-2 md:px-6 bg-[#0A192F] border-b border-[#64FFDA]/10 shadow-lg"
@@ -62,9 +64,11 @@ export function TopBar() {
                 <HeaderSidebar />
                 <div className="flex items-center gap-2 shrink-0">
                     <div className="w-8 h-8 rounded-lg bg-transparent flex items-center justify-center border border-white/20 overflow-hidden shrink-0 shadow-md">
-                        {!imageError ? (
+                        {(!branding || branding.schoolName === "") ? (
+                            <div className="w-full h-full bg-[#64FFDA]/10 flex items-center justify-center text-[#0A192F] font-bold font-display text-xs animate-pulse">S</div>
+                        ) : !imageError ? (
                             <img
-                                src={branding?.schoolLogo || "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png"}
+                                src={effectiveLogo}
                                 alt="Logo"
                                 className="w-full h-full object-contain"
                                 onError={() => setImageError(true)}
@@ -74,9 +78,20 @@ export function TopBar() {
                         )}
                     </div>
                     {/* Hide name on tiny/medium screens to make room for Search and dev tools */}
-                    <span className="font-display font-black text-white text-[10px] xs:text-sm tracking-tight truncate max-w-[80px] sm:max-w-[150px] md:max-w-[250px] hidden xs:block">
-                        {branding?.schoolName || "Spoorthy School"}
-                    </span>
+                    <div className="hidden md:block">
+                        {(!branding || branding.schoolName === "") ? (
+                            <div className="h-4 w-40 bg-white/10 rounded animate-pulse" />
+                        ) : (
+                            <span className="font-display font-black text-white text-sm tracking-tight truncate max-w-[120px] sm:max-w-[220px] md:max-w-[400px]">
+                                {branding.schoolName}
+                                {branding?.schoolId && (
+                                    <span className="text-[10px] text-[#64FFDA] font-mono ml-1.5 opacity-85">
+                                        ({branding.schoolId})
+                                    </span>
+                                )}
+                            </span>
+                        )}
+                    </div>
                 </div>
             </div>
 
@@ -100,7 +115,7 @@ export function TopBar() {
                                 <span className="text-[9px] md:text-xs font-bold font-mono whitespace-nowrap hidden xs:inline">{selectedYear}</span>
                             </Button>
                         </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end" className="bg-[#0A192F]/95 backdrop-blur-xl border border-[#64FFDA]/20 text-white min-w-[150px]">
+                        <DropdownMenuContent align="end" className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl border-white/10/95 backdrop-blur-xl border border-[#64FFDA]/20 text-white min-w-[150px]">
                             <DropdownMenuLabel className="text-[10px] uppercase tracking-widest opacity-90">Academic Session</DropdownMenuLabel>
                             <DropdownMenuSeparator className="bg-white/10" />
                             <div className="max-h-[300px] overflow-y-auto">
@@ -146,7 +161,7 @@ export function TopBar() {
                             </div>
                         </button>
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end" className="w-56 bg-[#0A192F]/90 backdrop-blur-xl border border-[#64FFDA]/20 text-white p-1 shadow-2xl rounded-xl mt-2">
+                    <DropdownMenuContent align="end" className="w-56 bg-[#0B1120]/95 backdrop-blur-2xl border-white/10/90 backdrop-blur-xl border border-[#64FFDA]/20 text-white p-1 rounded-xl mt-2 shadow-2xl">
                         <DropdownMenuLabel className="px-3 py-2 text-sm font-bold opacity-90 uppercase tracking-widest">Account</DropdownMenuLabel>
                         <DropdownMenuSeparator className="bg-white/10 mx-1" />
                         <DropdownMenuItem className="focus:bg-white/10 focus:text-white cursor-pointer rounded-lg px-3 py-2 text-sm font-medium">

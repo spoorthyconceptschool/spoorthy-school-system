@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { collection, query, orderBy, onSnapshot, limit, doc } from "firebase/firestore";
+import { collection, query, where, orderBy, onSnapshot, limit, doc } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -43,7 +43,7 @@ const DEFAULT_STUDENT_LEAVES = [
 ];
 
 export function StudentLeavesManager() {
-    const { user } = useAuth();
+    const { user, userData, branchId } = useAuth();
     const [leaves, setLeaves] = useState<any[]>(() => {
         if (typeof window !== 'undefined') {
             const cached = localStorage.getItem(STUDENT_LEAVES_CACHE_KEY);
@@ -57,11 +57,24 @@ export function StudentLeavesManager() {
     const [actioning, setActioning] = useState<string | null>(null);
 
     useEffect(() => {
-        const q = query(
-            collection(db, "student_leaves"),
-            orderBy("createdAt", "desc"),
-            limit(50)
-        );
+        const activeBranchId = branchId || "global";
+        const isGlobal = activeBranchId === "global";
+
+        let q;
+        if (!isGlobal) {
+            q = query(
+                collection(db, "student_leaves"),
+                where("schoolId", "==", activeBranchId),
+                orderBy("createdAt", "desc"),
+                limit(50)
+            );
+        } else {
+            q = query(
+                collection(db, "student_leaves"),
+                orderBy("createdAt", "desc"),
+                limit(50)
+            );
+        }
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
             const loaded = snapshot.docs.map(doc => ({
@@ -79,7 +92,7 @@ export function StudentLeavesManager() {
         });
 
         return () => unsubscribe();
-    }, []);
+    }, [branchId]);
 
     const handleAction = async (leaveId: string, action: "APPROVE" | "REJECT" | "REVERT") => {
         if (!user) return;

@@ -5,7 +5,7 @@ async function verifyMatching() {
     console.log('--- STARTING VERIFICATION ---');
     const paymentsSnap = await adminDb.collection('payments').get();
     let paymentSum = 0;
-    paymentsSnap.forEach(d => {
+    paymentsSnap.forEach((d: any) => {
         const a = d.data().amount;
         paymentSum += typeof a === 'number' ? a : parseFloat(String(a).replace(/[^0-9.-]/g, '')) || 0;
     });
@@ -13,7 +13,7 @@ async function verifyMatching() {
     const ledgersSnap = await adminDb.collection('student_fee_ledgers').get();
     let ledgerPaidSum = 0;
     let ledgerFeeSum = 0;
-    ledgersSnap.forEach(d => {
+    ledgersSnap.forEach((d: any) => {
         const data = d.data();
         ledgerPaidSum += (data.totalPaid || 0);
         ledgerFeeSum += (data.totalFee || 0);

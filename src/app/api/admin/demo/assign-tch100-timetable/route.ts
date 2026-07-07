@@ -99,7 +99,7 @@ export async function GET(req: NextRequest) {
             .get();
 
         const batch = adminDb.batch();
-        existingSnap.docs.forEach(d => batch.delete(d.ref));
+        existingSnap.docs.forEach((d: any) => batch.delete(d.ref));
         await batch.commit();
 
         // 6. Write new entries in batches (Firestore batch limit = 500)

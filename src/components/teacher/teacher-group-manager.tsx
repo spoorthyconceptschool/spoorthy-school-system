@@ -12,6 +12,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { Loader2, Users, ArrowRight, Shield, Filter, Search } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { toast } from "@/lib/toast-store";
+import { useAuth } from "@/context/AuthContext";
 
 interface Group {
     id: string;
@@ -114,6 +115,10 @@ export function TeacherGroupManager() {
         }
     }, [selectedClassId, classSections, sectionsData]);
 
+    const { branchId: userBranchId, userData } = useAuth();
+    const currentSchoolId = userBranchId || userData?.schoolId;
+    const authUser = { token: { schoolId: userData?.schoolId || userData?.branchId } };
+
     // Fetch Students when Class/Section changes
     useEffect(() => {
         if (!selectedClassId) {
@@ -127,7 +132,11 @@ export function TeacherGroupManager() {
                 setLoading(true);
             }
             try {
-                let q = query(collection(db, "students"), where("classId", "==", selectedClassId));
+                let q = query(
+                    collection(db, "students"), 
+                    where("classId", "==", selectedClassId),
+                    where("schoolId", "==", authUser.token.schoolId || currentSchoolId)
+                );
                 if (selectedSectionId !== "all") {
                     q = query(q, where("sectionId", "==", selectedSectionId));
                 }
@@ -151,7 +160,7 @@ export function TeacherGroupManager() {
         };
 
         fetchStudents();
-    }, [selectedClassId, selectedSectionId]);
+    }, [selectedClassId, selectedSectionId, currentSchoolId]);
 
     // Filter Logic
     useEffect(() => {

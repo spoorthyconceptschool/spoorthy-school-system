@@ -59,7 +59,7 @@ export default function LoginPage() {
             }
 
             console.log("[Login] Attempting sign-in for:", email);
-            await signIn(email, password);
+            const dataToStore = await signIn(email, password);
 
             toast({
                 title: "Login Successful",
@@ -67,19 +67,22 @@ export default function LoginPage() {
                 type: "success"
             });
 
-            // --- INSTANT REDIRECTION LOGIC (Heuristic First) ---
-            const lowerId = schoolId.toLowerCase();
-            const lowerEmail = email.toLowerCase();
+            // --- STRICT SERVER-VERIFIED REDIRECTION ---
             let targetPath = "/student";
-
-            if (adminEmails.includes(lowerEmail) || lowerId.includes("admin")) {
-                targetPath = "/admin";
-            } else if (lowerId.startsWith("shst") || lowerId.startsWith("tch")) {
-                targetPath = "/teacher";
+            if (dataToStore?.role) {
+                const r = String(dataToStore.role).toUpperCase();
+                if (["SUPER_ADMIN", "SUPERADMIN"].includes(r)) {
+                    targetPath = "/super-admin";
+                } else if (["ADMIN", "MANAGER", "DEVELOPER", "OWNER"].includes(r)) {
+                    targetPath = "/admin";
+                } else if (r === "TEACHER") {
+                    targetPath = "/teacher";
+                }
             }
 
-            console.log("[Login] Instant Redirect to:", targetPath);
+            console.log("[Login] Redirecting to verified role dashboard:", targetPath);
             router.push(targetPath);
+            router.refresh();
 
         } catch (err: any) {
             // Use console.warn to avoid triggering the Next.js Dev Overlay for expected auth failures
@@ -96,12 +99,12 @@ export default function LoginPage() {
     };
 
     return (
-        <div className="min-h-screen flex items-center justify-center bg-black p-4 relative overflow-hidden">
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-[#0A192F] via-[#112240] to-[#0A192F] p-4 relative overflow-hidden">
             {/* Background Effects */}
             <div className="absolute top-1/4 left-1/4 w-96 h-96 bg-accent/20 rounded-full blur-[120px] -z-10 animate-pulse" />
             <div className="absolute bottom-1/4 right-1/4 w-64 h-64 bg-emerald-500/10 rounded-full blur-[100px] -z-10" />
 
-            <Card className="w-full max-w-md bg-black/60 border-white/10 backdrop-blur-2xl shadow-2xl rounded-3xl">
+            <Card className="w-full max-w-md bg-[#050D1A]/60 border-white/10 backdrop-blur-2xl shadow-2xl rounded-3xl">
                 <CardHeader className="space-y-4 text-center">
                     <div className="mx-auto w-16 h-16 bg-accent/10 rounded-2xl flex items-center justify-center border border-accent/20">
                         <School className="w-8 h-8 text-accent" />

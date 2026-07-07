@@ -79,11 +79,11 @@ interface Student {
     dateOfBirth?: string;
     gender?: string;
     transportRequired?: boolean;
-    admissionNumber?: string;
     academicYear?: string;
     address?: string;
     firstName?: string;
     lastName?: string;
+    branchId?: string;
 }
 
 interface Payment {
@@ -94,6 +94,7 @@ interface Payment {
     method: string;
     remarks?: string;
     termId?: string;
+    academicYear?: string;
 }
 
 interface FeeLedgerItem {
@@ -128,6 +129,8 @@ export default function StudentDetailsPage() {
     const [student, setStudent] = useState<Student | null>(null);
     const [payments, setPayments] = useState<Payment[]>([]);
     const [ledger, setLedger] = useState<FeeLedger | null>(null);
+    const [previousLedger, setPreviousLedger] = useState<any>(null);
+    const [classHistory, setClassHistory] = useState<{ year: string; className: string }[]>([]);
     const [loading, setLoading] = useState(true);
     const [role, setRole] = useState<string>("");
     const { user, userData, role: authRole } = useAuth();
@@ -161,7 +164,7 @@ export default function StudentDetailsPage() {
 
     // Academic Year Toggle & Read-Only Checks
     const [viewingYear, setViewingYear] = useState(selectedYear || "2025-2026");
-    const [activeTab, setActiveTab] = useState<'profile' | 'academic' | 'attendance'>('profile');
+    const [activeTab, setActiveTab] = useState<'profile' | 'academic' | 'attendance' | 'fees' | 'history' | 'documents'>('profile');
 
     useEffect(() => {
         if (selectedYear) {
@@ -179,13 +182,24 @@ export default function StudentDetailsPage() {
     useEffect(() => {
         const fetchExamsAndResults = async () => {
             if (!student?.schoolId) return;
+            const tenantId = student.branchId || student.schoolId;
             setLoadingExams(true);
             try {
-                // Fetch exams ordered by startDate descending
-                const examsQ = query(collection(db, "exams"), orderBy("startDate", "desc"));
+                // Fetch exams filtered by tenantId/schoolId
+                const examsQ = query(
+                    collection(db, "exams"),
+                    where("schoolId", "==", tenantId)
+                );
                 const snap = await getDocs(examsQ);
                 const allExams = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
                 
+                // Sort by startDate descending in-memory
+                allExams.sort((a: any, b: any) => {
+                    const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
+                    const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
+                    return dateB - dateA;
+                });
+
                 // Filter by viewingYear, defaulting to 2025-2026
                 const matchedExams = allExams.filter((e: any) => (e.academicYear || "2025-2026") === viewingYear);
                 setExams(matchedExams);
@@ -209,7 +223,7 @@ export default function StudentDetailsPage() {
             }
         };
         fetchExamsAndResults();
-    }, [student?.schoolId, viewingYear]);
+    }, [student?.schoolId, student?.branchId, viewingYear]);
 
     // Attendance State
     const [attendanceMap, setAttendanceMap] = useState<Record<string, 'P' | 'A'>>({});
@@ -348,6 +362,45 @@ export default function StudentDetailsPage() {
                 // 3. Auto-Sync Fee Ledger (Uses Centralized Config)
                 const ledgerRef = doc(db, "student_fee_ledgers", `${sData.schoolId}_${currentYearId}`);
                 const ledgerSnap = await getDoc(ledgerRef);
+
+                const getPreviousYearId = (yearId: string) => {
+                    const parts = yearId.split('-');
+                    if (parts.length === 2) {
+                        const start = parseInt(parts[0]);
+                        const end = parseInt(parts[1]);
+                        if (!isNaN(start) && !isNaN(end)) {
+                            return `${start - 1}-${end - 1}`;
+                        }
+                    }
+                    return null;
+                };
+                const prevYearId = getPreviousYearId(currentYearId);
+                if (prevYearId) {
+                    const prevLedgerRef = doc(db, "student_fee_ledgers", `${sData.schoolId}_${prevYearId}`);
+                    const prevLedgerSnap = await getDoc(prevLedgerRef);
+                    if (prevLedgerSnap.exists()) {
+                        setPreviousLedger(prevLedgerSnap.data());
+                    } else {
+                        setPreviousLedger(null);
+                    }
+                } else {
+                    setPreviousLedger(null);
+                }
+
+                try {
+                    const ledgersQ = query(collection(db, "student_fee_ledgers"), where("studentId", "==", sData.schoolId));
+                    const ledgersSnap = await getDocs(ledgersQ);
+                    const history = ledgersSnap.docs.map((doc: any) => {
+                        const data = doc.data();
+                        return {
+                            year: data.academicYearId || data.yearId || "Unknown Year",
+                            className: data.className || "Unknown Class"
+                        };
+                    }).sort((a: any, b: any) => String(a.year).localeCompare(String(b.year)));
+                    setClassHistory(history);
+                } catch (historyErr) {
+                    console.error("Error fetching class history:", historyErr);
+                }
 
                 try {
                     const feeTerms = (feeConfig.terms || []).filter((t: any) => t.isActive);
@@ -763,7 +816,7 @@ export default function StudentDetailsPage() {
                                         Collect Fee
                                     </Button>
                                 </DialogTrigger>
-                                <DialogContent className="bg-[#0A192F] text-white border-white/10 sm:max-w-md w-[95vw] rounded-2xl">
+                                <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white sm:max-w-md w-[95vw] rounded-2xl border-white/10">
                                     <DialogHeader><DialogTitle className="text-xl">Collect Fee</DialogTitle></DialogHeader>
                                     <form onSubmit={handleCollectFee}>
                                         <div className="space-y-4 pt-4">
@@ -803,14 +856,14 @@ export default function StudentDetailsPage() {
                 {!loading && student && (
                     <div className="flex items-center gap-1.5 mt-1.5">
                         <span className="text-[10px] text-[#8892B0] font-mono bg-white/5 px-2 py-0.5 rounded-md border border-white/5 truncate max-w-[180px]">
-                            {student.schoolId} • {(classesData || {})[student.classId]?.name || student.className || "Class"}-{(sectionsData || {})[student.sectionId]?.name || student.sectionName || "Section"}
+                            {student.schoolId || student.id} • {(classesData || {})[student.classId]?.name || student.className || "Class"}-{(sectionsData || {})[student.sectionId]?.name || student.sectionName || "Section"}
                         </span>
                         
                         <Select value={viewingYear} onValueChange={setViewingYear}>
                             <SelectTrigger className="h-5 py-0 border-white/10 bg-white/5 text-[9px] font-bold w-auto min-w-[80px] focus:ring-0 rounded-md text-white ml-auto">
                                 <SelectValue placeholder="Session" />
                             </SelectTrigger>
-                            <SelectContent className="bg-[#0A192F] border-white/10 text-white font-semibold">
+                            <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white font-semibold border-white/10">
                                 {Object.keys(academicYears || {}).map(year => (
                                     <SelectItem key={year} value={year} className="text-[11px]">
                                         {year}
@@ -864,6 +917,7 @@ export default function StudentDetailsPage() {
                         sections={sections} 
                         loading={loading}
                         setIsResetModalOpen={setIsResetModalOpen}
+                        classHistory={classHistory}
                     />
                 )}
                 {activeTab === 'fees' && (
@@ -880,6 +934,7 @@ export default function StudentDetailsPage() {
                         printStudentFeeStructure={printStudentFeeStructure}
                         branding={branding}
                         loading={loading}
+                        previousLedger={previousLedger}
                     />
                 )}
                 {activeTab === 'attendance' && (

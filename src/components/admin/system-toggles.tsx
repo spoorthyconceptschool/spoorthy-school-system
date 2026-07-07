@@ -5,14 +5,17 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Switch } from "@/components/ui/switch";
 import { Label } from "@/components/ui/label";
 import { doc, setDoc } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { useMasterData } from "@/context/MasterDataContext";
 import { toast } from "@/lib/toast-store";
 import { Terminal, FlaskConical, ShieldAlert, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { useAuth } from "@/context/AuthContext";
 
 export function SystemToggles() {
     const { systemConfig } = useMasterData();
+    const { branchId: userBranchId, userData } = useAuth();
+    const activeBranchId = userBranchId || userData?.schoolId || null;
     const [updating, setUpdating] = useState(false);
 
     const toggleTestingMode = async (enabled: boolean) => {
@@ -77,50 +80,6 @@ export function SystemToggles() {
                 </div>
 
                 <div className="pt-4 border-t border-[#64FFDA]/10 space-y-4">
-                    <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-[#64FFDA]/5 border border-[#64FFDA]/20 transition-all hover:bg-[#64FFDA]/10 group/seed">
-                        <div className="space-y-1">
-                            <div className="flex items-center gap-2">
-                                <Terminal size={16} className="text-[#64FFDA]" />
-                                <Label className="text-sm font-bold text-white uppercase tracking-wider">Demo Data Seed</Label>
-                            </div>
-                            <p className="text-[10px] text-muted-foreground leading-relaxed max-w-[280px]">
-                                Populates the system with 200 students (10 per section), master data, and financial records.
-                            </p>
-                        </div>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            className="bg-[#64FFDA]/10 text-[#64FFDA] hover:bg-[#64FFDA] hover:text-[#0A192F] border-[#64FFDA]/30 font-bold transition-all duration-300"
-                            onClick={async () => {
-                                const confirm = window.confirm("This will seed the redesigned demo data (200 students, full master data sync). Existing operational data will be purged. Proceed?");
-                                if (!confirm) return;
-
-                                setUpdating(true);
-                                try {
-                                    const res = await fetch("/api/setup-data");
-                                    const data = await res.json();
-                                    if (data.success) {
-                                        toast({
-                                            title: "System Seeded",
-                                            description: "200 students and full master data generated successfully.",
-                                            type: "success"
-                                        });
-                                        setTimeout(() => window.location.reload(), 1500);
-                                    } else {
-                                        throw new Error(data.error || "Failed to seed data");
-                                    }
-                                } catch (e: any) {
-                                    toast({ title: "Seeding Failed", description: e.message, type: "error" });
-                                } finally {
-                                    setUpdating(false);
-                                }
-                            }}
-                            disabled={updating}
-                        >
-                            {updating ? <Loader2 className="w-4 h-4 animate-spin" /> : "GENERATE DATA"}
-                        </Button>
-                    </div>
-
                     <div className="flex items-center justify-between gap-4 p-4 rounded-xl bg-red-500/5 border border-red-500/20 transition-all hover:bg-red-500/10">
                         <div className="space-y-1">
                             <div className="flex items-center gap-2">
@@ -128,7 +87,7 @@ export function SystemToggles() {
                                 <Label className="text-sm font-bold text-red-500 uppercase tracking-wider">Factory Reset</Label>
                             </div>
                             <p className="text-[10px] text-red-400/80 leading-relaxed max-w-[280px]">
-                                Completely wipes all operational and transactional data. Cannot be undone. Super Admin only.
+                                Completely wipes all operational and transactional data for this campus. Cannot be undone. School Admin only.
                             </p>
                         </div>
                         <Button
@@ -136,7 +95,7 @@ export function SystemToggles() {
                             size="sm"
                             className="bg-red-500/20 text-red-500 hover:bg-red-500 hover:text-white border border-red-500/30"
                             onClick={async () => {
-                                const confirm1 = window.confirm("CRITICAL WARNING: This will permanently delete ALL operational data in the database. Are you absolutely sure?");
+                                const confirm1 = window.confirm("CRITICAL WARNING: This will permanently delete ALL operational data for this campus. Are you absolutely sure?");
                                 if (!confirm1) return;
 
                                 const confirm2 = window.prompt("To proceed, type exactly: I AM SURE");
@@ -153,13 +112,15 @@ export function SystemToggles() {
                                             "Content-Type": "application/json",
                                             "Authorization": `Bearer ${token}`
                                         },
-                                        body: JSON.stringify({ type: "FULL_SYSTEM" })
+                                        body: JSON.stringify({ type: "FULL_SYSTEM", schoolId: activeBranchId })
                                     });
                                     const data = await res.json();
                                     if (data.success) {
-                                        toast({ title: "System Nuked", description: "All system data has been wiped.", type: "success" });
-                                        localStorage.clear();
-                                        setTimeout(() => window.location.reload(), 2000);
+                                        toast({ title: "Campus Data Nuked", description: "All operational data for this branch has been wiped.", type: "success" });
+                                        import("@/lib/cache-utils").then(({ fullSystemWipe }) => {
+                                            fullSystemWipe();
+                                            setTimeout(() => window.location.reload(), 2000);
+                                        });
                                     } else {
                                         throw new Error(data.error || "Failed to nuke system");
                                     }

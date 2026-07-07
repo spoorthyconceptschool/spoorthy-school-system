@@ -71,7 +71,7 @@ export default function TeacherNotificationsPage() {
             const unsubPersonal = onSnapshot(qPersonal, (snap) => {
                 if (!isMounted) return;
                 updateNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
-            });
+            }, (err) => console.warn("[Teacher Notifications] Personal subscription error:", err.message));
             unsubscribes.push(unsubPersonal);
 
             // 2. School ID Personal and Global Faculty Notifications
@@ -94,7 +94,7 @@ export default function TeacherNotificationsPage() {
                         const unsubAllFaculty = onSnapshot(qAllFaculty, (snap) => {
                             if (!isMounted) return;
                             updateNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
-                        });
+                        }, (err) => console.warn("[Teacher Notifications] Global faculty subscription error:", err.message));
                         unsubscribes.push(unsubAllFaculty);
 
                         // B. School personal notifications
@@ -102,7 +102,7 @@ export default function TeacherNotificationsPage() {
                         const unsubSchool = onSnapshot(qSchool, (snap) => {
                             if (!isMounted) return;
                             updateNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
-                        });
+                        }, (err) => console.warn("[Teacher Notifications] School subscription error:", err.message));
                         unsubscribes.push(unsubSchool);
                     }
                 }

@@ -20,9 +20,9 @@ export default async function LandingPage() {
             <div className="relative z-10">
                 <Facilities content={sectionsContent?.facilities} />
                 <Leadership content={sectionsContent?.leadership} />
-                <WhyUs content={sectionsContent?.whyUs} />
+                <WhyUs />
                 <GalleryPreview content={sectionsContent?.gallery} />
-                <Testimonials content={sectionsContent?.testimonials} />
+                <Testimonials />
                 <ContactBand content={sectionsContent?.contact} />
                 <Footer />
             </div>

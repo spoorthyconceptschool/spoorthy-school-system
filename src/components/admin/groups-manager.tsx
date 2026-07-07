@@ -82,7 +82,7 @@ function SelectionDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="bg-slate-950 border-slate-800 text-white sm:max-w-[400px] flex flex-col max-h-[80vh] p-0 gap-0">
+            <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl border-white/10 border-slate-800 text-white sm:max-w-[400px] flex flex-col max-h-[80vh] p-0 gap-0">
                 <DialogHeader className="p-4 border-b border-slate-800 flex flex-row items-center justify-between">
                     <DialogTitle>{title}</DialogTitle>
                     {multiSelect && (
@@ -647,7 +647,7 @@ export function GroupsManager() {
 
             {/* View Members Modal */}
             <Dialog open={!!viewingGroup} onOpenChange={(open) => !open && setViewingGroup(null)}>
-                <DialogContent className="bg-slate-950 border-slate-800 text-white sm:max-w-2xl max-h-[80vh] flex flex-col">
+                <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl border-white/10 border-slate-800 text-white sm:max-w-2xl max-h-[80vh] flex flex-col">
                     <DialogHeader className="flex flex-row items-center justify-between">
                         <DialogTitle className="flex items-center gap-2">
                             {viewingGroup?.symbolUrl && (
@@ -725,7 +725,7 @@ export function GroupsManager() {
 
             {/* Create Modal */}
             < Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen} >
-                <DialogContent className="bg-slate-950 border-slate-800 text-white">
+                <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl border-white/10 border-slate-800 text-white">
                     <DialogHeader>
                         <DialogTitle>Create New Group</DialogTitle>
                     </DialogHeader>
@@ -819,7 +819,7 @@ export function GroupsManager() {
 
             {/* Edit Modal */}
             <Dialog open={isEditOpen} onOpenChange={setIsEditOpen}>
-                <DialogContent className="bg-slate-950 border-slate-800 text-white sm:max-w-lg">
+                <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl border-white/10 border-slate-800 text-white sm:max-w-lg">
                     <DialogHeader>
                         <DialogTitle>Management: {editingGroup?.name}</DialogTitle>
                     </DialogHeader>

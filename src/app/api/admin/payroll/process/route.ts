@@ -8,6 +8,7 @@ export async function POST(req: NextRequest) {
         let actorRole = "ADMIN";
         let actorName = "Admin";
         let actorUid = "";
+        let tenantBranchId = "global";
 
         if (authHeader?.startsWith("Bearer ")) {
             const token = authHeader.split("Bearer ")[1];
@@ -16,8 +17,10 @@ export async function POST(req: NextRequest) {
                 actorUid = decoded.uid;
                 const userDoc = await adminDb.collection("users").doc(decoded.uid).get();
                 if (userDoc.exists) {
-                    actorRole = userDoc.data()?.role || "ADMIN";
-                    actorName = userDoc.data()?.name || decoded.name || "Manager";
+                    const uData = userDoc.data();
+                    actorRole = uData?.role || "ADMIN";
+                    actorName = uData?.name || decoded.name || "Manager";
+                    tenantBranchId = uData?.branchId || uData?.schoolId || "global";
                 }
             } catch (e) {
                 console.error("Token verification failed in payroll:", e);
@@ -54,6 +57,8 @@ export async function POST(req: NextRequest) {
             method,
             notes: notes || "",
             type, // Added type: SALARY, BONUS, ADVANCE, ADJUSTMENT
+            schoolId: tenantBranchId,
+            branchId: tenantBranchId,
             createdAt: paymentId ? undefined : Timestamp.now(), // Don't overwrite createdAt on edit
             updatedAt: Timestamp.now(),
             createdBy: "ADMIN"
@@ -85,7 +90,9 @@ export async function POST(req: NextRequest) {
                 message: `Salary of ₹${netAmount.toLocaleString()} for ${month} ${year} has been ${paymentId ? 'updated' : 'processed'} by Manager ${actorName}.`,
                 type: "FEE",
                 actionBy: actorUid,
-                actionByName: actorName
+                actionByName: actorName,
+                schoolId: tenantBranchId,
+                branchId: tenantBranchId
             });
         }
 

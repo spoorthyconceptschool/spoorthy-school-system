@@ -13,7 +13,7 @@ async function checkSpecific() {
         ledgerId,
         exists: ledger.exists,
         data: ledger.data(),
-        payments: payments.docs.map(d => ({ id: d.id, ...d.data() }))
+        payments: payments.docs.map((d: any) => ({ id: d.id, ...d.data() }))
     };
 
     fs.writeFileSync('./specific_debug.json', JSON.stringify(res, null, 2));

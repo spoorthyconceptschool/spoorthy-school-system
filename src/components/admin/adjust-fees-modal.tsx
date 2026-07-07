@@ -86,7 +86,7 @@ export function AdjustFeesModal({ isOpen, onClose, studentId, academicYearId, le
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="bg-black/95 border-white/10 text-white sm:max-w-[500px]">
+            <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white sm:max-w-[500px] border-white/10">
                 <DialogHeader>
                     <DialogTitle>Adjust Student Fees</DialogTitle>
                 </DialogHeader>

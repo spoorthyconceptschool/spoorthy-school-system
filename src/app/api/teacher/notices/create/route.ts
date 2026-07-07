@@ -41,7 +41,7 @@ export async function POST(req: NextRequest) {
             schoolId = "global";
         } else {
             teacherData = teacherDoc.docs[0].data();
-            schoolId = teacherData.schoolId || "global";
+            schoolId = teacherData.branchId || teacherData.schoolId || "global";
         }
 
         const expiryDate = new Date();
@@ -57,6 +57,7 @@ export async function POST(req: NextRequest) {
             senderRole: "TEACHER",
             target: targetClassId,
             schoolId,
+            branchId: schoolId,
             expiresAt: expiryDate,
             createdAt: FieldValue.serverTimestamp()
         });
@@ -68,6 +69,7 @@ export async function POST(req: NextRequest) {
             type: "NOTICE",
             target: `class_${targetClassId}`,
             schoolId,
+            branchId: schoolId,
             status: "UNREAD",
             createdAt: FieldValue.serverTimestamp()
         });

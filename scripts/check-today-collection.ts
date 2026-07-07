@@ -16,7 +16,7 @@ async function checkCollection() {
 
     console.log(`Payments found starting from ${startOfDay.toISOString()}: ${snap.size}`);
     let total = 0;
-    snap.docs.forEach(d => {
+    snap.docs.forEach((d: any) => {
         const data = d.data();
         total += data.amount || 0;
         console.log(`- ${data.studentName}: ₹${data.amount} (Method: ${data.method}) createdAt: ${data.createdAt?.toDate().toISOString()}`);
@@ -30,7 +30,7 @@ async function checkCollection() {
         .get();
     console.log(`\nPayments in last 24 hours: ${snap2.size}`);
     let total24 = 0;
-    snap2.docs.forEach(d => {
+    snap2.docs.forEach((d: any) => {
         total24 += d.data().amount || 0;
     });
     console.log('Total (Last 24h):', total24);

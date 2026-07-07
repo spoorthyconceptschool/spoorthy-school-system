@@ -15,6 +15,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, ShieldCheck } from "lucide-react";
 import { toast } from "@/lib/toast-store";
 
+import { auth } from "@/lib/firebase";
+
 interface AddSystemUserModalProps {
     isOpen: boolean;
     onClose: () => void;
@@ -35,9 +37,13 @@ export function AddSystemUserModal({ isOpen, onClose, onSuccess }: AddSystemUser
         setSubmitting(true);
 
         try {
+            const token = await auth.currentUser?.getIdToken();
             const res = await fetch("/api/admin/users/create", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
                 body: JSON.stringify(form)
             });
 
@@ -66,7 +72,7 @@ export function AddSystemUserModal({ isOpen, onClose, onSuccess }: AddSystemUser
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="bg-black/95 border-white/10 text-white sm:max-w-[425px]">
+            <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white sm:max-w-[425px] border-white/10">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <ShieldCheck className="text-accent" size={20} />
@@ -119,7 +125,7 @@ export function AddSystemUserModal({ isOpen, onClose, onSuccess }: AddSystemUser
                             <SelectTrigger className="bg-white/5 border-white/10">
                                 <SelectValue placeholder="Select Role" />
                             </SelectTrigger>
-                            <SelectContent className="bg-black border-white/10 text-white">
+                            <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                                 <SelectItem value="MANAGER">Manager</SelectItem>
                                 <SelectItem value="ADMIN">Administrator</SelectItem>
                                 <SelectItem value="TIMETABLE_EDITOR">Timetable Editor</SelectItem>

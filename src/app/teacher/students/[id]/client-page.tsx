@@ -148,7 +148,7 @@ export default function TeacherStudentClientPage({ id }: { id: string }) {
                             <div className="divide-y divide-white/5">
                                 <InfoRow label="Class" value={classes[student.classId]?.name || student.className || 'N/A'} />
                                 <InfoRow label="Section" value={sections[student.sectionId]?.name || student.sectionName || 'N/A'} />
-                                <InfoRow label="Admission No." value={student.admissionNumber || 'N/A'} />
+                                <InfoRow label="School ID" value={student.schoolId || 'N/A'} />
                                 <InfoRow label="Roll Number" value={student.rollNumber?.toString() || 'N/A'} />
                                 <InfoRow label="Status" value={
                                     <span className={student.status === 'ACTIVE' ? "text-emerald-400 font-bold" : "text-red-400 font-bold"}>

@@ -11,9 +11,9 @@ async function audit() {
 
     let totalToday = 0;
     let counts = { numerics: 0, strings: 0 };
-    let hugeDocs = [];
+    let hugeDocs: any[] = [];
 
-    paymentsSnap.forEach(d => {
+    paymentsSnap.forEach((d: any) => {
         const data = d.data();
         let amt = data.amount;
         if (typeof amt === 'number') {
@@ -39,7 +39,7 @@ async function audit() {
     let totalPaidAcrossAll = 0;
     let zeroFeeLedgers = 0;
 
-    ledgersSnap.forEach(d => {
+    ledgersSnap.forEach((d: any) => {
         const data = d.data();
         totalFeeAcrossAll += (data.totalFee || 0);
         totalPaidAcrossAll += (data.totalPaid || 0);

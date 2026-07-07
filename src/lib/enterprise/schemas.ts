@@ -15,7 +15,7 @@ export const CreateStudentSchema = z.object({
     studentName: z.string().min(2).max(100),
     firstName: z.string().min(1, "First name must be at least 1 character").max(50),
     lastName: z.string().max(50).optional(),
-    admissionNumber: z.string().min(4).max(20).describe("Primary Key equivalent"),
+    schoolId: z.string().optional(),
     classId: z.string().min(1, "Class ID is required"),
     className: z.string().optional(),
     sectionId: z.string().min(1),

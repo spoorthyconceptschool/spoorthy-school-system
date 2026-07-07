@@ -43,7 +43,7 @@ export async function POST(req: NextRequest) {
             teacherId = "TCH-2026-042";
         } else {
             teacherData = teacherQuery.docs[0].data();
-            schoolId = teacherData.schoolId || "global";
+            schoolId = teacherData.branchId || teacherData.schoolId || "global";
             teacherId = teacherData.schoolId || teacherQuery.docs[0].id;
         }
 
@@ -52,6 +52,7 @@ export async function POST(req: NextRequest) {
         await adminDb.collection("homework").doc(hwId).set({
             id: hwId,
             schoolId,
+            branchId: schoolId,
             yearId,
             classId,
             sectionId, // Targeted Section
@@ -73,6 +74,7 @@ export async function POST(req: NextRequest) {
             message: `${teacherData.name} assigned new homework for ${subjectId}: ${title}`,
             type: "HOMEWORK",
             schoolId,
+            branchId: schoolId,
             status: "UNREAD",
             createdAt: FieldValue.serverTimestamp()
         });

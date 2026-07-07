@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { 
     doc, getDoc, setDoc, query, collection, where, getDocs, orderBy, 
     onSnapshot, addDoc, serverTimestamp, deleteDoc 
 } from "firebase/firestore";
-import { db } from "@/lib/firebase";
+import { db, auth } from "@/lib/firebase";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -20,6 +20,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Checkbox } from "@/components/ui/checkbox";
 import { Badge } from "@/components/ui/badge";
 import { useAuth } from "@/context/AuthContext";
+import Link from "next/link";
 
 // --- Types ---
 interface FeeTerm {
@@ -141,9 +142,37 @@ function StandardFeesTab() {
         }
         return DEFAULT_TRANSPORT_FEES;
     });
+    const [selfPaymentEnabled, setSelfPaymentEnabled] = useState<boolean>(() => {
+        if (typeof window !== 'undefined') {
+            const cached = localStorage.getItem(FEES_CACHE_KEY);
+            if (cached) {
+                try {
+                    const parsed = JSON.parse(cached);
+                    if (parsed.selfPaymentEnabled !== undefined) return parsed.selfPaymentEnabled;
+                } catch(e) {}
+            }
+        }
+        return true;
+    });
+    const { user } = useAuth();
     const [loading, setLoading] = useState(false);
     const [saving, setSaving] = useState(false);
     const [syncing, setSyncing] = useState(false);
+
+    const triggerServerSync = async (year: string) => {
+        const token = await user?.getIdToken();
+        const res = await fetch("/api/admin/fees/sync", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ academicYearId: year })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || "Failed server-side ledger sync");
+        return data.count;
+    };
 
     const classes = Object.values(classesData || {}).map((c: any) => ({ 
         id: c.id, 
@@ -160,6 +189,7 @@ function StandardFeesTab() {
                     const data = snapshot.data();
                     if (data.terms) setTerms(data.terms);
                     if (data.transportFees) setTransportFees(data.transportFees);
+                    if (data.selfPaymentEnabled !== undefined) setSelfPaymentEnabled(data.selfPaymentEnabled);
                     if (typeof window !== 'undefined') {
                         localStorage.setItem(FEES_CACHE_KEY, JSON.stringify(data));
                     }
@@ -177,10 +207,18 @@ function StandardFeesTab() {
         setSaving(true);
         try {
             const docRef = doc(db, "config", "fees");
-            await setDoc(docRef, { terms, transportFees }, { merge: true });
-            const { syncAllStudentLedgers } = await import("@/lib/services/fee-service");
-            const updatedCount = await syncAllStudentLedgers(db, selectedYear);
-            toast({ title: "Configuration Saved", description: `Student fee settings updated for ${updatedCount} students.`, type: "success" });
+            try {
+                await setDoc(docRef, { terms, transportFees, selfPaymentEnabled }, { merge: true });
+            } catch (e: any) {
+                throw new Error("Failed at setDoc config/fees: " + e.message);
+            }
+            
+            try {
+                const updatedCount = await triggerServerSync(selectedYear);
+                toast({ title: "Configuration Saved", description: `Student fee settings updated for ${updatedCount} students.`, type: "success" });
+            } catch (e: any) {
+                throw new Error("Failed at syncAllStudentLedgers: " + e.message);
+            }
         } catch (error: any) {
             console.error("Error saving fees:", error);
             toast({ title: "Save Failed", description: error.message, type: "error" });
@@ -193,8 +231,7 @@ function StandardFeesTab() {
         if (!confirm("This will synchronize fee structures for ALL students. Continue?")) return;
         setSyncing(true);
         try {
-            const { syncAllStudentLedgers } = await import("@/lib/services/fee-service");
-            const updatedCount = await syncAllStudentLedgers(db, selectedYear);
+            const updatedCount = await triggerServerSync(selectedYear);
             alert(`Synced successfully for ${updatedCount} students.`);
         } catch (error: any) {
             console.error("Sync failed:", error);
@@ -218,6 +255,29 @@ function StandardFeesTab() {
 
     return (
         <div className="space-y-6">
+            <Card className="border border-white/5 bg-black/20 overflow-hidden shadow-2xl backdrop-blur-xl">
+                <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center p-6 gap-4 border-b border-white/[0.04]">
+                    <div>
+                        <h3 className="text-lg font-bold text-white flex items-center gap-2">
+                            <Settings2 className="w-5 h-5 text-emerald-400" />
+                            Online Fee Payment Portal
+                        </h3>
+                        <p className="text-sm text-white/50 mt-1">Enable or disable the ability for students to pay their fees online.</p>
+                    </div>
+                    <div className="flex items-center gap-3">
+                        <Label htmlFor="selfPaymentEnabled" className="text-sm font-medium text-white/70">
+                            {selfPaymentEnabled ? "Enabled" : "Disabled"}
+                        </Label>
+                        <Switch 
+                            id="selfPaymentEnabled"
+                            checked={selfPaymentEnabled} 
+                            onCheckedChange={setSelfPaymentEnabled} 
+                            className="data-[state=checked]:bg-emerald-500"
+                        />
+                    </div>
+                </div>
+            </Card>
+
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 bg-white/5 p-4 rounded-2xl border border-white/5">
                 <div>
                     <h2 className="text-xl font-bold">Standard Fee Config</h2>
@@ -327,15 +387,41 @@ const DEFAULT_CUSTOM_FEES = [
 
 // --- Custom Fees Tab ---
 function CustomFeesTab() {
-    const [fees, setFees] = useState<any[]>(() => {
-        if (typeof window !== 'undefined') {
+    const { branchId: userBranchId, userData, role, user } = useAuth();
+    const activeBranchId = userBranchId || userData?.schoolId || (role === "SUPER_ADMIN" ? "global" : null);
+
+    const triggerServerSync = async (year: string) => {
+        const token = await user?.getIdToken();
+        const res = await fetch("/api/admin/fees/sync", {
+            method: "POST",
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${token}`
+            },
+            body: JSON.stringify({ academicYearId: year })
+        });
+        const data = await res.json();
+        if (!res.ok || !data.success) throw new Error(data.error || "Failed server-side ledger sync");
+        return data.count;
+    };
+
+    const CUSTOM_FEES_CACHE_KEY = activeBranchId ? `spoorthy_custom_fees_cache_${activeBranchId}` : null;
+    const [fees, setFees] = useState<any[]>([]);
+    const isComponentMounted = useRef(true);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && CUSTOM_FEES_CACHE_KEY) {
             const cached = localStorage.getItem(CUSTOM_FEES_CACHE_KEY);
             if (cached) {
-                try { return JSON.parse(cached); } catch(e) {}
+                try {
+                    setFees(JSON.parse(cached));
+                    return;
+                } catch(e) {}
             }
         }
-        return DEFAULT_CUSTOM_FEES;
-    });
+        setFees([]);
+    }, [CUSTOM_FEES_CACHE_KEY]);
+
     const [loading, setLoading] = useState(false);
     const [isWizardOpen, setIsWizardOpen] = useState(false);
     const [step, setStep] = useState(1);
@@ -349,24 +435,82 @@ function CustomFeesTab() {
     const [searchQuery, setSearchQuery] = useState("");
 
     useEffect(() => {
-        const q = query(collection(db, "custom_fees"), orderBy("createdAt", "desc"));
-        const unsubscribe = onSnapshot(q, (snap) => {
-            const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            setFees(list);
-            if (typeof window !== 'undefined') {
-                localStorage.setItem(CUSTOM_FEES_CACHE_KEY, JSON.stringify(list));
-            }
+        isComponentMounted.current = true;
+
+        const currentSchoolId = activeBranchId;
+        const authUser = { token: { schoolId: userData?.schoolId || userData?.branchId } };
+        if (!currentSchoolId || !auth.currentUser) return;
+
+        let baseConstraints: any[] = [];
+        if (currentSchoolId && currentSchoolId !== "global") {
+            baseConstraints.push(where("schoolId", "==", authUser.token.schoolId || currentSchoolId));
+        }
+
+        let unsubscribe: (() => void) | null = null;
+        const q = query(collection(db, "custom_fees"), ...baseConstraints);
+        
+        try {
+            unsubscribe = onSnapshot(q, (snap) => {
+                if (!isComponentMounted.current) return;
+                
+                const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                // Sort in memory by createdAt descending
+                list.sort((a: any, b: any) => {
+                    const timeA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+                    const timeB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+                    return timeB - timeA;
+                });
+                setFees(list);
+                if (typeof window !== 'undefined' && CUSTOM_FEES_CACHE_KEY) {
+                    localStorage.setItem(CUSTOM_FEES_CACHE_KEY, JSON.stringify(list));
+                }
+                setLoading(false);
+            }, (err) => {
+                console.warn("[CustomFeesTab] Sync Warning:", err.message);
+                isComponentMounted.current = false;
+                if (err.code === "permission-denied" || err.message?.includes("permission")) {
+                    if (unsubscribe) {
+                        try { unsubscribe(); } catch (ue) {}
+                    } else {
+                        setTimeout(() => {
+                            if (unsubscribe) {
+                                try { unsubscribe(); } catch (ue) {}
+                            }
+                        }, 0);
+                    }
+                }
+                setLoading(false);
+            });
+        } catch (e: any) {
+            console.error("[CustomFeesTab] setup error:", e.message);
             setLoading(false);
-        });
+        }
 
         const fetchStudents = async () => {
-            const snap = await getDocs(query(collection(db, "students"), where("status", "==", "ACTIVE")));
-            setAllStudents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            let studentConstraints: any[] = [
+                where("status", "==", "ACTIVE"),
+                where("schoolId", "==", authUser.token.schoolId || currentSchoolId)
+            ];
+            try {
+                const snap = await getDocs(query(collection(db, "students"), ...studentConstraints));
+                setAllStudents(snap.docs.map(d => ({ id: d.id, ...d.data() })));
+            } catch (e) {
+                console.error("Error fetching active students:", e);
+            }
         };
         fetchStudents();
 
-        return () => unsubscribe();
-    }, []);
+        return () => {
+            isComponentMounted.current = false;
+            if (typeof unsubscribe === 'function') {
+                try {
+                    unsubscribe();
+                } catch(e) {
+                    console.debug("Silent unsubscribe catch", e);
+                }
+            }
+        };
+    }, [activeBranchId, CUSTOM_FEES_CACHE_KEY, userData]);
 
     const classes = Object.entries(masterClasses || {}).map(([id, data]: any) => ({ id, ...data })).filter((c: any) => c.isActive !== false).sort((a: any, b: any) => (a.order || 99) - (b.order || 99));
     const villages = Object.entries(masterVillages || {}).map(([id, data]: any) => ({ id, ...data })).filter((v: any) => v.isActive !== false).sort((a: any, b: any) => String(a.name || "").localeCompare(String(b.name || "")));
@@ -375,15 +519,28 @@ function CustomFeesTab() {
         if (!formData.name || !formData.amount || !formData.dueDate || formData.targetIds.length === 0) return;
         setSubmitting(true);
         try {
-            if (editingFeeId) {
-                await setDoc(doc(db, "custom_fees", editingFeeId), { ...formData, updatedAt: serverTimestamp() }, { merge: true });
-            } else {
-                await addDoc(collection(db, "custom_fees"), { ...formData, academicYearId: selectedYear, createdAt: serverTimestamp(), status: "ACTIVE" });
-            }
-            const { syncAllStudentLedgers } = await import("@/lib/services/fee-service");
-            await syncAllStudentLedgers(db, selectedYear);
-            toast({ title: editingFeeId ? "Fee Updated" : "Fee Assigned", description: "All student ledgers have been synchronized.", type: "success" });
+            const feeDoc = {
+                ...formData,
+                schoolId: activeBranchId,
+                branchId: activeBranchId
+            };
+            
+            // Optimistically close wizard
             setIsWizardOpen(false);
+            
+            if (editingFeeId) {
+                await setDoc(doc(db, "custom_fees", editingFeeId), { ...feeDoc, updatedAt: serverTimestamp() }, { merge: true });
+            } else {
+                await addDoc(collection(db, "custom_fees"), { ...feeDoc, academicYearId: selectedYear, createdAt: serverTimestamp(), status: "ACTIVE" });
+            }
+            
+            // Run heavy sync in background without awaiting
+            triggerServerSync(selectedYear).then(() => {
+                toast({ title: editingFeeId ? "Fee Updated" : "Fee Assigned", description: "All student ledgers have been synchronized.", type: "success" });
+            }).catch(err => {
+                console.error("Background sync failed:", err);
+            });
+            
         } catch (err: any) {
             console.error(err);
             toast({ title: "Failed", description: err.message, type: "error" });
@@ -396,8 +553,7 @@ function CustomFeesTab() {
         if (!confirm("Are you sure? This will remove the fee from all unpaid student ledgers.")) return;
         try {
             await deleteDoc(doc(db, "custom_fees", id));
-            const { syncAllStudentLedgers } = await import("@/lib/services/fee-service");
-            await syncAllStudentLedgers(db, selectedYear);
+            await triggerServerSync(selectedYear);
             toast({ title: "Deleted", description: "Fee removed and ledgers synced.", type: "success" });
         } catch (e: any) {
             toast({ title: "Failed", description: e.message, type: "error" });
@@ -514,7 +670,7 @@ function WizardDialog({ isOpen, onClose, step, setStep, formData, setFormData, h
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="bg-black/95 border-white/10 text-white sm:max-w-[650px] overflow-hidden">
+            <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white sm:max-w-[650px] overflow-hidden border-white/10">
                 <div className="absolute top-0 left-0 w-full h-[3px] bg-gradient-to-r from-emerald-500/0 via-emerald-500 to-emerald-500/0 opacity-50" />
                 <DialogHeader className="pt-2">
                     <div className="flex items-center gap-4 mb-2">
@@ -566,7 +722,7 @@ function WizardDialog({ isOpen, onClose, step, setStep, formData, setFormData, h
                                 <SelectTrigger className="bg-white/5 border-white/10 h-11 rounded-xl focus:border-emerald-500/50">
                                     <SelectValue />
                                 </SelectTrigger>
-                                <SelectContent className="bg-black border-white/10 rounded-xl">
+                                <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl rounded-xl border-white/10">
                                     <SelectItem value="CLASS" className="focus:bg-emerald-500/10 focus:text-emerald-400">Specific Classes</SelectItem>
                                     <SelectItem value="VILLAGE" className="focus:bg-emerald-500/10 focus:text-emerald-400">Specific Villages</SelectItem>
                                     <SelectItem value="STUDENT" className="focus:bg-emerald-500/10 focus:text-emerald-400">Specific Students</SelectItem>

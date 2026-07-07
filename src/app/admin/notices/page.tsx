@@ -47,19 +47,28 @@ const formatTimestamp = (ts: any) => {
 
 export default function AdminNoticesPage() {
     const { user, userData, role } = useAuth();
-    const [notices, setNotices] = useState<any[]>(() => {
-        if (typeof window !== 'undefined') {
+    const activeBranchId = userData?.schoolId || userData?.branchId || (role === "SUPER_ADMIN" ? "global" : null);
+
+    const NOTICES_CACHE_KEY = activeBranchId ? `spoorthy_notices_cache_${activeBranchId}` : null;
+    const [notices, setNotices] = useState<any[]>(DEFAULT_NOTICES);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && NOTICES_CACHE_KEY) {
             const cached = localStorage.getItem(NOTICES_CACHE_KEY);
             if (cached) {
-                try { return JSON.parse(cached); } catch(e) {}
+                try {
+                    setNotices(JSON.parse(cached));
+                    return;
+                } catch(e) {}
             }
         }
-        return DEFAULT_NOTICES;
-    });
+        setNotices([]); // Reset if not cached or activeBranchId changes
+    }, [NOTICES_CACHE_KEY]);
+
     const [loading, setLoading] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [useFallback, setUseFallback] = useState(false);
-
+ 
     // Form
     const [title, setTitle] = useState("");
     const [content, setContent] = useState("");
@@ -67,26 +76,32 @@ export default function AdminNoticesPage() {
     const [target, setTarget] = useState("ALL"); // ALL | TEACHERS | STUDENTS
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
-
+ 
     useEffect(() => {
         if (role === "MANAGER") {
             setTarget("STUDENTS");
         }
     }, [role]);
-
+ 
     useEffect(() => {
+        if (!activeBranchId) {
+            console.log("[NoticesPage] activeBranchId is not yet resolved, skipping subscription.");
+            return;
+        }
         let isMounted = true;
+
+        const schoolIdFilter = activeBranchId === "global" ? "global" : activeBranchId;
         const q = useFallback
             ? query(
                 collection(db, "notices"),
-                where("schoolId", "==", userData?.schoolId || "global")
+                where("schoolId", "==", schoolIdFilter)
             )
             : query(
                 collection(db, "notices"), 
-                where("schoolId", "==", userData?.schoolId || "global"),
+                where("schoolId", "==", schoolIdFilter),
                 orderBy("createdAt", "desc")
             );
-
+ 
         const unsubscribe = onSnapshot(q, (snap) => {
             if (!isMounted) return;
             let list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -94,7 +109,7 @@ export default function AdminNoticesPage() {
                 list = [...list].sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
             }
             setNotices(list);
-            if (typeof window !== 'undefined') {
+            if (typeof window !== 'undefined' && NOTICES_CACHE_KEY) {
                 localStorage.setItem(NOTICES_CACHE_KEY, JSON.stringify(list));
             }
             setLoading(false);
@@ -108,12 +123,12 @@ export default function AdminNoticesPage() {
                 setLoading(false);
             }
         });
-
+ 
         return () => {
             isMounted = false;
             unsubscribe();
         };
-    }, [useFallback]);
+    }, [useFallback, activeBranchId, NOTICES_CACHE_KEY]);
 
     const handleSend = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -187,7 +202,7 @@ export default function AdminNoticesPage() {
                                 <label className="text-[10px] md:text-xs font-black uppercase tracking-tighter text-muted-foreground">Notice Type</label>
                                 <Select onValueChange={setType} value={type}>
                                     <SelectTrigger className="bg-white/5 border-white/10 h-8 md:h-10 text-xs md:text-sm"><SelectValue /></SelectTrigger>
-                                    <SelectContent className="bg-[#0A192F] border-white/10">
+                                    <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl border-white/10">
                                         <SelectItem value="REGULAR">Regular Notice</SelectItem>
                                         <SelectItem value="HOLIDAY">Holiday Notice</SelectItem>
                                     </SelectContent>
@@ -211,7 +226,7 @@ export default function AdminNoticesPage() {
                                 <label className="text-[10px] md:text-xs font-black uppercase tracking-tighter text-muted-foreground">Target Audience</label>
                                 <Select onValueChange={setTarget} value={target} disabled={role === "MANAGER"}>
                                     <SelectTrigger className="bg-white/5 border-white/10 h-8 md:h-10 text-xs md:text-sm"><SelectValue /></SelectTrigger>
-                                    <SelectContent className="bg-[#0A192F] border-white/10">
+                                    <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl border-white/10">
                                         <SelectItem value="ALL">Everyone</SelectItem>
                                         <SelectItem value="TEACHERS">Teachers Only</SelectItem>
                                         <SelectItem value="STUDENTS">Students Only</SelectItem>

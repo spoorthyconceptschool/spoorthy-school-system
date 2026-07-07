@@ -11,7 +11,7 @@ async function testPayment() {
     console.log('Before TotalPaid:', before.data()?.totalPaid || 0);
 
     const amount = 500;
-    await adminDb.runTransaction(async (transaction) => {
+    await adminDb.runTransaction(async (transaction: any) => {
         const snap = await transaction.get(ledgerRef);
         const currentPaid = snap.exists ? (snap.data()?.totalPaid || 0) : 0;
         transaction.set(ledgerRef, {

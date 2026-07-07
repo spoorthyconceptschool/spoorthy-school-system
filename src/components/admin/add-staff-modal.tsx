@@ -17,6 +17,7 @@ import { collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "@/lib/toast-store";
 import { useAuth } from "@/context/AuthContext";
+import { useBranch } from "@/context/BranchContext";
 import { onSnapshot, doc } from "firebase/firestore";
 
 interface AddStaffModalProps {
@@ -28,6 +29,7 @@ interface AddStaffModalProps {
 
 export function AddStaffModal({ isOpen, onClose, onSuccess, onOptimisticUpdate }: AddStaffModalProps) {
     const { user } = useAuth();
+    const { selectedBranchId } = useBranch();
     const [roles, setRoles] = useState<any[]>([]);
     const [loadingRoles, setLoadingRoles] = useState(false);
     const [role, setRole] = useState<string>("");
@@ -36,7 +38,7 @@ export function AddStaffModal({ isOpen, onClose, onSuccess, onOptimisticUpdate }
         if (!user) return;
         const unsub = onSnapshot(doc(db, "users", user.uid), (d) => {
             if (d.exists()) setRole(d.data().role);
-        });
+        }, (err) => console.warn("[AddStaffModal] User session sync warning:", err.message));
         return () => unsub();
     }, [user]);
 
@@ -125,7 +127,8 @@ export function AddStaffModal({ isOpen, onClose, onSuccess, onOptimisticUpdate }
                     baseSalary: Number(form.baseSalary) || selectedRole.basicSalary || 0,
                     name: form.name,
                     mobile: form.mobile,
-                    address: form.address
+                    address: form.address,
+                    branchId: selectedBranchId || "global"
                 })
             });
 
@@ -155,7 +158,7 @@ export function AddStaffModal({ isOpen, onClose, onSuccess, onOptimisticUpdate }
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="bg-black/95 border-white/10 text-white sm:max-w-[425px]">
+            <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white sm:max-w-[425px] border-white/10">
                 <DialogHeader>
                     <DialogTitle>Add Non-Teaching Staff</DialogTitle>
                 </DialogHeader>
@@ -186,7 +189,7 @@ export function AddStaffModal({ isOpen, onClose, onSuccess, onOptimisticUpdate }
                                 <SelectTrigger className="bg-white/5 border-white/10">
                                     <SelectValue placeholder={loadingRoles ? "Loading roles..." : "Select Role"} />
                                 </SelectTrigger>
-                                <SelectContent className="bg-black border-white/10 text-white">
+                                <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                                     {roles.map(role => (
                                         <SelectItem key={role.id} value={role.id}>
                                             {role.name} ({role.code})

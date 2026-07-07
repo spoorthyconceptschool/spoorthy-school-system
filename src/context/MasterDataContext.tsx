@@ -1,6 +1,6 @@
 "use client";
 
-import { createContext, useContext, useEffect, useState, ReactNode, useMemo } from "react";
+import { createContext, useContext, useEffect, useState, ReactNode, useMemo, useRef } from "react";
 import { ref, onValue, off } from "firebase/database";
 import { doc, onSnapshot, collection, query, limit, orderBy, where } from "firebase/firestore";
 import { onAuthStateChanged } from "firebase/auth";
@@ -40,6 +40,7 @@ interface MasterDataState {
         teacherIdPrefix?: string;
         studentIdSuffix?: number;
         teacherIdSuffix?: number;
+        schoolId?: string;
     };
     /** Configured academic cycles and their timeline status. */
     academicYears: Record<string, { id: string, name: string, active: boolean, startDate: string, endDate: string }>;
@@ -130,12 +131,12 @@ const initialState: MasterDataState = {
     homeworkSubjects: {},
     roles: {},
     branding: {
-        schoolName: "Spoorthy High School",
-        address: "Miyapur, Hyderabad",
+        schoolName: "",
+        address: "",
         schoolLogo: "",
         principalSignature: "",
-        studentIdPrefix: "SCS",
-        teacherIdPrefix: "SHST",
+        studentIdPrefix: "",
+        teacherIdPrefix: "",
         studentIdSuffix: 1,
         teacherIdSuffix: 1
     },
@@ -185,7 +186,7 @@ export function useSubjectName(id: string) {
     return subjects[id]?.name || id;
 }
 
-const MASTER_CACHE_KEY = "spoorthy_master_cache";
+const MASTER_CACHE_KEY_PREFIX = "spoorthy_master_cache_";
 
 /**
  * Central data synchronization provider for the entire school application.
@@ -193,24 +194,57 @@ const MASTER_CACHE_KEY = "spoorthy_master_cache";
  * UI components in sync with the school's master configuration.
  */
 export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
-    const [data, setData] = useState<Omit<MasterDataState, 'selectedYear' | 'setSelectedYear'>>(() => {
-        if (typeof window !== 'undefined') {
-            const cachedData = localStorage.getItem(MASTER_CACHE_KEY);
-            if (cachedData) {
-                try {
-                    const parsed = JSON.parse(cachedData);
-                    return {
-                        ...initialState,
-                        ...parsed,
-                        branding: { ...initialState.branding, ...(parsed.branding || {}) },
-                        systemConfig: { ...initialState.systemConfig, ...(parsed.systemConfig || {}) },
-                        loading: false
-                    };
-                } catch (e) {}
-            }
+    const { user, userData, branchId: userBranchId, role } = useAuth();
+    const activeBranchId = userBranchId || userData?.schoolId || (role === "SUPER_ADMIN" ? "global" : null);
+    const MASTER_CACHE_KEY = activeBranchId ? `${MASTER_CACHE_KEY_PREFIX}${activeBranchId}` : null;
+
+    const isDataQuarantined = useRef(false);
+    const getCachedBranding = () => {
+        if (typeof window === "undefined") {
+            return {
+                schoolLogo: "",
+                schoolName: "",
+                address: "",
+                principalSignature: "",
+                studentIdPrefix: "",
+                teacherIdPrefix: "",
+                studentIdSuffix: 1,
+                teacherIdSuffix: 1,
+                schoolId: "",
+                branchDocId: ""
+            };
         }
-        return initialState;
-    });
+        try {
+            const lastBranchId = localStorage.getItem("spoorthy_last_branch_id");
+            if (lastBranchId) {
+                const cached = localStorage.getItem(`spoorthy_cached_branding_${lastBranchId}`);
+                if (cached) {
+                    return JSON.parse(cached);
+                }
+            }
+        } catch (e) {}
+        return {
+            schoolLogo: "",
+            schoolName: "Spoorthy High School",
+            address: "",
+            principalSignature: "",
+            studentIdPrefix: "",
+            teacherIdPrefix: "",
+            studentIdSuffix: 1,
+            teacherIdSuffix: 1,
+            schoolId: "",
+            branchDocId: ""
+        };
+    };
+
+    const [cachedBranding, setCachedBranding] = useState(() => getCachedBranding());
+    const [data, setData] = useState<Omit<MasterDataState, 'selectedYear' | 'setSelectedYear'>>(initialState);
+    
+    // Cache hydration removed to prevent stale data flash. Data will load fresh from Firestore/RTDB.
+    useEffect(() => {
+        // No-op
+    }, [MASTER_CACHE_KEY]);
+
     const [selectedYear, setSelectedYear] = useState(() => {
         if (typeof window !== 'undefined') {
             const cachedYear = localStorage.getItem("spoorthy_academic_year");
@@ -224,12 +258,10 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
         setMounted(true);
     }, []);
 
-    // Helper to persist data
+    // Helper to persist data - Removed to prevent stale flash
     useEffect(() => {
-        if (typeof window !== "undefined" && !data.loading) {
-            localStorage.setItem(MASTER_CACHE_KEY, JSON.stringify(data));
-        }
-    }, [data.classes, data.sections, data.villages, data.subjects, data.branding]);
+        // No-op
+    }, [data.classes, data.sections, data.villages, data.subjects, data.branding, MASTER_CACHE_KEY]);
 
     // 1. RTDB Sync for Master Data & Branding
     useEffect(() => {
@@ -248,7 +280,15 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
                     return { ...prev, branding: nextBranding };
                 });
             }
+        }, (error) => {
+            console.warn("[MasterDataContext] RTDB Permission (branding):", error.message);
         });
+
+        const DEFAULT_SUBJECTS = {
+            "math": { id: "math", name: "Mathematics", isActive: true },
+            "science": { id: "science", name: "Science", isActive: true },
+            "english": { id: "english", name: "English", isActive: true }
+        };
 
         // Protected Master Data Sync (Authenticated only)
         const authUnsub = onAuthStateChanged(auth, (user) => {
@@ -258,32 +298,22 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
                 const dataRef = ref(rtdb, 'master');
                 const onMasterValue = onValue(dataRef, (snapshot) => {
                     const rawData = snapshot.val() || {};
-                    const updates: Partial<MasterDataState> = { loading: false };
-
-                    // 1. Master Data Keys (Villages, Classes, etc.)
-                    const keys: (keyof Omit<MasterDataState, 'loading' | 'selectedYear' | 'setSelectedYear' | 'branding' | 'academicYears' | 'students' | 'teachers' | 'staff'>)[] =
-                        ['villages', 'classes', 'sections', 'subjects', 'classSections', 'classSubjects', 'subjectTeachers', 'homeworkSubjects', 'roles'];
-
-                    keys.forEach(key => {
-                        const val = rawData[key] || {};
-                        const processed = { ...val };
-                        Object.keys(processed).forEach(id => {
-                            if (typeof processed[id] === 'object' && processed[id] !== null) {
-                                processed[id].id = id;
-                            }
-                        });
-                        (updates as any)[key] = processed;
-                    });
-
-                    // 2. Note: Branding fallback removed to prevent split-brain flicker. 
-                    // siteContent/branding is now the absolute source.
-
                     setData(prev => {
-                        return { ...prev, ...updates };
+                        return { 
+                            ...prev, 
+                            subjects: rawData.subjects || prev.subjects || DEFAULT_SUBJECTS,
+                            classSubjects: rawData.classSubjects || prev.classSubjects || {},
+                            subjectTeachers: rawData.subjectTeachers || prev.subjectTeachers || {},
+                            loading: false 
+                        };
                     });
                 }, (error) => {
                     console.warn("RTDB Permission (master):", error.message);
-                    setData(prev => ({ ...prev, loading: false }));
+                    setData(prev => ({ 
+                        ...prev, 
+                        subjects: prev.subjects || DEFAULT_SUBJECTS,
+                        loading: false 
+                    }));
                 });
 
                 masterUnsub = () => off(dataRef, 'value', onMasterValue);
@@ -306,6 +336,7 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
 
     // 2. Firestore Sync for Academic Years
     useEffect(() => {
+        if (isDataQuarantined.current) return;
         const unsub = onSnapshot(doc(db, "config", "academic_years"), (docSnap) => {
             if (docSnap.exists()) {
                 const config = docSnap.data();
@@ -383,6 +414,7 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
 
     // 3. Firestore Sync for System Config (Testing Mode, etc.)
     useEffect(() => {
+        if (isDataQuarantined.current) return;
         const unsub = onSnapshot(doc(db, "config", "system"), (docSnap) => {
             if (docSnap.exists()) {
                 const config = docSnap.data();
@@ -419,89 +451,283 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
     }, [data.branding?.schoolLogo]);
 
     // 4. Authenticated Real-time Sync for Core Directories
-    const { role, user, userData } = useAuth();
+    const [branchBranding, setBranchBranding] = useState<any>(null);
+    const [branchBrandingLoading, setBranchBrandingLoading] = useState(false);
+    const [websiteBranding, setWebsiteBranding] = useState<any>(null);
+
+    // Sync website settings branding
     useEffect(() => {
-        if (!user) return;
-
-        const normalizedRole = String(role || "").toUpperCase();
-        const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'SUPERADMIN', 'OWNER', 'DEVELOPER', 'MANAGER'].includes(normalizedRole);
-        const isTeacher = normalizedRole === 'TEACHER';
-
-        if (!isAdmin && !isTeacher) return;
-
-        // Sync Teachers (Active only for speed)
-        let teachersBaseQ = query(collection(db, "teachers"), where("status", "==", "ACTIVE"));
-        if (userData?.schoolId && userData.schoolId !== "global") {
-            teachersBaseQ = query(teachersBaseQ, where("schoolId", "==", userData.schoolId));
-        }
-        const teachersUnsub = onSnapshot(teachersBaseQ, (snap) => {
-            const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setData(prev => ({ ...prev, teachers: list }));
-        }, (err) => console.warn("[MasterData] Teachers Sync Error:", err.message));
-
-        // Sync Staff (Active only)
-        let staffBaseQ = query(collection(db, "staff"), where("status", "==", "ACTIVE"));
-        if (userData?.schoolId && userData.schoolId !== "global") {
-            staffBaseQ = query(staffBaseQ, where("schoolId", "==", userData.schoolId));
-        }
-        const staffUnsub = onSnapshot(staffBaseQ, (snap) => {
-            const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setData(prev => ({ ...prev, staff: list }));
-        }, (err) => console.warn("[MasterData] Staff Sync Error:", err.message));
-
-        // Sync Groups (House system)
-        let groupsBaseQ = collection(db, "groups");
-        if (userData?.schoolId && userData.schoolId !== "global") {
-            groupsBaseQ = query(groupsBaseQ, where("schoolId", "==", userData.schoolId)) as any;
-        }
-        const groupsUnsub = onSnapshot(groupsBaseQ, (snap) => {
-            const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setData(prev => ({ ...prev, groups: list }));
-        }, (err) => console.warn("[MasterData] Groups Sync Error:", err.message));
-
-        // Sync Students (Active only)
-        let studentsBaseQ = query(collection(db, "students"), where("status", "==", "ACTIVE"));
-        if (userData?.schoolId && userData.schoolId !== "global" && normalizedRole !== "TEACHER") {
-            studentsBaseQ = query(studentsBaseQ, where("branchId", "==", userData.schoolId));
-        }
-        const studentsUnsub = onSnapshot(studentsBaseQ, (snap) => {
-            const list = snap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-            setData(prev => ({ ...prev, students: list }));
-        }, (err) => console.warn("[MasterData] Students Sync Error:", err.message));
-
-        return () => {
-            teachersUnsub();
-            staffUnsub();
-            groupsUnsub();
-            studentsUnsub();
-        };
-    }, [user, role]);
-
-    // 5. Fee Configuration & Custom Fees Sync
-    useEffect(() => {
-        if (!user) return;
-        const isAdmin = ['ADMIN', 'SUPER_ADMIN', 'SUPERADMIN', 'OWNER', 'DEVELOPER', 'MANAGER'].includes(String(role || "").toUpperCase());
-        if (!isAdmin) return;
-
-        // Sync Global Fee Terms
-        const feeConfigUnsub = onSnapshot(doc(db, "config", "fees"), (snap) => {
+        if (isDataQuarantined.current) return;
+        const unsub = onSnapshot(doc(db, "website_settings", "main"), (snap) => {
             if (snap.exists()) {
-                setData(prev => ({ ...prev, feeConfig: snap.data() as any }));
+                setWebsiteBranding(snap.data());
             }
-        }, (err) => console.warn("[MasterData] Fee Config Sync Error:", err.message));
+        }, (err) => {
+            console.warn("[MasterData] Website settings sync error:", err.message);
+        });
+        return () => unsub();
+    }, []);
 
-        // Sync Custom Fees
-        const customFeesQ = query(collection(db, "custom_fees"), where("status", "==", "ACTIVE"));
-        const customFeesUnsub = onSnapshot(customFeesQ, (snap) => {
-            const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
-            setData(prev => ({ ...prev, customFees: list }));
-        }, (err) => console.warn("[MasterData] Custom Fees Sync Error:", err.message));
+    // Sync branch-specific branding if not global
+    useEffect(() => {
+        if (!activeBranchId || activeBranchId === "global" || isDataQuarantined.current) {
+            setBranchBranding(null);
+            setBranchBrandingLoading(false);
+            return;
+        }
+
+        setBranchBrandingLoading(true);
+        const unsub = onSnapshot(doc(db, "branches", activeBranchId), (snap) => {
+            if (snap.exists()) {
+                setBranchBranding(snap.data());
+            } else {
+                setBranchBranding(null);
+            }
+            setBranchBrandingLoading(false);
+        }, (err) => {
+            console.warn("[MasterData] Branch sync error:", err.message);
+            setBranchBranding(null);
+            setBranchBrandingLoading(false);
+        });
+
+        return () => unsub();
+    }, [activeBranchId]);
+
+    // Sync branch-specific Master Data (Villages, Classes, Sections, combinations) from Firestore
+    useEffect(() => {
+        if (!activeBranchId || activeBranchId === "global" || isDataQuarantined.current) {
+            return;
+        }
+
+        console.log(`[MasterDataContext] Syncing Firestore master registries for branch: ${activeBranchId}`);
+
+        const currentSchoolId = activeBranchId;
+        const authUser = { token: { schoolId: userData?.schoolId || userData?.branchId } };
+
+        const classesQuery = query(collection(db, "classes"), where("schoolId", "==", authUser.token.schoolId || currentSchoolId));
+        const sectionsQuery = query(collection(db, "sections"), where("schoolId", "==", authUser.token.schoolId || currentSchoolId));
+        const villagesQuery = query(collection(db, "villages"), where("schoolId", "==", authUser.token.schoolId || currentSchoolId));
+        const classSectionsQuery = query(collection(db, "master_class_sections"), where("schoolId", "==", authUser.token.schoolId || currentSchoolId));
+
+        let localClassesMap: Record<string, any> = {};
+        let localSectionsMap: Record<string, any> = {};
+        let localVillagesMap: Record<string, any> = {};
+        let localClassSectionsMap: Record<string, any> = {};
+
+        const updateMasterDataState = () => {
+            const finalClassesMap = { ...localClassesMap };
+            Object.values(localClassSectionsMap).forEach((cs: any) => {
+                const classId = cs.classId;
+                const sectionId = cs.sectionId;
+                if (finalClassesMap[classId]) {
+                    finalClassesMap[classId].sections = finalClassesMap[classId].sections || {};
+                    finalClassesMap[classId].sections[sectionId] = {
+                        id: sectionId,
+                        name: localSectionsMap[sectionId]?.name || sectionId.split('_').pop() || "A"
+                    };
+                }
+            });
+
+            setData(prev => ({
+                ...prev,
+                classes: finalClassesMap,
+                sections: localSectionsMap,
+                villages: localVillagesMap,
+                classSections: localClassSectionsMap
+            }));
+        };
+
+        const unsubClasses = onSnapshot(classesQuery, (snap) => {
+            const classesMap: Record<string, any> = {};
+            snap.docs.forEach(doc => {
+                const d = doc.data();
+                const classId = d.id;
+                classesMap[classId] = {
+                    id: classId,
+                    name: d.name,
+                    isActive: d.isActive || d.active || false,
+                    order: d.order || 99,
+                    sections: {}
+                };
+            });
+            localClassesMap = classesMap;
+            updateMasterDataState();
+        }, (err) => {
+            console.warn("[MasterDataContext] classes listener error:", err.message);
+        });
+
+        const unsubSections = onSnapshot(sectionsQuery, (snap) => {
+            const sectionsMap: Record<string, any> = {};
+            snap.docs.forEach(doc => {
+                const d = doc.data();
+                const sectionId = d.id;
+                sectionsMap[sectionId] = {
+                    id: sectionId,
+                    name: d.name,
+                    isActive: d.isActive || d.active || false
+                };
+            });
+            localSectionsMap = sectionsMap;
+            updateMasterDataState();
+        }, (err) => {
+            console.warn("[MasterDataContext] sections listener error:", err.message);
+        });
+
+        const unsubVillages = onSnapshot(villagesQuery, (snap) => {
+            const villagesMap: Record<string, any> = {};
+            snap.docs.forEach(doc => {
+                const d = doc.data();
+                const villageId = d.id;
+                villagesMap[villageId] = {
+                    id: villageId,
+                    name: d.name,
+                    isActive: d.isActive || d.active || false
+                };
+            });
+            localVillagesMap = villagesMap;
+            updateMasterDataState();
+        }, (err) => {
+            console.warn("[MasterDataContext] villages listener error:", err.message);
+        });
+
+        const unsubClassSections = onSnapshot(classSectionsQuery, (snap) => {
+            const classSectionsMap: Record<string, any> = {};
+            snap.docs.forEach(doc => {
+                const d = doc.data();
+                const id = d.id;
+                const key = id.startsWith(activeBranchId + '_') ? id.substring(activeBranchId.length + 1) : id;
+                classSectionsMap[key] = {
+                    id: key,
+                    classId: d.classId,
+                    sectionId: d.sectionId,
+                    isActive: d.isActive !== false,
+                    displayName: d.displayName || `${d.className} - ${d.sectionName}`
+                };
+            });
+            localClassSectionsMap = classSectionsMap;
+            updateMasterDataState();
+        }, (err) => {
+            console.warn("[MasterDataContext] classSections listener error:", err.message);
+        });
 
         return () => {
-            feeConfigUnsub();
-            customFeesUnsub();
+            unsubClasses();
+            unsubSections();
+            unsubVillages();
+            unsubClassSections();
         };
-    }, [user, role]);
+    }, [activeBranchId, userData]);
+
+    const effectiveBranding = useMemo(() => {
+        const globalBranding = data.branding || initialState.branding;
+        
+        // Merge website settings from Firestore if available
+        const currentWebsiteBranding: MasterDataState['branding'] = websiteBranding ? {
+            schoolLogo: websiteBranding.website_logo || globalBranding.schoolLogo || "",
+            schoolName: websiteBranding.website_school_name || globalBranding.schoolName || "",
+            address: websiteBranding.website_address || globalBranding.address || "",
+            principalSignature: globalBranding.principalSignature || "",
+            studentIdPrefix: globalBranding.studentIdPrefix || "",
+            teacherIdPrefix: globalBranding.teacherIdPrefix || "",
+            studentIdSuffix: globalBranding.studentIdSuffix || 1,
+            teacherIdSuffix: globalBranding.teacherIdSuffix || 1,
+            schoolId: globalBranding.schoolId || ""
+        } : globalBranding;
+
+        let resolved = currentWebsiteBranding;
+
+        if (activeBranchId && activeBranchId !== "global") {
+            if (branchBrandingLoading || !branchBranding) {
+                // If we have a cached branding for this branch, use it immediately to prevent loading states
+                if (cachedBranding && cachedBranding.branchDocId === activeBranchId) {
+                    return cachedBranding;
+                }
+                return {
+                    schoolLogo: "",
+                    schoolName: "",
+                    address: "",
+                    principalSignature: "",
+                    studentIdPrefix: "",
+                    teacherIdPrefix: "",
+                    studentIdSuffix: 1,
+                    teacherIdSuffix: 1,
+                    schoolId: "",
+                    branchDocId: activeBranchId
+                };
+            }
+            resolved = {
+                schoolLogo: branchBranding.logoUrl || branchBranding.logo || currentWebsiteBranding.schoolLogo || "", 
+                schoolName: branchBranding.schoolName || currentWebsiteBranding.schoolName || "",
+                address: branchBranding.address || currentWebsiteBranding.address || "",
+                principalSignature: branchBranding.principalSignature || currentWebsiteBranding.principalSignature || "",
+                studentIdPrefix: branchBranding.studentIdPrefix || currentWebsiteBranding.studentIdPrefix || "",
+                teacherIdPrefix: branchBranding.teacherIdPrefix || currentWebsiteBranding.teacherIdPrefix || "",
+                studentIdSuffix: branchBranding.studentIdSuffix !== undefined ? Number(branchBranding.studentIdSuffix) : (currentWebsiteBranding.studentIdSuffix || 1),
+                teacherIdSuffix: branchBranding.teacherIdSuffix !== undefined ? Number(branchBranding.teacherIdSuffix) : (currentWebsiteBranding.teacherIdSuffix || 1),
+                schoolId: branchBranding.schoolId || branchBranding.branchCode || ""
+            };
+        } else {
+            // If activeBranchId is not set yet, but we have a cached branding, return it as a placeholder to prevent flicker
+            if (!activeBranchId && cachedBranding && cachedBranding.schoolName) {
+                return cachedBranding;
+            }
+        }
+
+        // Cache the resolved branding if it has valid contents
+        if (typeof window !== "undefined" && resolved && resolved.schoolName && resolved.schoolName !== "School ERP") {
+            const cachePayload = { 
+                ...resolved as any, 
+                schoolId: resolved.schoolId || "", 
+                branchDocId: activeBranchId || "" 
+            };
+            if (activeBranchId) {
+                try {
+                    localStorage.setItem("spoorthy_last_branch_id", activeBranchId);
+                    localStorage.setItem(`spoorthy_cached_branding_${activeBranchId}`, JSON.stringify(cachePayload));
+                } catch (e) {}
+            }
+            if (JSON.stringify(cachedBranding) !== JSON.stringify(cachePayload)) {
+                // Set state asynchronously to avoid render loop warning
+                setTimeout(() => setCachedBranding(cachePayload), 0);
+            }
+        }
+
+        return resolved;
+    }, [data.branding, branchBranding, branchBrandingLoading, websiteBranding, activeBranchId, cachedBranding]);
+
+    // --- DECOUPLED HEAVY FETCHES ---
+    // The previous monolithic fetch blocks for 'teachers', 'staff', 'groups', 'students', 'feeConfig', and 'customFees'
+    // have been entirely removed to smash the monolithic global context and prevent permission-denied crashes.
+    // These collections must now be fetched exclusively at the page-level using the `useTenantQuery` architecture.
+
+    // Synchronous Cache Purge Interceptor (ABSOLUTE GLOBAL CACHE DESTRUCTION)
+    // When the tenant (activeBranchId) changes, we IMMEDIATELY wipe any residual data arrays
+    // so old school data does not "fall back" or bleed into the new school's UI portal.
+    useEffect(() => {
+        if (activeBranchId) {
+            setData(prev => ({
+                ...prev,
+                students: [],
+                teachers: [],
+                staff: [],
+                groups: [],
+                customFees: [],
+                feeConfig: { terms: [] },
+                villages: {},
+                classes: {},
+                sections: {},
+                subjects: {},
+                classSections: {},
+                homeworkSubjects: {},
+                roles: {}
+            }));
+            
+            // Absolute cache annihilation using the new global utility
+            import("@/lib/cache-utils").then(({ clearTenantCache }) => {
+                clearTenantCache(activeBranchId);
+            });
+        }
+    }, [activeBranchId]);
 
     const handleSetSelectedYear = (year: string) => {
         setSelectedYear(year);
@@ -510,9 +736,10 @@ export const MasterDataProvider = ({ children }: { children: ReactNode }) => {
 
     const contextValue = useMemo(() => ({
         ...data,
+        branding: effectiveBranding,
         selectedYear,
         setSelectedYear: handleSetSelectedYear
-    }), [data, selectedYear]);
+    }), [data, effectiveBranding, selectedYear]);
 
 
 

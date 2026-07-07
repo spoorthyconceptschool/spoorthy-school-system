@@ -11,11 +11,14 @@ import { Loader2, Lock, School } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
 import { toast } from "@/lib/toast-store";
 
+import { useAuth } from "@/context/AuthContext";
+
 export default function StudentLoginPage() {
     const router = useRouter();
     const [form, setForm] = useState({ schoolId: "", password: "" });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
+    const { signIn } = useAuth();
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -26,35 +29,17 @@ export default function StudentLoginPage() {
             // 1. Construct Email (e.g., SHS00001@school.local)
             const syntheticEmail = `${form.schoolId.toUpperCase()}@school.local`;
 
-            // 2. Auth Sign In
-            const userCredential = await signInWithEmailAndPassword(auth, syntheticEmail, form.password);
-            const user = userCredential.user;
+            // 2. Auth Sign In via centralized useAuth provider
+            const dataToStore = await signIn(syntheticEmail, form.password);
 
-            // 3. Verify Role & Status in Firestore
-            // Note: We use the UID from Auth which should match the Student Doc ID if we set it up correctly,
-            // OR we query by schoolId. 
-            // In our CREATE logic, we created the Auth User. The Auth UID might NOT match the custom "SHS..." ID 
-            // unless we explicitly set it (which admin SDK allows).
-            // Let's assume standard behavior: Auth UID != School ID.
-            // So we need to find the student doc. 
-            // Actually, for students, we stored the `uid` on the student doc OR we can just check the custom claim if set.
-            // Simplified: User logs in. We check if a student doc exists with this `schoolId` (from input).
-
-            const studentDocRef = doc(db, "students", form.schoolId.toUpperCase()); // We used SchoolID as Doc ID!
-            const studentSnap = await getDoc(studentDocRef);
-
-            if (!studentSnap.exists()) {
-                throw new Error("Student record not found.");
-            }
-
-            const studentData = studentSnap.data();
-            if (studentData.status !== "ACTIVE") {
-                throw new Error("Account is inactive. Contact Admin.");
+            // 3. Verify Role (done in auth context, but double check here for student portal restriction)
+            if (dataToStore?.role && String(dataToStore.role).toUpperCase() !== "STUDENT") {
+                throw new Error("This portal is for students only.");
             }
 
             toast({
                 title: "Welcome Back",
-                description: `Logged in as ${studentData.studentName}`,
+                description: `Logged in successfully`,
                 type: "success"
             });
 
@@ -70,11 +55,7 @@ export default function StudentLoginPage() {
                 type: "error"
             });
 
-            if (err.code === "auth/invalid-credential" || err.code === "auth/user-not-found") {
-                setError("Invalid ID or Password");
-            } else {
-                setError(err.message || "Login Failed");
-            }
+            setError(err.message || "Login Failed");
         } finally {
             setLoading(false);
         }

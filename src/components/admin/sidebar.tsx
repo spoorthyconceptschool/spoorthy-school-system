@@ -27,6 +27,7 @@ import {
     ClipboardCheck,
     Trash2,
     CalendarOff,
+    Award,
     X
 } from "lucide-react";
 import Link from "next/link";
@@ -40,9 +41,10 @@ import { useMasterData } from "@/context/MasterDataContext";
 
 // High-Tech Grouping
 const NAV_ITEMS = [
-    { label: "Overview", icon: LayoutDashboard, href: "/admin", exact: true },
+    { label: "Dashboard", icon: LayoutDashboard, href: "/admin", exact: true },
     { type: "separator", label: "Directory" },
     { label: "Students", icon: GraduationCap, href: "/admin/students" },
+    { label: "Alumni", icon: Award, href: "/admin/alumni" },
     { label: "Staff Members", icon: Users, href: "/admin/faculty" },
     { label: "Groups", icon: Users, href: "/admin/groups" },
     { label: "Attendance", icon: UserCheck, href: "/admin/attendance" },
@@ -71,7 +73,7 @@ interface SidebarProps {
 export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
     const pathname = usePathname();
     const collapsed = false;
-    const { user, userData, role, signOut } = useAuth();
+    const { user, userData, role, signOut, branchId } = useAuth();
     const { branding } = useMasterData();
     const [imageError, setImageError] = useState(false);
     const [pendingStaffLeaves, setPendingStaffLeaves] = useState(0);
@@ -91,28 +93,36 @@ export function Sidebar({ mobile = false, onItemClick }: SidebarProps) {
         const staffLeavesQ = query(
             collection(db, "leave_requests"), 
             where("status", "==", "PENDING"),
-            where("schoolId", "==", userData?.schoolId || "global")
+            where("schoolId", "==", branchId || "global")
         );
-        const unsubStaffLeaves = onSnapshot(staffLeavesQ, (snap) => setPendingStaffLeaves(snap.size));
+        const unsubStaffLeaves = onSnapshot(
+            staffLeavesQ, 
+            (snap) => setPendingStaffLeaves(snap.size),
+            (err) => console.warn("[Sidebar] Staff leaves listener:", err?.code)
+        );
 
         // Listen for Pending Leaves (Students)
         const studentLeavesQ = query(
             collection(db, "student_leaves"), 
             where("status", "==", "PENDING"),
-            where("schoolId", "==", userData?.schoolId || "global")
+            where("schoolId", "==", branchId || "global")
         );
-        const unsubStudentLeaves = onSnapshot(studentLeavesQ, (snap) => setPendingStudentLeaves(snap.size));
+        const unsubStudentLeaves = onSnapshot(
+            studentLeavesQ, 
+            (snap) => setPendingStudentLeaves(snap.size),
+            (err) => console.warn("[Sidebar] Student leaves listener:", err?.code)
+        );
 
         return () => {
             unsubStaffLeaves();
             unsubStudentLeaves();
         };
-    }, [user, userData?.schoolId]);
+    }, [user, branchId]);
 
     const filteredNav = useMemo(() => {
         return NAV_ITEMS.filter(item => {
             const allowedPaths = (role === "MANAGER")
-                ? ["/admin", "/admin/students", "/admin/attendance", "/admin/fees", "/admin/exams", "/admin/faculty", "/admin/master-data", "/admin/timetable/manage", "/admin/leaves", "/admin/holidays", "/admin/homework", "/admin/notices"]
+                ? ["/admin", "/admin/students", "/admin/alumni", "/admin/attendance", "/admin/fees", "/admin/exams", "/admin/faculty", "/admin/master-data", "/admin/timetable/manage", "/admin/leaves", "/admin/holidays", "/admin/homework", "/admin/notices"]
                 : (role === "TIMETABLE_EDITOR")
                     ? ["/admin", "/admin/timetable/manage", "/admin/faculty", "/admin/master-data/subjects", "/admin/master-data/classes-sections"]
                     : null;

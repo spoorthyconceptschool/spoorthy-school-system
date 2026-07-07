@@ -29,7 +29,7 @@ interface Slot {
 }
 
 export default function TimetableManagePage() {
-    const { user } = useAuth();
+    const { user, branchId: activeBranchId } = useAuth();
     const { classes: classesData, sections: sectionsData, subjects: masterSubjects, classSubjects, subjectTeachers, branding, selectedYear } = useMasterData();
     const [activeTab, setActiveTab] = useState("settings");
     const [loading, setLoading] = useState(false);
@@ -51,9 +51,25 @@ export default function TimetableManagePage() {
     const [teachers, setTeachers] = useState<any[]>([]);
 
     useEffect(() => {
-        fetchMasterData();
         fetchSettings();
     }, []);
+
+    useEffect(() => {
+        if (!activeBranchId) return;
+        
+        const fetchMasterData = async () => {
+            try {
+                let baseConstraints: any[] = [where("status", "==", "ACTIVE")];
+                if (activeBranchId && activeBranchId !== "global") {
+                    baseConstraints.push(where("branchId", "==", activeBranchId));
+                }
+                const tSnap = await getDocs(query(collection(db, "teachers"), ...baseConstraints));
+                setTeachers(tSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            } catch (e) { console.error(e); }
+        };
+
+        fetchMasterData();
+    }, [activeBranchId]);
 
     const [holidays, setHolidays] = useState<any[]>([]);
 
@@ -77,7 +93,12 @@ export default function TimetableManagePage() {
 
     useEffect(() => {
         const fetchHolidays = async () => {
-            const hQuery = query(collection(db, "notices"), where("type", "==", "HOLIDAY"));
+            if (!activeBranchId) return;
+            const hQuery = query(
+                collection(db, "notices"), 
+                where("type", "==", "HOLIDAY"), 
+                where("schoolId", "==", activeBranchId)
+            );
             const hSnap = await getDocs(hQuery);
             const holidayList = hSnap.docs.map(doc => ({
                 id: doc.id,
@@ -86,7 +107,7 @@ export default function TimetableManagePage() {
             setHolidays(holidayList);
         };
         fetchHolidays();
-    }, []);
+    }, [activeBranchId]);
 
     useEffect(() => {
         if (selectedClassId && selectedSectionId) {
@@ -123,12 +144,7 @@ export default function TimetableManagePage() {
         }
     }, [selectedClassId, selectedSectionId, subjectTeachers, timetable]);
 
-    const fetchMasterData = async () => {
-        try {
-            const tSnap = await getDocs(query(collection(db, "teachers"), where("status", "==", "ACTIVE")));
-            setTeachers(tSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        } catch (e) { console.error(e); }
-    };
+    // fetchMasterData is handled inside useEffect listening to activeBranchId above
 
     const fetchSettings = async () => {
         try {
@@ -400,7 +416,7 @@ export default function TimetableManagePage() {
                                                 <label className="text-[8px] font-black text-muted-foreground uppercase tracking-widest">Type</label>
                                                 <Select value={slot.type} onValueChange={v => updateSlot(idx, 'type', v)}>
                                                     <SelectTrigger className="h-9 md:h-10 bg-black/40 border-white/10 text-xs md:text-sm"><SelectValue /></SelectTrigger>
-                                                    <SelectContent className="bg-[#0A192F] border-white/10">
+                                                    <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl border-white/10">
                                                         <SelectItem value="CLASS">Class</SelectItem>
                                                         <SelectItem value="BREAK">Break</SelectItem>
                                                     </SelectContent>
@@ -457,14 +473,14 @@ export default function TimetableManagePage() {
                                 <label className="text-[8px] font-black text-muted-foreground uppercase tracking-widest ml-1">Class</label>
                                 <Select value={selectedClassId} onValueChange={setSelectedClassId}>
                                     <SelectTrigger className="w-full md:w-[180px] h-10 bg-white/5 border-white/10 rounded-xl text-xs"><SelectValue placeholder="Choose Class" /></SelectTrigger>
-                                    <SelectContent className="bg-[#0A192F] border-white/10">{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
+                                    <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl border-white/10">{classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}</SelectContent>
                                 </Select>
                             </div>
                             <div className="space-y-1">
                                 <label className="text-[8px] font-black text-muted-foreground uppercase tracking-widest ml-1">Section</label>
                                 <Select value={selectedSectionId} onValueChange={setSelectedSectionId}>
                                     <SelectTrigger className="w-full md:w-[150px] h-10 bg-white/5 border-white/10 rounded-xl text-xs"><SelectValue placeholder="Section" /></SelectTrigger>
-                                    <SelectContent className="bg-[#0A192F] border-white/10">{sections.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
+                                    <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl border-white/10">{sections.map(s => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}</SelectContent>
                                 </Select>
                             </div>
                         </div>
@@ -549,7 +565,7 @@ export default function TimetableManagePage() {
                                                                     <div className="space-y-1 md:space-y-2 p-1 md:p-2 bg-white/5 rounded-lg md:rounded-xl border border-white/5 group-hover:bg-white/10 transition-all">
                                                                         <Select value={cell.subjectId} onValueChange={v => updateTimeTable(day, slot.id, "subjectId", v)}>
                                                                             <SelectTrigger className="h-6 md:h-8 text-[8px] md:text-[10px] bg-black/40 border-white/5 rounded-md md:rounded-lg focus:ring-accent/30"><SelectValue placeholder="Sub" /></SelectTrigger>
-                                                                            <SelectContent className="bg-[#0A192F] border-white/10">
+                                                                            <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl border-white/10">
                                                                                 <SelectItem value="leisure" className="text-[9px] md:text-[10px] uppercase font-bold">Leisure</SelectItem>
                                                                                 {subjects.map(s => <SelectItem key={s.id} value={s.id} className="text-[9px] md:text-[10px] font-bold">{s.name}</SelectItem>)}
                                                                             </SelectContent>

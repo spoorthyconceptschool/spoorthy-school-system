@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect, useMemo } from "react";
 import { useStudentData } from "@/context/StudentDataContext";
 import { 
     BookOpen, Bell, Calendar, ChevronRight, AlertTriangle, Megaphone, 
@@ -20,6 +20,27 @@ export default function StudentDashboard() {
 
     // Segment tab control state for mobile and desktop dashboards
     const [activeTab, setActiveTab] = useState<'notices' | 'homework'>('notices');
+
+    const [greeting, setGreeting] = useState<{ text: string; sub: string; icon: string }>({
+        text: "Welcome",
+        sub: "Loading dashboard...",
+        icon: "👋"
+    });
+    const [todayDayName, setTodayDayName] = useState<string>("");
+
+    useEffect(() => {
+        const getGreeting = () => {
+            const hrs = new Date().getHours();
+            if (hrs >= 5 && hrs < 12) return { text: "Good Morning", sub: "Ready for an exciting day of learning and growth?", icon: "🌅" };
+            if (hrs >= 12 && hrs < 17) return { text: "Good Afternoon", sub: "Keep up the excellent momentum and stay inspired!", icon: "☀️" };
+            if (hrs >= 17 && hrs < 22) return { text: "Good Evening", sub: "Review your diary, complete assignments, and relax!", icon: "🌇" };
+            return { text: "Good Night", sub: "Time to rest well and recharge for another bright tomorrow.", icon: "🌙" };
+        };
+        setGreeting(getGreeting());
+
+        const DAYS = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
+        setTodayDayName(DAYS[new Date().getDay()]);
+    }, []);
 
     const formatTimestamp = (timestamp: any) => {
         if (!timestamp) return "";
@@ -88,29 +109,10 @@ export default function StudentDashboard() {
         }
     };
 
-    const getGreeting = () => {
-        const hrs = new Date().getHours();
-        if (hrs >= 5 && hrs < 12) return { text: "Good Morning", sub: "Ready for an exciting day of learning and growth?", icon: "🌅" };
-        if (hrs >= 12 && hrs < 17) return { text: "Good Afternoon", sub: "Keep up the excellent momentum and stay inspired!", icon: "☀️" };
-        if (hrs >= 17 && hrs < 22) return { text: "Good Evening", sub: "Review your diary, complete assignments, and relax!", icon: "🌇" };
-        return { text: "Good Night", sub: "Time to rest well and recharge for another bright tomorrow.", icon: "🌙" };
-    };
-
-    if (loading) {
-        return (
-            <div className="h-[60vh] w-full flex flex-col items-center justify-center gap-4 text-blue-400">
-                <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
-                <p className="text-xs font-black uppercase tracking-widest text-[#8892B0] font-mono animate-pulse">
-                    Warming dashboard cache...
-                </p>
-            </div>
-        );
-    }
 
     const studentName = profile?.studentName || profile?.name || "Student";
     const studentClass = `${profile?.className || "Class 7"} (${profile?.sectionName || "A"})`;
     const studentId = profile?.schoolId || profile?.id || "SHS1400";
-    const greeting = getGreeting();
 
     // Ledger Dues Calculation
     const ledgerItems = ledger?.items || [];
@@ -124,8 +126,7 @@ export default function StudentDashboard() {
     const dashboardHomework = homework.slice(0, 5);
 
     // Today's Timetable slots
-    const DAYS = ["SUNDAY", "MONDAY", "TUESDAY", "WEDNESDAY", "THURSDAY", "FRIDAY", "SATURDAY"];
-    const todayDayName = DAYS[new Date().getDay()];
+
     const PERIOD_TIMINGS: Record<number, string> = {
         1: "08:30 - 09:20",
         2: "09:20 - 10:10",
@@ -137,7 +138,7 @@ export default function StudentDashboard() {
         8: "03:00 - 03:45"
     };
 
-    const todaySlots = (() => {
+    const todaySlots = useMemo(() => {
         if (!schedule || !todayDayName || todayDayName === "SUNDAY") return [];
         const rawDay = schedule[todayDayName] || {};
         const slots = [];
@@ -152,7 +153,18 @@ export default function StudentDashboard() {
             });
         }
         return slots;
-    })();
+    }, [schedule, todayDayName, teacherMap]);
+
+    if (loading) {
+        return (
+            <div className="h-[60vh] w-full flex flex-col items-center justify-center gap-4 text-blue-400">
+                <Loader2 className="w-10 h-10 animate-spin text-blue-500" />
+                <p className="text-xs font-black uppercase tracking-widest text-[#8892B0] font-mono animate-pulse">
+                    Warming dashboard cache...
+                </p>
+            </div>
+        );
+    }
 
     return (
         <div className="w-full max-w-7xl mx-auto px-4 sm:px-6 py-6 md:py-8 space-y-6 md:space-y-8 animate-in fade-in duration-500 relative bg-transparent select-none pb-12">

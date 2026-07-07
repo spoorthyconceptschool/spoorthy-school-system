@@ -12,7 +12,8 @@ import { useMasterData } from "@/context/MasterDataContext";
 import { useAuth } from "@/context/AuthContext";
 
 export default function TeachingAssignmentsPage() {
-    const { user } = useAuth();
+    const { user, branchId: userBranchId, userData, role } = useAuth();
+    const activeBranchId = userBranchId || userData?.schoolId || (role === "SUPER_ADMIN" ? "global" : null);
     const { classes: classesData, subjects: masterSubjects, selectedYear } = useMasterData();
     const [loading, setLoading] = useState(true);
 
@@ -31,8 +32,25 @@ export default function TeachingAssignmentsPage() {
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
+        if (!activeBranchId) return;
+
+        const fetchMasterData = async () => {
+            try {
+                let baseConstraints: any[] = [where("status", "==", "ACTIVE")];
+                if (activeBranchId && activeBranchId !== "global") {
+                    baseConstraints.push(where("branchId", "==", activeBranchId));
+                }
+                const tSnap = await getDocs(query(collection(db, "teachers"), ...baseConstraints));
+                setTeachers(tSnap.docs.map(d => ({ id: d.id, ...d.data() })));
+            } catch (e) {
+                console.error(e);
+            } finally {
+                setLoading(false);
+            }
+        };
+
         fetchMasterData();
-    }, []);
+    }, [activeBranchId]);
 
     useEffect(() => {
         // Keep subjects synced with Master Data RTDB
@@ -50,16 +68,7 @@ export default function TeachingAssignmentsPage() {
         }
     }, [selectedClassId]);
 
-    const fetchMasterData = async () => {
-        try {
-            const tSnap = await getDocs(query(collection(db, "teachers"), where("status", "==", "ACTIVE")));
-            setTeachers(tSnap.docs.map(d => ({ id: d.id, ...d.data() })));
-        } catch (e) {
-            console.error(e);
-        } finally {
-            setLoading(false);
-        }
-    };
+    // fetchMasterData is handled inside useEffect listening to activeBranchId above
 
     const fetchAssignments = async (classId: string) => {
         setLoading(true);

@@ -84,11 +84,8 @@ export function AcademicsTab({
                                         <span className="text-[12px] font-bold text-emerald-400">{result.percentage || 0}%</span>
                                     </div>
                                     <SingleReportCardButton 
-                                        studentId={student.schoolId}
-                                        examId={exam.id}
-                                        classId={student.classId}
-                                        sectionId={student.sectionId}
-                                        studentName={student.studentName}
+                                        student={student}
+                                        exam={exam}
                                     />
                                 </div>
                             ) : (

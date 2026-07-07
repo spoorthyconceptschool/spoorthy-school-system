@@ -80,7 +80,7 @@ export function AdminChangePasswordModal({ isOpen, onClose, user, onSuccess }: A
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="bg-zinc-950 border-white/10 text-white sm:max-w-[425px]">
+            <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white sm:max-w-[425px] border-white/10">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Lock className="w-5 h-5 text-amber-500" />

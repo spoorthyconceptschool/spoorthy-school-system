@@ -48,7 +48,7 @@ const ADMIN_GRID_ITEMS = [
     { label: "Academics", icon: BookOpen, href: "/admin/homework" },
     { label: "Exams", icon: ClipboardCheck, href: "/admin/exams" },
     { label: "Master Data", icon: Database, href: "/admin/master-data" },
-    { label: "Settings", icon: Settings, href: "/admin/settings" },
+    { label: "System Settings", icon: Settings, href: "/admin/settings" },
     { label: "Notices", icon: Bell, href: "/admin/notices" },
     { label: "Holidays", icon: CalendarOff, href: "/admin/holidays" },
     { label: "Purge Data", icon: Trash2, href: "/admin/purge-data" },
@@ -67,7 +67,7 @@ export function BottomNav() {
     const filteredGridItems = React.useMemo(() => {
         return ADMIN_GRID_ITEMS.filter(item => {
             const allowedPaths = (role === "MANAGER")
-                ? ["/admin/students", "/admin/attendance", "/admin/fees", "/admin/exams", "/admin/faculty", "/admin/master-data", "/admin/timetable/manage", "/admin/leaves", "/admin/holidays"]
+                ? ["/admin/students", "/admin/attendance", "/admin/fees", "/admin/exams", "/admin/faculty", "/admin/master-data", "/admin/timetable/manage", "/admin/leaves", "/admin/holidays", "/admin/settings", "/admin/notices"]
                 : (role === "TIMETABLE_EDITOR")
                     ? ["/admin/timetable/manage", "/admin/faculty", "/admin/master-data/subjects", "/admin/master-data/classes-sections"]
                     : null;

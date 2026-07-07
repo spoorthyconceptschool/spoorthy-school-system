@@ -61,7 +61,6 @@ export async function POST(req: NextRequest) {
                 const updatedData = {
                     ...data,
                     schoolId: newId,
-                    admissionNumber: data.admissionNumber === oldId ? newId : data.admissionNumber,
                     keywords: (data.keywords || []).map((k: string) => k.replace(new RegExp(oldId.toLowerCase(), 'g'), newId.toLowerCase()))
                 };
                 batch.set(newStudentRef, updatedData);

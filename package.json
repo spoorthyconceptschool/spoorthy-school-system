@@ -10,7 +10,15 @@
     "build": "next build",
     "start": "next start",
     "lint": "eslint",
-    "bump": "ts-node --compiler-options \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/bump-version.ts"
+    "bump": "ts-node --compiler-options \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/bump-version.ts",
+    "check-users": "ts-node -r tsconfig-paths/register --compiler-options \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/check-users.ts",
+    "check-students": "ts-node -r tsconfig-paths/register --compiler-options \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/check-students.ts",
+    "check-branches": "ts-node -r tsconfig-paths/register --compiler-options \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/check-branches.ts",
+    "check-tenant-data": "ts-node -r tsconfig-paths/register --compiler-options \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/check-tenant-data.ts",
+    "check-academic-years": "ts-node -r tsconfig-paths/register --compiler-options \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/check-academic-years.ts",
+    "test-queries": "ts-node -r tsconfig-paths/register --compiler-options \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/test-queries.ts",
+    "trigger-seed": "ts-node -r tsconfig-paths/register --compiler-options \"{\\\"module\\\":\\\"commonjs\\\"}\" scripts/trigger-seed.ts",
+    "test-db": "ts-node -r tsconfig-paths/register --compiler-options \"{\\\"module\\\":\\\"commonjs\\\"}\" check-db.ts"
   },
   "dependencies": {
     "@gsap/react": "^2.1.2",

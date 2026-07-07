@@ -14,6 +14,10 @@
                 ".write": "auth != null && (auth.token.role == 'ADMIN' || auth.token.role == 'SUPER_ADMIN')"
             }
         },
+        "system": {
+            ".read": "true",
+            ".write": "auth != null && auth.token.role == 'SUPER_ADMIN'"
+        },
         "chats": {
             "$chatId": {
                 ".read": "auth != null && (data.child('participant1').val() == auth.uid || data.child('participant2').val() == auth.uid || auth.token.role == 'ADMIN')",
@@ -23,6 +27,13 @@
         "presence": {
             "$uid": {
                 ".read": "auth != null",
+                ".write": "auth != null && auth.uid == $uid"
+            }
+        },
+        "sessions": {
+            ".read": "auth != null && (auth.token.role == 'ADMIN' || auth.token.role == 'SUPER_ADMIN')",
+            "$uid": {
+                ".read": "auth != null && auth.uid == $uid",
                 ".write": "auth != null && auth.uid == $uid"
             }
         },

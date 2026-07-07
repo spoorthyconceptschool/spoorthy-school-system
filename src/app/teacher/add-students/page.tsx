@@ -203,7 +203,7 @@ export default function TeacherAddStudentsPage() {
                                     <Label>Village *</Label>
                                     <Select onValueChange={val => setFormData({ ...formData, villageId: val })}>
                                         <SelectTrigger className="bg-white/5 border-white/10"><SelectValue placeholder="Select Village" /></SelectTrigger>
-                                        <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                                        <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                                             {villages.map(v => <SelectItem key={v.id} value={v.id}>{v.name}</SelectItem>)}
                                         </SelectContent>
                                     </Select>
@@ -218,7 +218,7 @@ export default function TeacherAddStudentsPage() {
                                     <Label>Gender *</Label>
                                     <Select value={formData.gender} onValueChange={val => setFormData({ ...formData, gender: val })}>
                                         <SelectTrigger className="bg-white/5 border-white/10"><SelectValue placeholder="Select" /></SelectTrigger>
-                                        <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                                        <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                                             <SelectItem value="male">Male</SelectItem>
                                             <SelectItem value="female">Female</SelectItem>
                                             <SelectItem value="other">Other</SelectItem>

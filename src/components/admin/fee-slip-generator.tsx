@@ -313,7 +313,7 @@ export function FeeSlipGenerator({ students, buttonClassName }: FeeSlipGenerator
                     <FileText className="w-4 h-4" /> <span className="hidden sm:inline">Fee Slips</span><span className="sm:hidden">Slips</span>
                 </Button>
             </DialogTrigger>
-            <DialogContent className="bg-black/95 border-white/10 text-white max-w-lg">
+            <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white max-w-lg border-white/10">
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2">
                         <Printer className="w-5 h-5 text-amber-500" />

@@ -22,6 +22,18 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Missing required fields" }, { status: 400 });
         }
 
+        // Resolve teacher's branch
+        const teacherSnap = await adminDb.collection("teachers").where("uid", "==", decodedToken.uid).limit(1).get();
+        let branchId = "global";
+        if (!teacherSnap.empty) {
+            branchId = teacherSnap.docs[0].data().branchId || "global";
+        } else {
+            const userDoc = await adminDb.collection("users").doc(decodedToken.uid).get();
+            if (userDoc.exists) {
+                branchId = userDoc.data()?.branchId || userDoc.data()?.schoolId || "global";
+            }
+        }
+
         const leaveRef = adminDb.collection("leave_requests").doc();
         const leaveData = {
             id: leaveRef.id,
@@ -32,7 +44,9 @@ export async function POST(req: NextRequest) {
             reason,
             type: type || "General",
             status: "PENDING", // PENDING -> APPROVED/REJECTED
-            createdAt: FieldValue.serverTimestamp()
+            createdAt: FieldValue.serverTimestamp(),
+            schoolId: branchId,
+            branchId: branchId
         };
 
         await leaveRef.set(leaveData);

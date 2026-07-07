@@ -1,132 +1,110 @@
-import { z } from 'zod';
 import { NextRequest, NextResponse } from 'next/server';
-import { adminAuth, adminDb } from '@/lib/firebase-admin';
+import { adminAuth, adminDb } from '../firebase-admin';
 
-/**
- * Enterprise Route Authorization Middleware
- * Ensures strict role-based access control at the API level.
- */
+// Helper to fetch Firestore user info if missing from claims
+async function resolveUserInfo(decodedToken: any) {
+  const info = {
+    role: decodedToken.role,
+    schoolId: decodedToken.schoolId,
+    branchId: decodedToken.branchId,
+  };
 
-export type Role = 'ADMIN' | 'TEACHER' | 'ACCOUNTANT' | 'STUDENT' | 'MANAGER' | 'SUPERADMIN' | 'SUPER_ADMIN' | 'OWNER' | 'DEVELOPER';
-
-export interface AuthenticatedUser {
-    uid: string;
-    email: string | undefined;
-    role: Role;
-    schoolId?: string; // For multi-tenant readiness
-}
-
-/**
- * Validates the Authorization Bearer token and verifies the required RBAC role.
- * 
- * @param req The Next.js request object
- * @param allowedRoles Array of roles authorized to hit this endpoint
- * @returns { user, errorResponse } Returns the user if valid, or a generic NextResponse if unauthorized.
- */
-export async function authenticateRoute(
-    req: NextRequest,
-    allowedRoles: Role[]
-): Promise<{ user?: AuthenticatedUser; errorResponse?: NextResponse }> {
+  // If role, schoolId, or branchId is missing, fetch from Firestore
+  if (!info.role || !info.schoolId || !info.branchId) {
     try {
-        const authHeader = req.headers.get('authorization');
-        if (!authHeader || !authHeader.startsWith('Bearer ')) {
-            return {
-                errorResponse: NextResponse.json({ error: 'Unauthorized: Missing or invalid token' }, { status: 401 })
-            };
-        }
-
-        const token = authHeader.split('Bearer ')[1];
-
-        // Verify token using Firebase Admin
-        const decodedToken = await adminAuth.verifyIdToken(token);
-
-        // Destructure custom claims (Role should be strictly set on the user claims)
-        let roleStr = String(decodedToken.role || "").toUpperCase();
-
-        if (!roleStr) {
-            // Fallback: Check Firestore if custom claims are not yet set (legacy admin accounts)
-            try {
-                const userDoc = await adminDb.collection('users').doc(decodedToken.uid).get();
-                if (userDoc.exists) {
-                    const data = userDoc.data();
-                    roleStr = String(data?.role || "").toUpperCase();
-                    // Also resolve schoolId from Firestore if missing in token
-                    if (!decodedToken.schoolId) {
-                        (decodedToken as any).schoolId = data?.schoolId || "global";
-                    }
-                }
-            } catch (err) {
-                console.warn("[Enterprise SecOps] Fallback role fetch failed:", err);
-            }
-        }
-
-        // Role Normalization: Treat SUPER_ADMIN, SUPERADMIN, OWNER, DEVELOPER as ADMIN for simplicity in checks
-        const normalizedRole = (roleStr === 'SUPER_ADMIN' || roleStr === 'SUPERADMIN' || roleStr === 'OWNER' || roleStr === 'DEVELOPER')
-            ? 'ADMIN'
-            : roleStr;
-
-        if (!roleStr || (!allowedRoles.includes(roleStr as Role) && !allowedRoles.includes(normalizedRole as Role))) {
-            console.warn(`[Enterprise SecOps] User ${decodedToken.uid} attempted forbidden access. Role: ${decodedToken.role}. Required: ${allowedRoles.join(' | ')}`);
-            return {
-                errorResponse: NextResponse.json({
-                    error: 'Forbidden: Insufficient privileges',
-                    debug: { userRole: decodedToken.role, required: allowedRoles }
-                }, { status: 403 })
-            };
-        }
-
-        const authUser: AuthenticatedUser = {
-            uid: decodedToken.uid,
-            email: decodedToken.email,
-            role: normalizedRole as Role,
-            schoolId: decodedToken.schoolId || 'global',
-        };
-
-        return { user: authUser };
-    } catch (error: any) {
-        console.error("[Enterprise SecOps] Authentication Error:", error);
-        
-        // SENIOR ARCHITECT DIAGNOSTIC: Surface specific failure reasons in DEV/LOCAL to resolve clock-skew or project mismatches
-        const isDev = process.env.NODE_ENV === 'development' || req.nextUrl.hostname === 'localhost';
-        const diagnosticMessage = isDev ? `Unauthorized: ${error.message || 'Invalid token'}` : 'Unauthorized: Invalid token';
-        
-        return {
-            errorResponse: NextResponse.json({ 
-                error: diagnosticMessage,
-                timestamp: new Date().toISOString(),
-                code: error.code || 'auth/unknown',
-                hint: error.message?.includes('future') ? 'Check your system clock sync.' : 'Ensure Firebase Project ID matches.'
-            }, { status: 401 })
-        };
+      const userDoc = await adminDb.collection('users').doc(decodedToken.uid).get();
+      if (userDoc.exists) {
+        const data = userDoc.data();
+        if (!info.role) info.role = data?.role;
+        if (!info.schoolId) info.schoolId = data?.schoolId;
+        if (!info.branchId) info.branchId = data?.branchId;
+        console.log(`[AuthGuard] Resolved user info from Firestore for ${decodedToken.email || decodedToken.uid}:`, info);
+      } else {
+        console.warn(`[AuthGuard] Firestore document not found for uid ${decodedToken.uid}`);
+      }
+    } catch (e: any) {
+      console.error("[AuthGuard] Error resolving user info from Firestore:", e.message);
     }
+  }
+
+  // Hardcoded fallback for known super admin emails if role is still missing
+  if (!info.role) {
+    if (['spoorthy@school.local', 'pranesh@school.local'].includes(decodedToken.email)) {
+      info.role = 'SUPER_ADMIN';
+    } else {
+      info.role = 'undefined';
+    }
+  }
+
+  return info;
 }
 
-/**
- * Convenience wrapper for API routes to handle standard formatting
- */
+export async function validateTenantMiddleware(req: NextRequest) {
+  const authHeader = req.headers.get('authorization');
+  const targetSchoolId = req.headers.get('x-school-id');
+
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return NextResponse.json({ error: 'Unauthorized' }, { status: 401 });
+  }
+
+  if (!targetSchoolId) {
+    return NextResponse.json({ error: 'Missing x-school-id header' }, { status: 400 });
+  }
+
+  try {
+    const token = authHeader.split('Bearer ')[1];
+    const decodedToken = await adminAuth.verifyIdToken(token);
+
+    const userInfo = await resolveUserInfo(decodedToken);
+
+    // Super Admins bypass strict matching; standard users must match target school
+    const isSuperAdmin = userInfo.role === 'super-admin' || userInfo.role === 'SUPER_ADMIN';
+    const schoolMatches = userInfo.schoolId === targetSchoolId || userInfo.branchId === targetSchoolId;
+
+    if (!isSuperAdmin && !schoolMatches) {
+      console.log("[validateTenantMiddleware] REJECTED. Tenant mismatch. User role:", userInfo.role, "schoolId:", userInfo.schoolId, "branchId:", userInfo.branchId, "Target:", targetSchoolId);
+      return NextResponse.json({ error: 'Forbidden: Tenant mismatch' }, { status: 403 });
+    }
+
+    return NextResponse.next();
+  } catch (error) {
+    return NextResponse.json({ error: 'Invalid token' }, { status: 401 });
+  }
+}
+
 export async function withEnterpriseGuard(
-    req: NextRequest,
-    allowedRoles: Role[],
-    handler: (req: NextRequest, user: AuthenticatedUser) => Promise<NextResponse>
+  req: NextRequest,
+  allowedRoles: string[],
+  handler: (req: NextRequest, decodedToken: any) => Promise<NextResponse>
 ) {
-    try {
-        const { user, errorResponse } = await authenticateRoute(req, allowedRoles);
+  const authHeader = req.headers.get('authorization');
 
-        if (errorResponse || !user) {
-            return errorResponse;
-        }
+  if (!authHeader || !authHeader.startsWith('Bearer ')) {
+    return NextResponse.json({ error: 'Unauthorized', success: false }, { status: 401 });
+  }
 
-        return await handler(req, user);
-    } catch (error: any) {
-        console.error(`[Enterprise Backend] FATAL Exception:`, error);
-        return NextResponse.json(
-            {
-                success: false,
-                error: 'Internal Server Error (Backend Runtime)',
-                message: error.message,
-                status: 'CRITICAL_FAILURE'
-            },
-            { status: 500 }
-        );
+  try {
+    const token = authHeader.split('Bearer ')[1];
+    const decodedToken = await adminAuth.verifyIdToken(token);
+
+    const userInfo = await resolveUserInfo(decodedToken);
+
+    // Merge resolved values into decodedToken so handler has access to them
+    decodedToken.role = userInfo.role;
+    decodedToken.schoolId = userInfo.schoolId;
+    decodedToken.branchId = userInfo.branchId;
+
+    const role = userInfo.role;
+
+    if (allowedRoles.length > 0 && !allowedRoles.includes(role) && role !== 'SUPER_ADMIN' && role !== 'super-admin') {
+      console.log("[AuthGuard] REJECTED. Email:", decodedToken.email, "Computed Role:", role, "Allowed:", allowedRoles);
+      return NextResponse.json({ error: `Forbidden: Insufficient privileges (Role: ${role})`, success: false }, { status: 403 });
     }
+
+    return await handler(req, decodedToken);
+  } catch (error) {
+    console.error("[AuthGuard] Token validation/handler error:", error);
+    return NextResponse.json({ error: 'Invalid token', success: false }, { status: 401 });
+  }
 }
+

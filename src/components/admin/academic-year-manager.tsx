@@ -230,6 +230,37 @@ export function AcademicYearManager() {
     const upcomingYears = years.filter(y => y.isUpcoming);
     const pastYears = years.filter(y => !y.isActive && !y.isUpcoming).sort((a, b) => String(b.year || "").localeCompare(String(a.year || "")));
 
+    const handleRevertTransition = async () => {
+        if (!activeYear) return;
+        const confirmMsg = `CRITICAL WARNING: Reverting the transition will delete all fee ledgers, timetables, and assignments created for ${activeYear.year}, and restore students to their previous classes. This action CANNOT be undone. Are you sure you want to proceed?`;
+        if (!confirm(confirmMsg)) return;
+
+        setLoading(true);
+        try {
+            const token = await user?.getIdToken();
+            const res = await fetch("/api/admin/academic-years/revert", {
+                method: "POST",
+                headers: {
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
+                body: JSON.stringify({ targetYear: pastYears.length > 0 ? pastYears[0].year : "2025-2026" })
+            });
+
+            const data = await res.json();
+            if (data.success) {
+                alert(data.message);
+                fetchYears();
+            } else {
+                alert("Error reverting transition: " + data.error);
+            }
+        } catch (e: any) {
+            alert("Revert failed: " + e.message);
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
         <div className="space-y-4 md:space-y-6">
             <div className="flex flex-col md:flex-row md:justify-between md:items-end gap-3 md:gap-0">
@@ -240,7 +271,23 @@ export function AcademicYearManager() {
                     </div>
                     <p className="text-[10px] md:text-sm text-slate-400">Archiving, student promotion, and multi-year management.</p>
                 </div>
-                <div className="flex gap-2 md:gap-3">
+                <div className="flex gap-2 md:gap-3 flex-wrap">
+                    <Button
+                        onClick={handleRevertTransition}
+                        disabled={loading}
+                        variant="outline"
+                        className="bg-red-900/20 border-red-800 text-red-400 hover:text-white hover:bg-red-800 h-8 md:h-10 text-[10px] md:text-sm px-2 md:px-4"
+                    >
+                        {loading ? (
+                            <>
+                                <Loader2 className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2 animate-spin" /> Reverting...
+                            </>
+                        ) : (
+                            <>
+                                <History className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" /> Revert Transition
+                            </>
+                        )}
+                    </Button>
                     <Button
                         onClick={() => setIsAddYearModalOpen(true)}
                         variant="outline"
@@ -412,7 +459,7 @@ export function AcademicYearManager() {
 
             {/* Add Year Modal */}
             <Dialog open={isAddYearModalOpen} onOpenChange={setIsAddYearModalOpen}>
-                <DialogContent className="bg-slate-950 border-slate-800 text-white sm:max-w-md">
+                <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl border-white/10 border-slate-800 text-white sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>Define New Session</DialogTitle>
                         <DialogDescription className="text-slate-400">Add a future academic year to the planning queue.</DialogDescription>
@@ -437,7 +484,7 @@ export function AcademicYearManager() {
 
             {/* Edit Year Modal */}
             <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
-                <DialogContent className="bg-slate-950 border-slate-800 text-white sm:max-w-md">
+                <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl border-white/10 border-slate-800 text-white sm:max-w-md">
                     <DialogHeader>
                         <DialogTitle>Refine Academic Details</DialogTitle>
                         <DialogDescription className="text-slate-400">Modify properties for the {editingYear?.year} session.</DialogDescription>
@@ -499,7 +546,7 @@ export function AcademicYearManager() {
                 if (!open && transitionStep === "EXECUTING") return;
                 setIsTransitionModalOpen(open);
             }}>
-                <DialogContent className="bg-slate-950 border-slate-800 text-white sm:max-w-xl">
+                <DialogContent className="bg-slate-900/95 backdrop-blur-2xl shadow-2xl border-white/10 text-white w-[92vw] sm:max-w-md rounded-[20px] mx-auto">
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-bold flex items-center gap-2">
                             <TrendingUp className="text-blue-500" />
@@ -531,7 +578,7 @@ export function AcademicYearManager() {
                                         <SelectTrigger className="bg-slate-900 border-slate-800 h-14 text-xl font-mono">
                                             <SelectValue placeholder="Select Year..." />
                                         </SelectTrigger>
-                                        <SelectContent className="bg-slate-950 border-slate-800">
+                                        <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl border-white/10 border-slate-800">
                                             {upcomingYears.map(y => (
                                                 <SelectItem key={y.year} value={y.year} className="text-lg font-mono">{y.year}</SelectItem>
                                             ))}
@@ -556,23 +603,27 @@ export function AcademicYearManager() {
                     )}
 
                     {transitionStep === "DONE" && (
-                        <div className="py-12 flex flex-col items-center justify-center space-y-6 text-center">
-                            <div className="w-24 h-24 bg-emerald-500/10 rounded-full flex items-center justify-center border border-emerald-500/20 shadow-2xl shadow-emerald-500/10">
-                                <CheckCircle className="w-12 h-12 text-emerald-400" />
+                        <div className="py-4 sm:py-10 flex flex-col items-center justify-center space-y-4 sm:space-y-6 text-center">
+                            <div className="w-16 h-16 sm:w-24 sm:h-24 bg-emerald-500/10 rounded-full flex items-center justify-center border border-emerald-500/20 shadow-2xl shadow-emerald-500/10">
+                                <CheckCircle className="w-8 h-8 sm:w-12 sm:h-12 text-emerald-400" />
                             </div>
                             <div>
-                                <h3 className="text-3xl font-black text-white tracking-tight italic">SYSTEM ADVANCED!</h3>
-                                <p className="text-slate-400 mt-2">
+                                <h3 className="text-xl sm:text-3xl font-black text-white tracking-tight italic">SYSTEM ADVANCED!</h3>
+                                <p className="text-sm sm:text-base text-slate-400 mt-1 sm:mt-2">
                                     Successful transition to <span className="text-white font-bold">{selectedTargetYear}</span>.
                                 </p>
-                                <div className="mt-8 flex gap-4 justify-center">
-                                    <div className="bg-white/5 px-4 py-2 rounded-lg border border-white/5">
-                                        <div className="text-[10px] uppercase text-slate-500">Promoted</div>
-                                        <div className="text-lg font-bold text-emerald-400">{transitionStats?.promoted}</div>
+                                <div className="mt-4 sm:mt-8 flex flex-wrap gap-2 sm:gap-4 justify-center">
+                                    <div className="bg-white/5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg border border-white/5 flex-1 min-w-[80px]">
+                                        <div className="text-[9px] sm:text-[10px] uppercase text-slate-500">Promoted</div>
+                                        <div className="text-base sm:text-lg font-bold text-emerald-400">{transitionStats?.promoted || 0}</div>
                                     </div>
-                                    <div className="bg-white/5 px-4 py-2 rounded-lg border border-white/5">
-                                        <div className="text-[10px] uppercase text-slate-500">Retained</div>
-                                        <div className="text-lg font-bold text-blue-400">{transitionStats?.retained}</div>
+                                    <div className="bg-white/5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg border border-white/5 flex-1 min-w-[80px]">
+                                        <div className="text-[9px] sm:text-[10px] uppercase text-slate-500">Graduated</div>
+                                        <div className="text-base sm:text-lg font-bold text-amber-400">{transitionStats?.graduated || 0}</div>
+                                    </div>
+                                    <div className="bg-white/5 px-3 py-1.5 sm:px-4 sm:py-2 rounded-lg border border-white/5 flex-1 min-w-[80px]">
+                                        <div className="text-[9px] sm:text-[10px] uppercase text-slate-500">Retained</div>
+                                        <div className="text-base sm:text-lg font-bold text-blue-400">{transitionStats?.retained || 0}</div>
                                     </div>
                                 </div>
                             </div>

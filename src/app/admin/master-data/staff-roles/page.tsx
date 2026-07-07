@@ -151,7 +151,7 @@ export default function StaffRolesPage() {
             </div>
 
             <Dialog open={isModalOpen} onOpenChange={setIsModalOpen}>
-                <DialogContent className="bg-black/95 border-white/10 text-white">
+                <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                     <DialogHeader>
                         <DialogTitle>{editingRole ? "Edit Role" : "Create New Role"}</DialogTitle>
                     </DialogHeader>

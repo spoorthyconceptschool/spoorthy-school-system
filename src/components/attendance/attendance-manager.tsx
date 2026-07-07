@@ -26,7 +26,7 @@ export default function AttendanceManager({
     sectionId: string;
     defaultDate?: string;
 }) {
-    const { user, userData } = useAuth();
+    const { user, userData, branchId } = useAuth();
     const DEFAULT_STUDENTS = [
         { id: "std_1", rollNumber: 1, studentName: "Aarav Sharma", schoolId: "SCH-001", status: "ACTIVE", parentMobile: "+91 99887 76655", gender: "MALE" },
         { id: "std_2", rollNumber: 2, studentName: "Ananya Reddy", schoolId: "SCH-002", status: "ACTIVE", parentMobile: "+91 88776 65544", gender: "FEMALE" },
@@ -84,7 +84,7 @@ export default function AttendanceManager({
                 if (isM) {
                     const filtered = snap.docs
                         .map(doc => ({ id: doc.id, ...doc.data() }))
-                        .filter((h: any) => h.schoolId === "global" || h.schoolId === userData?.schoolId);
+                        .filter((h: any) => h.schoolId === "global" || h.schoolId === branchId);
                     setHolidays(filtered);
                 }
             } catch (e) {}
@@ -117,12 +117,12 @@ export default function AttendanceManager({
             );
             const sSnap = await getDocs(sQ);
             
-            const schoolId = userData?.schoolId || "global";
+            const schoolId = branchId || "global";
             const isGlobal = schoolId === "global";
 
             const sList = sSnap.docs
                 .map(d => ({ id: d.id, ...d.data() }))
-                .filter((s: any) => s.status === "ACTIVE")
+                .filter((s: any) => s.status === "ACTIVE" && (isGlobal || s.branchId === schoolId))
                 .sort((a: any, b: any) => (a.rollNumber || 0) - (b.rollNumber || 0));
             setStudents(sList);
 
@@ -279,12 +279,12 @@ export default function AttendanceManager({
                 );
                 const sSnap = await getDocs(sQ);
 
-                const schoolId = userData?.schoolId || "global";
+                const schoolId = branchId || "global";
                 const isGlobal = schoolId === "global";
 
                 const sList = sSnap.docs
                     .map(d => ({ id: d.id, ...d.data() }))
-                    .filter((s: any) => s.status === "ACTIVE")
+                    .filter((s: any) => s.status === "ACTIVE" && (isGlobal || s.branchId === schoolId))
                     .sort((a: any, b: any) => (a.rollNumber || 0) - (b.rollNumber || 0));
 
                 if (isMounted) {
@@ -302,7 +302,7 @@ export default function AttendanceManager({
                 // 2. Fetch Leaves
                 const lQuery = query(
                     collection(db, "student_leaves"),
-                    where("classId", "==", classId)
+                    where("schoolId", "==", branchId || "global")
                 );
 
                 const attId = `${date}_${classId}_${sectionId}`;
@@ -311,7 +311,7 @@ export default function AttendanceManager({
                 const absentIds = new Set<string>();
                 lSnap.forEach(ld => {
                     const l = ld.data();
-                    if (l.status === "APPROVED" && l.schoolId === (userData?.schoolId || "global")) {
+                    if (l.classId === classId && l.status === "APPROVED") {
                         if (l.fromDate <= date && l.toDate >= date) {
                             if (!l.sectionId || l.sectionId === sectionId) {
                                 absentIds.add(l.studentId);
@@ -366,7 +366,7 @@ export default function AttendanceManager({
             isMounted = false;
             if (unsubAttendance) unsubAttendance();
         };
-    }, [classId, sectionId, date, viewStats, statsMonth]);
+    }, [classId, sectionId, date, viewStats, statsMonth, branchId]);
 
     const [touched, setTouched] = useState<Set<string>>(new Set());
 
@@ -832,7 +832,7 @@ export default function AttendanceManager({
                                             <SelectTrigger className="w-[180px] h-9 bg-transparent border-white/10 text-xs font-bold rounded-lg ml-2">
                                                 <SelectValue placeholder="Period" />
                                             </SelectTrigger>
-                                            <SelectContent className="bg-slate-900 border-white/10 text-white">
+                                            <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                                                 <SelectItem value="ALL">Full Academic Year</SelectItem>
                                                 <SelectItem value="01">January</SelectItem>
                                                 <SelectItem value="02">February</SelectItem>

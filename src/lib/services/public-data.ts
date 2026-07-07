@@ -1,4 +1,4 @@
-import { adminRtdb } from "@/lib/firebase-admin";
+import { adminRtdb, adminDb } from "@/lib/firebase-admin";
 
 export async function getPublicHeroContent() {
     if (process.env.NEXT_PHASE === "phase-production-build") {
@@ -89,12 +89,31 @@ export async function getPublicBranding() {
         };
     }
     try {
-        const snap = await adminRtdb.ref('siteContent/branding').get();
-        if (snap.exists()) {
-            return snap.val();
+        const snap = await adminDb.collection("website_settings").doc("main").get();
+        if (snap.exists) {
+            const data = snap.data();
+            return {
+                schoolName: data?.website_school_name || "Spoorthy High School",
+                schoolLogo: data?.website_logo || null,
+                ...data
+            };
         }
     } catch (e) {
-        console.error("Error fetching public branding:", e);
+        console.error("Error fetching public branding from Firestore:", e);
+    }
+    // Fallback to RTDB
+    try {
+        const snap = await adminRtdb.ref('siteContent/branding').get();
+        if (snap.exists()) {
+            const val = snap.val();
+            return {
+                schoolName: val.schoolName || "Spoorthy High School",
+                schoolLogo: val.schoolLogo || null,
+                ...val
+            };
+        }
+    } catch (e) {
+        console.error("Error fetching public branding fallback from RTDB:", e);
     }
     return {
         schoolName: "Spoorthy High School",

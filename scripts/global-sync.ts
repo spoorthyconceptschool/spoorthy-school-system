@@ -13,7 +13,7 @@ async function globalSync() {
     const allPayments = await adminDb.collection('payments').get();
     const paymentsByStudent: Record<string, number> = {};
 
-    allPayments.forEach(d => {
+    allPayments.forEach((d: any) => {
         const p = d.data();
         const sid = p.studentId;
         const amt = typeof p.amount === 'number' ? p.amount : parseFloat(String(p.amount || "0").replace(/[^0-9.-]/g, "")) || 0;

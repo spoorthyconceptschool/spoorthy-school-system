@@ -70,7 +70,7 @@ export default function StudentNotificationsPage() {
             if (!isMounted) return;
             const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification));
             updateNotifications(list);
-        });
+        }, (err) => console.warn("[Student Notifications] Personal subscription error:", err.message));
         unsubscribes.push(unsubPersonal);
 
         // 2. Class & Global Broadcast Notifications - Dual Strategy Profile Fetch
@@ -84,7 +84,7 @@ export default function StudentNotificationsPage() {
                     if (!isMounted) return;
                     const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification));
                     updateNotifications(list);
-                });
+                }, (err) => console.warn("[Student Notifications] Class subscription error:", err.message));
                 unsubscribes.push(unsubClass);
             }
 
@@ -114,6 +114,9 @@ export default function StudentNotificationsPage() {
                 const unsubQuery = onSnapshot(q, (qSnap) => {
                     if (!qSnap.empty) setupClassListener(qSnap.docs[0].data());
                     else setLoading(false);
+                }, (err) => {
+                    console.warn("[Student Notifications] Fallback profile sync warning:", err.message);
+                    setLoading(false);
                 });
                 unsubscribes.push(unsubQuery);
             } else {

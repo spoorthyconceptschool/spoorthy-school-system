@@ -32,6 +32,14 @@ export async function POST(req: NextRequest) {
         const schoolId = decodedToken.email?.split('@')[0].toUpperCase();
         if (!schoolId) throw new Error("Invalid Student ID");
 
+        // Fetch student profile to resolve tenant branchId
+        const studentDoc = await adminDb.collection("students").doc(schoolId).get();
+        if (!studentDoc.exists) {
+            throw new Error("Student profile not found");
+        }
+        const studentData = studentDoc.data() || {};
+        const tenantBranchId = studentData.branchId || studentData.schoolId || "global";
+
         const leaveRef = adminDb.collection("student_leaves").doc();
         await leaveRef.set({
             studentId: schoolId,
@@ -45,7 +53,9 @@ export async function POST(req: NextRequest) {
             reason,
             status: "PENDING", // PENDING, APPROVED, REJECTED
             createdAt: FieldValue.serverTimestamp(),
-            uid: decodedToken.uid
+            uid: decodedToken.uid,
+            schoolId: tenantBranchId,
+            branchId: tenantBranchId
         });
 
         // Notify Admins
@@ -55,7 +65,8 @@ export async function POST(req: NextRequest) {
             message: `${studentName} (${schoolId}) requested leave: ${reason}`,
             type: "LEAVE_REQUEST",
             target: "admin",
-            // We can't pass arbitrary metadata gracefully to createServerNotification typed props, but the deep link handles routing!
+            schoolId: tenantBranchId,
+            branchId: tenantBranchId
         });
 
         // MANDATORY: Notify Class Teacher
@@ -75,7 +86,9 @@ export async function POST(req: NextRequest) {
                         message: `${studentName} from your class requested leave: ${reason}`,
                         type: "LEAVE_REQUEST",
                         target: "user",
-                        userId: teacherUid
+                        userId: teacherUid,
+                        schoolId: tenantBranchId,
+                        branchId: tenantBranchId
                     });
                 }
             }

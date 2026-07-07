@@ -41,6 +41,10 @@ export function BranchProvider({ children }: { children: React.ReactNode }) {
             } else {
                 localStorage.removeItem("spoorthy_superadmin_branch");
             }
+            // Trigger state reset across the app to prevent data leakage
+            if (typeof window !== "undefined") {
+                window.dispatchEvent(new CustomEvent("branch_changed"));
+            }
         }
         // If not super admin, we ignore requests to change branch.
     };

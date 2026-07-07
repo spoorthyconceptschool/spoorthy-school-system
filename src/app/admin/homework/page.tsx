@@ -14,18 +14,26 @@ import { db } from "@/lib/firebase";
 
 export default function AdminHomeworkPage() {
     const { user } = useAuth();
-    const { classes, sections, subjects, classSections } = useMasterData();
+    const { classes, sections, subjects, classSections, homeworkSubjects } = useMasterData();
 
     const classList = Object.values(classes || {}).sort((a: any, b: any) => (a.order || 99) - (b.order || 99));
     const subjectList = Object.values(subjects || {}).sort((a: any, b: any) => String(a.name || "").localeCompare(String(b.name || "")));
 
     const [classId, setClassId] = useState("");
     const [sectionId, setSectionId] = useState("");
-    const [subjectId, setSubjectId] = useState("");
-    const [title, setTitle] = useState("");
-    const [description, setDescription] = useState("");
     const [dueDate, setDueDate] = useState("");
+    const [assignments, setAssignments] = useState<Record<string, { title: string; description: string }>>({});
     const [submitting, setSubmitting] = useState(false);
+
+    const updateAssignment = (subjectId: string, field: 'title' | 'description', value: string) => {
+        setAssignments(prev => ({
+            ...prev,
+            [subjectId]: {
+                ...(prev[subjectId] || { title: '', description: '' }),
+                [field]: value
+            }
+        }));
+    };
     const [homeworkHistory, setHomeworkHistory] = useState<any[]>([]);
     const [useFallback, setUseFallback] = useState(false);
 
@@ -75,37 +83,66 @@ export default function AdminHomeworkPage() {
         ? [{ id: "GENERAL", name: "General / No Section" }]
         : fetchedSections;
 
+    const classKey = `${classId}_${sectionId}`;
+    const hwMapping = homeworkSubjects?.[classKey] || {};
+    let activeSubjectIds = Object.keys(hwMapping).filter(id => hwMapping[id]);
+    
+    if (activeSubjectIds.length === 0 && classId && sectionId) {
+        activeSubjectIds = subjectList.map((s: any) => s.id);
+    }
+    
+    const displaySubjects = activeSubjectIds
+        .map(id => subjects[id])
+        .filter(Boolean)
+        .sort((a: any, b: any) => String(a.name || "").localeCompare(String(b.name || "")));
+
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        if (!classId || !sectionId || !subjectId) {
-            alert("Please select Class, Section, and Subject.");
+        if (!classId || !sectionId) {
+            alert("Please select Class and Section.");
+            return;
+        }
+
+        const subjectsToPost = Object.keys(assignments).filter(subjId => {
+            const data = assignments[subjId];
+            return data.title?.trim() !== "" || data.description?.trim() !== "";
+        });
+
+        if (subjectsToPost.length === 0) {
+            alert("Please enter homework for at least one subject.");
             return;
         }
 
         setSubmitting(true);
         try {
-            const res = await fetch("/api/admin/homework/create", {
-                method: "POST",
-                headers: {
-                    "Content-Type": "application/json",
-                    "Authorization": `Bearer ${await user?.getIdToken()}`
-                },
-                body: JSON.stringify({
-                    classId,
-                    sectionId,
-                    subjectId,
-                    title,
-                    description,
-                    dueDate,
-                    isInternal: true
-                })
+            const promises = subjectsToPost.map(async subjId => {
+                const data = assignments[subjId];
+                const res = await fetch("/api/admin/homework/create", {
+                    method: "POST",
+                    headers: {
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${await user?.getIdToken()}`
+                    },
+                    body: JSON.stringify({
+                        classId,
+                        sectionId,
+                        subjectId: subjId,
+                        title: data.title || "Assignment",
+                        description: data.description || "",
+                        dueDate,
+                        isInternal: true
+                    })
+                });
+                return res.json();
             });
-            const data = await res.json();
-            if (data.success) {
-                alert("Homework sent successfully!");
-                setTitle(""); setDescription(""); setClassId(""); setSectionId(""); setSubjectId(""); setDueDate("");
+
+            const results = await Promise.all(promises);
+            const failed = results.filter(r => !r.success);
+            if (failed.length > 0) {
+                alert(`${failed.length} assignments failed to post.`);
             } else {
-                alert(data.error);
+                alert(`Successfully posted ${subjectsToPost.length} assignments!`);
+                setAssignments({});
             }
         } catch (e: any) {
             alert(e.message);
@@ -129,115 +166,111 @@ export default function AdminHomeworkPage() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-                <div className="lg:col-span-5">
+                <div className="lg:col-span-7">
                     <Card className="glass-panel border-white/5 bg-black/20 overflow-hidden shadow-2xl">
                         <div className="bg-white/5 border-b border-white/5 px-5 py-3 flex items-center justify-between">
                             <CardTitle className="text-sm font-bold flex items-center gap-2 italic">
                                 <Send className="w-4 h-4 text-accent" />
-                                New Assignment
+                                Bulk Assignment Entry
                             </CardTitle>
                         </div>
                         <CardContent className="p-4 md:p-5">
-                            <form onSubmit={handleSubmit} className="space-y-4">
-                                <div className="grid grid-cols-2 gap-2">
+                            <form onSubmit={handleSubmit} className="space-y-6">
+                                {/* Top Controls */}
+                                <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                                     <div className="space-y-1">
-                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-100 ml-0.5">Class</label>
-                                        <Select onValueChange={(val) => { setClassId(val); setSectionId(""); }} value={classId}>
-                                            <SelectTrigger className="bg-white/5 border-white/5 h-9 rounded-md focus:ring-accent transition-all text-white text-[10px] px-3">
+                                        <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground ml-0.5">Class</label>
+                                        <Select onValueChange={(val) => { setClassId(val); setSectionId(""); setAssignments({}); }} value={classId}>
+                                            <SelectTrigger className="bg-white/5 border-white/5 h-10 rounded-md focus:ring-accent transition-all text-white text-xs px-3">
                                                 <SelectValue placeholder="Select" />
                                             </SelectTrigger>
                                             <SelectContent className="bg-neutral-900 border-white/10">
                                                 {classList.map((c: any) => (
-                                                    <SelectItem key={c.id} value={c.id} className="text-[10px]">
-                                                        {c.name}
-                                                    </SelectItem>
+                                                    <SelectItem key={c.id} value={c.id} className="text-xs">{c.name}</SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
                                     </div>
 
                                     <div className="space-y-1">
-                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-100 ml-0.5">Section</label>
-                                        <Select onValueChange={setSectionId} value={sectionId} disabled={!classId}>
-                                            <SelectTrigger className="bg-white/5 border-white/5 h-9 rounded-md focus:ring-accent transition-all text-white text-[10px] px-3">
+                                        <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground ml-0.5">Section</label>
+                                        <Select onValueChange={(val) => { setSectionId(val); setAssignments({}); }} value={sectionId} disabled={!classId}>
+                                            <SelectTrigger className="bg-white/5 border-white/5 h-10 rounded-md focus:ring-accent transition-all text-white text-xs px-3">
                                                 <SelectValue placeholder={classId ? "Select" : "..."} />
                                             </SelectTrigger>
                                             <SelectContent className="bg-neutral-900 border-white/10">
-                                                <SelectItem value="ALL" className="text-[10px]">ALL</SelectItem>
+                                                <SelectItem value="ALL" className="text-xs">ALL</SelectItem>
                                                 {availableSections.map((s: any) => (
-                                                    <SelectItem key={s.id} value={s.id} className="text-[10px]">
-                                                        {s.name}
-                                                    </SelectItem>
+                                                    <SelectItem key={s.id} value={s.id} className="text-xs">{s.name}</SelectItem>
                                                 ))}
                                             </SelectContent>
                                         </Select>
                                     </div>
 
                                     <div className="space-y-1">
-                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-100 ml-0.5">Subject</label>
-                                        <Select onValueChange={setSubjectId} value={subjectId}>
-                                            <SelectTrigger className="bg-white/5 border-white/5 h-9 rounded-md focus:ring-accent transition-all text-white text-[10px] px-3">
-                                                <SelectValue placeholder="Select" />
-                                            </SelectTrigger>
-                                            <SelectContent className="bg-neutral-900 border-white/10">
-                                                {subjectList.map((s: any) => (
-                                                    <SelectItem key={s.id} value={s.id} className="text-[10px]">
-                                                        {s.name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-
-                                    <div className="space-y-1">
-                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-100 ml-0.5">Due Date</label>
+                                        <label className="text-[9px] font-black uppercase tracking-widest text-muted-foreground ml-0.5">Due Date</label>
                                         <Input
                                             type="date"
                                             value={dueDate}
                                             onChange={e => setDueDate(e.target.value)}
-                                            className="bg-white/5 border-white/5 h-9 rounded-md focus:ring-accent transition-all text-white text-[10px] px-3"
+                                            className="bg-white/5 border-white/5 h-10 rounded-md focus:ring-accent transition-all text-white text-xs px-3"
                                         />
                                     </div>
                                 </div>
 
-                                <div className="space-y-3 pt-2">
-                                    <div className="space-y-1">
-                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-100">Homework Title</label>
-                                        <Input
-                                            required
-                                            value={title}
-                                            onChange={e => setTitle(e.target.value)}
-                                            placeholder="e.g. Chapter 5 Review"
-                                            className="bg-white/10 border-white/5 h-9 rounded-md focus:ring-accent transition-all text-[11px] font-bold text-white px-3"
-                                        />
-                                    </div>
+                                {/* Dynamic Subject Grid */}
+                                {classId && sectionId && displaySubjects.length > 0 && (
+                                    <div className="space-y-4 pt-4 border-t border-white/5">
+                                        <div className="flex items-center gap-2 mb-2">
+                                            <BookOpen className="w-4 h-4 text-accent" />
+                                            <h3 className="text-sm font-bold text-white/90">Assigned Subjects</h3>
+                                        </div>
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                            {displaySubjects.map((subject: any) => (
+                                                <div key={subject.id} className="bg-white/5 border border-white/10 rounded-xl p-3 space-y-3 transition-all hover:border-accent/30 hover:bg-white/10">
+                                                    <h4 className="font-extrabold text-xs text-accent uppercase tracking-widest border-b border-white/5 pb-2">
+                                                        {subject.name}
+                                                    </h4>
+                                                    <div className="space-y-2">
+                                                        <Input
+                                                            value={assignments[subject.id]?.title || ""}
+                                                            onChange={e => updateAssignment(subject.id, 'title', e.target.value)}
+                                                            placeholder="Homework Title..."
+                                                            className="bg-black/40 border-white/5 h-8 rounded text-[11px] text-white px-2 focus:ring-accent"
+                                                        />
+                                                        <Textarea
+                                                            value={assignments[subject.id]?.description || ""}
+                                                            onChange={e => updateAssignment(subject.id, 'description', e.target.value)}
+                                                            placeholder="Detailed instructions..."
+                                                            className="bg-black/40 border-white/5 min-h-[60px] rounded text-[10px] text-white/80 p-2 focus:ring-accent resize-none scrollbar-none"
+                                                        />
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
 
-                                    <div className="space-y-1">
-                                        <label className="text-[8px] font-black uppercase tracking-widest text-muted-foreground opacity-100">Detailed Instructions</label>
-                                        <Textarea
-                                            required
-                                            value={description}
-                                            onChange={e => setDescription(e.target.value)}
-                                            placeholder="Task details..."
-                                            className="bg-white/5 border-white/5 min-h-[80px] rounded-md focus:ring-accent transition-all text-[10px] text-white/80 leading-relaxed p-3"
-                                        />
+                                        <Button
+                                            type="submit"
+                                            disabled={submitting}
+                                            className="w-full mt-4 h-12 rounded-xl bg-accent text-accent-foreground font-black text-xs hover:bg-accent/90 shadow-lg shadow-accent/20 transition-all uppercase tracking-widest"
+                                        >
+                                            {submitting ? (
+                                                <Loader2 className="animate-spin w-5 h-5" />
+                                            ) : (
+                                                <span className="flex items-center gap-2">
+                                                    <Send className="w-4 h-4" />
+                                                    POST ALL ASSIGNMENTS
+                                                </span>
+                                            )}
+                                        </Button>
                                     </div>
-                                </div>
+                                )}
 
-                                <Button
-                                    type="submit"
-                                    disabled={submitting || !classId || !sectionId || !subjectId}
-                                    className="w-full h-10 rounded-lg bg-accent text-accent-foreground font-black text-[10px] hover:bg-accent/90 shadow-md shadow-accent/5 transition-all uppercase tracking-widest"
-                                >
-                                    {submitting ? (
-                                        <Loader2 className="animate-spin w-4 h-4" />
-                                    ) : (
-                                        <span className="flex items-center gap-2">
-                                            <Send className="w-3.5 h-3.5" />
-                                            POST ASSIGNMENT
-                                        </span>
-                                    )}
-                                </Button>
+                                {classId && sectionId && displaySubjects.length === 0 && (
+                                    <div className="text-center py-10 text-neutral-500 font-bold uppercase tracking-widest text-xs border border-dashed border-white/10 rounded-xl">
+                                        No subjects mapped to this class/section.
+                                    </div>
+                                )}
                             </form>
                         </CardContent>
                     </Card>

@@ -556,18 +556,24 @@ export function ContactBand({ content }: { content?: any }) {
 // === FOOTER (Big & Clean) ===
 export function Footer() {
     const { branding } = useMasterData();
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
     return (
         <footer className="bg-[#0A192F] text-white pt-12 md:pt-20 pb-16 border-t border-[#64FFDA]/10">
             <div className="container mx-auto px-6">
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-8 md:gap-12 lg:gap-24 mb-16 md:mb-32">
                     <div className="space-y-8">
                         <Link href="/" className="flex items-center gap-3 group">
-                            {branding.schoolLogo && (
+                            {mounted && branding.schoolLogo && (
                                 <div className="w-12 h-12 rounded-xl bg-white/5 p-1 border border-white/10 group-hover:scale-110 transition-transform relative">
                                     <Image src={branding.schoolLogo} alt="Logo" width={48} height={48} className="w-full h-full object-contain" />
                                 </div>
                             )}
-                            <span className="text-2xl md:text-4xl font-premium tracking-tighter block group-hover:text-accent transition-colors">
+                            <span suppressHydrationWarning className="text-2xl md:text-4xl font-premium tracking-tighter block group-hover:text-accent transition-colors">
                                 {branding.schoolName || "Spoorthy"}.
                             </span>
                         </Link>
@@ -596,7 +602,7 @@ export function Footer() {
                 </div>
 
                 <div className="border-t border-white/5 pt-12 flex flex-col md:flex-row justify-between items-center text-sm text-white/30 font-bold uppercase tracking-widest">
-                    <p>© {new Date().getFullYear()} {branding.schoolName || "Spoorthy School"}.</p>
+                    <p suppressHydrationWarning>© {new Date().getFullYear()} {branding.schoolName || "Spoorthy School"}.</p>
                     <div className="flex gap-12 mt-8 md:mt-0">
                         <span>Privacy</span>
                         <span>Terms</span>

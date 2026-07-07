@@ -8,12 +8,15 @@ import { TopBar } from "@/components/admin/topbar";
 import { BottomNav } from "@/components/layout/bottom-nav";
 import { cn } from "@/lib/utils";
 import { useSidebarStore } from "@/lib/sidebar-store";
+import { useMasterData } from "@/context/MasterDataContext";
 
 import { AuthenticatedProvider } from "@/components/providers/AuthenticatedProvider";
 
 function AdminContent({ children }: { children: React.ReactNode }) {
     const { user, userData, loading } = useAuth();
+    const { branding } = useMasterData();
     const router = useRouter();
+    const { isOpen } = useSidebarStore();
 
 
 
@@ -52,8 +55,6 @@ function AdminContent({ children }: { children: React.ReactNode }) {
         );
     }
 
-    const { isOpen } = useSidebarStore();
-
     // Brief loading state while auth resolves
     const isAuthenticating = loading && !userData;
 
@@ -61,6 +62,18 @@ function AdminContent({ children }: { children: React.ReactNode }) {
         <div className="flex flex-col h-[100dvh] bg-gradient-to-br from-[#0A192F] via-[#112240] to-[#0A192F] text-foreground font-sans overflow-hidden">
             {/* Full-width Top Header */}
             <TopBar />
+
+            {/* Mobile Branch Name Indicator */}
+            {branding?.schoolId && (
+                <div className="md:hidden w-full bg-[#112240] border-b border-[#64FFDA]/10 px-4 py-2 flex items-center justify-between text-[11px] font-mono shrink-0">
+                    <span className="text-white/60">Active Branch:</span>
+                    {branding.schoolName === "" ? (
+                        <div className="h-3 w-32 bg-white/10 rounded animate-pulse" />
+                    ) : (
+                        <span className="text-[#64FFDA] font-bold">{branding.schoolName} ({branding.schoolId})</span>
+                    )}
+                </div>
+            )}
             
             {/* Content Area below header */}
             <div className="flex-1 flex relative min-w-0 overflow-hidden">
@@ -69,14 +82,7 @@ function AdminContent({ children }: { children: React.ReactNode }) {
                     isOpen && "md:pl-[190px]"
                 )}>
                     <div className="w-full space-y-4 md:space-y-6">
-                        {isAuthenticating ? (
-                            <div className="h-full w-full flex flex-col items-center justify-center p-20">
-                                <Loader2 className="w-8 h-8 text-accent animate-spin mb-4 opacity-20" />
-                                <p className="text-[10px] font-mono uppercase tracking-[0.5em] text-white/10 animate-pulse italic">Synchronizing...</p>
-                            </div>
-                        ) : (
-                            children
-                        )}
+                        {children}
                     </div>
                 </main>
                 <BottomNav />

@@ -137,6 +137,8 @@ export async function POST(req: NextRequest) {
                 type: action === "APPROVED" ? "SUCCESS" : "ERROR",
                 status: "UNREAD",
                 target: "student",
+                schoolId: leaveData.schoolId || "global",
+                branchId: leaveData.branchId || leaveData.schoolId || "global",
                 createdAt: new Date(),
                 metadata: {
                     leaveId: leaveId,

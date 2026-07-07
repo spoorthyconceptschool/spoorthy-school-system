@@ -28,7 +28,7 @@ interface Notification {
 }
 
 export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEACHER" | "STUDENT" }) {
-    const { user } = useAuth();
+    const { user, branchId } = useAuth();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [unreadCount, setUnreadCount] = useState(0);
     const [optimisticReads, setOptimisticReads] = useState<Set<string>>(() => {
@@ -83,7 +83,12 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
             // B. Role-based secondary listeners
             try {
                 if (role === "ADMIN" || role === "MANAGER") {
-                    const qAdmin = query(collection(db, "notifications"), where("target", "==", "ALL_ADMINS"), limit(20));
+                    let qAdmin;
+                    if (branchId) {
+                        qAdmin = query(collection(db, "notifications"), where("schoolId", "==", branchId), where("target", "==", "ALL_ADMINS"), limit(20));
+                    } else {
+                        qAdmin = query(collection(db, "notifications"), where("target", "==", "ALL_ADMINS"), limit(20));
+                    }
                     const unsubAdmin = onSnapshot(qAdmin, (snap) => {
                         if (!isMounted) return;
                         const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification));
@@ -264,7 +269,7 @@ export function NotificationCenter({ role }: { role: "ADMIN" | "MANAGER" | "TEAC
                     )}
                 </button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-80 bg-[#112240] border-[#64FFDA]/20 text-[#E6F1FF] backdrop-blur-xl p-0 shadow-2xl rounded-xl">
+            <DropdownMenuContent align="end" className="w-80 bg-[#0B1120]/95 backdrop-blur-2xl border-white/10 border-[#64FFDA]/20 text-[#E6F1FF] backdrop-blur-xl p-0 rounded-xl shadow-2xl">
                 <DropdownMenuLabel className="p-4 flex justify-between items-center border-b border-[#64FFDA]/10">
                     <span className="font-bold">Notifications</span>
                     <div className="flex items-center gap-2">

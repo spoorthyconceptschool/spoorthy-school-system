@@ -14,7 +14,7 @@ import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/lib/toast-store";
 
 export function DeclareHolidayModal() {
-    const { user } = useAuth();
+    const { user, branchId } = useAuth();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
 
@@ -26,6 +26,8 @@ export function DeclareHolidayModal() {
         e.preventDefault();
         if (!title || !date) return;
         setLoading(true);
+
+        const activeBranchId = branchId || "global";
 
         try {
             const start = new Date(date);
@@ -45,7 +47,9 @@ export function DeclareHolidayModal() {
                 senderId: user?.uid,
                 senderName: user?.displayName || "Admin",
                 senderRole: "ADMIN",
-                status: 'ACTIVE'
+                status: 'ACTIVE',
+                schoolId: activeBranchId,
+                branchId: activeBranchId
             });
 
             // Notify Students and Teachers
@@ -55,7 +59,9 @@ export function DeclareHolidayModal() {
                 type: "HOLIDAY",
                 target: "ALL",
                 status: "UNREAD",
-                createdAt: Timestamp.now()
+                createdAt: Timestamp.now(),
+                schoolId: activeBranchId,
+                branchId: activeBranchId
             });
 
             // Notify Admins
@@ -65,7 +71,9 @@ export function DeclareHolidayModal() {
                 type: "HOLIDAY",
                 target: "ALL_ADMINS",
                 status: "UNREAD",
-                createdAt: Timestamp.now()
+                createdAt: Timestamp.now(),
+                schoolId: activeBranchId,
+                branchId: activeBranchId
             });
 
             toast({ title: "Holiday Declared", description: `Holiday '${title}' on ${format(date, "PPP")} added.`, type: "success" });
@@ -88,7 +96,7 @@ export function DeclareHolidayModal() {
                     Declare Holiday
                 </Button>
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[425px] bg-black/90 border-white/10 text-white">
+            <DialogContent className="sm:max-w-[425px] bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                 <DialogHeader>
                     <DialogTitle>Declare Holiday</DialogTitle>
                     <DialogDescription>

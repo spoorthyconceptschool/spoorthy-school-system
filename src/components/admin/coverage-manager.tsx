@@ -10,6 +10,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@
 import { Loader2, CheckCircle, Coffee, UserPlus } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { cn } from "@/lib/utils";
+import { useAuth } from "@/context/AuthContext";
 
 /**
  * Represents a single coverage task that requires administrative resolution.
@@ -66,9 +67,15 @@ const DEFAULT_COVERAGE_TASKS: CoverageTask[] = [
 ];
 
 export function CoverageManager() {
+    const { branchId } = useAuth();
+    
+    // Scoped cache keys
+    const cacheKeyTasks = branchId ? `${COVERAGE_TASKS_CACHE_KEY}_${branchId}` : COVERAGE_TASKS_CACHE_KEY;
+    const cacheKeyTeachers = branchId ? `${COVERAGE_TEACHERS_CACHE_KEY}_${branchId}` : COVERAGE_TEACHERS_CACHE_KEY;
+
     const [tasks, setTasks] = useState<CoverageTask[]>(() => {
         if (typeof window !== 'undefined') {
-            const cached = localStorage.getItem(COVERAGE_TASKS_CACHE_KEY);
+            const cached = localStorage.getItem(cacheKeyTasks);
             if (cached) {
                 try { return JSON.parse(cached); } catch(e) {}
             }
@@ -78,7 +85,7 @@ export function CoverageManager() {
     const [loading, setLoading] = useState(false);
     const [teachers, setTeachers] = useState<any[]>(() => {
         if (typeof window !== 'undefined') {
-            const cached = localStorage.getItem(COVERAGE_TEACHERS_CACHE_KEY);
+            const cached = localStorage.getItem(cacheKeyTeachers);
             if (cached) {
                 try { return JSON.parse(cached); } catch(e) {}
             }
@@ -100,44 +107,69 @@ export function CoverageManager() {
      * Continuously sinks modified and newly pushed tasks directly into component state.
      */
     useEffect(() => {
+        if (!branchId) return;
+
         // Real-time Tasks
-        const q = query(collection(db, "coverage_tasks"), orderBy("createdAt", "desc"), limit(100));
-        const unsubscribeTasks = onSnapshot(q, (snapshot) => {
-            const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as CoverageTask));
+        let q = query(collection(db, "coverage_tasks"), limit(100));
+        if (branchId !== "global") {
+            q = query(collection(db, "coverage_tasks"), where("schoolId", "==", branchId), limit(100));
+        }
+
+        const handleTasksSnapshot = (snapshot: any) => {
+            const list = snapshot.docs.map((d: any) => ({ id: d.id, ...d.data() } as CoverageTask));
+            // In-memory sort by createdAt descending
+            list.sort((a: any, b: any) => {
+                const dateA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0;
+                const dateB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0;
+                return dateB - dateA;
+            });
             setTasks(list);
             if (typeof window !== 'undefined') {
-                localStorage.setItem(COVERAGE_TASKS_CACHE_KEY, JSON.stringify(list));
+                localStorage.setItem(cacheKeyTasks, JSON.stringify(list));
             }
             setLoading(false);
-        }, (err) => {
+        };
+
+        const unsubscribeTasks = onSnapshot(q, handleTasksSnapshot, (err) => {
             console.warn("Task Listener Error, falling back...", err);
-            // Fallback for missing index
-            const qFallback = query(collection(db, "coverage_tasks"), limit(100));
+            // Fallback for missing index/permissions (safety)
+            let qFallback = query(collection(db, "coverage_tasks"), limit(100));
+            if (branchId !== "global") {
+                qFallback = query(collection(db, "coverage_tasks"), where("schoolId", "==", branchId), limit(100));
+            }
             onSnapshot(qFallback, (snap) => {
                 const list = snap.docs.map(d => ({ id: d.id, ...d.data() } as CoverageTask));
+                list.sort((a: any, b: any) => {
+                    const dateA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0;
+                    const dateB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0;
+                    return dateB - dateA;
+                });
                 setTasks(list);
                 if (typeof window !== 'undefined') {
-                    localStorage.setItem(COVERAGE_TASKS_CACHE_KEY, JSON.stringify(list));
+                    localStorage.setItem(cacheKeyTasks, JSON.stringify(list));
                 }
                 setLoading(false);
-            });
+            }, (fallbackErr) => console.warn("[Coverage] Fallback listener error:", fallbackErr?.code));
         });
 
         // Real-time Teachers
-        const qT = query(collection(db, "teachers"), where("status", "==", "ACTIVE"));
+        let qT = query(collection(db, "teachers"), where("status", "==", "ACTIVE"));
+        if (branchId !== "global") {
+            qT = query(collection(db, "teachers"), where("status", "==", "ACTIVE"), where("branchId", "==", branchId));
+        }
         const unsubscribeTeachers = onSnapshot(qT, (snapshot) => {
             const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
             setTeachers(list);
             if (typeof window !== 'undefined') {
-                localStorage.setItem(COVERAGE_TEACHERS_CACHE_KEY, JSON.stringify(list));
+                localStorage.setItem(cacheKeyTeachers, JSON.stringify(list));
             }
-        });
+        }, (err) => console.warn("[Coverage] Teachers listener:", err?.code));
 
         return () => {
             unsubscribeTasks();
             unsubscribeTeachers();
         };
-    }, []);
+    }, [branchId, cacheKeyTasks, cacheKeyTeachers]);
 
     /**
      * Helper to reliably resolve a teacher's human-readable name from their ID.
@@ -378,7 +410,7 @@ export function CoverageManager() {
                                                         </Button>
                                                     </DialogTrigger>
 
-                                                    <DialogContent className="bg-[#0A192F] border-white/10 text-white rounded-2xl shadow-2xl shadow-black/50 w-[95vw] md:w-full max-w-3xl max-h-[85vh] flex flex-col p-0 overflow-hidden">
+                                                    <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl text-white rounded-2xl shadow-black/50 w-[95vw] md:w-full max-w-3xl max-h-[85vh] flex flex-col p-0 overflow-hidden shadow-2xl border-white/10">
                                                         <DialogHeader className="p-6 border-b border-white/5 shrink-0">
                                                             <DialogTitle className="text-xl font-bold flex items-center gap-2 italic">
                                                                 <UserPlus className="text-accent" /> {showResolved ? "Coverage Details" : "Manage Coverage"}
@@ -456,7 +488,7 @@ export function CoverageManager() {
                                                                                     </Button>
                                                                                 </DialogTrigger>
 
-                                                                                <DialogContent className="bg-[#0A192F] border-white/10 text-white rounded-2xl shadow-2xl shadow-black/50 w-[95vw] md:w-full max-w-sm border-l-4 border-l-accent overflow-hidden">
+                                                                                <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl text-white rounded-2xl shadow-black/50 w-[95vw] md:w-full max-w-sm border-l-4 border-l-accent overflow-hidden shadow-2xl border-white/10">
                                                                                     <DialogHeader className="bg-black/20 p-4 border-b border-white/5">
                                                                                         <DialogTitle className="text-lg font-bold flex items-center gap-2 italic">
                                                                                             <UserPlus className="text-accent" /> Manual Coverage
@@ -493,7 +525,7 @@ export function CoverageManager() {
                                                                                                     <SelectTrigger className="h-10 bg-black/40 border-white/10 rounded-xl font-bold focus:ring-accent/20">
                                                                                                         <SelectValue placeholder="Choose Teacher" />
                                                                                                     </SelectTrigger>
-                                                                                                    <SelectContent className="bg-[#0A192F] border-white/10 text-white max-h-[200px]">
+                                                                                                    <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white max-h-[200px] border-white/10">
                                                                                                         {teachers
                                                                                                             .filter(t => (t.schoolId || t.id) !== task.originalTeacherId)
                                                                                                             .map(t => (

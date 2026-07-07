@@ -290,7 +290,7 @@ export default function TeacherTimetablePage() {
         const q = query(
             collection(db, "teachers"), 
             where("uid", "==", user.uid),
-            where("schoolId", "==", userData.schoolId)
+            where("branchId", "==", userData.schoolId)
         );
         const snap = await getDocs(q);
         if (!snap.empty) {

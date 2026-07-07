@@ -45,7 +45,7 @@ export default function StudentProfilePage() {
     // Location safety mapping
     const villageName = villages?.[profile?.villageId]?.name || profile?.villageName || profile?.city || "Not Specified";
     const academicYear = profile?.academicYear || "2025-2026";
-    const admissionNo = profile?.admissionNo || profile?.rollNo || "Not Specified";
+    const schoolIdDisplay = profile?.schoolId || profile?.rollNo || "Not Specified";
 
     return (
         <div className="w-full h-full overflow-y-auto">
@@ -114,8 +114,8 @@ export default function StudentProfilePage() {
                                         <p className="text-sm font-extrabold text-white">{profile?.rollNumber || "Not Assigned"}</p>
                                     </div>
                                     <div className="space-y-0.5">
-                                        <span className="text-[10px] font-black uppercase text-blue-200/50 tracking-wider font-sans">Admission No</span>
-                                        <p className="text-sm font-extrabold text-white">{admissionNo}</p>
+                                        <span className="text-[10px] uppercase font-bold tracking-widest text-[#8892B0] mb-0.5">School ID</span>
+                                        <p className="text-sm font-extrabold text-white">{schoolIdDisplay}</p>
                                     </div>
                                 </div>
                             </CardContent>
@@ -328,8 +328,8 @@ export default function StudentProfilePage() {
                                             <div className="text-xs font-bold text-white truncate">{profile?.rollNumber || "Not Assigned"}</div>
                                         </div>
                                         <div className="space-y-0.5">
-                                            <label className="text-[10px] font-bold text-blue-200/70 uppercase tracking-widest block">Admission No</label>
-                                            <div className="text-xs font-bold text-white truncate">{admissionNo}</div>
+                                            <div className="text-[10px] font-bold text-[#8892B0] uppercase tracking-wider mb-0.5">School ID</div>
+                                            <div className="text-xs font-bold text-white truncate">{schoolIdDisplay}</div>
                                         </div>
                                         <div className="space-y-0.5">
                                             <label className="text-[10px] font-bold text-blue-200/70 uppercase tracking-widest block">Class & Section</label>

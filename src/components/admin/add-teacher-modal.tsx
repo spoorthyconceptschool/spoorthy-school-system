@@ -35,6 +35,7 @@ import { db } from "@/lib/firebase";
 import { useMasterData } from "@/context/MasterDataContext";
 import { toast } from "@/lib/toast-store";
 import { useAuth } from "@/context/AuthContext";
+import { useBranch } from "@/context/BranchContext";
 
 interface AddTeacherModalProps {
     isOpen: boolean;
@@ -45,6 +46,7 @@ interface AddTeacherModalProps {
 
 export function AddTeacherModal({ isOpen, onClose, onSuccess, onOptimisticUpdate }: AddTeacherModalProps) {
     const { user } = useAuth();
+    const { selectedBranchId } = useBranch();
     const { subjects: masterSubjects, classes: masterClasses, sections: masterSections, classSections } = useMasterData();
     const [subjects, setSubjects] = useState<any[]>([]);
     const [role, setRole] = useState<string>("");
@@ -54,7 +56,7 @@ export function AddTeacherModal({ isOpen, onClose, onSuccess, onOptimisticUpdate
         if (!user) return;
         const unsub = onSnapshot(doc(db, "users", user.uid), (d) => {
             if (d.exists()) setRole(d.data().role);
-        });
+        }, (err) => console.warn("[AddTeacherModal] User session sync warning:", err.message));
         return () => unsub();
     }, [user]);
 
@@ -197,9 +199,13 @@ export function AddTeacherModal({ isOpen, onClose, onSuccess, onOptimisticUpdate
         }
 
         try {
+            const token = await user?.getIdToken();
             const res = await fetch("/api/admin/teachers/create", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
+                headers: { 
+                    "Content-Type": "application/json",
+                    "Authorization": `Bearer ${token}`
+                },
                 body: JSON.stringify({
                     ...form,
                     age: Number(form.age),
@@ -207,7 +213,8 @@ export function AddTeacherModal({ isOpen, onClose, onSuccess, onOptimisticUpdate
                     subjects: Array.from(selectedSubjects),
                     classTeacherOf: classTeacherOfList[0] || null,
                     classTeacherOfList: classTeacherOfList,
-                    subjectAssignments: subjectAssignments
+                    subjectAssignments: subjectAssignments,
+                    branchId: selectedBranchId || "global"
                 })
             });
 

@@ -11,6 +11,7 @@ import {
     ChevronDown
 } from "lucide-react";
 import { auth } from "@/lib/firebase";
+import { useAuth } from "@/context/AuthContext";
 import { toast } from "@/lib/toast-store";
 import { cn } from "@/lib/utils";
 import {
@@ -26,6 +27,9 @@ export function SeedDataButton() {
     const [loading, setLoading] = useState(false);
     const [settingLogins, setSettingLogins] = useState(false);
     const [confirmingLogins, setConfirmingLogins] = useState(false);
+
+    const { branchId: authBranchId, userData } = useAuth();
+    const activeBranchId = authBranchId || userData?.schoolId || "global";
 
     const setupLogins = async () => {
         if (!confirmingLogins) {
@@ -57,7 +61,13 @@ export function SeedDataButton() {
 
         setLoading(true);
         try {
-            const res = await fetch("/api/setup-data");
+            const token = await auth.currentUser?.getIdToken();
+            const res = await fetch(`/api/setup-data?branchId=${activeBranchId}`, {
+                method: "GET",
+                headers: {
+                    "Authorization": `Bearer ${token}`
+                }
+            });
             const data = await res.json();
             if (data.success) {
                 toast({ title: "System Ready", description: "Successfully seeded 200 students.", type: "success" });
@@ -110,7 +120,7 @@ export function SeedDataButton() {
                     <ChevronDown className="w-3 h-3 opacity-50" />
                 </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent align="end" className="w-56 bg-zinc-950 border-white/10 text-white p-1 rounded-xl shadow-2xl">
+            <DropdownMenuContent align="end" className="w-56 bg-[#0B1120]/95 backdrop-blur-2xl text-white p-1 rounded-xl shadow-2xl border-white/10">
                 <DropdownMenuLabel className="px-3 py-2 text-[10px] font-black uppercase tracking-widest text-muted-foreground opacity-50">Testing & Maintenance</DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-white/5" />
 

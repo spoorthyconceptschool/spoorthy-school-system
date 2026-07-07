@@ -67,7 +67,7 @@ export class EnterpriseStudentService {
 
             const brandingData = settingsSnap.data() || {};
             const branchData = branchSnap?.exists ? branchSnap.data() : null;
-            const prefix = branchData?.studentIdPrefix || brandingData.studentIdPrefix || "SCS";
+            const prefix = branchData?.studentIdPrefix || brandingData.studentIdPrefix || "";
             const startingNumber = branchData?.studentIdSuffix ? Number(branchData.studentIdSuffix) : (brandingData.studentIdSuffix ? Number(brandingData.studentIdSuffix) : 1);
 
             const feeConfig = configSnap.exists ? configSnap.data() : { terms: [], transportFees: {} };
@@ -79,7 +79,7 @@ export class EnterpriseStudentService {
             const counterId = `students_global`;
             const counterRef = adminDb.collection("counters").doc(counterId);
 
-            let newSchoolId = payload.admissionNumber;
+            let newSchoolId = payload.schoolId || `PENDING_ID`;
 
             const studentRecord = await adminDb.runTransaction(async (transaction: FirebaseFirestore.Transaction) => {
                 const counterDoc = await transaction.get(counterRef as FirebaseFirestore.DocumentReference);
@@ -117,16 +117,11 @@ export class EnterpriseStudentService {
                 ...SearchService.generateKeywords(payload.classId || "")
             ]));
 
-            const resolvedAdmissionNumber = (!payload.admissionNumber || payload.admissionNumber === "PENDING")
-                ? studentRecord.newSchoolId
-                : payload.admissionNumber;
-
             const finalStudentData = {
                 ...payload,
                 studentName,
                 schoolId: studentRecord.newSchoolId,
                 branchId,
-                admissionNumber: resolvedAdmissionNumber,
                 uid: userRecord.uid,
                 role: "STUDENT",
                 status: "ACTIVE",
@@ -153,6 +148,7 @@ export class EnterpriseStudentService {
             const userRef = adminDb.collection("users").doc(userRecord.uid);
             batch.set(userRef, {
                 schoolId: studentRecord.newSchoolId,
+                branchId: branchId,
                 role: "STUDENT",
                 status: "ACTIVE",
                 email: studentRecord.syntheticEmail,

@@ -9,7 +9,7 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Calendar, Plus, Loader2, RefreshCw, Trash2, ShieldAlert } from "lucide-react";
-import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from "@/components/ui/dialog";
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter, DialogDescription } from "@/components/ui/dialog";
 import { collection, query, orderBy, onSnapshot, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { toast } from "@/lib/toast-store";
@@ -37,71 +37,104 @@ const DEFAULT_HOLIDAYS = [
 ];
 
 export default function AdminHolidaysPage() {
-    const { user, userData } = useAuth();
-    const [holidays, setHolidays] = useState<any[]>(() => {
-        if (typeof window !== 'undefined') {
+    const { user, userData, role } = useAuth();
+    const activeBranchId = userData?.schoolId || userData?.branchId || (role === "SUPER_ADMIN" ? "global" : null);
+
+    const HOLIDAYS_CACHE_KEY = activeBranchId ? `spoorthy_holidays_cache_${activeBranchId}` : null;
+    const [holidays, setHolidays] = useState<any[]>(DEFAULT_HOLIDAYS);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && HOLIDAYS_CACHE_KEY) {
             const cached = localStorage.getItem(HOLIDAYS_CACHE_KEY);
             if (cached) {
-                try { return JSON.parse(cached); } catch(e) {}
+                try {
+                    setHolidays(JSON.parse(cached));
+                    return;
+                } catch (e) {}
             }
         }
-        return DEFAULT_HOLIDAYS;
-    });
+        setHolidays([]); // Reset if not cached or activeBranchId changes
+    }, [HOLIDAYS_CACHE_KEY]);
+
     const [loading, setLoading] = useState(false);
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [openAdd, setOpenAdd] = useState(false);
-
+    const [hasLoggedError, setHasLoggedError] = useState(false);
+    const { loading: authLoading } = useAuth();
+ 
     // Form State
     const [title, setTitle] = useState("");
     const [description, setDescription] = useState("");
     const [startDate, setStartDate] = useState("");
     const [endDate, setEndDate] = useState("");
-
+ 
     useEffect(() => {
-        if (!user) return;
-
-        const q = query(
-            collection(db, "notices"),
-            where("type", "==", "HOLIDAY")
-        );
-
-        const unsubscribe = onSnapshot(q, (snapshot) => {
-            const schoolId = userData?.schoolId || "global";
-            const isGlobal = schoolId === "global";
-            
-            const hols = snapshot.docs
-                .map(doc => ({ id: doc.id, ...doc.data() }))
-                .filter((doc: any) => isGlobal || doc.schoolId === schoolId)
-                .sort((a: any, b: any) => {
-                    const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
-                    const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
-                    return dateB - dateA; // descending
-                });
-                
-            setHolidays(hols);
-            if (typeof window !== 'undefined') {
-                localStorage.setItem(HOLIDAYS_CACHE_KEY, JSON.stringify(hols));
+        const userId = user?.uid;
+        
+        // CIRCUIT BREAKER: Stop execution if auth is transitioning, missing, or if we've already hit an error
+        if (authLoading || !userId || !activeBranchId || hasLoggedError) {
+            if (!activeBranchId && !authLoading) {
+                console.log("[HolidaysPage] activeBranchId is not yet resolved, skipping subscription.");
             }
-            setLoading(false);
-        }, (error) => {
-            console.error("Error fetching holidays:", error);
-            setLoading(false);
-        });
+            return;
+        }
 
-        return () => unsubscribe();
-    }, [user, userData?.schoolId]);
+        // Synchronous cache purge before listening
+        setHolidays([]);
+        setLoading(true);
+
+        try {
+            let baseConstraints: any[] = [
+                where("type", "==", "HOLIDAY")
+            ];
+            if (activeBranchId && activeBranchId !== "global") {
+                baseConstraints.push(where("schoolId", "==", activeBranchId));
+            }
+
+            const q = query(
+                collection(db, "notices"),
+                ...baseConstraints
+            );
+     
+            const unsubscribe = onSnapshot(q, (snapshot) => {
+                const hols = snapshot.docs
+                    .map(doc => ({ id: doc.id, ...doc.data() }))
+                    .sort((a: any, b: any) => {
+                        const dateA = a.startDate ? new Date(a.startDate).getTime() : 0;
+                        const dateB = b.startDate ? new Date(b.startDate).getTime() : 0;
+                        return dateB - dateA; // descending
+                    });
+                     
+                setHolidays(hols);
+                if (typeof window !== 'undefined' && HOLIDAYS_CACHE_KEY) {
+                    localStorage.setItem(HOLIDAYS_CACHE_KEY, JSON.stringify(hols));
+                }
+                setLoading(false);
+            }, (error) => {
+                console.warn("[Holidays] Permission Denied or Fetch error:", error.message);
+                setHasLoggedError(true); // TRIPS THE CIRCUIT BREAKER
+                setLoading(false);
+            });
+     
+            return () => unsubscribe();
+        } catch (e: any) {
+            console.error("[Holidays] Setup Error:", e.message);
+            setHasLoggedError(true); // TRIPS THE CIRCUIT BREAKER
+            setLoading(false);
+        }
+    }, [user?.uid, activeBranchId, HOLIDAYS_CACHE_KEY, authLoading, hasLoggedError]);
 
     const handleCreateHoliday = async (e: React.FormEvent) => {
         e.preventDefault();
         if (!title || !startDate || !endDate) {
-            toast({ title: "Validation Error", description: "Please fill all required fields.", variant: "destructive" });
+            toast({ title: "Validation Error", description: "Please fill all required fields.", type: "error" });
             return;
         }
 
         const sDate = new Date(startDate);
         const eDate = new Date(endDate);
         if (sDate > eDate) {
-            toast({ title: "Invalid Dates", description: "End date must be after start date.", variant: "destructive" });
+            toast({ title: "Invalid Dates", description: "End date must be after start date.", type: "error" });
             return;
         }
 
@@ -126,10 +159,10 @@ export default function AdminHolidaysPage() {
                 setStartDate("");
                 setEndDate("");
             } else {
-                toast({ title: "Failed", description: data.error, variant: "destructive" });
+                toast({ title: "Failed", description: data.error, type: "error" });
             }
         } catch (error: any) {
-            toast({ title: "Error", description: error.message, variant: "destructive" });
+            toast({ title: "Error", description: error.message, type: "error" });
         } finally {
             setIsSubmitting(false);
         }
@@ -151,10 +184,10 @@ export default function AdminHolidaysPage() {
             if (data.success) {
                 toast({ title: "Holiday Reverted", description: "Successfully restored to working day." });
             } else {
-                toast({ title: "Failed", description: data.error, variant: "destructive" });
+                toast({ title: "Failed", description: data.error, type: "error" });
             }
         } catch (error: any) {
-            toast({ title: "Error", description: error.message, variant: "destructive" });
+            toast({ title: "Error", description: error.message, type: "error" });
         }
     };
 
@@ -176,7 +209,7 @@ export default function AdminHolidaysPage() {
                             <Plus className="w-4 h-4" /> Declare Holiday
                         </Button>
                     </DialogTrigger>
-                    <DialogContent className="bg-[#0A192F] text-white border-white/10 sm:max-w-[425px]">
+                    <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white sm:max-w-[425px] border-white/10">
                         <DialogHeader>
                             <DialogTitle className="text-xl font-bold flex items-center gap-2">
                                 <Calendar className="w-5 h-5 text-accent" /> New Holiday

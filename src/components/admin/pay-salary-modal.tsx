@@ -166,7 +166,7 @@ export function PaySalaryModal({
 
     return (
         <Dialog open={isOpen} onOpenChange={handleOpenChange}>
-            <DialogContent className="bg-black/95 border-white/10 text-white sm:max-w-[500px]">
+            <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white sm:max-w-[500px] border-white/10">
                 <DialogHeader className="pb-2 border-b border-white/5">
                     <DialogTitle className="flex items-center gap-2">
                         <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center">

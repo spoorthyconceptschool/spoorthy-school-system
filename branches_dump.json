@@ -1,0 +1,45 @@
+[
+  {
+    "id": "R63uU7cnSsLtDs6B1UeV",
+    "branchName": "SPOORTHY CONCEPT SCHOOL",
+    "branchCode": "CONCEPT",
+    "schoolId": "SPCON",
+    "schoolName": "SPOORTHY CONCEPT SCHOOL",
+    "email": "bunny@gmail.com",
+    "phone": "+919963256396",
+    "address": "kanagal",
+    "city": "Nalgonda District",
+    "state": "Telangana",
+    "country": "India",
+    "pincode": "508255",
+    "principalName": "RAMESH",
+    "studentIdPrefix": "CSS",
+    "teacherIdPrefix": "CST",
+    "status": "ACTIVE",
+    "createdAt": {
+      "_seconds": 1781117325,
+      "_nanoseconds": 792000000
+    },
+    "updatedAt": "2026-06-10T18:50:00.055Z"
+  },
+  {
+    "id": "W4ZEOJXUpmccvyffIaIo",
+    "phone": "+91 0000000000",
+    "address": "Kanagal X Road",
+    "city": "Nalgonda",
+    "state": "Telangana",
+    "country": "India",
+    "pincode": "508001",
+    "principalName": "Admin",
+    "status": "ACTIVE",
+    "createdAt": {
+      "_seconds": 1780856387,
+      "_nanoseconds": 309000000
+    },
+    "branchCode": "SHS",
+    "branchName": "Spoorthy High Branch",
+    "schoolName": "Spoorthy High School",
+    "email": "prannu@gmail.com",
+    "updatedAt": "2026-06-11T18:32:58.263Z"
+  }
+]

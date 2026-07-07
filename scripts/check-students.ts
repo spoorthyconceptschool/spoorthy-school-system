@@ -3,12 +3,11 @@ import * as fs from 'fs';
 
 async function checkStudents() {
     const students = await adminDb.collection("students").limit(5).get();
-    const results = [];
-    students.forEach(doc => {
+    const results: any[] = [];
+    students.forEach((doc: any) => {
         results.push({
             docId: doc.id,
-            schoolId: doc.data().schoolId,
-            studentName: doc.data().studentName
+            ...doc.data()
         });
     });
     fs.writeFileSync('./students_check.json', JSON.stringify(results, null, 2));

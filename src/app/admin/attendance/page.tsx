@@ -1,4 +1,3 @@
-
 "use client";
 
 import { useState, useEffect } from "react";
@@ -15,6 +14,7 @@ import {
 } from "@/components/ui/select";
 import { Card } from "@/components/ui/card";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { CalendarDays, Users2, ShieldAlert } from "lucide-react";
 
 export default function AdminAttendancePage() {
     const { classes, classSections, sections } = useMasterData();
@@ -22,12 +22,11 @@ export default function AdminAttendancePage() {
     const [selectedSection, setSelectedSection] = useState<string>("");
     // Initialize date synchronously to avoid first-render flicker
     const [date, setDate] = useState(() => {
-        if (typeof window === "undefined") return "2026-02-23"; // Fallback for SSR using current user time
+        if (typeof window === "undefined") return "2026-02-23"; 
         return new Date().toISOString().split('T')[0];
     });
 
     useEffect(() => {
-        // Double check on client side to handle overnight sessions
         const today = new Date().toISOString().split('T')[0];
         if (date !== today) setDate(today);
     }, []);
@@ -40,93 +39,129 @@ export default function AdminAttendancePage() {
         : [];
 
     return (
-        <div className="max-w-none p-0 space-y-6 animate-in fade-in">
-            <div className="flex flex-col md:flex-row items-center justify-between gap-4 border-b border-white/10 pb-6">
-                <div>
-                    <h1 className="text-3xl font-display font-bold">Attendance Management</h1>
-                    <p className="text-muted-foreground">Mark or modify attendance for students and teachers.</p>
+        <div className="max-w-7xl mx-auto p-4 md:p-8 space-y-8 animate-in fade-in duration-500">
+            {/* Header section with glow effect */}
+            <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 bg-[#0B1524] p-6 rounded-2xl border border-white/5 shadow-2xl relative overflow-hidden">
+                <div className="absolute top-0 right-0 w-80 h-80 bg-gradient-to-bl from-emerald-500/10 via-transparent to-transparent opacity-40 blur-3xl pointer-events-none" />
+                
+                <div className="flex items-center gap-4 relative z-10">
+                    <div className="w-14 h-14 rounded-2xl bg-gradient-to-br from-emerald-500/20 to-teal-600/20 flex items-center justify-center border border-emerald-500/30 shadow-inner">
+                        <CalendarDays className="w-7 h-7 text-emerald-400" />
+                    </div>
+                    <div>
+                        <h1 className="text-2xl md:text-3xl font-display font-black text-white tracking-tight">Attendance Management</h1>
+                        <p className="text-zinc-400 text-sm mt-1">Track and manage attendance records across all classes and staffing divisions</p>
+                    </div>
                 </div>
-                <div className="w-full md:w-48 space-y-2">
-                    <label className="text-xs text-muted-foreground uppercase font-medium">Select Date</label>
-                    <div className="relative">
-                        <input
-                            type="date"
-                            value={date}
-                            onChange={(e) => setDate(e.target.value)}
-                            className="bg-white/5 border border-white/10 rounded-md py-2 px-3 w-full text-white focus:outline-none focus:ring-1 focus:ring-emerald-500/50"
-                        />
+
+                <div className="w-full lg:w-auto relative z-10 shrink-0">
+                    <div className="bg-white/5 border border-white/10 rounded-xl p-3 px-4 flex items-center gap-4 hover:border-emerald-500/30 transition-all">
+                        <div className="space-y-1">
+                            <label className="block text-[10px] text-zinc-500 uppercase tracking-widest font-black">Attendance Date</label>
+                            <input
+                                type="date"
+                                value={date}
+                                onChange={(e) => setDate(e.target.value)}
+                                className="bg-transparent border-0 p-0 text-white font-bold outline-none focus:ring-0 text-sm cursor-pointer [color-scheme:dark]"
+                            />
+                        </div>
                     </div>
                 </div>
             </div>
 
-            <Tabs defaultValue="student" className="w-full">
-                <TabsList className="flex flex-wrap h-auto w-full md:grid md:grid-cols-3 md:w-full max-w-[600px] mb-6 bg-black/40 border border-white/10 gap-2 p-1">
-                    <TabsTrigger value="student" className="flex-1 min-w-[140px]">Student Attendance</TabsTrigger>
-                    <TabsTrigger value="teacher" className="flex-1 min-w-[140px]">Teacher Attendance</TabsTrigger>
-                    <TabsTrigger value="staff" className="flex-1 min-w-[140px]">Staff Attendance</TabsTrigger>
+            {/* Attendance Modules Tabs */}
+            <Tabs defaultValue="student" className="w-full space-y-6">
+                <TabsList className="bg-[#0B1524] border border-white/5 p-1.5 rounded-2xl flex flex-wrap md:inline-flex h-auto gap-1">
+                    <TabsTrigger 
+                        value="student" 
+                        className="rounded-xl px-6 py-2.5 font-bold tracking-tight text-zinc-400 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-teal-600 data-[state=active]:text-black transition-all"
+                    >
+                        Student Attendance
+                    </TabsTrigger>
+                    <TabsTrigger 
+                        value="teacher" 
+                        className="rounded-xl px-6 py-2.5 font-bold tracking-tight text-zinc-400 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-teal-600 data-[state=active]:text-black transition-all"
+                    >
+                        Teacher Attendance
+                    </TabsTrigger>
+                    <TabsTrigger 
+                        value="staff" 
+                        className="rounded-xl px-6 py-2.5 font-bold tracking-tight text-zinc-400 data-[state=active]:bg-gradient-to-r data-[state=active]:from-emerald-500 data-[state=active]:to-teal-600 data-[state=active]:text-black transition-all"
+                    >
+                        Staff Attendance
+                    </TabsTrigger>
                 </TabsList>
 
-                <TabsContent value="student" className="space-y-6">
-                    <Card className="bg-black/20 border-white/10 p-4">
-                        <div className="flex flex-col md:flex-row gap-4 items-end">
-                            <div className="space-y-2 w-full md:w-48">
-                                <label className="text-xs text-muted-foreground uppercase">Class</label>
+                {/* Students Content */}
+                <TabsContent value="student" className="space-y-6 outline-none">
+                    <Card className="bg-[#0B1524] border border-white/5 p-6 rounded-2xl shadow-xl relative overflow-hidden">
+                        <div className="absolute top-0 left-0 w-full h-1 bg-gradient-to-r from-emerald-500/40 via-teal-500/20 to-transparent" />
+                        <div className="flex flex-col sm:flex-row gap-4 items-end max-w-xl">
+                            <div className="space-y-2 w-full sm:w-1/2">
+                                <label className="text-[10px] text-zinc-500 uppercase tracking-widest font-black block">Class</label>
                                 <Select value={selectedClass} onValueChange={(val) => { setSelectedClass(val); setSelectedSection(""); }}>
-                                    <SelectTrigger className="bg-white/5 border-white/10">
+                                    <SelectTrigger className="bg-[#050B14] border-white/10 rounded-xl h-11 focus:ring-emerald-500/30 text-white font-medium">
                                         <SelectValue placeholder="Select Class" />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="bg-[#0B1524] border-white/10 text-white">
                                         {Object.values(classes || {}).map((c: any) => (
-                                            <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                            <SelectItem key={c.id} value={c.id} className="hover:bg-white/5 focus:bg-white/5 rounded-lg">{c.name}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                             </div>
 
-                            <div className="space-y-2 w-full md:w-32">
-                                <label className="text-xs text-muted-foreground uppercase">Section</label>
+                            <div className="space-y-2 w-full sm:w-1/2">
+                                <label className="text-[10px] text-zinc-500 uppercase tracking-widest font-black block">Section</label>
                                 <Select
                                     value={selectedSection}
                                     onValueChange={setSelectedSection}
                                     disabled={!selectedClass}
                                 >
-                                    <SelectTrigger className="bg-white/5 border-white/10">
-                                        <SelectValue placeholder="Sec" />
+                                    <SelectTrigger className="bg-[#050B14] border-white/10 rounded-xl h-11 focus:ring-emerald-500/30 text-white font-medium disabled:opacity-40">
+                                        <SelectValue placeholder="Select Section" />
                                     </SelectTrigger>
-                                    <SelectContent>
+                                    <SelectContent className="bg-[#0B1524] border-white/10 text-white">
                                         {fetchedSections.map((sec: any) => (
-                                            <SelectItem key={sec.id} value={sec.id}>{sec.name}</SelectItem>
+                                            <SelectItem key={sec.id} value={sec.id} className="hover:bg-white/5 focus:bg-white/5 rounded-lg">{sec.name}</SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                                 {selectedClass && fetchedSections.length === 0 && (
-                                    <p className="text-[10px] text-red-400">No sections linked.</p>
+                                    <p className="text-[10px] text-rose-400 font-medium">No sections linked.</p>
                                 )}
                             </div>
                         </div>
                     </Card>
 
-                    {selectedClass && selectedSection && date && (
-                        <div>
+                    {selectedClass && selectedSection && date ? (
+                        <div className="animate-in fade-in duration-500">
                             <AttendanceManager
                                 classId={selectedClass}
                                 sectionId={selectedSection}
                                 defaultDate={date}
                             />
                         </div>
-                    )}
-                    {(!selectedClass || !selectedSection) && (
-                        <div className="flex flex-col items-center justify-center p-20 border border-dashed border-white/10 rounded-xl bg-white/5">
-                            <p className="text-muted-foreground">Please select Class and Section to view student attendance.</p>
+                    ) : (
+                        <div className="flex flex-col items-center justify-center p-16 border border-dashed border-white/10 rounded-2xl bg-[#0B1524]/20 text-center space-y-4">
+                            <div className="w-16 h-16 rounded-full bg-white/5 flex items-center justify-center text-zinc-500">
+                                <Users2 size={28} />
+                            </div>
+                            <div className="max-w-sm space-y-1">
+                                <h3 className="font-bold text-white text-lg">No Class Selected</h3>
+                                <p className="text-zinc-500 text-sm leading-relaxed">Please select a class and section from the dropdowns above to mark student attendance.</p>
+                            </div>
                         </div>
                     )}
                 </TabsContent>
 
-                <TabsContent value="teacher">
+                {/* Teachers Content */}
+                <TabsContent value="teacher" className="outline-none">
                     <TeacherAttendanceManager defaultDate={date} />
                 </TabsContent>
 
-                <TabsContent value="staff">
+                {/* Staff Content */}
+                <TabsContent value="staff" className="outline-none">
                     <StaffAttendanceManager defaultDate={date} />
                 </TabsContent>
             </Tabs>

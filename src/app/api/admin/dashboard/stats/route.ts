@@ -1,12 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getInitError, adminDb, adminRtdb, adminAuth, Timestamp } from "@/lib/firebase-admin";
+import { adminDb, adminRtdb, adminAuth, Timestamp } from "@/lib/firebase-admin";
 
 /**
- * Enterprise Dashboard Aggregator
+ * Enterprise Dashboard Aggregator - Optimized V2 (Zero Latency)
  * 
  * Rules:
- * - Dashboards must load from cached/pre-computed backend data.
- * - Frontend must NEVER calculate these summaries.
+ * - Use native Firestore count queries for total students/teachers/staff.
+ * - Cache bulky ledger calculations in system_aggregates with a 5-minute TTL.
+ * - Avoid fetching full collections of 30,000 documents to count them.
  */
 export async function GET(req: NextRequest) {
     try {
@@ -27,50 +28,88 @@ export async function GET(req: NextRequest) {
         const token = authHeader.split("Bearer ")[1];
         const decodedToken = await adminAuth.verifyIdToken(token);
         
-        let schoolId = decodedToken.schoolId;
+        let schoolId = decodedToken.schoolId || decodedToken.branchId || decodedToken.SchoolId || decodedToken.BranchId;
+        let role = decodedToken.role || decodedToken.Role;
         if (!schoolId) {
             const userDoc = await adminDb.collection("users").doc(decodedToken.uid).get();
-            schoolId = userDoc.data()?.schoolId || "global";
+            const uData = userDoc.data();
+            schoolId = uData?.schoolId || uData?.SchoolId || uData?.branchId || uData?.BranchId || "global";
+            role = uData?.role || uData?.Role || role;
         }
 
-        // --- ROBUST ENTERPRISE AGGREGATION ---
-        // If schoolId is "global", we query ALL data for the school system.
-        // If it's a specific branch ID, we isolate.
+        const requestedBranchId = url.searchParams.get("branchId");
+        if (requestedBranchId && (schoolId === "global" || role === "SUPER_ADMIN")) {
+            schoolId = requestedBranchId;
+        }
+
+
         const isGlobal = schoolId === "global";
 
+        // --- OPTIMIZED FAST COUNT QUERIES ---
         let studentsBaseQ = adminDb.collection("students").where("status", "==", "ACTIVE");
         let teachersBaseQ = adminDb.collection("teachers").where("status", "==", "ACTIVE");
         let staffBaseQ = adminDb.collection("staff").where("status", "==", "ACTIVE");
-        
-        const [studentsSnap, teachersSnap, staffSnap, classesSnap, leavesSnap] = await Promise.all([
-            studentsBaseQ.get(), // Get full snapshot for memory filtering if needed
-            teachersBaseQ.get(),
-            staffBaseQ.get(),
-            adminDb.collection("master_classes").get(),
-            adminDb.collection("leave_requests").where("status", "==", "PENDING").get()
+        let leavesBaseQ = adminDb.collection("leave_requests").where("status", "==", "PENDING");
+
+        if (!isGlobal) {
+            studentsBaseQ = studentsBaseQ.where("branchId", "==", schoolId);
+            teachersBaseQ = teachersBaseQ.where("branchId", "==", schoolId);
+            staffBaseQ = staffBaseQ.where("branchId", "==", schoolId);
+            leavesBaseQ = leavesBaseQ.where("branchId", "==", schoolId);
+        }
+
+        const [studentsCountSnap, teachersCountSnap, staffCountSnap, leavesCountSnap, classesSnap] = await Promise.all([
+            studentsBaseQ.count().get(),
+            teachersBaseQ.count().get(),
+            staffBaseQ.count().get(),
+            leavesBaseQ.count().get(),
+            adminDb.collection("master_classes").get()
         ]);
 
-        // --- IN-MEMORY FILTERING TO AVOID COMPOSITE INDEXES ---
-        // To prevent leaking old data to new branches, we consider empty branchId to belong to the HQ/Default branch.
-        const branchDoc = !isGlobal ? await adminDb.collection("branches").doc(schoolId).get() : null;
-        const isOriginalBranch = branchDoc?.exists ? branchDoc.data()?.branchCode === "SHS" : false;
-
-        const matchesBranch = (d: any) => {
-            if (isGlobal) return true;
-            const bId = d.data().branchId;
-            return bId === schoolId || (isOriginalBranch && !bId);
-        };
-
-        const filteredStudents = studentsSnap.docs.filter(matchesBranch);
-        const filteredTeachers = teachersSnap.docs.filter(matchesBranch);
-        const filteredStaff = staffSnap.docs.filter(matchesBranch);
-        const filteredLeaves = leavesSnap.docs.filter(matchesBranch);
-
+        const totalStudents = studentsCountSnap.data().count;
+        const totalTeachers = teachersCountSnap.data().count;
+        const totalStaff = staffCountSnap.data().count;
+        const leaveRequests = leavesCountSnap.data().count;
         const totalClasses = classesSnap.size;
 
-        const systemStatsSnap = await adminDb.collection("system_aggregates").doc(academicYear).get();
-        const systemStats = systemStatsSnap.exists ? systemStatsSnap.data() : { totalPendingFees: 0 };
+        // --- BRANCHES LIST & RESOLUTION ---
+        const allBranchesSnap = await adminDb.collection("branches").get();
+        const totalSchools = allBranchesSnap.size;
         
+        let defaultBranchId = "unknown";
+        const branchWiseStats: Record<string, { branchId: string; branchName: string; totalStudents: number; revenue: number; pendingFees: number }> = {};
+        
+        allBranchesSnap.docs.forEach((doc: any) => {
+            const data = doc.data();
+            if (data.branchCode === "SHS") defaultBranchId = doc.id;
+            branchWiseStats[doc.id] = {
+                branchId: doc.id,
+                branchName: data.branchName || doc.id,
+                totalStudents: 0,
+                revenue: 0,
+                pendingFees: 0
+            };
+        });
+
+        // Parallelize branch-wise student counts for global view in 1 go
+        if (isGlobal) {
+            await Promise.all(allBranchesSnap.docs.map(async (doc: any) => {
+                const bId = doc.id;
+                const countSnap = await adminDb.collection("students")
+                    .where("status", "==", "ACTIVE")
+                    .where("branchId", "==", bId)
+                    .count()
+                    .get();
+                if (branchWiseStats[bId]) {
+                    branchWiseStats[bId].totalStudents = countSnap.data().count;
+                }
+            }));
+        } else {
+            if (branchWiseStats[schoolId]) {
+                branchWiseStats[schoolId].totalStudents = totalStudents;
+            }
+        }
+
         // --- TIMEZONE-SAFE TODAY WINDOW ---
         const now = new Date();
         const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -79,14 +118,13 @@ export async function GET(req: NextRequest) {
         let paymentsQ = adminDb.collection("payments")
             .where("createdAt", ">=", Timestamp.fromDate(todayStart))
             .where("createdAt", "<=", Timestamp.fromDate(todayEnd));
-            
-        // paymentsQ usually has an index for createdAt, but schoolId would require composite.
+        
         const paymentsSnap = await paymentsQ.get();
         let exactTodayCollection = 0;
         paymentsSnap.forEach((doc: any) => {
             const data = doc.data();
             const bId = data.branchId;
-            const matchesSchool = isGlobal || bId === schoolId || (isOriginalBranch && !bId);
+            const matchesSchool = isGlobal || bId === schoolId;
             if (matchesSchool && (data.status === "success" || data.status === "SUCCESS" || !data.status)) {
                 exactTodayCollection += Number(data.amount || 0);
             }
@@ -94,9 +132,11 @@ export async function GET(req: NextRequest) {
 
         // --- ATTENDANCE AGGREGATION (TODAY) ---
         const todayStr = now.toISOString().split('T')[0]; // YYYY-MM-DD
-        
-        // Query only by date to avoid index requirement
-        const attendanceSnap = await adminDb.collection("attendance_daily").where("date", "==", todayStr).get();
+        let attendanceQ = adminDb.collection("attendance_daily").where("date", "==", todayStr);
+        if (!isGlobal) {
+            attendanceQ = attendanceQ.where("branchId", "==", schoolId);
+        }
+        const attendanceSnap = await attendanceQ.get();
         
         let presentStudents = 0;
         let presentTeachers = 0;
@@ -106,12 +146,8 @@ export async function GET(req: NextRequest) {
         let absentTeachers = 0;
         let absentStaff = 0;
 
-        attendanceSnap.forEach(doc => {
+        attendanceSnap.forEach((doc: any) => {
             const data = doc.data();
-            const bId = data.branchId;
-            const matchesSchool = isGlobal || bId === schoolId || (isOriginalBranch && !bId);
-            if (!matchesSchool) return;
-
             const pCount = data.stats?.present || 0;
             const aCount = data.stats?.absent || 0;
             
@@ -127,31 +163,18 @@ export async function GET(req: NextRequest) {
             }
         });
 
+        // --- FINANCIAL FILTER PARAMETERS ---
         const filterClass = url.searchParams.get("classId");
         const filterSection = url.searchParams.get("section");
         const filterVillage = url.searchParams.get("village");
 
-        const matchingStudentIds = new Set(
-            filteredStudents
-                .filter(doc => {
-                    const data = doc.data();
-                    if (filterClass && data.classId !== filterClass) return false;
-                    if (filterSection && data.section !== filterSection) return false;
-                    if (filterVillage && data.village !== filterVillage) return false;
-                    return true;
-                })
-                .map(doc => {
-                    const data = doc.data();
-                    return data.schoolId || doc.id;
-                })
-        );
+        const isFiltered = !!(filterClass || filterSection || filterVillage);
 
-        // --- FINANCIAL AGGREGATION (REAL-TIME LEDGER SCAN) ---
-        const ledgersSnap = await adminDb.collection("student_fee_ledgers")
-            .where("academicYearId", "==", academicYear)
-            .get();
-
-        const finance = {
+        // --- SERVER-SIDE LEDGER CACHE ---
+        const cacheDocId = `finance_aggregate_${schoolId}_${academicYear}`;
+        const cacheDocRef = adminDb.collection("system_aggregates").doc(cacheDocId);
+        
+        let finance = {
             totalFee: 0,
             totalPaid: 0,
             hostelFee: 0,
@@ -163,80 +186,159 @@ export async function GET(req: NextRequest) {
             schoolFee: 0,
             schoolPaid: 0,
             customFees: {} as Record<string, { total: number; paid: number }>,
-            terms: {} as Record<string, { total: number; paid: number }>
+            terms: {} as Record<string, { total: number; paid: number }>,
+            feeTypeAnalytics: {} as Record<string, { pending: number; partial: number; noDue: number; totalAccounts: number }>
         };
 
-        ledgersSnap.forEach((doc: any) => {
-            const data = doc.data();
-            const bId = data.branchId;
-            const matchesSchool = isGlobal || bId === schoolId || (isOriginalBranch && !bId);
-            if (!matchesSchool) return;
+        const CACHE_TTL_MS = 5 * 60 * 1000; // 5 min TTL
+        let useServerCache = false;
 
-            // Apply Filter Intersection
-            if (!matchingStudentIds.has(data.studentId)) return;
-
-            finance.totalFee += Number(data.totalFee || 0);
-            finance.totalPaid += Number(data.totalPaid || 0);
-
-            (data.items || []).forEach((item: any) => {
-                const amt = Number(item.amount || 0);
-                const paid = Number(item.paidAmount || 0);
-                
-                if (item.type === "TRANSPORT") {
-                    finance.transportFee += amt;
-                    finance.transportPaid += paid;
-                } else if (item.type === "TERM") {
-                    finance.schoolFee += amt;
-                    finance.schoolPaid += paid;
-                    
-                    const termName = item.name || "Unknown Term";
-                    if (!finance.terms[termName]) {
-                        finance.terms[termName] = { total: 0, paid: 0 };
-                    }
-                    finance.terms[termName].total += amt;
-                    finance.terms[termName].paid += paid;
-                } else {
-                    // Dynamically group custom or other extra fees by their exact name
-                    const feeName = item.name || "Custom Fee";
-                    if (!finance.customFees[feeName]) {
-                        finance.customFees[feeName] = { total: 0, paid: 0 };
-                    }
-                    finance.customFees[feeName].total += amt;
-                    finance.customFees[feeName].paid += paid;
-
-                    // Legacy metric fallbacks for full system compatibility
-                    if (item.name?.toUpperCase().includes("HOSTEL") || item.type === "HOSTEL") {
-                        finance.hostelFee += amt;
-                        finance.hostelPaid += paid;
-                    } else {
-                        finance.customFee += amt;
-                        finance.customPaid += paid;
+        // Only use server cache if no UI filters are applied
+        if (!isFiltered) {
+            try {
+                const cacheSnap = await cacheDocRef.get();
+                if (cacheSnap.exists) {
+                    const cacheData = cacheSnap.data();
+                    const ageMs = Date.now() - new Date(cacheData.updatedAt || 0).getTime();
+                    if (ageMs < CACHE_TTL_MS) {
+                        finance = cacheData.finance || finance;
+                        useServerCache = true;
                     }
                 }
+            } catch (err) {
+                console.warn("[DashboardStats API] Failed reading cache doc:", err);
+            }
+        }
+
+        if (!useServerCache) {
+            // Build filtered query to avoid fetching all 30,000 ledger docs if UI filters are active
+            let ledgersQ = adminDb.collection("student_fee_ledgers").where("academicYearId", "==", academicYear);
+            if (!isGlobal) {
+                ledgersQ = ledgersQ.where("branchId", "==", schoolId);
+            }
+            if (filterClass && filterClass !== "all") {
+                ledgersQ = ledgersQ.where("classId", "==", filterClass);
+            }
+            if (filterSection && filterSection !== "all") {
+                ledgersQ = ledgersQ.where("sectionId", "==", filterSection);
+            }
+
+            const ledgersSnap = await ledgersQ.get();
+
+            // Fetch students list for village filtering if necessary
+            let villageMatchedStudentIds = new Set<string>();
+            if (filterVillage && filterVillage !== "all") {
+                const studsSnap = await adminDb.collection("students")
+                    .where("branchId", "==", schoolId)
+                    .where("villageId", "==", filterVillage)
+                    .get();
+                studsSnap.forEach((d: any) => villageMatchedStudentIds.add(d.id));
+            }
+
+            ledgersSnap.forEach((doc: any) => {
+                const data = doc.data();
+                
+                // If village filter is applied, skip ledgers for other students
+                if (filterVillage && filterVillage !== "all" && !villageMatchedStudentIds.has(data.studentId)) {
+                    return;
+                }
+
+                finance.totalFee += Number(data.totalFee || 0);
+                finance.totalPaid += Number(data.totalPaid || 0);
+
+                const resolved = data.branchId || schoolId;
+                if (branchWiseStats[resolved]) {
+                    branchWiseStats[resolved].revenue += Number(data.totalPaid || 0);
+                    branchWiseStats[resolved].pendingFees += Math.max(0, Number(data.totalFee || 0) - Number(data.totalPaid || 0));
+                }
+
+                (data.items || []).forEach((item: any) => {
+                    const amt = Number(item.amount || 0);
+                    const paid = Number(item.paidAmount || 0);
+                    
+                    let feeTypeLabel = "School Fee";
+                    if (item.type === "TRANSPORT") {
+                        finance.transportFee += amt;
+                        finance.transportPaid += paid;
+                        feeTypeLabel = "Transport";
+                    } else if (item.type === "TERM") {
+                        finance.schoolFee += amt;
+                        finance.schoolPaid += paid;
+                        feeTypeLabel = item.name || "School Fee";
+                        
+                        const termName = item.name || "Unknown Term";
+                        if (!finance.terms[termName]) {
+                            finance.terms[termName] = { total: 0, paid: 0 };
+                        }
+                        finance.terms[termName].total += amt;
+                        finance.terms[termName].paid += paid;
+                    } else {
+                        const feeName = item.name || "Custom Fee";
+                        feeTypeLabel = feeName;
+                        if (!finance.customFees[feeName]) {
+                            finance.customFees[feeName] = { total: 0, paid: 0 };
+                        }
+                        finance.customFees[feeName].total += amt;
+                        finance.customFees[feeName].paid += paid;
+
+                        if (item.name?.toUpperCase().includes("HOSTEL") || item.type === "HOSTEL") {
+                            finance.hostelFee += amt;
+                            finance.hostelPaid += paid;
+                        } else {
+                            finance.customFee += amt;
+                            finance.customPaid += paid;
+                        }
+                    }
+
+                    // Account stats calculation
+                    if (!finance.feeTypeAnalytics[feeTypeLabel]) {
+                        finance.feeTypeAnalytics[feeTypeLabel] = { pending: 0, partial: 0, noDue: 0, totalAccounts: 0 };
+                    }
+                    finance.feeTypeAnalytics[feeTypeLabel].totalAccounts++;
+                    if (paid === 0) {
+                        finance.feeTypeAnalytics[feeTypeLabel].pending++;
+                    } else if (paid >= amt) {
+                        finance.feeTypeAnalytics[feeTypeLabel].noDue++;
+                    } else {
+                        finance.feeTypeAnalytics[feeTypeLabel].partial++;
+                    }
+                });
             });
-        });
+
+            // Write back base financials to the cache document (unfiltered only)
+            if (!isFiltered) {
+                try {
+                    await cacheDocRef.set({
+                        finance,
+                        updatedAt: new Date().toISOString()
+                    }, { merge: true });
+                } catch (err) {
+                    console.warn("[DashboardStats API] Failed writing cache doc:", err);
+                }
+            }
+        }
 
         const preComputedStats = {
-            totalStudents: filteredStudents.length,
-            totalTeachers: filteredTeachers.length,
-            totalStaff: filteredStaff.length,
-            totalClasses: totalClasses,
-            pendingFees: systemStats?.totalPendingFees || 0,
+            totalSchools: isGlobal ? totalSchools : 1,
+            totalStudents,
+            totalTeachers,
+            totalStaff,
+            totalClasses,
+            pendingFees: Math.max(0, finance.totalFee - finance.totalPaid),
             todayCollection: exactTodayCollection,
-            leaveRequests: filteredLeaves.length,
+            leaveRequests,
             presentStudents,
             presentTeachers,
             presentStaff,
             absentStudents,
             absentTeachers,
             absentStaff,
-            pendingStudents: Math.max(0, filteredStudents.length - (presentStudents + absentStudents)),
-            pendingTeachers: Math.max(0, filteredTeachers.length - (presentTeachers + absentTeachers)),
-            pendingStaff: Math.max(0, filteredStaff.length - (presentStaff + absentStaff)),
-            finance
+            pendingStudents: Math.max(0, totalStudents - (presentStudents + absentStudents)),
+            pendingTeachers: Math.max(0, totalTeachers - (presentTeachers + absentTeachers)),
+            pendingStaff: Math.max(0, totalStaff - (presentStaff + absentStaff)),
+            finance,
+            branchWiseStats: Object.values(branchWiseStats)
         };
-
-        console.log(`[Dashboard Stats] year=${academicYear} isGlobal=${isGlobal} totalStudents=${preComputedStats.totalStudents} todayColl=${exactTodayCollection}`);
 
         return NextResponse.json({
             success: true,
@@ -256,8 +358,7 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({
             success: false,
             error: "Failed to load dashboard aggregations.",
-            details: error.message,
-            help: error.message?.includes("index") ? "This query requires a Firestore composite index. Check Firebase Console logs for the index creation link." : undefined
+            details: error.message
         }, { status: 500 });
     }
 }

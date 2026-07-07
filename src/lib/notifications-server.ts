@@ -8,10 +8,24 @@ export async function createServerNotification(props: {
     type: string;
     actionBy?: string;
     actionByName?: string;
+    schoolId?: string;
+    branchId?: string;
 }) {
     try {
+        let schoolId = props.schoolId || "global";
+        const actorId = props.actionBy || props.userId;
+        if (!props.schoolId && actorId) {
+            const userSnap = await adminDb.collection("users").doc(actorId).get();
+            if (userSnap.exists) {
+                const uData = userSnap.data();
+                schoolId = uData?.branchId || uData?.schoolId || "global";
+            }
+        }
+
         await adminDb.collection("notifications").add({
             ...props,
+            schoolId,
+            branchId: schoolId,
             status: "UNREAD",
             createdAt: Timestamp.now()
         });
@@ -114,6 +128,8 @@ export async function notifyManagerActionServer(props: {
     type: string;
     actionBy: string;
     actionByName: string;
+    schoolId?: string;
+    branchId?: string;
 }) {
     // 1. Notify Admins
     await createServerNotification({

@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { useAuth } from "@/context/AuthContext";
 import { Card } from "@/components/ui/card";
 import { useMasterData } from "@/context/MasterDataContext";
@@ -29,6 +29,10 @@ export default function StudentHomeworkPage() {
     const [selectedDate, setSelectedDate] = useState<string>("");
     const [animationDirection, setAnimationDirection] = useState<'prev' | 'next'>('next');
     const [animating, setAnimating] = useState(false);
+    
+    // Swipe state refs to persist across renders
+    const touchStartX = useRef(0);
+    const touchEndX = useRef(0);
 
     // Format helper for classic diary date
     const formatDiaryDate = (dateStr: string) => {
@@ -41,18 +45,30 @@ export default function StudentHomeworkPage() {
         return `${dd} . ${mm} . ${yy}`;
     };
 
+    const parseDateStr = (createdAt: any) => {
+        if (!createdAt) return null;
+        let d: Date;
+        if (createdAt.seconds) {
+            d = new Date(createdAt.seconds * 1000);
+        } else if (createdAt.toDate) {
+            d = createdAt.toDate();
+        } else {
+            d = new Date(createdAt);
+        }
+        if (isNaN(d.getTime())) return null;
+        return d.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        });
+    };
+
     // Unique dates sorting
     const getUniqueHomeworkDates = () => {
         const dates = new Set<string>();
         homework.forEach(hw => {
-            if (hw.createdAt) {
-                const d = new Date(hw.createdAt.seconds * 1000).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit'
-                });
-                dates.add(d);
-            }
+            const d = parseDateStr(hw.createdAt);
+            if (d) dates.add(d);
         });
         return Array.from(dates).sort((a, b) => new Date(b).getTime() - new Date(a).getTime());
     };
@@ -95,15 +111,9 @@ export default function StudentHomeworkPage() {
     const getHomeworkForSelectedDate = () => {
         const map: Record<string, any> = {};
         homework.forEach(hw => {
-            if (hw.createdAt) {
-                const d = new Date(hw.createdAt.seconds * 1000).toLocaleDateString('en-US', {
-                    year: 'numeric',
-                    month: '2-digit',
-                    day: '2-digit'
-                });
-                if (d === selectedDate) {
-                    map[hw.subjectId] = hw;
-                }
+            const d = parseDateStr(hw.createdAt);
+            if (d === selectedDate) {
+                map[hw.subjectId] = hw;
             }
         });
         return map;
@@ -126,38 +136,43 @@ export default function StudentHomeworkPage() {
         return nameA.localeCompare(nameB);
     });
 
-    const navigatePage = (direction: 'prev' | 'next') => {
-        if (uniqueDates.length <= 1 || animating) return;
-        const currentIndex = uniqueDates.indexOf(selectedDate);
-        if (currentIndex === -1) return;
-
-        let nextIndex = direction === 'prev' ? currentIndex + 1 : currentIndex - 1;
-        if (nextIndex >= 0 && nextIndex < uniqueDates.length) {
-            setAnimationDirection(direction);
-            setAnimating(true);
-            setSelectedDate(uniqueDates[nextIndex]);
-            setTimeout(() => setAnimating(false), 600);
-        }
+    const changeDateByDays = (days: number) => {
+        if (animating) return;
+        const current = new Date(selectedDate);
+        if (isNaN(current.getTime())) return;
+        current.setDate(current.getDate() + days);
+        const newDateStr = current.toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: '2-digit',
+            day: '2-digit'
+        });
+        
+        setAnimationDirection(days > 0 ? 'next' : 'prev');
+        setAnimating(true);
+        setSelectedDate(newDateStr);
+        setTimeout(() => setAnimating(false), 600);
     };
 
-    const hasNext = uniqueDates.indexOf(selectedDate) > 0;
-    const hasPrev = uniqueDates.indexOf(selectedDate) < uniqueDates.length - 1 && uniqueDates.indexOf(selectedDate) !== -1;
+    const navigatePage = (direction: 'prev' | 'next') => {
+        changeDateByDays(direction === 'next' ? 1 : -1);
+    };
+
+    const hasNext = true;
+    const hasPrev = true;
 
     // Swipe gesture support for mobile
-    let touchStartX = 0;
-    let touchEndX = 0;
     const handleTouchStart = (e: React.TouchEvent) => {
-        touchStartX = e.changedTouches[0].screenX;
+        touchStartX.current = e.changedTouches[0].screenX;
     };
     const handleTouchEnd = (e: React.TouchEvent) => {
-        touchEndX = e.changedTouches[0].screenX;
+        touchEndX.current = e.changedTouches[0].screenX;
         handleSwipeGesture();
     };
     const handleSwipeGesture = () => {
-        if (touchStartX - touchEndX > 50) {
+        if (touchStartX.current - touchEndX.current > 50) {
             if (hasNext) navigatePage('next');
         }
-        if (touchEndX - touchStartX > 50) {
+        if (touchEndX.current - touchStartX.current > 50) {
             if (hasPrev) navigatePage('prev');
         }
     };
@@ -503,7 +518,7 @@ export default function StudentHomeworkPage() {
                         <div 
                             onTouchStart={handleTouchStart}
                             onTouchEnd={handleTouchEnd}
-                            className="relative bg-[#3e2723] rounded-[24px] p-3.5 md:p-5 shadow-2xl border-2 border-[#2d1b18] w-full flex flex-col justify-between"
+                            className="relative bg-[#3e2723] rounded-[24px] p-3.5 md:p-5 shadow-2xl border-2 border-[#2d1b18] w-full flex flex-col justify-between touch-pan-y overscroll-x-none"
                         >
                             {/* Leather grain textures */}
                             <div className="absolute inset-0 bg-gradient-to-tr from-black/30 via-transparent to-white/5 pointer-events-none z-10" />

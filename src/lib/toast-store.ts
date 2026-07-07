@@ -28,10 +28,17 @@ export const useToastStore = create<ToastState>((set) => ({
         const id = Math.random().toString(36).substring(2, 9);
         const newToast = { ...toast, id, timestamp: Date.now() };
 
-        set((state) => ({
-            toasts: [...state.toasts, newToast],
-            history: [newToast, ...state.history].slice(0, 50), // Keep last 50
-        }));
+        set((state) => {
+            const nextToasts = [...state.toasts, newToast];
+            // OVERFLOW MITIGATION: Prevent more than 5 active toasts
+            if (nextToasts.length > 5) {
+                nextToasts.shift(); // Remove oldest
+            }
+            return {
+                toasts: nextToasts,
+                history: [newToast, ...state.history].slice(0, 50), // Keep last 50
+            };
+        });
 
         if (toast.duration !== Infinity) {
             setTimeout(() => {

@@ -46,7 +46,7 @@ export async function POST(req: NextRequest) {
         if (actorRole === "MANAGER") {
             audience = "STUDENTS";
         }
-        const actorSchoolId = userDoc.data()?.schoolId || "global";
+        const actorSchoolId = userDoc.data()?.branchId || userDoc.data()?.schoolId || "global";
         
         const noticeRef = adminDb.collection("notices").doc();
         
@@ -58,6 +58,7 @@ export async function POST(req: NextRequest) {
             type: noticeType,
             target: audience,
             schoolId: actorSchoolId,
+            branchId: actorSchoolId,
             senderId: decodedToken.uid,
             senderName: actorName,
             senderRole: actorRole,
@@ -89,6 +90,7 @@ export async function POST(req: NextRequest) {
             type: "NOTICE",
             target: broadcastTarget,
             schoolId: actorSchoolId,
+            branchId: actorSchoolId,
             status: "UNREAD",
             createdAt: FieldValue.serverTimestamp()
         });

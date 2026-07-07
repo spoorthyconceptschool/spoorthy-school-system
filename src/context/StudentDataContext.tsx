@@ -45,6 +45,7 @@ export function useStudentData() {
 
 export function StudentDataProvider({ children }: { children: React.ReactNode }) {
     const { user, userData } = useAuth();
+    const isDataQuarantined = React.useRef(false);
     
     // Core state
     const [profile, setProfile] = useState<any>(() => {
@@ -138,6 +139,38 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
         return true;
     });
 
+    useEffect(() => {
+        const handleBranchChange = () => {
+            setProfile(null);
+            setLedger(null);
+            setTransactions([]);
+            setHomework([]);
+            setNotices([]);
+            setAttendanceMap({});
+            setAttendanceStats({ total: 0, present: 0, absent: 0, percentage: 0 });
+            setSchedule(null);
+            setSubstitutions([]);
+            setTeacherMap({});
+            setLeaves([]);
+            setExams([]);
+            setClassSyllabi([]);
+            
+            const keys = [
+                "student_profile_cache", "student_ledger_cache", "student_tx_cache",
+                "student_hw_cache", "student_notices_cache", "student_att_map_cache",
+                "student_att_stats_cache", "student_schedule_cache", "student_substitutions_cache",
+                "student_teacherMap_cache", "student_leaves_cache", "student_exams_cache",
+                "student_syllabi_cache"
+            ];
+            keys.forEach(k => localStorage.removeItem(k));
+        };
+        
+        if (typeof window !== "undefined") {
+            window.addEventListener("branch_changed", handleBranchChange);
+            return () => window.removeEventListener("branch_changed", handleBranchChange);
+        }
+    }, []);
+
     // Dynamic refetch helper for Leaves
     const refetchLeaves = useCallback(async () => {
         if (!user) return;
@@ -157,7 +190,7 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
 
     // 1. Sync Student Profile (Dual-Path Strategy)
     useEffect(() => {
-        if (!user?.email) {
+        if (!user?.email || isDataQuarantined.current) {
             setLoading(false);
             return;
         }
@@ -169,48 +202,90 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
             if (typeof window !== "undefined") {
                 localStorage.setItem("student_profile_cache", JSON.stringify(pData));
             }
+            setLoading(false);
         };
 
+        let active = true;
+
+        // Primary doc listener
         const unsubProfile = onSnapshot(doc(db, "students", schoolIdFromEmail), (pSnap) => {
+            if (!active) return;
             if (pSnap.exists()) {
                 processProfileData({ id: pSnap.id, ...pSnap.data() });
-            } else if (user.uid) {
-                const qProfile = query(
-                    collection(db, "students"),
-                    where("uid", "==", user.uid)
-                );
-                const unsubQuery = onSnapshot(qProfile, (qSnap) => {
-                    if (!qSnap.empty) {
-                        processProfileData({ id: qSnap.docs[0].id, ...qSnap.docs[0].data() });
-                    } else {
-                        console.warn("[StudentCache] Profile not found in uid fallback either.");
-                    }
-                }, (err) => console.error("[StudentCache] Fallback profile listen error:", err));
-                
-                return () => unsubQuery();
             }
         }, (err) => {
-            console.error("[StudentCache] Primary profile listen error:", err);
+            console.warn("[StudentCache] Primary profile listen error:", err.message);
+            if (err.code === "permission-denied" || err.message?.includes("permission")) {
+                if (unsubProfile) {
+                    try { (unsubProfile as any)(); } catch (ue) {}
+                } else {
+                    setTimeout(() => {
+                        if (unsubProfile) {
+                            try { (unsubProfile as any)(); } catch (ue) {}
+                        }
+                    }, 0);
+                }
+            }
+            isDataQuarantined.current = true;
         });
 
+        // Fallback UID listener
+        let unsubFallback: (() => void) | null = null;
+        if (user.uid) {
+            const qProfile = query(
+                collection(db, "students"),
+                where("uid", "==", user.uid)
+            );
+            unsubFallback = onSnapshot(qProfile, (qSnap) => {
+                if (!active) return;
+                if (!qSnap.empty) {
+                    processProfileData({ id: qSnap.docs[0].id, ...qSnap.docs[0].data() });
+                } else {
+                    console.warn("[StudentCache] Profile not found in uid fallback.");
+                }
+            }, (err) => {
+                console.warn("[StudentCache] Fallback profile listen error:", err.message);
+                if (err.code === "permission-denied" || err.message?.includes("permission")) {
+                    if (unsubFallback) {
+                        try { unsubFallback(); } catch (ue) {}
+                    } else {
+                        setTimeout(() => {
+                            if (unsubFallback) {
+                                try { unsubFallback(); } catch (ue) {}
+                            }
+                        }, 0);
+                    }
+                }
+                isDataQuarantined.current = true;
+            });
+        }
+
         return () => {
+            active = false;
             unsubProfile();
+            if (unsubFallback) unsubFallback();
         };
     }, [user]);
 
     // 2. Sync all other student collections once profile is warm
     useEffect(() => {
-        if (!user || !profile) return;
+        if (!user || !profile || isDataQuarantined.current) return;
 
+        let active = true;
         const sId = profile.schoolId || profile.id;
         const classId = profile.classId;
         const sectionId = profile.sectionId;
         const yearId = profile.academicYear || "2025-2026";
+        const schoolId = profile.branchId || profile.schoolId || "global";
 
         if (!sId) return;
 
+        const unsubs: Array<() => void> = [];
+        let paymentsFallbackUnsub: (() => void) | null = null;
+
         // A. Listen to Fee Ledger
         const unsubLedger = onSnapshot(doc(db, "student_fee_ledgers", `${sId}_${yearId}`), (lSnap) => {
+            if (!active) return;
             if (lSnap.exists()) {
                 const lData = lSnap.data();
                 setLedger(lData);
@@ -218,114 +293,122 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
                     localStorage.setItem("student_ledger_cache", JSON.stringify(lData));
                 }
             }
-        }, (err) => console.warn("[StudentCache] Ledger listen error:", err));
+        }, (err) => {
+            console.warn("[StudentCache] Ledger listen error:", err);
+            isDataQuarantined.current = true;
+        });
+        unsubs.push(unsubLedger);
 
         // B. Listen to Payments/Transactions
         const pxQ = query(
             collection(db, "payments"),
             where("studentId", "==", sId),
+            where("schoolId", "==", schoolId),
             orderBy("createdAt", "desc"),
             limit(30)
         );
         const unsubPayments = onSnapshot(pxQ, (pxSnap) => {
-            const list = pxSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+            if (!active) return;
+            const list = pxSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
             setTransactions(list);
             if (typeof window !== "undefined") {
                 localStorage.setItem("student_tx_cache", JSON.stringify(list));
             }
         }, (err) => {
+            console.warn("[StudentCache] Primary payments listen warning (index missing fallback):", err.message);
+            if (!active) return;
             // Index fallback
-            const pxQFallback = query(collection(db, "payments"), where("studentId", "==", sId));
-            onSnapshot(pxQFallback, (pxSnap) => {
+            const pxQFallback = query(collection(db, "payments"), where("studentId", "==", sId), where("schoolId", "==", schoolId));
+            if (paymentsFallbackUnsub) {
+                try { paymentsFallbackUnsub(); } catch(e) {}
+            }
+            paymentsFallbackUnsub = onSnapshot(pxQFallback, (pxSnap) => {
+                if (!active) return;
                 const sorted = pxSnap.docs
-                    .map(d => ({ id: d.id, ...d.data() }))
+                    .map((d: any) => ({ id: d.id, ...d.data() }))
                     .sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
                 setTransactions(sorted);
                 if (typeof window !== "undefined") {
                     localStorage.setItem("student_tx_cache", JSON.stringify(sorted));
                 }
-            }, (err) => console.warn("[StudentCache] Fallback TX error:", err));
+            }, (fallbackErr) => {
+                console.warn("[StudentCache] Fallback TX error:", fallbackErr.message);
+                isDataQuarantined.current = true;
+            });
         });
+        unsubs.push(unsubPayments);
 
         // C. Listen to Homework
         const hwQ = query(
             collection(db, "homework"),
-            where("classId", "==", classId),
-            orderBy("createdAt", "desc"),
-            limit(50)
+            where("schoolId", "==", schoolId)
         );
         const unsubHomework = onSnapshot(hwQ, (snapshot) => {
-            const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
+            if (!active) return;
+            const list = snapshot.docs
+                .map((d: any) => ({ id: d.id, ...d.data() }))
+                .filter((hw: any) => hw.classId === classId);
             const filtered = sectionId
                 ? list.filter((hw: any) => !hw.sectionId || hw.sectionId === sectionId || hw.sectionId === "ALL" || hw.sectionId === "GENERAL")
                 : list;
-            setHomework(filtered);
+            const sorted = filtered.sort((a: any, b: any) => {
+                const timeA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime());
+                const timeB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime());
+                return (timeB || 0) - (timeA || 0);
+            });
+            const sliced = sorted.slice(0, 50);
+            setHomework(sliced);
             if (typeof window !== "undefined") {
-                localStorage.setItem("student_hw_cache", JSON.stringify(filtered));
+                localStorage.setItem("student_hw_cache", JSON.stringify(sliced));
             }
         }, (err) => {
-            // Index fallback
-            const hwQFallback = query(collection(db, "homework"), where("classId", "==", classId));
-            onSnapshot(hwQFallback, (snapshot) => {
-                const list = snapshot.docs.map(d => ({ id: d.id, ...d.data() }));
-                let filtered = sectionId
-                    ? list.filter((hw: any) => !hw.sectionId || hw.sectionId === sectionId || hw.sectionId === "ALL" || hw.sectionId === "GENERAL")
-                    : list;
-                filtered = filtered.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-                setHomework(filtered);
-                if (typeof window !== "undefined") {
-                    localStorage.setItem("student_hw_cache", JSON.stringify(filtered));
-                }
-            }, (err) => console.warn("[StudentCache] Fallback HW error:", err));
+            console.warn("[StudentCache] Homework listen error:", err);
+            isDataQuarantined.current = true;
         });
+        unsubs.push(unsubHomework);
 
         // D. Listen to Notices
         const noticeQ = query(
             collection(db, "notices"),
-            where("target", "in", ["ALL", "STUDENTS", classId]),
-            orderBy("createdAt", "desc")
+            where("schoolId", "==", schoolId)
         );
         const unsubNotices = onSnapshot(noticeQ, (snap) => {
+            if (!active) return;
             const now = Date.now();
             const list = snap.docs
-                .map(d => ({ id: d.id, ...d.data() }))
+                .map((d: any) => ({ id: d.id, ...d.data() }))
+                .filter((n: any) => n.target === "ALL" || n.target === "STUDENTS" || n.target === classId)
                 .filter((n: any) => {
                     if (n.expiresAt) return n.expiresAt.seconds * 1000 > now;
                     return true;
                 });
-            setNotices(list);
+            const sorted = list.sort((a: any, b: any) => {
+                const timeA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime());
+                const timeB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime());
+                return (timeB || 0) - (timeA || 0);
+            });
+            setNotices(sorted);
         }, (err) => {
-            // Index fallback
-            const noticeQFallback = query(
-                collection(db, "notices"),
-                where("target", "in", ["ALL", "STUDENTS", classId])
-            );
-            onSnapshot(noticeQFallback, (snap) => {
-                const now = Date.now();
-                let list = snap.docs
-                    .map(d => ({ id: d.id, ...d.data() }))
-                    .filter((n: any) => {
-                        if (n.expiresAt) return n.expiresAt.seconds * 1000 > now;
-                        return true;
-                    });
-                list = list.sort((a: any, b: any) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
-                setNotices(list);
-            }, (err) => console.warn("[StudentCache] Fallback Notices error:", err));
+            console.warn("[StudentCache] Notices listen error:", err);
+            isDataQuarantined.current = true;
         });
+        unsubs.push(unsubNotices);
 
         // E. Listen to Attendance
         const attQuery = query(
             collection(db, "attendance_daily"),
             where("classId", "==", classId),
-            where("sectionId", "==", sectionId)
+            where("sectionId", "==", sectionId),
+            where("branchId", "==", schoolId)
         );
         const unsubAttendance = onSnapshot(attQuery, (attSnap) => {
+            if (!active) return;
             const map: Record<string, "P" | "A"> = {};
             let present = 0;
             let absent = 0;
             let total = 0;
 
-            attSnap.forEach(doc => {
+            attSnap.forEach((doc: any) => {
                 const data = doc.data();
                 const status = data.records?.[sId];
                 if (status) {
@@ -350,39 +433,56 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
                 localStorage.setItem("student_att_map_cache", JSON.stringify(map));
                 localStorage.setItem("student_att_stats_cache", JSON.stringify(newStats));
             }
-        }, (err) => console.error("[StudentCache] Attendance listen error:", err));
+        }, (err) => {
+            console.warn("[StudentCache] Attendance listen error:", err);
+            isDataQuarantined.current = true;
+        });
+        unsubs.push(unsubAttendance);
 
         // F. Listen to Exams (real-time, zero latency)
-        const unsubExams = onSnapshot(collection(db, "exams"), (snap) => {
-            const allExams = snap.docs
-                .map(d => ({ id: d.id, ...d.data() }))
-                .filter((e: any) => e.status !== "DELETED")
-                .sort((a: any, b: any) => {
-                    const dateA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
-                    const dateB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
-                    return dateB - dateA;
-                });
-            setExams(allExams);
-            if (typeof window !== "undefined") {
-                localStorage.setItem("student_exams_cache", JSON.stringify(allExams));
-            }
-        }, (err) => console.error("[StudentCache] Exams listen error:", err));
+        const unsubExams = onSnapshot(
+            query(collection(db, "exams"), where("schoolId", "==", schoolId)),
+            (snap) => {
+                if (!active) return;
+                const allExams = snap.docs
+                    .map((d: any) => ({ id: d.id, ...d.data() }))
+                    .filter((e: any) => e.status !== "DELETED")
+                    .sort((a: any, b: any) => {
+                        const dateA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+                        const dateB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+                        return dateB - dateA;
+                    });
+                setExams(allExams);
+                if (typeof window !== "undefined") {
+                    localStorage.setItem("student_exams_cache", JSON.stringify(allExams));
+                }
+            }, (err) => {
+                console.warn("[StudentCache] Exams listen error:", err);
+                isDataQuarantined.current = true;
+            });
+        unsubs.push(unsubExams);
 
         // G. Listen to Syllabi (real-time, zero latency)
         const unsubSyllabi = onSnapshot(
             query(collection(db, "exam_syllabus"), where("classId", "==", classId)),
             (snap) => {
-                const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+                if (!active) return;
+                const list = snap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
                 setClassSyllabi(list);
                 if (typeof window !== "undefined") {
                     localStorage.setItem("student_syllabi_cache", JSON.stringify(list));
                 }
             },
-            (err) => console.error("[StudentCache] Syllabi listen error:", err)
+            (err) => {
+                console.warn("[StudentCache] Syllabi listen error:", err);
+                isDataQuarantined.current = true;
+            }
         );
+        unsubs.push(unsubSyllabi);
 
         // H. Prefetch remaining static/dynamic endpoints in parallel
         const fetchInitialAsyncs = async () => {
+            if (isDataQuarantined.current) return;
             try {
                 const token = await user.getIdToken();
                 await Promise.allSettled([
@@ -393,12 +493,12 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
                                 headers: { Authorization: `Bearer ${token}` }
                             });
                             const tData = await tRes.json();
-                            if (tData.success) {
+                            if (tData.success && !isDataQuarantined.current) {
                                 setSchedule(tData.data.weeklySchedule || {});
                                 setSubstitutions(tData.data.substitutions || []);
                             }
                         } catch (err) {
-                            console.error("[StudentCache] Timetable fetch failed:", err);
+                            console.warn("[StudentCache] Timetable fetch failed:", err);
                         }
                     })(),
 
@@ -408,18 +508,18 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
                             const teachersSnap = await getDocs(
                                 query(
                                     collection(db, "teachers"),
-                                    where("schoolId", "==", userData?.schoolId || profile.schoolId || "global")
+                                    where("branchId", "==", profile.branchId || userData?.branchId || "global")
                                 )
                             );
                             const tMap: Record<string, string> = {};
-                            teachersSnap.docs.forEach(d => {
+                            teachersSnap.docs.forEach((d: any) => {
                                 const data = d.data();
                                 if (data.schoolId) tMap[data.schoolId] = data.name;
                                 tMap[d.id] = data.name;
                             });
-                            setTeacherMap(tMap);
+                            if (!isDataQuarantined.current) setTeacherMap(tMap);
                         } catch (err) {
-                            console.error("[StudentCache] Teachers fetch failed:", err);
+                            console.warn("[StudentCache] Teachers fetch failed:", err);
                         }
                     })(),
 
@@ -430,16 +530,16 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
                                 headers: { Authorization: `Bearer ${token}` }
                             });
                             const lData = await lRes.json();
-                            if (lData.success) {
+                            if (lData.success && !isDataQuarantined.current) {
                                 setLeaves(lData.data || []);
                             }
                         } catch (err) {
-                            console.error("[StudentCache] Leaves fetch failed:", err);
+                            console.warn("[StudentCache] Leaves fetch failed:", err);
                         }
                     })()
                 ]);
-            } catch (e) {
-                console.error("[StudentCache] Background fetches failed:", e);
+            } catch (err) {
+                console.warn("[StudentCache] Batch prefetch error:", err);
             } finally {
                 setLoading(false);
             }
@@ -447,14 +547,11 @@ export function StudentDataProvider({ children }: { children: React.ReactNode })
 
         fetchInitialAsyncs();
 
+        // Ensure completely strict clean up
         return () => {
-            unsubLedger();
-            unsubPayments();
-            unsubHomework();
-            unsubNotices();
-            unsubAttendance();
-            unsubExams();
-            unsubSyllabi();
+            active = false;
+            unsubs.forEach(unsub => unsub());
+            if (paymentsFallbackUnsub) paymentsFallbackUnsub();
         };
     }, [user, profile]);
 

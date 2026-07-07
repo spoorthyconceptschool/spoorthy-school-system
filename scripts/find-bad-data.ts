@@ -6,7 +6,7 @@ async function findBadData() {
     let missingAmounts = 0;
     let totalDocs = payments.size;
 
-    payments.forEach(doc => {
+    payments.forEach((doc: any) => {
         const data = doc.data();
         if (typeof data.amount === 'string') {
             stringAmounts++;

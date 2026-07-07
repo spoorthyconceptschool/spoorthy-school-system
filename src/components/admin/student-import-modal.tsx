@@ -92,7 +92,7 @@ export function StudentImportModal({ onSuccess, children }: StudentImportModalPr
                     </Button>
                 )}
             </DialogTrigger>
-            <DialogContent className="bg-black/95 border-white/10 text-white max-w-2xl">
+            <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white max-w-2xl border-white/10">
                 <DialogHeader>
                     <DialogTitle>Import Students via Excel/CSV</DialogTitle>
                 </DialogHeader>

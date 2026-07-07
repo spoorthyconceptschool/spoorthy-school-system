@@ -7,6 +7,15 @@ export async function POST(req: NextRequest) {
         if (!authHeader?.startsWith("Bearer ")) {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
+        const token = authHeader.substring(7);
+        const decodedToken = await adminAuth.verifyIdToken(token);
+        let branchId = decodedToken.branchId || decodedToken.schoolId;
+        if (!branchId) {
+            const userDoc = await adminDb.collection("users").doc(decodedToken.uid).get();
+            const uData = userDoc.data();
+            branchId = uData?.branchId || uData?.schoolId || "global";
+        }
+
         const body = await req.json();
         const { yearId, classId, schedule } = body; // schedule: { [day]: { [slotId]: { subjectId, teacherId } } }
 
@@ -86,6 +95,8 @@ export async function POST(req: NextRequest) {
                 const tRef = adminDb.collection("teacher_schedules").doc(`${yearId}_${tId}`);
                 batch.set(tRef, {
                     schedule: currentTTimeTable,
+                    schoolId: branchId,
+                    branchId: branchId,
                     updatedAt: FieldValue.serverTimestamp()
                 }, { merge: true });
             }
@@ -97,6 +108,8 @@ export async function POST(req: NextRequest) {
             classId,
             schedule,
             status: "PUBLISHED",
+            schoolId: branchId,
+            branchId: branchId,
             updatedAt: FieldValue.serverTimestamp()
         });
 
@@ -162,6 +175,8 @@ export async function POST(req: NextRequest) {
                     period: parseInt(slotId),
                     startTime: slotConfig.startTime,
                     endTime: slotConfig.endTime,
+                    schoolId: branchId,
+                    branchId: branchId,
                     updatedAt: FieldValue.serverTimestamp()
                 });
             }

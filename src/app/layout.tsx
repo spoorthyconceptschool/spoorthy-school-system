@@ -25,8 +25,8 @@ const outfit = Outfit({
 });
 
 export const metadata: Metadata = {
-  title: 'Spoorthy High School | Spoorthy Concept School (Kanagal, Nalgonda)',
-  description: 'Welcome to the official website of Spoorthy High School and Spoorthy Concept School, located at Kanagal X Road, Nalgonda. Renowned as one of the best concept schools and top high schools in the Nalgonda district, Telangana. Offering high-quality secondary education, modern facilities, digital school management systems, and premium student development. Explore admissions for the 2026-2027 academic session.',
+  title: 'Spoorthy High school | Spoorthy Concept school',
+  description: 'Welcome to the official portal for your institution. Offering high-quality secondary education, modern facilities, digital school management systems, and premium student development.',
   keywords: [
     'spoorthy school',
     'spoorthy high school',
@@ -53,7 +53,7 @@ export const metadata: Metadata = {
   appleWebApp: {
     capable: true,
     statusBarStyle: 'black-translucent',
-    title: 'Spoorthy High School | Spoorthy Concept School (Kanagal, Nalgonda)',
+    title: 'School ERP | Modern School Management System',
   },
   icons: {
     icon: [

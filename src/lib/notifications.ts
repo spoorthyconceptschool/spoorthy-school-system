@@ -9,12 +9,27 @@ export interface CreateNotificationProps {
     type: "INFO" | "WARNING" | "SUCCESS" | "ERROR" | "FEE" | "LEAVE" | "NOTICE";
     actionBy?: string;   // UID of the person who did the action
     actionByName?: string;
+    schoolId?: string;
+    branchId?: string;
 }
 
 export const createNotification = async (props: CreateNotificationProps) => {
     try {
+        let schoolId = props.schoolId || "global";
+        if (!props.schoolId && typeof window !== "undefined") {
+            const cached = localStorage.getItem("spoorthy_user_cache");
+            if (cached) {
+                try {
+                    const user = JSON.parse(cached);
+                    schoolId = user.branchId || user.schoolId || "global";
+                } catch (e) {}
+            }
+        }
+
         await addDoc(collection(db, "notifications"), {
             ...props,
+            schoolId,
+            branchId: schoolId,
             status: "UNREAD",
             createdAt: Timestamp.now()
         });

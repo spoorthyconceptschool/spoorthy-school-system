@@ -1,8 +1,9 @@
 "use client";
 
-import { useEffect, useState, useMemo } from "react";
+import React, { useEffect, useState, useMemo, useRef } from "react";
 import { collection, onSnapshot, query, orderBy, where, doc, limit, Timestamp } from "firebase/firestore";
 import { db } from "@/lib/firebase";
+import { cacheManager } from "@/lib/services/cache-manager";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/context/AuthContext";
 import { useMasterData } from "@/context/MasterDataContext";
@@ -18,7 +19,7 @@ import {
     PieChart, Wallet, Bus, Home, Settings2, Filter, X,
     Loader2
 } from "lucide-react";
-import { PieChart as RePieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer } from "recharts";
+import { PieChart as RePieChart, Pie, Cell, Tooltip as ReTooltip, ResponsiveContainer, BarChart, Bar, XAxis, YAxis, Legend } from "recharts";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { AddStudentModal } from "@/components/admin/add-student-modal";
@@ -43,7 +44,6 @@ interface Student {
     studentName?: string;
     classId?: string;
     className?: string;
-    admissionNumber?: string;
     schoolId?: string;
     createdAt?: { seconds: number };
     status?: string;
@@ -69,6 +69,12 @@ interface DashboardStats {
     presentStudents?: number;
     presentTeachers?: number;
     presentStaff?: number;
+    absentStudents?: number;
+    absentTeachers?: number;
+    absentStaff?: number;
+    pendingStudents?: number;
+    pendingTeachers?: number;
+    pendingStaff?: number;
     finance?: {
         totalFee: number;
         totalPaid: number;
@@ -82,6 +88,7 @@ interface DashboardStats {
         schoolPaid: number;
         customFees?: Record<string, { total: number; paid: number }>;
         terms: Record<string, { total: number; paid: number }>;
+        feeTypeAnalytics?: Record<string, { pending: number; partial: number; noDue: number; totalAccounts: number }>;
     };
 }
 
@@ -111,7 +118,7 @@ function CardFilter({
                     <Filter size={iconSize} />
                 </Button>
             </DropdownMenuTrigger>
-            <DropdownMenuContent className="w-56 bg-zinc-950 border-white/10 backdrop-blur-xl" align="end">
+            <DropdownMenuContent className="w-56 bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl backdrop-blur-xl border-white/10" align="end">
                 <DropdownMenuLabel className="text-[10px] font-black uppercase tracking-widest opacity-50">Filter Module</DropdownMenuLabel>
                 <DropdownMenuSeparator className="bg-white/5" />
                 
@@ -184,8 +191,12 @@ function CardFilter({
 }
 
 export default function AdminDashboard() {
-    const { user, role: authRole } = useAuth();
-    const { selectedYear, classes, sections, villages } = useMasterData();
+    const { user, userData, branchId: userBranchId, role: authRole } = useAuth();
+    
+    // Safety fallback: if BranchContext is used elsewhere, we stick to the user's specific assigned branch.
+    // If the user is Super Admin, they have no specific branch (it's "global").
+    const activeBranchId = userBranchId || userData?.schoolId || (authRole === "SUPER_ADMIN" ? "global" : null);
+    const { selectedYear, classes, sections, villages, branding } = useMasterData();
     const router = useRouter();
 
     const DASHBOARD_CACHE_KEY = `spoorthy_dashboard_cache_${selectedYear}`;
@@ -197,46 +208,35 @@ export default function AdminDashboard() {
     const [filterSection, setFilterSection] = useState<string>("");
     const [filterVillage, setFilterVillage] = useState<string>("");
 
-    const [recentStudents, setRecentStudents] = useState<Student[]>(() => {
-        if (typeof window !== 'undefined' && selectedYear) {
-            const cached = localStorage.getItem(`spoorthy_dashboard_cache_${selectedYear}_students`);
-            if (cached) {
-                try { return JSON.parse(cached); } catch (e) {}
-            }
-        }
-        return [];
-    });
+    const [recentStudents, setRecentStudents] = useState<Student[]>([]);
     const [pendingLeavesList, setPendingLeavesList] = useState<LeaveRequest[]>([]);
-    const [stats, setStats] = useState<DashboardStats>(() => {
-        if (typeof window !== 'undefined' && selectedYear) {
-            const cached = localStorage.getItem(`spoorthy_dashboard_cache_${selectedYear}_stats`);
-            if (cached) {
-                try {
-                    return {
-                        totalStudents: 0,
-                        pendingFees: 0,
-                        leaveRequests: 0,
-                        totalLeaves: 0,
-                        todayCollection: 0,
-                        totalStaff: 0,
-                        staffPresent: 0,
-                        ...JSON.parse(cached)
-                    };
-                } catch (e) {}
-            }
+    const [stats, setStats] = useState<DashboardStats>({
+        totalStudents: 0,
+        pendingFees: 0,
+        leaveRequests: 0,
+        totalLeaves: 0,
+        todayCollection: 0,
+        totalStaff: 0,
+        staffPresent: 0,
+        finance: {
+            totalFee: 0,
+            totalPaid: 0,
+            hostelFee: 0,
+            hostelPaid: 0,
+            customFee: 0,
+            customPaid: 0,
+            transportFee: 0,
+            transportPaid: 0,
+            schoolFee: 0,
+            schoolPaid: 0,
+            terms: {},
+            customFees: {},
+            feeTypeAnalytics: {}
         }
-        return {
-            totalStudents: 0,
-            pendingFees: 0,
-            leaveRequests: 0,
-            totalLeaves: 0,
-            todayCollection: 0,
-            totalStaff: 0,
-            staffPresent: 0
-        };
     });
 
     const [loading, setLoading] = useState(false);
+    const isDataQuarantined = useRef(false);
 
     // Derived Statistics Aggregator to prevent timing & race condition glitches
     const calculatedStats = useMemo(() => {
@@ -273,51 +273,92 @@ export default function AdminDashboard() {
         };
     }, [stats]);
 
-    // Hydration-safe cache loading
+    // Load and sync dashboard stats with 1ms zero-latency hydration from cache, and clean background fetching
     useEffect(() => {
-        if (typeof window !== 'undefined' && selectedYear) {
-            const cachedStudents = localStorage.getItem(`${DASHBOARD_CACHE_KEY}_students`);
-            if (cachedStudents) {
-                try { setRecentStudents(JSON.parse(cachedStudents)); } catch (e) {}
-            }
-            const cachedStats = localStorage.getItem(`${DASHBOARD_CACHE_KEY}_stats`);
-            if (cachedStats) {
-                try { setStats(prev => ({ ...prev, ...JSON.parse(cachedStats) })); } catch (e) {}
-            }
-        }
-    }, [selectedYear, DASHBOARD_CACHE_KEY]);
-
-    useEffect(() => {
-        if (!user) return;
+        if (!user || !selectedYear) return;
 
         const isFiltered = !!(filterClass || filterSection || filterVillage);
+        const cacheKey = `dashboard_stats_${activeBranchId || "global"}_${selectedYear}_${filterClass}_${filterSection}_${filterVillage}`;
 
         const fetchEnterpriseStats = async (isBackground = false) => {
+            let cacheHit = false;
+            if (!isBackground) {
+                try {
+                    const cached = await cacheManager.get<any>(cacheKey);
+                    if (cached) {
+                        setStats(cached);
+                        cacheHit = true;
+                    }
+                } catch (e) {
+                    console.warn("[Dashboard] Failed to read cache:", e);
+                }
+
+                // If no cache exists for this filter set, show loading indicator and clear previous metrics
+                if (!cacheHit) {
+                    setLoading(true);
+                    setStats({
+                        totalStudents: 0,
+                        pendingFees: 0,
+                        leaveRequests: 0,
+                        totalLeaves: 0,
+                        todayCollection: 0,
+                        totalStaff: 0,
+                        staffPresent: 0,
+                        presentStudents: 0,
+                        presentTeachers: 0,
+                        presentStaff: 0,
+                        absentStudents: 0,
+                        absentTeachers: 0,
+                        absentStaff: 0,
+                        pendingStudents: 0,
+                        pendingTeachers: 0,
+                        pendingStaff: 0,
+                        finance: {
+                            totalFee: 0,
+                            totalPaid: 0,
+                            hostelFee: 0,
+                            hostelPaid: 0,
+                            customFee: 0,
+                            customPaid: 0,
+                            transportFee: 0,
+                            transportPaid: 0,
+                            schoolFee: 0,
+                            schoolPaid: 0,
+                            terms: {},
+                            customFees: {},
+                            feeTypeAnalytics: {}
+                        }
+                    });
+                }
+            }
+
             try {
-                if (!isBackground) setLoading(true);
-                const currentYear = selectedYear || "2026-2027";
                 const token = await user.getIdToken();
-                
-                let url = `/api/admin/dashboard/stats?year=${encodeURIComponent(currentYear)}`;
+                let url = `/api/admin/dashboard/stats?year=${encodeURIComponent(selectedYear)}`;
                 if (filterClass) url += `&classId=${filterClass}`;
                 if (filterSection) url += `&section=${filterSection}`;
                 if (filterVillage) url += `&village=${filterVillage}`;
+                if (activeBranchId && activeBranchId !== "global") url += `&branchId=${activeBranchId}`;
 
                 const req = await fetch(url, {
                     headers: { 'Authorization': `Bearer ${token}` },
                     cache: 'no-store'
                 });
                 const res = await req.json();
+                console.log("[DEBUG API Response]", res);
                 if (res.success) {
-                    setStats(prev => ({ ...prev, ...res.data }));
-                    if (!isFiltered) {
-                        localStorage.setItem(`${DASHBOARD_CACHE_KEY}_stats`, JSON.stringify(res.data));
-                    }
+                    setStats(res.data);
+                    await cacheManager.set(cacheKey, res.data, 5 * 60 * 1000);
+                } else {
+                    console.error("[DEBUG API Error]", res);
                 }
             } catch (e) {
                 console.error("[Dashboard] Stats Sync Error:", e);
+                isDataQuarantined.current = true;
             } finally {
-                setLoading(false);
+                if (!isBackground) {
+                    setLoading(false);
+                }
             }
         };
 
@@ -329,9 +370,9 @@ export default function AdminDashboard() {
         let unsubAtt = () => {};
 
         // Only register real-time listeners for the global (unfiltered) view
-        if (!isFiltered) {
+        if (!isFiltered && !isDataQuarantined.current) {
             // --- REAL-TIME COUNTERS SYNC (ONLY FOR GLOBAL ADMIN) ---
-            if (user?.schoolId === "global") {
+            if (activeBranchId === "global") {
                 unsubCounters = onSnapshot(collection(db, "counters"), (snap) => {
                     const counts: any = {};
                     snap.forEach(doc => { counts[doc.id] = doc.data().current || 0; });
@@ -341,28 +382,44 @@ export default function AdminDashboard() {
                         totalTeachers: counts.teachers || (prev as any).totalTeachers,
                         totalStaff: counts.staff || prev.totalStaff
                     }));
+                }, (err) => {
+                    console.warn("[Admin Dashboard] Counters sync warning:", err.message);
+                    isDataQuarantined.current = true;
                 });
             }
 
             // --- REAL-TIME PAYMENTS SYNC (TODAY) ---
             const todayStart = new Date();
             todayStart.setHours(0, 0, 0, 0);
-            const qPay = query(collection(db, "payments"), where("createdAt", ">=", todayStart));
+            let qPay = query(collection(db, "payments"), where("createdAt", ">=", todayStart));
+            if (activeBranchId && activeBranchId !== "global") {
+                qPay = query(collection(db, "payments"), where("schoolId", "==", activeBranchId));
+            }
             unsubPay = onSnapshot(qPay, (snap) => {
                 let total = 0;
                 snap.forEach(doc => {
                     const data = doc.data();
-                    if (user?.schoolId && user.schoolId !== "global" && data.branchId !== user.schoolId) return;
-                    if (data.status === "success" || data.status === "SUCCESS" || !data.status) {
-                        total += Number(data.amount || 0);
+                    if (activeBranchId && activeBranchId !== "global" && data.schoolId !== activeBranchId) return;
+                    
+                    const createdTime = data.createdAt?.seconds ? data.createdAt.seconds * 1000 : (data.createdAt ? new Date(data.createdAt).getTime() : 0);
+                    if (createdTime >= todayStart.getTime()) {
+                        if (data.status === "success" || data.status === "SUCCESS" || !data.status) {
+                            total += Number(data.amount || 0);
+                        }
                     }
                 });
                 setStats(prev => ({ ...prev, todayCollection: total }));
+            }, (err) => {
+                console.warn("[Admin Dashboard] Payments sync warning:", err.message);
+                isDataQuarantined.current = true;
             });
 
             // --- ZERO-LATENCY REAL-TIME ATTENDANCE SYNC ---
             const todayStr = new Date().toISOString().split('T')[0];
-            const qAtt = query(collection(db, "attendance_daily"), where("date", "==", todayStr));
+            let qAtt = query(collection(db, "attendance_daily"), where("date", "==", todayStr));
+            if (activeBranchId && activeBranchId !== "global") {
+                qAtt = query(collection(db, "attendance_daily"), where("schoolId", "==", activeBranchId), where("date", "==", todayStr));
+            }
             unsubAtt = onSnapshot(qAtt, (snap) => {
                 let presentStudents = 0, absentStudents = 0;
                 let presentTeachers = 0, absentTeachers = 0;
@@ -370,7 +427,7 @@ export default function AdminDashboard() {
 
                 snap.docs.forEach(doc => {
                     const data = doc.data();
-                    if (user?.schoolId && user.schoolId !== "global" && data.branchId !== user.schoolId) return;
+                    if (activeBranchId && activeBranchId !== "global" && data.branchId !== activeBranchId) return;
                     if (data.type === "TEACHERS") {
                         presentTeachers += data.stats?.present || 0;
                         absentTeachers += data.stats?.absent || 0;
@@ -396,6 +453,9 @@ export default function AdminDashboard() {
                 if (!snap.metadata.hasPendingWrites) {
                     fetchEnterpriseStats(true);
                 }
+            }, (err) => {
+                console.warn("[Admin Dashboard] Attendance sync warning:", err.message);
+                isDataQuarantined.current = true;
             });
         }
 
@@ -405,43 +465,54 @@ export default function AdminDashboard() {
             unsubPay();
             unsubAtt();
         };
-    }, [user, selectedYear, filterClass, filterSection, filterVillage]);
+    }, [user, selectedYear, filterClass, filterSection, filterVillage, activeBranchId]);
 
     useEffect(() => {
-        if (!user) return;
-        const qLeaves = query(collection(db, "leave_requests"), where("status", "==", "PENDING"), limit(20));
+        if (!user || isDataQuarantined.current) return;
+        let qLeaves = query(collection(db, "leave_requests"), where("status", "==", "PENDING"), limit(20));
+        if (activeBranchId && activeBranchId !== "global") {
+            qLeaves = query(collection(db, "leave_requests"), where("status", "==", "PENDING"), where("schoolId", "==", activeBranchId), limit(50));
+        }
         const unsubLeaves = onSnapshot(qLeaves, (snap) => {
             let leaves = snap.docs.map(d => ({ id: d.id, ...d.data() } as LeaveRequest));
-            if (user?.schoolId && user.schoolId !== "global") {
-                leaves = leaves.filter((l: any) => l.branchId === user.schoolId || l.schoolId === user.schoolId);
-            }
-            leaves.sort((a, b) => (b.createdAt?.seconds || 0) - (a.createdAt?.seconds || 0));
+            leaves.sort((a, b) => {
+                const dateA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0;
+                const dateB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0;
+                return dateB - dateA;
+            });
             setPendingLeavesList(leaves.slice(0, 5));
+        }, (err) => {
+            console.warn("[Admin Dashboard] Leave requests sync warning:", err.message);
+            isDataQuarantined.current = true;
         });
         return () => unsubLeaves();
-    }, [user, selectedYear]);
+    }, [user, selectedYear, activeBranchId]);
 
     useEffect(() => {
-        if (!user || authRole === "TIMETABLE_EDITOR") return;
+        if (!user || authRole === "TIMETABLE_EDITOR" || isDataQuarantined.current) return;
         
-        let baseConstraints: any[] = [orderBy("createdAt", "desc"), limit(20)];
-        if (user.schoolId && user.schoolId !== "global") {
-            // Need composite index if we use where + orderBy. To avoid, we fetch more and filter in memory.
-            // Or since we only care about recent, we can filter in memory.
+        let studentsQ = query(collection(db, "students"), orderBy("createdAt", "desc"), limit(20));
+        if (activeBranchId && activeBranchId !== "global") {
+            studentsQ = query(collection(db, "students"), where("branchId", "==", activeBranchId), limit(100));
         }
         
-        const studentsQ = query(collection(db, "students"), ...baseConstraints);
         const unsubscribe = onSnapshot(studentsQ, (snapshot) => {
             let list = snapshot.docs.map(doc => ({ id: doc.id, schoolId: doc.id, ...doc.data() } as Student));
-            if (user.schoolId && user.schoolId !== "global") {
-                list = list.filter((s: any) => s.branchId === user.schoolId);
+            if (activeBranchId && activeBranchId !== "global") {
+                list.sort((a, b) => {
+                    const dateA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : 0;
+                    const dateB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : 0;
+                    return dateB - dateA;
+                });
             }
             const finalRecent = list.slice(0, 10);
             setRecentStudents(finalRecent);
-            localStorage.setItem(`${DASHBOARD_CACHE_KEY}_students`, JSON.stringify(finalRecent));
+        }, (err) => {
+            console.warn("[Admin Dashboard] Students sync warning:", err.message);
+            isDataQuarantined.current = true;
         });
         return () => unsubscribe();
-    }, [user, authRole]);
+    }, [user, authRole, activeBranchId]);
 
     const columns = useMemo(() => [
         {
@@ -458,11 +529,10 @@ export default function AdminDashboard() {
             }
         },
         {
-            key: "admissionNumber",
-            header: "Adm. No.",
+            key: "schoolId",
+            header: "School ID",
             render: (s: any) => {
-                const adm = (!s.admissionNumber || s.admissionNumber === "PENDING") ? null : s.admissionNumber;
-                return <span className="font-mono text-xs text-white/60">{adm || s.schoolId || "PENDING"}</span>
+                return <span className="font-mono text-xs text-white/60">{s.schoolId || "PENDING"}</span>
             }
         },
         {
@@ -599,7 +669,13 @@ export default function AdminDashboard() {
                 <div className="flex items-center justify-between shrink-0 px-1">
                     <div>
                         <h1 className="font-display text-base font-bold tracking-tight italic text-white leading-none">
-                            Admin <span className="text-[#64FFDA]">Central</span>
+                            {branding?.schoolName ? (
+                                <span className="bg-gradient-to-r from-white to-[#64FFDA] bg-clip-text text-transparent">
+                                    {branding.schoolName}
+                                </span>
+                            ) : (
+                                <>Admin <span className="text-[#64FFDA]">Central</span></>
+                            )}
                         </h1>
                         <p className="text-[7px] text-muted-foreground uppercase tracking-widest font-black mt-0.5">Real-time School Operations</p>
                     </div>
@@ -912,8 +988,14 @@ export default function AdminDashboard() {
             <div className="hidden md:block space-y-6 md:space-y-8 animate-in fade-in duration-200 pb-10 w-full">
             <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                 <div>
-                    <h1 className="font-display text-3xl md:text-5xl font-bold tracking-tighter italic pb-1 text-white">
-                        <span className="bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">Admin</span> Central
+                    <h1 className="font-display text-3xl md:text-5xl font-bold tracking-tighter italic pb-1 text-white truncate">
+                        {branding?.schoolName ? (
+                            <span className="bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">
+                                {branding.schoolName}
+                            </span>
+                        ) : (
+                            <><span className="bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent">Admin</span> Central</>
+                        )}
                     </h1>
                     <p className="text-muted-foreground mt-1 text-[10px] md:text-xs uppercase tracking-widest font-black opacity-70">Real-time School Operations</p>
                 </div>
@@ -1078,13 +1160,14 @@ export default function AdminDashboard() {
                         </div>
 
                         <div className="space-y-6">
+                        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6 items-stretch">
                             {/* MASTER SUMMARY CARD */}
-                            <div className="p-6 md:p-8 rounded-[2rem] bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#020617] border border-indigo-500/30 shadow-[0_0_60px_-15px_rgba(79,70,229,0.3)] ring-1 ring-white/5 relative overflow-hidden group/master backdrop-blur-2xl">
+                            <div className="p-6 md:p-8 rounded-[2rem] bg-gradient-to-br from-[#0f172a] via-[#1e1b4b] to-[#020617] border border-indigo-500/30 shadow-[0_0_60px_-15px_rgba(79,70,229,0.3)] ring-1 ring-white/5 relative overflow-hidden group/master backdrop-blur-2xl h-full flex flex-col justify-between">
                                 {/* Intricate Background Elements */}
                                 <div className="absolute top-0 right-0 w-[500px] h-[500px] bg-indigo-500/20 rounded-full blur-[100px] -mr-48 -mt-48 transition-all duration-1000 group-hover/master:bg-indigo-500/30 mix-blend-screen pointer-events-none" />
                                 <div className="absolute bottom-0 left-0 w-[400px] h-[400px] bg-emerald-500/10 rounded-full blur-[100px] -ml-32 -mb-32 mix-blend-screen pointer-events-none" />
                                 
-                                <div className="absolute top-6 right-8 z-20">
+                                <div className="absolute top-6 right-8 z-20 scale-90 xl:scale-100 origin-right">
                                     <CardFilter 
                                         villages={villages} classes={classes} sections={sections}
                                         filterVillage={filterVillage} setFilterVillage={setFilterVillage}
@@ -1093,9 +1176,9 @@ export default function AdminDashboard() {
                                     />
                                 </div>
                                 
-                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 relative z-10 items-center">
+                                <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 lg:gap-8 relative z-10 items-center mt-8 xl:mt-4">
                                     {/* Left side Pie Chart */}
-                                    <div className="lg:col-span-5 h-[200px] w-full relative flex justify-center items-center">
+                                    <div className="lg:col-span-5 h-[240px] w-full relative flex justify-center items-center">
                                         <div className="absolute inset-0 bg-white/5 rounded-full blur-3xl" />
                                         <ResponsiveContainer width="100%" height="100%">
                                             <RePieChart>
@@ -1106,8 +1189,8 @@ export default function AdminDashboard() {
                                                     ]}
                                                     cx="50%"
                                                     cy="50%"
-                                                    innerRadius={80}
-                                                    outerRadius={110}
+                                                    innerRadius={70}
+                                                    outerRadius={95}
                                                     paddingAngle={8}
                                                     dataKey="value"
                                                     stroke="rgba(255,255,255,0.1)"
@@ -1128,55 +1211,55 @@ export default function AdminDashboard() {
                                                     </linearGradient>
                                                 </defs>
                                                 <ReTooltip 
-                                                    formatter={(value: number) => `₹${value.toLocaleString()}`}
+                                                    formatter={(value: any) => `₹${Number(value || 0).toLocaleString()}`}
                                                     contentStyle={{ backgroundColor: 'rgba(15, 23, 42, 0.9)', backdropFilter: 'blur(10px)', border: '1px solid rgba(255,255,255,0.1)', borderRadius: '12px', color: '#fff', boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)' }}
-                                                    itemStyle={{ color: '#fff', fontSize: '14px', fontWeight: 'bold' }}
+                                                    itemStyle={{ color: '#fff', fontSize: '12px', fontWeight: 'bold' }}
                                                 />
                                             </RePieChart>
                                         </ResponsiveContainer>
                                         <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none">
-                                            <span className="text-[10px] font-black uppercase text-indigo-200/60 tracking-[0.2em] mb-0.5">Collection</span>
-                                            <span className="text-3xl font-black font-display text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70 tracking-tighter filter drop-shadow-[0_2px_10px_rgba(255,255,255,0.2)]">
+                                            <span className="text-[9px] font-black uppercase text-indigo-200/60 tracking-[0.2em] mb-0.5">Collection</span>
+                                            <span className="text-2xl font-black font-display text-transparent bg-clip-text bg-gradient-to-b from-white to-white/70 tracking-tighter filter drop-shadow-[0_2px_10px_rgba(255,255,255,0.2)]">
                                                 {calculatedStats.finance?.totalFee ? Math.round((calculatedStats.finance.totalPaid / calculatedStats.finance.totalFee) * 100) : 0}%
                                             </span>
                                         </div>
                                     </div>
                                     
                                     {/* Right side Stats */}
-                                    <div className="lg:col-span-7 flex flex-col gap-6">
+                                    <div className="lg:col-span-7 flex flex-col gap-4">
                                         <div className="space-y-1">
                                             <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-indigo-500/10 border border-indigo-500/20 mb-1">
                                                 <div className="w-1.5 h-1.5 rounded-full bg-indigo-400 animate-pulse" />
                                                 <span className="text-[9px] font-black uppercase tracking-[0.2em] text-indigo-300">Live Financial Status</span>
                                             </div>
-                                            <p className="text-[10px] font-black uppercase tracking-[0.3em] text-blue-400/80 pl-1">TOTAL FEE EXPECTED</p>
-                                            <h3 className="text-4xl md:text-5xl font-display font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-indigo-100 to-indigo-300 tracking-tight filter drop-shadow-lg">
+                                            <p className="text-[9px] font-black uppercase tracking-[0.3em] text-blue-400/80 pl-1">TOTAL FEE EXPECTED</p>
+                                            <h3 className="text-2xl md:text-3xl font-display font-black text-transparent bg-clip-text bg-gradient-to-r from-white via-indigo-100 to-indigo-300 tracking-tight filter drop-shadow-lg leading-none">
                                                 ₹{(calculatedStats.finance?.totalFee || 0).toLocaleString()}
                                             </h3>
                                         </div>
                                         
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                                            <div className="relative overflow-hidden group/stat p-5 rounded-2xl bg-gradient-to-br from-emerald-500/10 to-emerald-900/10 border border-emerald-500/20 backdrop-blur-md shadow-lg transition-all hover:border-emerald-400/40">
-                                                <div className="absolute top-0 right-0 w-24 h-24 bg-emerald-500/10 rounded-full blur-xl -mr-12 -mt-12 transition-all group-hover/stat:bg-emerald-500/20" />
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                            <div className="relative overflow-hidden group/stat p-4 rounded-xl bg-gradient-to-br from-emerald-500/10 to-emerald-900/10 border border-emerald-500/20 backdrop-blur-md shadow-lg transition-all hover:border-emerald-400/40">
+                                                <div className="absolute top-0 right-0 w-20 h-20 bg-emerald-500/10 rounded-full blur-xl -mr-10 -mt-10 transition-all group-hover/stat:bg-emerald-500/20" />
                                                 <div className="relative z-10 space-y-1.5">
                                                     <div className="flex items-center gap-2">
-                                                        <div className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400"><TrendingUp size={12} /></div>
-                                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-emerald-400">PAID FEE</p>
+                                                        <div className="p-1 rounded-lg bg-emerald-500/20 text-emerald-400"><TrendingUp size={10} /></div>
+                                                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-emerald-400">PAID FEE</p>
                                                     </div>
-                                                    <p className="text-2xl md:text-3xl font-display font-bold text-white tracking-tight">
+                                                    <p className="text-lg md:text-xl font-display font-bold text-white tracking-tight">
                                                         ₹{(calculatedStats.finance?.totalPaid || 0).toLocaleString()}
                                                     </p>
                                                 </div>
                                             </div>
                                             
-                                            <div className="relative overflow-hidden group/stat p-5 rounded-2xl bg-gradient-to-br from-rose-500/10 to-rose-900/10 border border-rose-500/20 backdrop-blur-md shadow-lg transition-all hover:border-rose-400/40">
-                                                <div className="absolute top-0 right-0 w-24 h-24 bg-rose-500/10 rounded-full blur-xl -mr-12 -mt-12 transition-all group-hover/stat:bg-rose-500/20" />
+                                            <div className="relative overflow-hidden group/stat p-4 rounded-xl bg-gradient-to-br from-rose-500/10 to-rose-900/10 border border-rose-500/20 backdrop-blur-md shadow-lg transition-all hover:border-rose-400/40">
+                                                <div className="absolute top-0 right-0 w-20 h-20 bg-rose-500/10 rounded-full blur-xl -mr-10 -mt-10 transition-all group-hover/stat:bg-rose-500/20" />
                                                 <div className="relative z-10 space-y-1.5">
                                                     <div className="flex items-center gap-2">
-                                                        <div className="p-1 rounded-lg bg-rose-500/20 text-rose-400"><AlertTriangle size={12} /></div>
-                                                        <p className="text-[10px] font-black uppercase tracking-[0.2em] text-rose-400">PENDING FEE</p>
+                                                        <div className="p-1 rounded-lg bg-rose-500/20 text-rose-400"><AlertTriangle size={10} /></div>
+                                                        <p className="text-[9px] font-black uppercase tracking-[0.2em] text-rose-400">PENDING FEE</p>
                                                     </div>
-                                                    <p className="text-2xl md:text-3xl font-display font-bold text-white tracking-tight">
+                                                    <p className="text-lg md:text-xl font-display font-bold text-white tracking-tight">
                                                         ₹{Math.max(0, (calculatedStats.finance?.totalFee || 0) - (calculatedStats.finance?.totalPaid || 0)).toLocaleString()}
                                                     </p>
                                                 </div>
@@ -1185,6 +1268,112 @@ export default function AdminDashboard() {
                                     </div>
                                 </div>
                             </div>
+
+                            {/* FEE TYPE ANALYTICS (DESKTOP & TAB ONLY - HIDDEN ON MOBILE) */}
+                            <div className="hidden md:flex flex-col p-6 rounded-[2rem] bg-gradient-to-br from-[#0f172a] via-[#09152b] to-[#020617] border border-cyan-500/20 shadow-[0_0_40px_-10px_rgba(6,182,212,0.15)] ring-1 ring-white/5 relative overflow-hidden h-full justify-between animate-in fade-in duration-300">
+                                <div className="absolute top-0 right-0 w-[300px] h-[300px] bg-cyan-500/10 rounded-full blur-[80px] -mr-24 -mt-24 pointer-events-none" />
+                                
+                                <div className="relative z-10 space-y-3 flex-1 flex flex-col justify-between">
+                                    <div className="space-y-1">
+                                        <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full bg-cyan-500/10 border border-cyan-500/20">
+                                            <div className="w-1.5 h-1.5 rounded-full bg-cyan-400 animate-pulse" />
+                                            <span className="text-[9px] font-black uppercase tracking-[0.2em] text-cyan-300">Fee Accounts Health</span>
+                                        </div>
+                                        <h3 className="text-xl font-display font-black text-white italic tracking-tight">
+                                            Fee Type Analytics
+                                        </h3>
+                                        <p className="text-[10px] text-muted-foreground uppercase tracking-wider font-bold">Outstanding dues & status counts</p>
+                                    </div>
+                                    
+                                    {/* Recharts Bar Chart Section */}
+                                    <div className="h-[250px] w-full mt-2">
+                                        <ResponsiveContainer width="100%" height="100%">
+                                            <BarChart
+                                                data={Object.entries(calculatedStats.finance?.feeTypeAnalytics || {
+                                                    "I Term (Admission)": { pending: 0, partial: 0, noDue: 0, totalAccounts: 0 },
+                                                    "II Term (Mid-Year)": { pending: 0, partial: 0, noDue: 0, totalAccounts: 0 },
+                                                    "III Term (Final)": { pending: 0, partial: 0, noDue: 0, totalAccounts: 0 }
+                                                })
+                                                .filter(([feeName]) => feeName !== "School Fee")
+                                                .sort(([a], [b]) => {
+                                                    const order: Record<string, number> = {
+                                                        "I Term (Admission)": 1,
+                                                        "II Term (Mid-Year)": 2,
+                                                        "III Term (Final)": 3,
+                                                        "Transport": 4
+                                                    };
+                                                    return (order[a] || 99) - (order[b] || 99);
+                                                })
+                                                .map(([feeName, counts]: [string, any]) => {
+                                                    let displayName = feeName;
+                                                    if (feeName.includes("III Term")) displayName = "Term 3";
+                                                    else if (feeName.includes("II Term")) displayName = "Term 2";
+                                                    else if (feeName.includes("I Term")) displayName = "Term 1";
+                                                    return {
+                                                        name: displayName,
+                                                        "No Due": counts.noDue || 0,
+                                                        "Partial": counts.partial || 0,
+                                                        "Pending": counts.pending || 0
+                                                    };
+                                                })}
+                                                margin={{ top: 10, right: 10, left: -20, bottom: 5 }}
+                                            >
+                                                <XAxis 
+                                                    dataKey="name" 
+                                                    stroke="rgba(255,255,255,0.4)" 
+                                                    fontSize={9}
+                                                    tickLine={false}
+                                                    axisLine={false}
+                                                />
+                                                <YAxis 
+                                                    stroke="rgba(255,255,255,0.4)" 
+                                                    fontSize={9}
+                                                    tickLine={false}
+                                                    axisLine={false}
+                                                />
+                                                <ReTooltip
+                                                    cursor={false}
+                                                    contentStyle={{
+                                                        backgroundColor: 'rgba(15, 23, 42, 0.95)',
+                                                        backdropFilter: 'blur(10px)',
+                                                        border: '1px solid rgba(255,255,255,0.1)',
+                                                        borderRadius: '12px',
+                                                        color: '#fff',
+                                                        boxShadow: '0 10px 25px -5px rgba(0, 0, 0, 0.5)'
+                                                    }}
+                                                    itemStyle={{ fontSize: '11px', fontWeight: 'bold' }}
+                                                />
+                                                <Legend 
+                                                    verticalAlign="bottom" 
+                                                    height={36} 
+                                                    iconType="circle"
+                                                    iconSize={8}
+                                                    wrapperStyle={{ fontSize: '9px', color: '#94a3b8', paddingTop: '10px' }}
+                                                />
+                                                <Bar 
+                                                    dataKey="No Due" 
+                                                    fill="#10b981" 
+                                                    radius={[3, 3, 0, 0]} 
+                                                    activeBar={{ fill: '#34d399', stroke: '#10b981', strokeWidth: 1 }}
+                                                />
+                                                <Bar 
+                                                    dataKey="Partial" 
+                                                    fill="#f59e0b" 
+                                                    radius={[3, 3, 0, 0]} 
+                                                    activeBar={{ fill: '#fbbf24', stroke: '#f59e0b', strokeWidth: 1 }}
+                                                />
+                                                <Bar 
+                                                    dataKey="Pending" 
+                                                    fill="#f43f5e" 
+                                                    radius={[3, 3, 0, 0]} 
+                                                    activeBar={{ fill: '#fb7185', stroke: '#f43f5e', strokeWidth: 1 }}
+                                                />
+                                            </BarChart>
+                                        </ResponsiveContainer>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
 
                             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
                                 {[

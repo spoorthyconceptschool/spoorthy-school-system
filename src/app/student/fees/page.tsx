@@ -21,6 +21,8 @@ import {
     ShieldCheck
 } from "lucide-react";
 import { printPaymentReceipt } from "@/lib/export-utils";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "@/lib/firebase";
 
 export default function StudentFeesPage() {
     const { user } = useAuth();
@@ -29,10 +31,43 @@ export default function StudentFeesPage() {
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
     const [paymentAmounts, setPaymentAmounts] = useState<{ [key: string]: string }>({});
     const [paying, setPaying] = useState(false);
+    const [mounted, setMounted] = useState(false);
+    const [selfPaymentEnabled, setSelfPaymentEnabled] = useState(true);
+    const [branchLogo, setBranchLogo] = useState<string>("");
+
+    useEffect(() => {
+        setMounted(true);
+        const checkFeeConfig = async () => {
+            try {
+                const snap = await getDoc(doc(db, "config", "fees"));
+                if (snap.exists()) {
+                    const data = snap.data();
+                    if (data.selfPaymentEnabled !== undefined) {
+                        setSelfPaymentEnabled(data.selfPaymentEnabled);
+                    }
+                }
+                
+                // Fetch branch logo
+                const bId = profile?.branchId || profile?.schoolId;
+                if (bId) {
+                    const branchSnap = await getDoc(doc(db, "branches", bId));
+                    if (branchSnap.exists()) {
+                        const bData = branchSnap.data();
+                        setBranchLogo(bData.logoUrl || bData.logo || "https://firebasestorage.googleapis.com/v0/b/spoorthy-16292.firebasestorage.app/o/demo%2Flogo.png?alt=media");
+                    } else {
+                        setBranchLogo("https://firebasestorage.googleapis.com/v0/b/spoorthy-16292.firebasestorage.app/o/demo%2Flogo.png?alt=media");
+                    }
+                }
+            } catch (e) {
+                console.error("Failed to check fee config:", e);
+            }
+        };
+        if (profile) checkFeeConfig();
+    }, [profile]);
 
     // Auto-select unpaid items and calculate initial payment amounts
     useEffect(() => {
-        if (!ledger) return;
+        if (!mounted || !ledger) return;
         const initialSelected = new Set<string>();
         const initialAmounts: { [key: string]: string } = {};
         const rawItems = ledger.items || [];
@@ -208,10 +243,12 @@ export default function StudentFeesPage() {
                     <title>Fee Structure - ${profile?.studentName || "Student"}</title>
                     <style>
                         body { font-family: 'Segoe UI', sans-serif; padding: 40px; color: #1f2937; line-height: 1.5; }
-                        .header { text-align: center; border-bottom: 2px solid #e5e7eb; padding-bottom: 20px; margin-bottom: 30px; }
-                        h1 { margin: 0; font-size: 24px; color: #111827; }
-                        h2 { margin: 5px 0 0 0; font-size: 16px; color: #4b5563; font-weight: normal; }
-                        .student-info { margin-bottom: 30px; font-size: 14px; background: #f9fafb; padding: 15px; border-radius: 8px; border: 1px solid #f3f4f6; }
+                        .header { display: flex; align-items: center; justify-content: center; gap: 20px; border-bottom: 2px solid #e5e7eb; padding-bottom: 20px; margin-bottom: 30px; }
+                        .header-logo { height: 60px; width: auto; object-fit: contain; }
+                        .header-text { text-align: left; }
+                        .school-name { font-size: 24px; font-weight: bold; text-transform: uppercase; color: #111827; margin: 0; }
+                        .doc-title { font-size: 16px; font-weight: normal; color: #4b5563; margin: 5px 0 0 0; }
+                        .student-info { margin-bottom: 30px; font-size: 14px; background: #f9fafb; padding: 15px; border-radius: 8px; border: 1px solid #e5e7eb; }
                         .student-info table { width: 100%; border-collapse: collapse; }
                         .student-info td { padding: 5px 10px; }
                         .student-info td.label { font-weight: bold; color: #4b5563; width: 15%; }
@@ -220,6 +257,8 @@ export default function StudentFeesPage() {
                         table.fees-table td { padding: 12px; border: 1px solid #e5e7eb; font-size: 14px; }
                         table.fees-table tr:nth-child(even) { background: #f9fafb; }
                         .footer { margin-top: 50px; text-align: center; font-size: 11px; color: #9ca3af; border-top: 1px solid #e5e7eb; padding-top: 20px; }
+                        .amount-pos { font-weight: 600; color: #111827; }
+                        .amount-neg { font-weight: 600; color: #10b981; }
                         @media print {
                             body { padding: 0; }
                             .print-btn { display: none; }
@@ -228,17 +267,20 @@ export default function StudentFeesPage() {
                 </head>
                 <body>
                     <div class="header">
-                        <h1>SPOORTHY HIGH SCHOOL</h1>
-                        <h2>Official Fee Structure Overview</h2>
+                        ${branchLogo ? `<img src="${branchLogo}" class="header-logo" alt="School Logo" onerror="this.style.display='none'" />` : ''}
+                        <div class="header-text">
+                            <h1 class="school-name">SPOORTHY HIGH SCHOOL</h1>
+                            <h2 class="doc-title">Official Fee Structure Overview</h2>
+                        </div>
                     </div>
-                    
+
                     <div class="student-info">
                         <table>
                             <tr>
                                 <td class="label">Student Name:</td>
                                 <td>${profile?.studentName || "N/A"}</td>
-                                <td class="label">Admission No:</td>
-                                <td>${profile?.admissionNo || "N/A"}</td>
+                                <td class="label">School ID:</td>
+                                <td>${profile?.schoolId || "N/A"}</td>
                             </tr>
                             <tr>
                                 <td class="label">Class & Sec:</td>
@@ -249,42 +291,39 @@ export default function StudentFeesPage() {
                         </table>
                     </div>
 
-                    <table class="fees-table">
-                        <thead>
-                            <tr>
-                                <th>Term</th>
-                                <th>Tuition Fee (₹)</th>
-                                <th>Other Fees (₹)</th>
-                                <th>Total (₹)</th>
-                                <th>Due Date</th>
-                            </tr>
-                        </thead>
-                        <tbody>
-                            <tr>
-                                <td style="font-weight: 500;">I Term (Admission)</td>
-                                <td>3,000</td>
-                                <td>300</td>
-                                <td style="font-weight: 600; color: #10b981;">3,300</td>
-                                <td>Jun 15, 2026</td>
-                            </tr>
-                            <tr>
-                                <td style="font-weight: 500;">II Term (Mid-Year)</td>
-                                <td>30,000</td>
-                                <td>3,000</td>
-                                <td style="font-weight: 600; color: #10b981;">33,000</td>
-                                <td>Oct 15, 2026</td>
-                            </tr>
-                            <tr>
-                                <td style="font-weight: 500;">III Term (Final)</td>
-                                <td>30,000</td>
-                                <td>3,000</td>
-                                <td style="font-weight: 600; color: #10b981;">33,000</td>
-                                <td>Feb 15, 2027</td>
-                            </tr>
-                        </tbody>
-                    </table>
+                        <table class="fees-table">
+                            <thead>
+                                <tr>
+                                    <th>Fee Type</th>
+                                    <th>Amount (₹)</th>
+                                    <th>Paid (₹)</th>
+                                    <th>Pending (₹)</th>
+                                    <th>Due Date</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                ${(ledger?.items || []).length > 0 ? (ledger?.items || []).map((item: any) => {
+                                    const amount = item.amount || 0;
+                                    const paid = item.paidAmount || 0;
+                                    const pending = amount - paid;
+                                    return `
+                                        <tr>
+                                            <td style="font-weight: 500;">${item.name}</td>
+                                            <td class="${amount < 0 ? 'amount-neg' : ''}">${amount.toLocaleString()}</td>
+                                            <td>${paid.toLocaleString()}</td>
+                                            <td class="${pending === 0 ? 'amount-neg' : 'amount-pos'}">${pending.toLocaleString()}</td>
+                                            <td>${item.dueDate || "N/A"}</td>
+                                        </tr>
+                                    `;
+                                }).join('') : `
+                                    <tr>
+                                        <td colspan="5" style="text-align: center; color: #6b7280;">No fee records found.</td>
+                                    </tr>
+                                `}
+                            </tbody>
+                        </table>
 
-                    <div style="margin-top: 20px; font-size: 12px; color: #6b7280; font-style: italic;">
+                        <div style="margin-top: 20px; font-size: 12px; color: #6b7280; font-style: italic;">
                         * Fee structure is subject to change. Please contact the school administration office for billing clarifications.
                     </div>
 
@@ -299,7 +338,7 @@ export default function StudentFeesPage() {
         printWindow.document.close();
     };
 
-    if (loading && !ledger) {
+    if (!mounted || (loading && !ledger)) {
         return (
             <div className="h-[40vh] flex flex-col items-center justify-center gap-4 text-blue-500">
                 <Loader2 className="w-10 h-10 animate-spin" />
@@ -345,7 +384,9 @@ export default function StudentFeesPage() {
                     <div className="space-y-0.5">
                         <div className="flex items-center gap-2">
                             <h3 className="font-bold text-white tracking-wide uppercase text-xs">Fee Structure Overview</h3>
-                            <Info className="w-4 h-4 text-white/40 cursor-help" title="Standard fee guidelines for the current session" />
+                            <span title="Standard fee guidelines for the current session">
+                                <Info className="w-4 h-4 text-white/40 cursor-help" />
+                            </span>
                         </div>
                         <p className="text-[10px] text-white/40 font-medium">Approved school academic board tuition terms</p>
                     </div>
@@ -357,38 +398,35 @@ export default function StudentFeesPage() {
                     </Button>
                 </CardHeader>
                 <CardContent className="p-0 overflow-x-auto">
-                    <table className="w-full text-left border-collapse min-w-[700px]">
+                    <table className="w-full text-left border-collapse">
                         <thead>
                             <tr className="border-b border-white/[0.04] bg-white/[0.01]">
-                                <th className="p-4 px-6 text-xs font-bold text-white/50 uppercase tracking-wider">Term</th>
-                                <th className="p-4 px-6 text-xs font-bold text-white/50 uppercase tracking-wider">Tuition Fee (₹)</th>
-                                <th className="p-4 px-6 text-xs font-bold text-white/50 uppercase tracking-wider">Other Fees (₹)</th>
-                                <th className="p-4 px-6 text-xs font-bold text-white/50 uppercase tracking-wider">Total (₹)</th>
-                                <th className="p-4 px-6 text-xs font-bold text-white/50 uppercase tracking-wider">Due Date</th>
+                                <th className="p-3 sm:p-4 px-4 sm:px-6 text-[10px] sm:text-xs font-bold text-white/50 uppercase tracking-wider">Fee Type</th>
+                                <th className="p-3 sm:p-4 px-4 sm:px-6 text-[10px] sm:text-xs font-bold text-white/50 uppercase tracking-wider">Amount (₹)</th>
+                                <th className="p-3 sm:p-4 px-4 sm:px-6 text-[10px] sm:text-xs font-bold text-white/50 uppercase tracking-wider">Paid (₹)</th>
+                                <th className="p-3 sm:p-4 px-4 sm:px-6 text-[10px] sm:text-xs font-bold text-white/50 uppercase tracking-wider">Pending (₹)</th>
+                                <th className="p-3 sm:p-4 px-4 sm:px-6 text-[10px] sm:text-xs font-bold text-white/50 uppercase tracking-wider">Due Date</th>
                             </tr>
                         </thead>
-                        <tbody className="divide-y divide-white/[0.03] text-sm">
-                            <tr className="hover:bg-white/[0.01] transition-colors">
-                                <td className="p-4 px-6 font-medium text-white/90">I Term (Admission)</td>
-                                <td className="p-4 px-6 text-white/70">3,000</td>
-                                <td className="p-4 px-6 text-white/70">300</td>
-                                <td className="p-4 px-6 font-mono font-bold text-emerald-400">3,300</td>
-                                <td className="p-4 px-6 text-white/60">Jun 15, 2026</td>
-                            </tr>
-                            <tr className="hover:bg-white/[0.01] transition-colors">
-                                <td className="p-4 px-6 font-medium text-white/90">II Term (Mid-Year)</td>
-                                <td className="p-4 px-6 text-white/70">30,000</td>
-                                <td className="p-4 px-6 text-white/70">3,000</td>
-                                <td className="p-4 px-6 font-mono font-bold text-emerald-400">33,000</td>
-                                <td className="p-4 px-6 text-white/60">Oct 15, 2026</td>
-                            </tr>
-                            <tr className="hover:bg-white/[0.01] transition-colors">
-                                <td className="p-4 px-6 font-medium text-white/90">III Term (Final)</td>
-                                <td className="p-4 px-6 text-white/70">30,000</td>
-                                <td className="p-4 px-6 text-white/70">3,000</td>
-                                <td className="p-4 px-6 font-mono font-bold text-emerald-400">33,000</td>
-                                <td className="p-4 px-6 text-white/60">Feb 15, 2027</td>
-                            </tr>
+                        <tbody className="divide-y divide-white/[0.03] text-[11px] sm:text-sm">
+                            {ledgerItems.length > 0 ? ledgerItems.map((item: any, idx: number) => {
+                                const amount = item.amount || 0;
+                                const paid = item.paidAmount || 0;
+                                const pending = amount - paid;
+                                return (
+                                    <tr key={item.id || idx} className="hover:bg-white/[0.01] transition-colors">
+                                        <td className="p-3 sm:p-4 px-4 sm:px-6 font-medium text-white/90">{item.name}</td>
+                                        <td className={`p-3 sm:p-4 px-4 sm:px-6 ${amount < 0 ? 'text-emerald-400' : 'text-white/70'}`}>{amount.toLocaleString()}</td>
+                                        <td className="p-3 sm:p-4 px-4 sm:px-6 text-white/70">{paid.toLocaleString()}</td>
+                                        <td className={`p-3 sm:p-4 px-4 sm:px-6 font-mono font-bold ${pending <= 0 ? 'text-emerald-400' : 'text-white/90'}`}>{pending.toLocaleString()}</td>
+                                        <td className="p-3 sm:p-4 px-4 sm:px-6 text-white/60">{item.dueDate || "N/A"}</td>
+                                    </tr>
+                                );
+                            }) : (
+                                <tr>
+                                    <td colSpan={5} className="p-4 px-6 text-center text-white/40 text-xs py-8">No fee records assigned.</td>
+                                </tr>
+                            )}
                         </tbody>
                     </table>
                     <div className="p-4 px-6 bg-white/[0.01] border-t border-white/[0.03] flex items-center gap-2 text-white/40 text-[10px] uppercase font-bold tracking-wider">
@@ -426,11 +464,12 @@ export default function StudentFeesPage() {
                     )}
 
                     {/* Select Terms to Pay Card */}
-                    <Card className="bg-[#112240]/20 border border-white/[0.05] rounded-3xl overflow-hidden backdrop-blur-md shadow-2xl">
-                        <div className="bg-white/[0.02] px-6 py-4 flex justify-between items-center border-b border-white/[0.04]">
-                            <h3 className="font-bold text-white tracking-wide uppercase text-xs">Select Terms To Pay</h3>
-                            <Badge className="bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-md font-bold">Tuition</Badge>
-                        </div>
+                    {selfPaymentEnabled && (
+                        <Card className="bg-[#112240]/20 border border-white/[0.05] rounded-3xl overflow-hidden backdrop-blur-md shadow-2xl">
+                            <div className="bg-white/[0.02] px-6 py-4 flex justify-between items-center border-b border-white/[0.04]">
+                                <h3 className="font-bold text-white tracking-wide uppercase text-xs">Select Terms To Pay</h3>
+                                <Badge className="bg-blue-500/10 text-blue-400 border border-blue-500/20 text-[9px] uppercase tracking-wider px-2 py-0.5 rounded-md font-bold">Tuition</Badge>
+                            </div>
                         <div className="p-4 space-y-3.5">
                             {(() => {
                                 let rollingReduction = ledgerTotalReductions;
@@ -462,6 +501,7 @@ export default function StudentFeesPage() {
                                                             checked={isSelected}
                                                             onCheckedChange={() => handleToggleItem(item.id, netRemaining)}
                                                             className="mt-1 border-white/20 data-[state=checked]:bg-blue-500 data-[state=checked]:border-blue-500"
+                                                            disabled={!selfPaymentEnabled}
                                                         />
                                                     )}
                                                     <div className="space-y-1">
@@ -495,7 +535,7 @@ export default function StudentFeesPage() {
                                                             onChange={(e) => handleAmountChange(item.id, e.target.value, netRemaining)}
                                                             className="bg-transparent border-none outline-none text-sm font-bold w-full text-white font-mono placeholder:text-white/10"
                                                             placeholder="0"
-                                                            disabled={!isSelected || netRemaining === 0}
+                                                            disabled={!isSelected || netRemaining === 0 || !selfPaymentEnabled}
                                                         />
                                                     </div>
                                                 </div>
@@ -508,9 +548,10 @@ export default function StudentFeesPage() {
                             })()}
                         </div>
                     </Card>
+                    )}
 
                     {/* Custom Fees Checklist Card */}
-                    {customFees.length > 0 && (
+                    {selfPaymentEnabled && customFees.length > 0 && (
                         <Card className="bg-[#112240]/20 border border-white/[0.05] rounded-3xl overflow-hidden backdrop-blur-md shadow-2xl">
                             <div className="bg-white/[0.02] px-6 py-4 flex justify-between items-center border-b border-white/[0.04]">
                                 <h3 className="font-bold text-amber-500 tracking-wide uppercase text-xs">Special / Activity Fees</h3>
@@ -539,6 +580,7 @@ export default function StudentFeesPage() {
                                                         checked={isSelected}
                                                         onCheckedChange={() => handleToggleItem(item.id, remaining)}
                                                         className="mt-1 border-white/20 data-[state=checked]:bg-amber-500 data-[state=checked]:border-amber-500"
+                                                        disabled={!selfPaymentEnabled}
                                                     />
                                                 )}
                                                 <div className="space-y-1">
@@ -562,7 +604,7 @@ export default function StudentFeesPage() {
                                                         onChange={(e) => handleAmountChange(item.id, e.target.value, remaining)}
                                                         className="bg-transparent border-none outline-none text-sm font-bold w-full text-white font-mono placeholder:text-white/10"
                                                         placeholder="0"
-                                                        disabled={!isSelected || remaining === 0}
+                                                        disabled={!isSelected || remaining === 0 || !selfPaymentEnabled}
                                                     />
                                                 </div>
                                             </div>
@@ -583,8 +625,9 @@ export default function StudentFeesPage() {
                 {/* Right Column: Checkout summary & history */}
                 <div className="space-y-6">
                     {/* Checkout Card */}
-                    <Card className="bg-[#112240]/30 border border-white/[0.05] p-6 md:p-8 rounded-3xl shadow-2xl relative overflow-hidden backdrop-blur-md">
-                        <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
+                    {selfPaymentEnabled ? (
+                        <Card className="bg-[#112240]/30 border border-white/[0.05] p-6 md:p-8 rounded-3xl shadow-2xl relative overflow-hidden backdrop-blur-md">
+                            <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/5 rounded-full blur-3xl pointer-events-none" />
                         <h3 className="text-sm font-bold uppercase tracking-widest text-white mb-6 flex items-center gap-2">
                             <CreditCard className="w-4 h-4 text-blue-400" />
                             Checkout Summary
@@ -619,25 +662,26 @@ export default function StudentFeesPage() {
                                 </div>
                             </div>
 
-                            <Button
-                                onClick={handlePay}
-                                disabled={totalToPay === 0 || paying}
-                                className="w-full h-13 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/30 text-white rounded-2xl font-bold text-sm shadow-xl shadow-blue-500/10 transition-all flex items-center justify-center gap-2 border-0"
-                            >
-                                {paying ? (
-                                    <Loader2 className="w-5 h-5 animate-spin" />
-                                ) : (
-                                    <>
-                                        <CreditCard className="w-4 h-4" /> Pay Selected Fees
-                                    </>
-                                )}
-                            </Button>
+                                <Button
+                                    onClick={handlePay}
+                                    disabled={totalToPay === 0 || paying}
+                                    className="w-full h-13 bg-blue-600 hover:bg-blue-500 disabled:bg-blue-600/30 text-white rounded-2xl font-bold text-sm shadow-xl shadow-blue-500/10 transition-all flex items-center justify-center gap-2 border-0"
+                                >
+                                    {paying ? (
+                                        <Loader2 className="w-5 h-5 animate-spin" />
+                                    ) : (
+                                        <>
+                                            <CreditCard className="w-4 h-4" /> Pay Selected Fees
+                                        </>
+                                    )}
+                                </Button>
 
-                            <p className="text-[8px] text-center text-white/30 font-bold tracking-widest uppercase">
-                                Secured payments powered by Razorpay
-                            </p>
-                        </div>
-                    </Card>
+                                <p className="text-[8px] text-center text-white/30 font-bold tracking-widest uppercase">
+                                    Secured payments powered by Razorpay
+                                </p>
+                            </div>
+                        </Card>
+                    ) : null}
 
                     {/* Transaction History Card */}
                     <Card className="bg-[#112240]/20 border border-white/[0.05] shadow-2xl rounded-3xl overflow-hidden backdrop-blur-md">
@@ -687,7 +731,8 @@ export default function StudentFeesPage() {
                                                 printPaymentReceipt({
                                                     payment: tx,
                                                     student: profile,
-                                                    ledger
+                                                    ledger,
+                                                    schoolLogo: branchLogo
                                                 })
                                             }
                                         >

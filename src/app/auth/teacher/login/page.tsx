@@ -11,13 +11,14 @@ import { Loader2, Lock, School, GraduationCap } from "lucide-react";
 import { doc, getDoc } from "firebase/firestore";
 import { toast } from "@/lib/toast-store";
 
+import { useAuth } from "@/context/AuthContext";
+
 export default function TeacherLoginPage() {
     const router = useRouter();
     const [form, setForm] = useState({ schoolId: "", password: "" });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState("");
-
-
+    const { signIn } = useAuth();
 
     const handleLogin = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -28,38 +29,23 @@ export default function TeacherLoginPage() {
             // 1. Construct Email (e.g., SHST0005@school.local)
             const syntheticEmail = `${form.schoolId.toUpperCase()}@school.local`;
 
-            // 2. Auth Sign In
-            const userCredential = await signInWithEmailAndPassword(auth, syntheticEmail, form.password);
-            const user = userCredential.user;
+            // 2. Auth Sign In via centralized useAuth provider
+            const dataToStore = await signIn(syntheticEmail, form.password);
 
-            // 3. Verify Role & Status in Firestore
-            // Check 'teachers' collection
-            const teacherDocRef = doc(db, "teachers", form.schoolId.toUpperCase());
-            const teacherSnap = await getDoc(teacherDocRef);
-
-            if (!teacherSnap.exists()) {
-                // Determine if it was actually a student trying to login here?
-                throw new Error("Teacher record not found.");
+            // 3. Verify Role
+            if (dataToStore?.role && String(dataToStore.role).toUpperCase() !== "TEACHER") {
+                throw new Error("This portal is for teachers only.");
             }
 
-            const teacherData = teacherSnap.data();
-            if (teacherData.status !== "ACTIVE") {
-                throw new Error("Account is inactive. Contact Admin.");
-            }
-
-            // 4. Check Force Password Policy (from 'users' collection generally, or just check 'users/{uid}')
-            // In API Create, we mapped UID to 'users/{uid}' with 'mustChangePassword: true'
-            const userMetaRef = doc(db, "users", user.uid);
-            const userMetaSnap = await getDoc(userMetaRef);
-
-            if (userMetaSnap.exists() && userMetaSnap.data().mustChangePassword) {
+            // 4. Check Force Password Policy (from 'users' collection generally, resolved in signIn)
+            if (dataToStore?.mustChangePassword) {
                 router.push("/auth/force-password-change");
                 return;
             }
 
             toast({
                 title: "Welcome Back",
-                description: `Logged in as ${teacherData.name}`,
+                description: `Logged in successfully`,
                 type: "success"
             });
 
@@ -75,11 +61,7 @@ export default function TeacherLoginPage() {
                 type: "error"
             });
 
-            if (err.code === "auth/invalid-credential" || err.code === "auth/user-not-found") {
-                setError("Invalid ID or Password");
-            } else {
-                setError(err.message || "Login Failed");
-            }
+            setError(err.message || "Login Failed");
         } finally {
             setLoading(false);
         }

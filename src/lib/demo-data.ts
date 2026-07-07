@@ -1,4 +1,4 @@
-import { adminDb, adminRtdb, FieldValue, Timestamp } from "@/lib/firebase-admin";
+import { adminDb, adminRtdb, Timestamp } from "@/lib/firebase-admin";
 
 /**
  * Enterprise Demo Data Seeding Script (SERVER SIDE ONLY)
@@ -11,41 +11,52 @@ import { adminDb, adminRtdb, FieldValue, Timestamp } from "@/lib/firebase-admin"
  * - Operational Data (Admissions, Search Index)
  * - Config (Academic Years, System Constants)
  */
-export const seedDemoData = async () => {
-    console.log("[Seeding] Initiating server-side ecosystem rebuild...");
+export const seedDemoData = async (branchId: string) => {
+    console.log(`[Seeding] Initiating server-side ecosystem rebuild for branch ${branchId}...`);
 
-    // Helper to delete all docs in a collection using Admin SDK
-    const nukeCollection = async (collectionName: string) => {
+    // Fetch Branch Configuration for prefixes
+    const branchDoc = await adminDb.collection("branches").doc(branchId).get();
+    const branchData = branchDoc.exists ? branchDoc.data() : {};
+    const websiteSettingsDoc = await adminDb.collection("website_settings").doc("main").get();
+    const websiteSettingsData = websiteSettingsDoc.exists ? websiteSettingsDoc.data() : {};
+
+    const studentIdPrefix = branchData?.studentIdPrefix || websiteSettingsData?.studentIdPrefix || "SHS";
+    const studentIdSuffix = branchData?.studentIdSuffix ? Number(branchData.studentIdSuffix) : (websiteSettingsData?.studentIdSuffix ? Number(websiteSettingsData.studentIdSuffix) : 1000);
+    const teacherIdPrefix = branchData?.teacherIdPrefix || websiteSettingsData?.teacherIdPrefix || "CST";
+    const teacherIdSuffix = branchData?.teacherIdSuffix ? Number(branchData.teacherIdSuffix) : (websiteSettingsData?.teacherIdSuffix ? Number(websiteSettingsData.teacherIdSuffix) : 100);
+
+    // Helper to delete all docs in a collection belonging to this branch
+    const nukeCollectionForBranch = async (collectionName: string, targetBranchId: string) => {
         const ref = adminDb.collection(collectionName);
         try {
-            // @ts-ignore
-            if (adminDb.recursiveDelete) {
-                // @ts-ignore
-                await adminDb.recursiveDelete(ref);
-            } else {
-                // Manual chunked delete for environments/versions without recursiveDelete
+            const batchDelete = async (q: FirebaseFirestore.Query<FirebaseFirestore.DocumentData>) => {
                 while (true) {
-                    const snap = await ref.limit(500).get();
+                    const snap = await q.limit(500).get();
                     if (snap.empty) break;
                     const batch = adminDb.batch();
                     snap.docs.forEach((d: any) => batch.delete(d.ref));
                     await batch.commit();
                     if (snap.size < 500) break;
                 }
-            }
+            };
+            
+            // Delete matching branchId
+            await batchDelete(ref.where("branchId", "==", targetBranchId));
+            // Delete matching schoolId (some collections or legacy docs use schoolId as tenant key)
+            await batchDelete(ref.where("schoolId", "==", targetBranchId));
         } catch (e) {
-            console.warn(`[Seeding] Could not purge ${collectionName}:`, e);
+            console.warn(`[Seeding] Could not purge ${collectionName} for branch ${targetBranchId}:`, e);
         }
     };
 
-    console.log("[Seeding] Purging old data...");
+    console.log(`[Seeding] Purging old data for branch ${branchId}...`);
     const coreCols = [
         "students", "master_villages", "master_classes", "master_sections", "master_class_sections",
         "payments", "applications", "leaves", "teachers", "staff", "student_fee_ledgers", "search_index", "notices",
-        "attendance_daily", "student_change_requests", "exams", "exam_results"
+        "attendance_daily", "student_change_requests", "exams", "exam_results", "villages", "classes", "sections"
     ];
     for (const col of coreCols) {
-        await nukeCollection(col);
+        await nukeCollectionForBranch(col, branchId);
     }
 
     const firstNames = ["Aarav", "Advait", "Akash", "Anay", "Arjun", "Aryan", "Ayaan", "Dhruv", "Ishaan", "Kabir", "Madhav", "Reyansh", "Rudra", "Sai", "Shaurya", "Siddharth", "Tejas", "Vasudev", "Vihaan", "Viraj", "Aadhya", "Ananya", "Anvi", "Avni", "Diya", "Ira", "Ishani", "Kavya", "Myra", "Navya", "Priya", "Riya", "Saanvi", "Sara", "Shanaya", "Siya", "Tanvi", "Vanya", "Zoya"];
@@ -99,9 +110,11 @@ export const seedDemoData = async () => {
     for (const [i, name] of villageNames.entries()) {
         const id = `VIL_${String(i + 1).padStart(3, '0')}`;
         villageIds.push(id);
-        const data = { id, name, isActive: true, createdAt: Timestamp.now() };
+        const data = { id, name, isActive: true, code: `VIL${i + 1}`, active: true, studentCount: 20, createdAt: Timestamp.now(), schoolId: branchId, branchId: branchId };
+        
         await addOp(adminDb.collection("master_villages").doc(id), data);
-        rtdbMaster.villages[id] = data;
+        await addOp(adminDb.collection("villages").doc(`${branchId}_${id}`), data);
+        rtdbMaster.villages[id] = { id, name, isActive: true, createdAt: Timestamp.now() };
     }
 
     // 2. Classes & Sections
@@ -110,9 +123,11 @@ export const seedDemoData = async () => {
         const id = `CLS_${String(i).padStart(2, '0')}`;
         const name = i === 1 ? "Nursery" : i === 2 ? "LKG" : i === 3 ? "UKG" : `Class ${i - 3}`;
         classData.push({ id, name });
-        const data = { id, name, isActive: true, order: i, createdAt: Timestamp.now() };
+        const data = { id, name, isActive: true, active: true, order: i, createdAt: Timestamp.now(), schoolId: branchId, branchId: branchId };
+        
         await addOp(adminDb.collection("master_classes").doc(id), data);
-        rtdbMaster.classes[id] = data;
+        await addOp(adminDb.collection("classes").doc(`${branchId}_${id}`), data);
+        rtdbMaster.classes[id] = { id, name, isActive: true, order: i, createdAt: Timestamp.now() };
     }
 
     const sections = [
@@ -120,21 +135,28 @@ export const seedDemoData = async () => {
         { id: "SEC_B", name: "B" }
     ];
     for (const s of sections) {
-        const data = { id: s.id, name: s.name, isActive: true, createdAt: Timestamp.now() };
+        const data = { id: s.id, name: s.name, isActive: true, active: true, createdAt: Timestamp.now(), schoolId: branchId, branchId: branchId };
+        
         await addOp(adminDb.collection("master_sections").doc(s.id), data);
-        rtdbMaster.sections[s.id] = data;
+        await addOp(adminDb.collection("sections").doc(`${branchId}_${s.id}`), data);
+        rtdbMaster.sections[s.id] = { id: s.id, name: s.name, isActive: true, createdAt: Timestamp.now() };
     }
 
     // 3. Mapping
     for (const c of classData) {
         for (const s of sections) {
             const id = `${c.id}_${s.id}`;
+            const docId = `${branchId}_${id}`;
             const data = {
+                id: docId, classId: c.id, className: c.name, sectionId: s.id, sectionName: s.name,
+                displayName: `${c.name} - ${s.name}`, isActive: true, createdAt: Timestamp.now(),
+                schoolId: branchId, branchId: branchId
+            };
+            await addOp(adminDb.collection("master_class_sections").doc(docId), data);
+            rtdbMaster.classSections[id] = {
                 id, classId: c.id, className: c.name, sectionId: s.id, sectionName: s.name,
                 displayName: `${c.name} - ${s.name}`, isActive: true, createdAt: Timestamp.now()
             };
-            await addOp(adminDb.collection("master_class_sections").doc(id), data);
-            rtdbMaster.classSections[id] = data;
         }
     }
 
@@ -152,14 +174,14 @@ export const seedDemoData = async () => {
     await addOp(adminDb.collection("config").doc("fees"), feeConfig);
 
     // 5. Students (Exactly ~400)
-    let studentIdCounter = 1000;
+    let studentIdCounter = studentIdSuffix;
     console.log("[Seeding] Generating ~400 students with financial records...");
     for (const cls of classData) {
         for (const sec of sections) {
             // Approx 20 students per section
             for (let i = 1; i <= 20; i++) {
                 studentIdCounter++;
-                const schoolId = `SHS${studentIdCounter}`;
+                const schoolId = `${studentIdPrefix}${String(studentIdCounter).padStart(5, "0")}`;
                 const fName = getRandom(firstNames);
                 const lName = getRandom(lastNames);
                 const sName = `${fName} ${lName}`;
@@ -192,37 +214,58 @@ export const seedDemoData = async () => {
                     villageId: vId, villageName: vName, classId: cls.id, className: cls.name,
                     sectionId: sec.id, sectionName: sec.name, status: "ACTIVE", academicYear: academicYearId,
                     gender: getRandom(genders), dateOfBirth: `201${Math.floor(Math.random() * 9)}-06-01`,
-                    transportRequired: Math.random() > 0.7, admissionNumber: `ADM/26/${studentIdCounter}`,
+                    transportRequired: Math.random() > 0.7, admissionNo: schoolId,
                     address: `${i}, Main Street, ${vName}`, createdAt: Timestamp.now(), recoveryPassword: mobile, type: "student",
-                    rollNumber: String(i), keywords: Array.from(searchTags)
+                    rollNo: String(i).padStart(2, '0'), keywords: Array.from(searchTags),
+                    branchId: branchId
                 };
                 await addOp(adminDb.collection("students").doc(schoolId), studentData);
 
                 // Ledger
                 const totalTermFee = feeConfig.terms.reduce((acc, t) => acc + (t.amounts[cls.name] || 0), 0);
-                const ledgerItems = feeConfig.terms.map(t => ({
-                    id: `TERM_${t.id}`, type: "TERM", name: t.name, dueDate: t.dueDate,
-                    amount: t.amounts[cls.name], paidAmount: 0, status: "PENDING"
-                }));
-                await addOp(adminDb.collection("student_fee_ledgers").doc(`${schoolId}_${academicYearId}`), {
-                    studentId: schoolId, academicYearId, classId: cls.id, className: cls.name,
-                    totalFee: totalTermFee, totalPaid: 0, status: "PENDING", items: ledgerItems, updatedAt: new Date().toISOString()
+                const hasPayment = Math.random() > 0.5;
+                const paymentAmount = 5000;
+                const totalPaid = hasPayment ? paymentAmount : 0;
+
+                const ledgerItems = feeConfig.terms.map((t, idx) => {
+                    const itemFee = t.amounts[cls.name] || 0;
+                    let itemPaid = 0;
+                    let itemStatus = "PENDING";
+                    
+                    if (hasPayment && idx === 0) {
+                        itemPaid = Math.min(itemFee, paymentAmount);
+                        itemStatus = itemPaid >= itemFee ? "PAID" : "PARTIAL";
+                    }
+                    
+                    return {
+                        id: `TERM_${t.id}`, type: "TERM", name: t.name, dueDate: t.dueDate,
+                        amount: itemFee, paidAmount: itemPaid, status: itemStatus
+                    };
                 });
 
-                // Search Index (Legacy/Global)
+                await addOp(adminDb.collection("student_fee_ledgers").doc(`${schoolId}_${academicYearId}`), {
+                    studentId: schoolId, academicYearId, classId: cls.id, className: cls.name,
+                    totalFee: totalTermFee, totalPaid: totalPaid, status: totalPaid >= totalTermFee ? "PAID" : (totalPaid > 0 ? "PARTIAL" : "PENDING"), items: ledgerItems, updatedAt: new Date().toISOString(),
+                    branchId: branchId
+                });
+
+                // Search Index (Legacy/Global but scoped)
                 await addOp(adminDb.collection("search_index").doc(schoolId), {
                     id: schoolId, entityId: schoolId, type: "student",
                     title: sName, subtitle: `${cls.name} | ${vName}`,
                     url: `/admin/students/${schoolId}`,
                     keywords: Array.from(searchTags),
-                    updatedAt: Timestamp.now()
+                    updatedAt: Timestamp.now(),
+                    branchId: branchId,
+                    schoolId: branchId
                 });
 
                 // Random Payment
-                if (Math.random() > 0.5) {
+                if (hasPayment) {
                     await addOp(adminDb.collection("payments").doc(`PAY_${schoolId}`), {
-                        studentId: schoolId, studentName: sName, amount: 5000,
-                        method: "cash", date: Timestamp.now(), status: "success", createdAt: Timestamp.now()
+                        studentId: schoolId, studentName: sName, amount: paymentAmount,
+                        method: "cash", date: Timestamp.now(), status: "success", createdAt: Timestamp.now(),
+                        schoolId: branchId, branchId: branchId
                     });
                 }
             }
@@ -254,8 +297,10 @@ export const seedDemoData = async () => {
     ];
 
     // Create Teachers in Firestore
+    let teacherIdCounter = teacherIdSuffix;
     for (let i = 0; i < teacherNames.length; i++) {
-        const id = `TCH${100 + i}`;
+        teacherIdCounter++;
+        const id = `${teacherIdPrefix}${String(teacherIdCounter).padStart(5, "0")}`;
         const name = teacherNames[i];
         const mobile = `98480${20000 + i}`;
         const tags = new Set<string>();
@@ -269,13 +314,14 @@ export const seedDemoData = async () => {
         name.toLowerCase().split(/\s+/).forEach(t => { if (t.length >= 1) for (let k = 1; k <= t.length; k++) tags.add(t.substring(0, k)); });
 
         await addOp(adminDb.collection("teachers").doc(id), {
-            id, schoolId: id, name, mobile, status: "ACTIVE",
+            id, teacherId: id, schoolId: branchId, branchId: branchId, name, mobile, status: "ACTIVE",
             salary: 35000 + (i * 1000), recoveryPassword: mobile,
             createdAt: Timestamp.now(), keywords: Array.from(tags)
         });
         await addOp(adminDb.collection("search_index").doc(id), {
             id, entityId: id, type: "teacher", title: name, subtitle: `Faculty | ${id}`,
-            url: `/admin/teachers/${id}`, keywords: Array.from(tags), updatedAt: Timestamp.now()
+            url: `/admin/teachers/${id}`, keywords: Array.from(tags), updatedAt: Timestamp.now(),
+            schoolId: branchId, branchId: branchId
         });
     }
 
@@ -283,7 +329,7 @@ export const seedDemoData = async () => {
     const staffNames = ["Somulu", "Yadiah", "Narsimha", "Laxmi", "Bharat", "Mallaiah", "Pentamma", "Ramulu", "Sattiah", "Chandraiah"];
     const sRoles = ["DRIVER", "CLEANER", "WATCHMAN", "DRIVER", "WATCHMAN", "DRIVER", "CLEANER", "WATCHMAN", "WATCHMAN", "CLEANER"];
     for (let i = 0; i < staffNames.length; i++) {
-        const id = `STF${500 + i}`;
+        const id = `${branchId}_STF${500 + i}`;
         const name = staffNames[i];
         const mobile = `91000${60000 + i}`;
         const tags = new Set<string>();
@@ -296,38 +342,40 @@ export const seedDemoData = async () => {
         });
 
         await addOp(adminDb.collection("staff").doc(id), {
-            id, schoolId: id, name, mobile, status: "ACTIVE",
+            id, staffId: id, schoolId: branchId, branchId: branchId, name, mobile, status: "ACTIVE",
             roleCode: sRoles[i], baseSalary: 12000 + (i * 200),
             createdAt: Timestamp.now(), keywords: Array.from(tags)
         });
         await addOp(adminDb.collection("search_index").doc(id), {
             id, entityId: id, type: "staff", title: name, subtitle: `${sRoles[i]} | ${id}`,
-            url: `/admin/staff/${id}`, keywords: Array.from(tags), updatedAt: Timestamp.now()
+            url: `/admin/staff/${id}`, keywords: Array.from(tags), updatedAt: Timestamp.now(),
+            schoolId: branchId, branchId: branchId
         });
     }
 
     // 9. Assign Teachers to Classes (Class Teachers & Subject Teachers)
     rtdbMaster.subjectTeachers = {};
+    const getTeacherId = (index: number) => {
+        const counter = teacherIdSuffix + index + 1;
+        return `${teacherIdPrefix}${String(counter).padStart(5, "0")}`;
+    };
     let teacherIndex = 0;
 
-    // Get all student records grouped by class/section for attendance generation
-    // We already added them to the batch, but let's query the ones we generated logic-wise.
-    // Instead of querying, we can simulate attendance directly by iterating the pattern.
     const studentRefsByClassSec: Record<string, string[]> = {};
     const classSectionsReal: any[] = [];
 
     for (const csKey in rtdbMaster.classSections) {
         const cs = rtdbMaster.classSections[csKey];
         // Assign Class Teacher
-        const ctId = `TCH${100 + (teacherIndex % teacherNames.length)}`;
+        const ctId = getTeacherId(teacherIndex % teacherNames.length);
         cs.classTeacherId = ctId;
         classSectionsReal.push(cs);
 
         // Assign Subject Teachers for this class section
         rtdbMaster.subjectTeachers[csKey] = {
-            "math": `TCH${100 + ((teacherIndex + 1) % teacherNames.length)}`,
-            "science": `TCH${100 + ((teacherIndex + 2) % teacherNames.length)}`,
-            "english": `TCH${100 + ((teacherIndex + 3) % teacherNames.length)}`
+            "math": getTeacherId((teacherIndex + 1) % teacherNames.length),
+            "science": getTeacherId((teacherIndex + 2) % teacherNames.length),
+            "english": getTeacherId((teacherIndex + 3) % teacherNames.length)
         };
 
         teacherIndex++;
@@ -335,13 +383,14 @@ export const seedDemoData = async () => {
     }
 
     // Since we know the students we generated, we can map them directly:
-    let tempStudentCounter = 1000;
+    let tempStudentCounter = studentIdSuffix;
     for (const c of classData) {
         for (const s of sections) {
             const csKey = `${c.id}_${s.id}`;
             for (let i = 1; i <= 20; i++) {
                 tempStudentCounter++;
-                studentRefsByClassSec[csKey].push(`SHS${tempStudentCounter}`);
+                const schoolId = `${studentIdPrefix}${String(tempStudentCounter).padStart(5, "0")}`;
+                studentRefsByClassSec[csKey].push(schoolId);
             }
         }
     }
@@ -380,14 +429,16 @@ export const seedDemoData = async () => {
             });
 
             const docId = `${dateStr}_${cs.classId}_${cs.sectionId}`;
-            await addOp(adminDb.collection("attendance_daily").doc(docId), {
+            await addOp(adminDb.collection("attendance_daily").doc(`${branchId}_${docId}`), {
                 date: dateStr,
                 classId: cs.classId,
                 sectionId: cs.sectionId,
                 records,
                 markedBy: cs.classTeacherId,
                 timestamp: Timestamp.fromDate(dateObj),
-                stats: { total: studentsInSec.length, present: presentCount, absent: absentCount }
+                stats: { total: studentsInSec.length, present: presentCount, absent: absentCount },
+                schoolId: branchId,
+                branchId: branchId
             });
         }
     }
@@ -397,7 +448,7 @@ export const seedDemoData = async () => {
     const dummyReqs = [
         {
             type: "EDIT",
-            studentId: "SHS1001",
+            studentId: `${studentIdPrefix}${String(studentIdSuffix + 1).padStart(5, "0")}`,
             classId: classData[0].id,
             sectionId: sections[0].id,
             requestedBy: rtdbMaster.classSections[`${classData[0].id}_${sections[0].id}`].classTeacherId,
@@ -407,7 +458,9 @@ export const seedDemoData = async () => {
             requestPayload: { parentMobile: "9888888888", address: "Secunderabad" },
             studentName: getRandom(firstNames) + " " + getRandom(lastNames),
             className: classData[0].name,
-            sectionName: sections[0].name
+            sectionName: sections[0].name,
+            schoolId: branchId,
+            branchId: branchId
         },
         {
             type: "ADD",
@@ -420,7 +473,9 @@ export const seedDemoData = async () => {
             requestPayload: { studentName: "New Student Entry", gender: "male", parentName: "Father Name", parentMobile: "9000000000" },
             studentName: "New Student Entry",
             className: classData[1].name,
-            sectionName: sections[1].name
+            sectionName: sections[1].name,
+            schoolId: branchId,
+            branchId: branchId
         }
     ];
 
@@ -434,7 +489,110 @@ export const seedDemoData = async () => {
         { title: "Annual Day 2026", content: "Coming soon.", audience: "STUDENTS", urgency: "NORMAL" }
     ];
     for (const n of notices) {
-        await addOp(adminDb.collection("notices").doc(), { ...n, date: Timestamp.now(), status: "PUBLISHED", createdAt: Timestamp.now() });
+        await addOp(adminDb.collection("notices").doc(), { ...n, date: Timestamp.now(), status: "PUBLISHED", createdAt: Timestamp.now(), schoolId: branchId, branchId: branchId });
+    }
+
+    // 13. Generate Perfect Exams History
+    console.log("[Seeding] Generating Perfect Exams History...");
+    const pastExams = [
+        { id: "exam_past_final", name: "Final Examination 2025", date: "2026-03-15", academicYearId: "2025-2026" },
+        { id: "exam_ut1", name: "Unit Test 1", date: "2026-08-15", academicYearId: academicYearId },
+        { id: "exam_qtr", name: "Quarterly Examination", date: "2026-10-20", academicYearId: academicYearId }
+    ];
+
+    for (const ex of pastExams) {
+        const timetables: any = {};
+        for (const cls of classData) {
+            timetables[cls.id] = {
+                "math": { enabled: true, examDate: ex.date, startTime: "10:00", endTime: "12:00" },
+                "science": { enabled: true, examDate: ex.date, startTime: "10:00", endTime: "12:00" },
+                "english": { enabled: true, examDate: ex.date, startTime: "10:00", endTime: "12:00" }
+            };
+        }
+
+        await addOp(adminDb.collection("exams").doc(`${branchId}_${ex.id}`), {
+            id: ex.id,
+            name: ex.name,
+            academicYear: ex.academicYearId,
+            startDate: ex.date,
+            endDate: ex.date,
+            status: "COMPLETED",
+            timetables: timetables,
+            schoolId: branchId,
+            branchId: branchId
+        });
+
+        // Generate results for every class section
+        for (const cs of classSectionsReal) {
+            const csKey = cs.id;
+            const studentsInSec = studentRefsByClassSec[csKey];
+            if (!studentsInSec || studentsInSec.length === 0) continue;
+
+            const subjectsList = [
+                { id: "math", name: "Mathematics", max: 100 },
+                { id: "science", name: "Science", max: 100 },
+                { id: "english", name: "English", max: 100 }
+            ];
+
+            // Add Syllabus
+            await addOp(adminDb.collection("exam_syllabus").doc(`${branchId}_${ex.id}_${cs.classId}_${cs.sectionId}`), {
+                examId: ex.id,
+                classId: cs.classId,
+                sectionId: cs.sectionId,
+                syllabus: subjectsList.map(s => ({
+                    subjectId: s.id,
+                    subjectName: s.name,
+                    topics: "Chapters 1 to 3, basic concepts",
+                    examDate: ex.date
+                })),
+                schoolId: branchId,
+                branchId: branchId
+            });
+
+            // Generate Results
+            for (const studentId of studentsInSec) {
+                const subjects: any = {};
+                let totalMarks = 0;
+                let isFail = false;
+                
+                subjectsList.forEach(sub => {
+                    const isStudentFail = Math.random() > 0.95;
+                    const minMarks = isStudentFail ? 20 : 40;
+                    const maxMarks = isStudentFail ? 34 : 100;
+                    const m = Math.floor(Math.random() * (maxMarks - minMarks + 1)) + minMarks;
+                    subjects[sub.id] = { obtained: m, maxMarks: sub.max, passMarks: 35 };
+                    totalMarks += m;
+                    if (m < 35) isFail = true;
+                });
+                
+                const percentage = totalMarks / (subjectsList.length * 100) * 100;
+                let grade = "F";
+                if (!isFail) {
+                    if (percentage >= 90) grade = "A+";
+                    else if (percentage >= 80) grade = "A";
+                    else if (percentage >= 70) grade = "B";
+                    else if (percentage >= 60) grade = "C";
+                    else if (percentage >= 50) grade = "D";
+                    else grade = "E";
+                }
+
+                await addOp(adminDb.collection("exam_results").doc(`${branchId}_${ex.id}_${studentId}`), {
+                    examId: ex.id,
+                    studentId: studentId,
+                    classId: cs.classId,
+                    sectionId: cs.sectionId,
+                    academicYear: ex.academicYearId,
+                    subjects: subjects,
+                    totalMarks: totalMarks,
+                    percentage: parseFloat(percentage.toFixed(2)),
+                    grade: grade,
+                    status: "PUBLISHED",
+                    schoolId: branchId,
+                    branchId: branchId,
+                    createdAt: Timestamp.now()
+                });
+            }
+        }
     }
 
     await commitBatch();
@@ -447,6 +605,6 @@ export const seedDemoData = async () => {
         console.warn("[Seeding] RTDB Sync skipped or failed:", e);
     }
 
-    console.log("[Seeding] Success. ~400 student ecosystem built with hierarchy and attendance.");
+    console.log(`[Seeding] Success. ~400 student ecosystem built with hierarchy and attendance for branch ${branchId}.`);
     return true;
 };

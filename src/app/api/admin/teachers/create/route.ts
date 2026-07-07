@@ -3,17 +3,39 @@ import { adminAuth, adminDb, Timestamp } from "@/lib/firebase-admin";
 
 export async function POST(req: Request) {
     try {
-        // 1. Validate Admin (In a real app, check 'Authorization' header)
-        // const authHeader = req.headers.get("Authorization");
-        // const token = authHeader?.split("Bearer ")[1];
-        // if (!token) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        // 1. Verify Authorization & Decode Token
+        const authHeader = req.headers.get("Authorization");
+        if (!authHeader?.startsWith("Bearer ")) {
+            return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+        }
+        const token = authHeader.split("Bearer ")[1];
+        let decodedToken;
+        try {
+            decodedToken = await adminAuth.verifyIdToken(token);
+        } catch (e: any) {
+            return NextResponse.json({ error: "Unauthorized: " + e.message }, { status: 401 });
+        }
+
+        // Role check
+        const allowedRoles = ["SUPER_ADMIN", "SUPERADMIN", "ADMIN", "OWNER", "DEVELOPER", "MANAGER"];
+        if (!allowedRoles.includes(String(decodedToken.role || "").toUpperCase()) && !decodedToken.email?.includes("admin")) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
 
         // Body Parsings
         const body = await req.json();
-        const { name, mobile, age, address, salary, qualifications, subjects, classTeacherOf, classTeacherOfList, subjectAssignments } = body;
+        const { name, mobile, age, address, salary, qualifications, subjects, classTeacherOf, classTeacherOfList, subjectAssignments, branchId: providedBranchId } = body;
 
         if (!name || !mobile || mobile.length !== 10) {
             return NextResponse.json({ error: "Invalid Data: Name and 10-digit mobile required." }, { status: 400 });
+        }
+
+        // Resolve branch ID
+        let resolvedBranchId = "global";
+        if (decodedToken.role === "ADMIN") {
+            resolvedBranchId = decodedToken.schoolId || "global";
+        } else if (providedBranchId) {
+            resolvedBranchId = providedBranchId;
         }
 
         // 2. Atomic ID Generation & Core Writes
@@ -21,10 +43,15 @@ export async function POST(req: Request) {
             const settingsRef = adminDb.collection("settings").doc("branding");
             const settingsSnap = await t.get(settingsRef);
             const brandingData = settingsSnap.data() || {};
-            const prefix = brandingData.teacherIdPrefix || "SHST";
-            const startingNumber = brandingData.teacherIdSuffix ? Number(brandingData.teacherIdSuffix) : 1;
 
-            const counterRef = adminDb.collection("counters").doc("teachers");
+            const branchRef = resolvedBranchId !== "global" ? adminDb.collection("branches").doc(resolvedBranchId) : null;
+            const branchSnap = branchRef ? await t.get(branchRef) : null;
+            const branchData = branchSnap?.exists ? branchSnap.data() : null;
+
+            const prefix = branchData?.teacherIdPrefix || brandingData.teacherIdPrefix || "";
+            const startingNumber = branchData?.teacherIdSuffix ? Number(branchData.teacherIdSuffix) : (brandingData.teacherIdSuffix ? Number(brandingData.teacherIdSuffix) : 1);
+
+            const counterRef = adminDb.collection("counters").doc(resolvedBranchId !== "global" ? `teachers_${resolvedBranchId}` : "teachers");
             const counterSnap = await t.get(counterRef);
 
             let newCount = startingNumber;
@@ -36,9 +63,7 @@ export async function POST(req: Request) {
             const teacherId = `${prefix}${paddedId}`;
             const email = `${teacherId}@school.local`.toLowerCase();
 
-            // 3. Auth Creation (Must be in transaction to prevent ID reuse if auth fails, 
-            // but we can't truly put it in a Firestore transaction. 
-            // However, we'll keep it here as the 'point of no return')
+            // 3. Auth Creation
             const userRecord = await adminAuth.createUser({
                 email,
                 password: mobile,
@@ -52,7 +77,9 @@ export async function POST(req: Request) {
             t.set(counterRef, { count: newCount }, { merge: true });
             
             t.set(adminDb.collection("teachers").doc(teacherId), {
-                schoolId: teacherId,
+                teacherId: teacherId,
+                schoolId: resolvedBranchId,
+                branchId: resolvedBranchId,
                 uid,
                 name,
                 mobile,
@@ -69,7 +96,9 @@ export async function POST(req: Request) {
             });
 
             t.set(adminDb.collection("users").doc(uid), {
-                schoolId: teacherId,
+                teacherId: teacherId,
+                schoolId: resolvedBranchId,
+                branchId: resolvedBranchId,
                 role: "TEACHER",
                 status: "ACTIVE",
                 mustChangePassword: true,
@@ -158,8 +187,6 @@ export async function POST(req: Request) {
         // We don't await backgroundTasks to keep response time ultra-low
         // but we'll trigger them now. 
         Promise.all(backgroundTasks).catch(e => console.error("Post-Teacher-Creation Task Error:", e));
-
-        return NextResponse.json({ success: true, ...result });
 
         return NextResponse.json({ success: true, ...result });
 

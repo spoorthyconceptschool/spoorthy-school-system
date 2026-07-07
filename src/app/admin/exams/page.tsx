@@ -42,7 +42,8 @@ const DEFAULT_EXAMS = [
 
 export default function ExamsListPage() {
     const { selectedYear, classes: classesData } = useMasterData();
-    const { role } = useAuth();
+    const { role, branchId: authBranchId, userData } = useAuth();
+    const activeBranchId = authBranchId || userData?.schoolId || userData?.branchId || "global";
     const [exams, setExams] = useState<any[]>(() => {
         if (typeof window !== 'undefined') {
             const cached = localStorage.getItem(EXAMS_CACHE_KEY);
@@ -56,27 +57,46 @@ export default function ExamsListPage() {
     const [createOpen, setCreateOpen] = useState(false);
     const [submitting, setSubmitting] = useState(false);
     const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
+    const [hasLoggedError, setHasLoggedError] = useState(false);
+    const { loading: authLoading } = useAuth();
     const router = useRouter();
-
+ 
     const [form, setForm] = useState({
         name: "",
         startDate: "",
         endDate: ""
     });
-
+ 
     const classes = Object.values(classesData || {}).map((c: any) => ({
         id: c.id,
         name: c.name,
         order: c.order || 99
     })).sort((a: any, b: any) => a.order - b.order);
-
+ 
     const fetchExams = async () => {
+        // Circuit breaker: prevent infinite loops during auth transitions or if already errored
+        if (authLoading || !activeBranchId || hasLoggedError) {
+            if (!activeBranchId) setLoading(false);
+            return;
+        }
+
+        // Synchronous cache purge before fetching new tenant data
+        setExams([]);
+        setLoading(true);
+        
         try {
-            const q = query(collection(db, "exams"), orderBy("createdAt", "desc"));
+            const q = query(collection(db, "exams"), where("schoolId", "==", activeBranchId));
             const snap = await getDocs(q);
             const allExams = snap.docs.map(d => ({ id: d.id, ...d.data() }));
+
+            // Sort in memory by createdAt descending
+            allExams.sort((a: any, b: any) => {
+                const dateA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt ? new Date(a.createdAt).getTime() : 0);
+                const dateB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt ? new Date(b.createdAt).getTime() : 0);
+                return dateB - dateA;
+            });
             
-            // Client-side filter to support backward compatibility for old exams
+            // Client-side filter to support backward compatibility and enforce academic year isolation
             const filtered = allExams.filter((exam: any) => {
                 const examYear = exam.academicYear || "2025-2026";
                 return examYear === selectedYear;
@@ -86,17 +106,19 @@ export default function ExamsListPage() {
             if (typeof window !== 'undefined') {
                 localStorage.setItem(EXAMS_CACHE_KEY, JSON.stringify(filtered));
             }
-        } catch (e) {
-            console.error(e);
+        } catch (e: any) {
+            console.warn("[Exams] Fetch error / Permission Denied:", e.message);
+            // TRIPS THE CIRCUIT BREAKER
+            setHasLoggedError(true);
         } finally {
             setLoading(false);
         }
     };
-
+ 
     useEffect(() => {
         fetchExams();
-    }, [selectedYear]);
-
+    }, [selectedYear, activeBranchId, authLoading, hasLoggedError]);
+ 
     const handleCreate = async () => {
         if (!form.name || !form.startDate || !form.endDate) return;
         if (selectedClasses.length === 0) {
@@ -113,7 +135,9 @@ export default function ExamsListPage() {
                 hallTicketRule: "NO_RESTRICTION",
                 hallTicketLimitAmount: 0,
                 hallTicketTerm: "",
-                classIds: selectedClasses
+                classIds: selectedClasses,
+                schoolId: activeBranchId,
+                branchId: activeBranchId
             });
             setCreateOpen(false);
             setForm({ name: "", startDate: "", endDate: "" });
@@ -160,31 +184,31 @@ export default function ExamsListPage() {
                             </span>
                             <span className="text-[9px] md:text-[10px] font-black uppercase tracking-[0.2em] text-blue-400/80">Academic Portal</span>
                         </div>
-                        <h1 className="text-3xl md:text-5xl font-display font-black text-white tracking-tight leading-none">
+                        <h1 className="text-3xl md:text-5xl font-display font-black text-white tracking-tight leading-none flex items-center gap-3">
                             Examinations
+                            {role !== "MANAGER" && (
+                                <Button
+                                    onClick={() => setCreateOpen(true)}
+                                    size="icon" 
+                                    className="w-[40px] h-[40px] rounded-full bg-[#00E5FF] hover:bg-[#00E5FF]/80 text-black shadow-[0_4px_14px_rgba(0,229,255,0.15)] transition-transform hover:scale-105 active:scale-95 shrink-0"
+                                >
+                                    <Plus size={22} strokeWidth={2.5} />
+                                </Button>
+                            )}
                         </h1>
-                        <p className="text-[#8892B0] text-xs md:text-base font-medium leading-relaxed">
-                            Manage examination schedules, student roll numbers, and generate hall tickets for academic year <span className="text-white font-bold">{selectedYear}</span>.
-                        </p>
                     </div>
 
-                    <div className="flex flex-col sm:flex-row gap-3 w-full lg:w-auto">
-                        <HallTicketGenerator />
-                        <Link href="/admin/exams/results">
+                    <div className="flex flex-row gap-3 w-full lg:w-auto">
+                        <div className="flex-1 lg:flex-none">
+                            <HallTicketGenerator />
+                        </div>
+                        <Link href="/admin/exams/results" className="flex-1 lg:flex-none">
                             <Button
-                                className="bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest text-[9px] md:text-[10px] h-12 w-full sm:w-auto px-6 md:px-8 rounded-xl shadow-[0_0_20px_-5px_theme(colors.blue.500/0.5)] transition-all hover:scale-[1.02] active:scale-[0.98]"
+                                className="bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest text-[9px] md:text-[10px] h-12 w-full px-4 md:px-8 rounded-xl shadow-[0_0_20px_-5px_theme(colors.blue.500/0.5)] transition-all hover:scale-[1.02] active:scale-[0.98]"
                             >
-                                <ClipboardCheck className="mr-2 h-4 w-4 stroke-[3px]" /> Academic Results
+                                <ClipboardCheck className="mr-2 h-4 w-4 stroke-[3px] hidden sm:block" /> Results
                             </Button>
                         </Link>
-                        {role !== "MANAGER" && (
-                            <Button
-                                onClick={() => setCreateOpen(true)}
-                                className="bg-emerald-500 hover:bg-emerald-400 text-black font-black uppercase tracking-widest text-[9px] md:text-[10px] h-12 px-6 md:px-8 rounded-xl shadow-[0_0_20px_-5px_theme(colors.emerald.500/0.5)] transition-all hover:scale-[1.02] active:scale-[0.98]"
-                            >
-                                <Plus className="mr-2 h-4 w-4 stroke-[3px]" /> Create New Exam
-                            </Button>
-                        )}
                     </div>
                 </div>
             </div>
@@ -206,55 +230,51 @@ export default function ExamsListPage() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                <div className="flex flex-col gap-[8px] md:gap-0 md:divide-y md:divide-white/[0.04] bg-[#050D1A]/40 backdrop-blur-xl border border-white/[0.06] rounded-2xl overflow-hidden shadow-2xl p-0">
                     {loading ? (
                         [1, 2, 3].map(i => (
-                            <div key={i} className="h-[250px] rounded-3xl bg-white/5 animate-pulse border border-white/5" />
+                            <div key={i} className="h-16 w-full bg-white/5 animate-pulse" />
                         ))
                     ) : (
                         exams.map(exam => (
                             <Link key={exam.id} href={`/admin/exams/${exam.id}`}>
-                                <Card className="group relative bg-[#1E293B]/40 hover:bg-[#1E293B]/60 border-white/5 hover:border-blue-500/30 transition-all duration-500 backdrop-blur-xl overflow-hidden rounded-[2rem] shadow-xl h-full flex flex-col">
-                                    {/* Status Glow Background */}
-                                    <div className={cn(
-                                        "absolute top-0 right-0 w-32 h-32 blur-[60px] rounded-full -mr-10 -mt-10 transition-opacity opacity-20 group-hover:opacity-40",
-                                        exam.status === "ACTIVE" ? "bg-emerald-500" : "bg-blue-500"
-                                    )} />
-
-                                    <CardHeader className="relative z-10 pb-4 p-5 md:p-6">
-                                        <div className="flex justify-between items-start">
-                                            <div className="w-10 h-10 md:w-12 md:h-12 rounded-xl md:rounded-2xl bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-400 group-hover:bg-blue-500/20 group-hover:scale-110 transition-all duration-300">
-                                                <ClipboardCheck className="w-5 h-5 md:w-6 md:h-6" />
-                                            </div>
-                                            <Badge
-                                                variant="outline"
-                                                className={cn(
-                                                    "text-[7px] md:text-[8px] font-black uppercase tracking-widest px-2 md:px-3 py-1 rounded-full border-none",
-                                                    exam.status === "ACTIVE"
-                                                        ? "bg-emerald-500/10 text-emerald-400"
-                                                        : "bg-blue-500/10 text-blue-400"
-                                                )}
-                                            >
-                                                <Sparkle className="w-2 md:w-2.5 h-2 md:h-2.5 mr-1 animate-pulse" /> {exam.status}
-                                            </Badge>
+                                <div className={cn(
+                                    "flex flex-row items-center justify-between p-4 md:py-3 px-4 transition-all cursor-pointer gap-4 relative group",
+                                    exam.status === "ACTIVE" ? "bg-emerald-500/5 hover:bg-emerald-500/10" : "bg-blue-500/5 hover:bg-blue-500/10"
+                                )}>
+                                    <div className="flex items-center gap-4 min-w-0">
+                                        <div className={cn(
+                                            "w-10 h-10 rounded-full flex items-center justify-center shrink-0 border",
+                                            exam.status === "ACTIVE" ? "bg-emerald-500/10 border-emerald-500/20 text-emerald-400 group-hover:bg-emerald-500/20" : "bg-blue-500/10 border-blue-500/20 text-blue-400 group-hover:bg-blue-500/20"
+                                        )}>
+                                            <ClipboardCheck className="w-5 h-5" />
                                         </div>
-                                        <CardTitle className="mt-4 md:mt-6 text-lg md:text-2xl font-black text-white group-hover:text-blue-400 transition-colors tracking-tight leading-tight">
-                                            {exam.name}
-                                        </CardTitle>
-                                        <CardDescription className="flex items-center gap-2 text-[#8892B0] font-medium text-[10px] md:text-xs mt-1">
-                                            <Calendar className="w-3 md:w-3.5 h-3 md:h-3.5" strokeWidth={2.5} />
-                                            {new Date(exam.startDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} – {new Date(exam.endDate).toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' })}
-                                        </CardDescription>
-                                    </CardHeader>
-                                    <CardContent className="relative z-10 mt-auto pt-4 md:pt-6 p-5 md:p-6 border-t border-white/5 bg-white/[0.02]">
-                                        <div className="flex items-center justify-between text-[9px] md:text-[10px] font-black uppercase tracking-widest text-white/40 group-hover:text-white transition-colors">
-                                            <span className="opacity-50">Standard Logic</span>
-                                            <div className="flex items-center gap-1.5 md:gap-2">
-                                                Profile <ChevronRight className="w-3.5 h-3.5 md:w-4 md:h-4 text-blue-500 group-hover:translate-x-1 transition-transform" />
-                                            </div>
+                                        <div className="flex flex-col min-w-0">
+                                            <span className="font-bold text-sm text-white group-hover:text-cyan-400 transition-colors leading-tight truncate">
+                                                {exam.name}
+                                            </span>
+                                            <span className="text-[10px] md:text-xs text-[#8892B0] mt-0.5 flex items-center gap-1 truncate">
+                                                <Calendar className="w-3 h-3 hidden sm:block" />
+                                                {new Date(exam.startDate).toLocaleDateString('en-GB')} – {new Date(exam.endDate).toLocaleDateString('en-GB')}
+                                            </span>
                                         </div>
-                                    </CardContent>
-                                </Card>
+                                    </div>
+                                    
+                                    <div className="flex items-center gap-4 shrink-0">
+                                        <Badge
+                                            variant="outline"
+                                            className={cn(
+                                                "text-[9px] font-black uppercase tracking-widest px-2 py-0.5 rounded-full border-none hidden sm:inline-flex",
+                                                exam.status === "ACTIVE"
+                                                    ? "bg-emerald-500/10 text-emerald-400"
+                                                    : "bg-blue-500/10 text-blue-400"
+                                            )}
+                                        >
+                                            {exam.status}
+                                        </Badge>
+                                        <ChevronRight className="w-4 h-4 text-white/30 group-hover:text-white transition-colors" />
+                                    </div>
+                                </div>
                             </Link>
                         ))
                     )}
@@ -288,47 +308,47 @@ export default function ExamsListPage() {
             </div>
 
             <Dialog open={createOpen} onOpenChange={setCreateOpen}>
-                <DialogContent className="bg-[#0F172A] border-white/10 text-white rounded-[2rem] md:rounded-[32px] max-w-[95vw] md:max-w-lg p-0 overflow-hidden shadow-2xl backdrop-blur-2xl border-white/5">
-                    <div className="bg-blue-600/10 p-6 md:p-8 border-b border-white/5 relative">
+                <DialogContent className="bg-[#0B1120]/95 text-white rounded-[2rem] md:rounded-[32px] max-w-[95vw] md:max-w-lg p-0 overflow-hidden border-white/5 backdrop-blur-2xl shadow-2xl border-white/10">
+                    <div className="bg-blue-600/10 p-4 md:p-8 border-b border-white/5 relative">
                         <div className="absolute top-0 right-0 w-32 h-32 bg-blue-500/20 blur-[60px] rounded-full -mr-10 -mt-10" />
-                        <DialogTitle className="text-2xl md:text-3xl font-black tracking-tight relative z-10 italic">Schedule Exam</DialogTitle>
+                        <DialogTitle className="text-xl md:text-3xl font-black tracking-tight relative z-10 italic">Schedule Exam</DialogTitle>
                         <p className="text-blue-400 font-bold uppercase tracking-[0.2em] text-[8px] md:text-[10px] mt-1 relative z-10 opacity-70">Initialize Academic Assessment</p>
                     </div>
 
-                    <div className="p-6 md:p-8 space-y-5 md:space-y-6">
-                        <div className="space-y-2">
+                    <div className="p-4 md:p-8 space-y-3 md:space-y-6">
+                        <div className="space-y-1.5 md:space-y-2">
                             <Label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-[#8892B0]">Examination Name</Label>
                             <Input
                                 placeholder="e.g. ANNUAL EXAMS 2026"
-                                className="bg-white/5 border-white/10 h-12 md:h-14 rounded-xl md:rounded-2xl text-base md:text-lg font-bold placeholder:text-white/20 focus:ring-blue-500/50 transition-all focus:bg-white/10"
+                                className="bg-white/5 border-white/10 h-10 md:h-14 rounded-xl md:rounded-2xl text-sm md:text-lg font-bold placeholder:text-white/20 focus:ring-blue-500/50 transition-all focus:bg-white/10"
                                 value={form.name}
                                 onChange={e => setForm({ ...form, name: e.target.value })}
                             />
                         </div>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div className="space-y-2">
+                        <div className="grid grid-cols-2 gap-3 md:gap-4">
+                            <div className="space-y-1.5 md:space-y-2">
                                 <Label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-[#8892B0]">Start Date</Label>
                                 <Input
                                     type="date"
-                                    className="bg-white/5 border-white/10 h-12 md:h-14 rounded-xl md:rounded-2xl font-bold focus:ring-blue-500/50 transition-all focus:bg-white/10"
+                                    className="bg-white/5 border-white/10 h-10 md:h-14 rounded-xl md:rounded-2xl text-xs md:text-base font-bold focus:ring-blue-500/50 transition-all focus:bg-white/10"
                                     value={form.startDate}
                                     onChange={e => setForm({ ...form, startDate: e.target.value })}
                                 />
                             </div>
-                            <div className="space-y-2">
+                            <div className="space-y-1.5 md:space-y-2">
                                 <Label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-[#8892B0]">End Date</Label>
                                 <Input
                                     type="date"
-                                    className="bg-white/5 border-white/10 h-12 md:h-14 rounded-xl md:rounded-2xl font-bold focus:ring-blue-500/50 transition-all focus:bg-white/10"
+                                    className="bg-white/5 border-white/10 h-10 md:h-14 rounded-xl md:rounded-2xl text-xs md:text-base font-bold focus:ring-blue-500/50 transition-all focus:bg-white/10"
                                     value={form.endDate}
                                     onChange={e => setForm({ ...form, endDate: e.target.value })}
                                 />
                             </div>
                         </div>
 
-                        <div className="space-y-2">
+                        <div className="space-y-1.5 md:space-y-2">
                             <Label className="text-[9px] md:text-[10px] font-black uppercase tracking-widest text-[#8892B0]">Select Eligible Classes</Label>
-                            <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto border border-white/10 rounded-xl p-3 bg-white/5">
+                            <div className="grid grid-cols-2 gap-2 max-h-24 md:max-h-40 overflow-y-auto border border-white/10 rounded-xl p-2 md:p-3 bg-white/5">
                                 {classes.map((cls: any) => {
                                     const isChecked = selectedClasses.includes(cls.id);
                                     return (
@@ -353,18 +373,18 @@ export default function ExamsListPage() {
                         </div>
                     </div>
 
-                    <div className="p-5 md:p-6 bg-white/[0.02] border-t border-white/5 flex flex-col md:flex-row gap-3">
+                    <div className="p-4 md:p-6 bg-white/[0.02] border-t border-white/5 flex flex-row gap-2 md:gap-3">
                         <Button
                             variant="ghost"
                             onClick={() => setCreateOpen(false)}
-                            className="flex-1 h-12 rounded-xl font-black text-[10px] uppercase tracking-widest text-white/40 hover:text-white hover:bg-white/5"
+                            className="flex-1 h-10 md:h-12 rounded-xl font-black text-[9px] md:text-[10px] uppercase tracking-widest text-white/40 hover:text-white hover:bg-white/5 px-0"
                         >
                             Cancel
                         </Button>
                          <Button
                             onClick={handleCreate}
                             disabled={submitting || !form.name || !form.startDate || !form.endDate || selectedClasses.length === 0}
-                            className="flex-[2] bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest text-[10px] h-12 rounded-xl shadow-[0_0_20px_-5px_theme(colors.blue.600/0.5)] transition-all active:scale-95"
+                            className="flex-[2] bg-blue-600 hover:bg-blue-500 text-white font-black uppercase tracking-widest text-[9px] md:text-[10px] h-10 md:h-12 rounded-xl shadow-[0_0_20px_-5px_theme(colors.blue.600/0.5)] transition-all active:scale-95 px-0"
                         >
                             {submitting ? <Loader2 className="animate-spin" /> : "Save & Schedule"}
                         </Button>

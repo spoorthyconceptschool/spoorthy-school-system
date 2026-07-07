@@ -79,8 +79,8 @@ export async function POST(req: NextRequest) {
                 schoolName: schoolName || branchData.schoolName || "",
                 address: address || branchData.address || "",
                 principalSignature: principalSignature || branchData.principalSignature || "",
-                studentIdPrefix: studentIdPrefix || branchData.studentIdPrefix || "SCS",
-                teacherIdPrefix: teacherIdPrefix || branchData.teacherIdPrefix || "SHST",
+                studentIdPrefix: studentIdPrefix || branchData.studentIdPrefix || "",
+                teacherIdPrefix: teacherIdPrefix || branchData.teacherIdPrefix || "",
                 studentIdSuffix: studentIdSuffix ? Number(studentIdSuffix) : (branchData.studentIdSuffix || 1),
                 teacherIdSuffix: teacherIdSuffix ? Number(teacherIdSuffix) : (branchData.teacherIdSuffix || 1),
                 updatedAt: new Date().toISOString()

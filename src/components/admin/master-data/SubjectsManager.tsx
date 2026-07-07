@@ -80,7 +80,7 @@ export function SubjectsManager() {
                     <DialogTrigger asChild>
                         <Button className="w-full sm:w-auto bg-accent text-accent-foreground"><Plus size={16} className="mr-2" /> Add Subject</Button>
                     </DialogTrigger>
-                    <DialogContent className="bg-black/95 border-white/10 text-white">
+                    <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                         <DialogHeader><DialogTitle>{editingId ? "Edit Subject" : "Add Subject"}</DialogTitle></DialogHeader>
                         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
                             <div className="space-y-2">

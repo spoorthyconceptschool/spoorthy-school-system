@@ -1,42 +1,25 @@
 import { NextResponse } from "next/server";
 import { adminDb } from "@/lib/firebase-admin";
 
+export const dynamic = "force-dynamic";
+
 export async function GET() {
     try {
-        const studentsSnap = await adminDb.collection("students").get();
-        const studentMap = new Map();
-        studentsSnap.forEach(doc => {
-            const data = doc.data();
-            const schoolId = data.schoolId || doc.id;
-            studentMap.set(schoolId, data);
-        });
+        const branchesSnap = await adminDb.collection("branches").get();
+        const branches = branchesSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
 
-        const ledgersSnap = await adminDb.collection("student_fee_ledgers").get();
-        const batch = adminDb.batch();
-        let count = 0;
+        const studentsSnap = await adminDb.collection("students").limit(3).get();
+        const students = studentsSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
 
-        ledgersSnap.forEach(doc => {
-            const data = doc.data();
-            const student = studentMap.get(data.studentId);
-            if (student) {
-                batch.update(doc.ref, {
-                    studentName: student.studentName || "Unknown",
-                    parentName: student.parentName || "",
-                    parentMobile: student.parentMobile || "",
-                    villageName: student.villageName || "",
-                    villageId: student.villageId || "",
-                    sectionName: student.sectionName || ""
-                });
-                count++;
-            }
-        });
+        const teachersSnap = await adminDb.collection("teachers").limit(3).get();
+        const teachers = teachersSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
 
-        if (count > 0) {
-            await batch.commit();
-        }
+        const staffSnap = await adminDb.collection("staff").limit(3).get();
+        const staff = staffSnap.docs.map((d: any) => ({ id: d.id, ...d.data() }));
 
-        return NextResponse.json({ success: true, updated: count });
-    } catch(e) {
-        return NextResponse.json({ error: String(e) });
+        return NextResponse.json({ branches, students, teachers, staff });
+    } catch (e: any) {
+        return NextResponse.json({ error: e.message });
     }
 }
+

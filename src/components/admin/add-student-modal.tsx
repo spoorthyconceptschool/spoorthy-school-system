@@ -1,9 +1,9 @@
 "use client";
 
-import { collection, query, where, getDocs } from "firebase/firestore";
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 
-import { useState, useRef } from "react";
+import { useState, useRef, useEffect } from "react";
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,12 +16,40 @@ import { toast } from "@/lib/toast-store";
 import { exportSingleStudentFee, printStudentFeeStructure } from "@/lib/export-utils";
 
 export function AddStudentModal({ onSuccess, onOptimisticUpdate, children }: { onSuccess?: (student: { schoolId: string, studentName: string }) => void, onOptimisticUpdate?: (student: any) => void, children?: React.ReactNode }) {
-    const { user, callApi } = useAuth();
+    const { user, userData, callApi, role, branchId: userBranchId } = useAuth();
     const { villages: villagesData, classes: classesData, sections: sectionsData, classSections, branding, loading: masterDataLoading, selectedYear } = useMasterData();
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [successData, setSuccessData] = useState<{ schoolId: string, studentName: string, className: string } | null>(null);
     const submittingRef = useRef(false);
+
+    // Defensive Local Hydration State
+    const [localVillages, setLocalVillages] = useState<any[]>([]);
+    const [localClasses, setLocalClasses] = useState<any[]>([]);
+    const currentSchoolId = userBranchId || userData?.schoolId || (role === "SUPER_ADMIN" ? "global" : null);
+    const authUser = { token: { schoolId: userData?.schoolId || userData?.branchId } };
+
+    useEffect(() => {
+        if (!open || !currentSchoolId || currentSchoolId === "global") return;
+
+        const hydrateDropdowns = async () => {
+            try {
+                if (!villagesData || Object.keys(villagesData).length === 0) {
+                    const vSnap = await getDocs(query(collection(db, "villages"), where("schoolId", "==", authUser.token.schoolId || currentSchoolId)));
+                    const loadedV = vSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    setLocalVillages(loadedV);
+                }
+                if (!classesData || Object.keys(classesData).length === 0) {
+                    const cSnap = await getDocs(query(collection(db, "classes"), where("schoolId", "==", authUser.token.schoolId || currentSchoolId)));
+                    const loadedC = cSnap.docs.map(d => ({ id: d.id, ...d.data() }));
+                    setLocalClasses(loadedC);
+                }
+            } catch (err) {
+                console.error("Defensive hydration failed:", err);
+            }
+        };
+        hydrateDropdowns();
+    }, [open, currentSchoolId, villagesData, classesData]);
 
     const [formData, setFormData] = useState({
         studentName: "",
@@ -35,8 +63,13 @@ export function AddStudentModal({ onSuccess, onOptimisticUpdate, children }: { o
         transportRequired: false
     });
 
-    const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name || "Unknown Village" })).sort((a, b) => String(a.name).localeCompare(String(b.name)));
-    const classesList = Object.values(classesData || {}).map((c: any) => ({ id: c.id, name: c.name || "Unknown Class", order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
+    const villages = Object.keys(villagesData || {}).length > 0 
+        ? Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name || "Unknown Village" })).sort((a, b) => String(a.name).localeCompare(String(b.name)))
+        : localVillages.map((v: any) => ({ id: v.id, name: v.name || "Unknown Village" })).sort((a, b) => String(a.name).localeCompare(String(b.name)));
+
+    const classesList = Object.keys(classesData || {}).length > 0 
+        ? Object.values(classesData || {}).map((c: any) => ({ id: c.id, name: c.name || "Unknown Class", order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order)
+        : localClasses.map((c: any) => ({ id: c.id, name: c.name || "Unknown Class", order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
 
     const availableSections = formData.classId
         ? Object.values(classSections || {})
@@ -184,7 +217,7 @@ export function AddStudentModal({ onSuccess, onOptimisticUpdate, children }: { o
                     </Button>
                 )}
             </DialogTrigger>
-            <DialogContent className="sm:max-w-[500px] bg-black/95 border-white/10 text-white">
+            <DialogContent className="sm:max-w-[500px] bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                 <DialogHeader>
                     <DialogTitle>Student Admission</DialogTitle>
                 </DialogHeader>
@@ -292,7 +325,7 @@ export function AddStudentModal({ onSuccess, onOptimisticUpdate, children }: { o
                                 <Label>Gender</Label>
                                 <Select value={formData.gender} onValueChange={val => setFormData({ ...formData, gender: val })}>
                                     <SelectTrigger className="bg-black/50 border-white/10"><SelectValue placeholder="Select Gender" /></SelectTrigger>
-                                    <SelectContent className="bg-black border-white/10">
+                                    <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl border-white/10">
                                         <SelectItem value="male">Male</SelectItem>
                                         <SelectItem value="female">Female</SelectItem>
                                         <SelectItem value="other">Other</SelectItem>

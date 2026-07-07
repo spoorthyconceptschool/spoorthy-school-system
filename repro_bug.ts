@@ -2,7 +2,7 @@ import { EnterpriseStudentService } from "./src/lib/services/enterprise/student-
 import { CreateStudentPayload } from "./src/lib/enterprise/schemas";
 
 async function reproduce() {
-    const testPayload: CreateStudentPayload = {
+    const testPayload: any = {
         studentName: "Test Student " + Date.now(),
         parentName: "Test Parent",
         parentMobile: "9876543210",

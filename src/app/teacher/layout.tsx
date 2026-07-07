@@ -45,7 +45,7 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
     const pathname = usePathname();
 
     const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-    const sidebarCollapsed = false;
+    const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
     const { branding } = useMasterData();
     const [imageError, setImageError] = useState(false);
     const [mobileMoreOpen, setMobileMoreOpen] = useState(false);
@@ -82,19 +82,22 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
         // Block all routing decisions until the loading state is fully resolved
         if (loading) return;
 
-        // If data is fully loaded but no user exists, do nothing and let the fallback UI handle it
-        if (!user) return;
+        // Prevent routing conflicts during logout transition
+        if (typeof window !== "undefined" && window.localStorage.getItem("spoorthy_logging_out")) {
+            return;
+        }
 
-        // Verify Rule: Must Change Password and Role
+        if (!user || !userData) {
+            router.replace("/login");
+            return;
+        }
+
+        // Verify Rule: Strict Teacher Role Check
         if (userData && userData.role) {
-            const actualRole = userData.role || "";
+            const actualRole = String(userData.role).toUpperCase();
 
-            if (["ADMIN", "SUPER_ADMIN", "MANAGER", "DEVELOPER", "OWNER"].includes(actualRole)) {
-                router.replace("/admin");
-                return;
-            }
-            if (actualRole === "STUDENT") {
-                router.replace("/student");
+            if (actualRole !== "TEACHER") {
+                router.replace("/unauthorized");
                 return;
             }
 
@@ -107,6 +110,16 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
     }, [user, userData, loading, pathname, router]);
 
     // Hard fallback UI if user slips through somehow without data to stop loops dead in their tracks
+    const isLoggingOut = typeof window !== "undefined" && window.localStorage.getItem("spoorthy_logging_out");
+    if (isLoggingOut) {
+        return (
+            <div className="h-screen w-full flex flex-col items-center justify-center bg-[#0A192F] text-white space-y-4">
+                <div className="w-8 h-8 border-4 border-[#10B981]/20 border-t-[#10B981] rounded-full animate-spin" />
+                <p className="text-white/50 animate-pulse text-sm">Signing out securely...</p>
+            </div>
+        );
+    }
+
     if (!loading && (!user || !userData || !userData.role)) {
         return (
             <div className="h-screen w-full flex flex-col items-center justify-center bg-[#0A192F] text-white">
@@ -234,7 +247,7 @@ function TeacherContent({ children }: { children: React.ReactNode }) {
                                     </div>
                                 </button>
                             </DropdownMenuTrigger>
-                            <DropdownMenuContent align="end" className="w-56 bg-[#0A192F] border-[#10B981]/20 text-[#E6F1FF] backdrop-blur-xl">
+                            <DropdownMenuContent align="end" className="w-56 bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl border-white/10 border-[#10B981]/20 text-[#E6F1FF] backdrop-blur-xl">
                                 <DropdownMenuLabel>My Account</DropdownMenuLabel>
                                 <DropdownMenuSeparator className="bg-[#10B981]/10" />
                                 <DropdownMenuItem asChild className="focus:bg-[#10B981]/10 focus:text-[#10B981] cursor-pointer">

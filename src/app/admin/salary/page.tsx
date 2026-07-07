@@ -38,39 +38,44 @@ export default function SalaryPage() {
             </div>
         );
     }
+
+    if (!role) {
+        return <div className="flex justify-center p-12"><Loader2 className="w-8 h-8 animate-spin text-accent" /></div>;
+    }
+
+    return <SalaryAdminPanel />;
+}
+
+function SalaryAdminPanel() {
+    const router = useRouter();
+    const { role, branchId: activeBranchId } = useAuth();
     const { branding, teachers: masterTeachers, staff: masterStaff } = useMasterData();
-    const [employees, setEmployees] = useState<any[]>(() => {
-        if (typeof window !== 'undefined') {
-            const cached = localStorage.getItem("spoorthy_salary_employees_cache");
-            if (cached) {
-                try { return JSON.parse(cached); } catch(e) {}
+    const EMPLOYEES_CACHE_KEY = activeBranchId ? `spoorthy_salary_employees_cache_${activeBranchId}` : null;
+    const PAYMENTS_CACHE_KEY = activeBranchId ? `spoorthy_salary_payments_cache_${activeBranchId}` : null;
+
+    const [employees, setEmployees] = useState<any[]>([]);
+    const [payments, setPayments] = useState<any[]>([]);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && EMPLOYEES_CACHE_KEY && PAYMENTS_CACHE_KEY) {
+            const cachedEmp = localStorage.getItem(EMPLOYEES_CACHE_KEY);
+            const cachedPay = localStorage.getItem(PAYMENTS_CACHE_KEY);
+            if (cachedEmp) {
+                try { setEmployees(JSON.parse(cachedEmp)); } catch(e) {}
+            } else {
+                setEmployees([]);
             }
-        }
-        const teachersList = (masterTeachers || []).map((t: any) => ({
-            id: t.id,
-            ...t,
-            personType: "TEACHER",
-            roleDisplay: "Teacher",
-            baseSalary: t.baseSalary || t.salary
-        }));
-        const staffList = (masterStaff || []).map((s: any) => ({
-            id: s.id,
-            ...s,
-            personType: "STAFF",
-            roleDisplay: s.roleName || "Staff",
-            baseSalary: s.baseSalary || s.salary
-        }));
-        return [...teachersList, ...staffList].sort((a: any, b: any) => String(a.name || "").localeCompare(String(b.name || "")));
-    });
-    const [payments, setPayments] = useState<any[]>(() => {
-        if (typeof window !== 'undefined') {
-            const cached = localStorage.getItem("spoorthy_salary_payments_cache");
-            if (cached) {
-                try { return JSON.parse(cached); } catch(e) {}
+            if (cachedPay) {
+                try { setPayments(JSON.parse(cachedPay)); } catch(e) {}
+            } else {
+                setPayments([]);
             }
+        } else {
+            setEmployees([]);
+            setPayments([]);
         }
-        return [];
-    });
+    }, [EMPLOYEES_CACHE_KEY, PAYMENTS_CACHE_KEY]);
+
     const [loading, setLoading] = useState(false);
     const [leavesMap, setLeavesMap] = useState<Record<string, number>>({});
 
@@ -89,12 +94,18 @@ export default function SalaryPage() {
 
     useEffect(() => {
         fetchData();
-    }, [month, year]);
+    }, [month, year, activeBranchId]);
 
     const fetchData = async () => {
+        if (!activeBranchId) return;
+        setLoading(true);
         try {
             // 1. Fetch Teachers
-            const tSnap = await getDocs(query(collection(db, "teachers"), where("status", "==", "ACTIVE")));
+            const tSnap = await getDocs(query(
+                collection(db, "teachers"), 
+                where("status", "==", "ACTIVE"),
+                where("branchId", "==", activeBranchId)
+            ));
             const teachers = tSnap.docs.map(doc => {
                 const data = doc.data();
                 return {
@@ -107,7 +118,10 @@ export default function SalaryPage() {
             });
 
             // 2. Fetch Staff
-            const sSnap = await getDocs(collection(db, "staff"));
+            const sSnap = await getDocs(query(
+                collection(db, "staff"),
+                where("branchId", "==", activeBranchId)
+            ));
             const staff = sSnap.docs.map(doc => {
                 const data = doc.data();
                 return {
@@ -126,57 +140,43 @@ export default function SalaryPage() {
             const pQuery = query(
                 collection(db, "salary_payments"),
                 where("month", "==", month),
-                where("year", "==", year)
+                where("year", "==", year),
+                where("branchId", "==", activeBranchId)
             );
             const pSnap = await getDocs(pQuery);
             const paymentData = pSnap.docs.map(doc => ({ id: doc.id, ...doc.data() }));
             setPayments(paymentData);
 
-            if (typeof window !== 'undefined') {
-                localStorage.setItem("spoorthy_salary_employees_cache", JSON.stringify(allEmployees));
-                localStorage.setItem("spoorthy_salary_payments_cache", JSON.stringify(paymentData));
+            if (typeof window !== 'undefined' && EMPLOYEES_CACHE_KEY && PAYMENTS_CACHE_KEY) {
+                localStorage.setItem(EMPLOYEES_CACHE_KEY, JSON.stringify(allEmployees));
+                localStorage.setItem(PAYMENTS_CACHE_KEY, JSON.stringify(paymentData));
             }
 
-            // 4. Fetch Teacher Attendance for Leaves
+            // 4. Fetch Teacher & Staff Attendance for Leaves from attendance_daily
             const monthIndex = new Date(`${month} 1, 2000`).getMonth() + 1;
             const monthStr = String(monthIndex).padStart(2, '0');
             const startDate = `${year}-${monthStr}-01`;
             const endDate = `${year}-${monthStr}-31`;
 
             const attQuery = query(
-                collection(db, "attendance"),
-                where(documentId(), ">=", `TEACHERS_${startDate}`),
-                where(documentId(), "<=", `TEACHERS_${endDate}`)
+                collection(db, "attendance_daily"),
+                where("schoolId", "==", activeBranchId)
             );
             const attSnap = await getDocs(attQuery);
             const counts: Record<string, number> = {};
 
             attSnap.forEach(doc => {
                 const data = doc.data();
-                if (data.records) {
-                    Object.entries(data.records).forEach(([schoolId, status]) => {
-                        if (status === 'A') {
-                            counts[schoolId] = (counts[schoolId] || 0) + 1;
+                if (data.date >= startDate && data.date <= endDate) {
+                    if (data.type === "TEACHERS" || data.type === "STAFF") {
+                        if (data.records) {
+                            Object.entries(data.records).forEach(([schoolId, status]) => {
+                                if (status === 'A') {
+                                    counts[schoolId] = (counts[schoolId] || 0) + 1;
+                                }
+                            });
                         }
-                    });
-                }
-            });
-
-            // 5. Fetch Staff Attendance for Leaves
-            const staffAttQuery = query(
-                collection(db, "attendance"),
-                where(documentId(), ">=", `STAFF_${startDate}`),
-                where(documentId(), "<=", `STAFF_${endDate}`)
-            );
-            const staffAttSnap = await getDocs(staffAttQuery);
-            staffAttSnap.forEach(doc => {
-                const data = doc.data();
-                if (data.records) {
-                    Object.entries(data.records).forEach(([schoolId, status]) => {
-                        if (status === 'A') {
-                            counts[schoolId] = (counts[schoolId] || 0) + 1;
-                        }
-                    });
+                    }
                 }
             });
 
@@ -290,7 +290,7 @@ export default function SalaryPage() {
             return `
                                     <tr>
                                         <td>${emp.name}</td>
-                                        <td>${emp.schoolId}</td>
+                                        <td>${emp.teacherId || emp.staffId || emp.id}</td>
                                         <td>${emp.roleDisplay}</td>
                                         <td>${leaves}</td>
                                         <td>${emp.baseSalary || '-'}</td>
@@ -363,7 +363,7 @@ export default function SalaryPage() {
                         <SelectTrigger className="w-[100px] md:w-[125px] bg-[#0B1524]/60 border-white/5 rounded-lg h-9 text-xs text-white focus:ring-0">
                             <SelectValue />
                         </SelectTrigger>
-                        <SelectContent className="bg-zinc-900 border-white/10 text-white text-xs">
+                        <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white text-xs border-white/10">
                             {['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'].map(m => (
                                 <SelectItem key={m} value={m} className="focus:bg-white/10 focus:text-white cursor-pointer">{m}</SelectItem>
                             ))}
@@ -424,63 +424,62 @@ export default function SalaryPage() {
             </div>
 
             {/* Search & Filter controls */}
-            <div className="flex items-center gap-2 mt-4">
-                <div className="relative flex-1">
-                    <Search className="absolute left-3 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/40" />
+            <div className="flex flex-col sm:flex-row items-center gap-2 mt-2">
+                <div className="relative flex-1 w-full">
+                    <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 w-3.5 h-3.5 text-white/40" />
                     <Input
                         value={searchTerm}
                         onChange={e => setSearchTerm(e.target.value)}
                         placeholder="Search name, ID, or base salary..."
-                        className="pl-9 h-9 bg-[#0B1524]/60 border-white/5 rounded-lg focus:ring-cyan-500/30 text-xs text-white placeholder-white/30"
+                        className="pl-8 h-8 bg-[#0B1524]/60 border-white/5 rounded-lg focus:ring-cyan-500/30 text-[10px] text-white placeholder-white/30 w-full"
                     />
                 </div>
-            </div>
+                
+                <div className="flex flex-wrap items-center gap-1.5 w-full sm:w-auto">
+                    {/* Role Filter */}
+                    <Select value={filterRole} onValueChange={setFilterRole}>
+                        <SelectTrigger className="w-fit h-8 bg-[#0B1524]/60 border border-white/5 rounded-lg text-[10px] px-2.5 font-bold uppercase tracking-wider text-white/60 focus:ring-0 cursor-pointer hover:bg-white/10 transition-colors">
+                            <div className="flex items-center gap-1.5">
+                                <Users size={12} className="text-cyan-400" />
+                                <SelectValue>{filterRole === "ALL" ? "All Roles" : (filterRole === "TEACHER" ? "Teachers" : "Staff")}</SelectValue>
+                            </div>
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white text-xs border-white/10">
+                            <SelectItem value="ALL">All Roles</SelectItem>
+                            <SelectItem value="TEACHER">Teachers</SelectItem>
+                            <SelectItem value="STAFF">Helpers</SelectItem>
+                        </SelectContent>
+                    </Select>
 
-            {/* Filter Pills row */}
-            <div className="flex flex-wrap items-center gap-1.5 mt-2">
-                {/* Role Filter */}
-                <Select value={filterRole} onValueChange={setFilterRole}>
-                    <SelectTrigger className="w-fit h-7 bg-[#0B1524]/60 border border-white/5 rounded-lg text-[9px] px-2.5 font-bold uppercase tracking-wider text-white/60 focus:ring-0 cursor-pointer hover:bg-white/10 transition-colors">
-                        <div className="flex items-center gap-1.5">
-                            <Users size={10} className="text-cyan-400" />
-                            <SelectValue>{filterRole === "ALL" ? "All Roles" : (filterRole === "TEACHER" ? "Teachers" : "Staff")}</SelectValue>
-                        </div>
-                    </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-white/10 text-white text-xs">
-                        <SelectItem value="ALL">All Roles</SelectItem>
-                        <SelectItem value="TEACHER">Teachers</SelectItem>
-                        <SelectItem value="STAFF">Helpers</SelectItem>
-                    </SelectContent>
-                </Select>
+                    {/* Status Filter */}
+                    <Select value={filterStatus} onValueChange={setFilterStatus}>
+                        <SelectTrigger className="w-fit h-8 bg-[#0B1524]/60 border border-white/5 rounded-lg text-[10px] px-2.5 font-bold uppercase tracking-wider text-white/60 focus:ring-0 cursor-pointer hover:bg-white/10 transition-colors">
+                            <div className="flex items-center gap-1.5">
+                                <CheckCircle2 size={12} className="text-[#64FFDA]" />
+                                <SelectValue>{filterStatus === "ALL" ? "All Status" : (filterStatus === "PAID" ? "Paid" : "Outstanding")}</SelectValue>
+                            </div>
+                        </SelectTrigger>
+                        <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white text-xs border-white/10">
+                            <SelectItem value="ALL">All Status</SelectItem>
+                            <SelectItem value="PAID">Paid</SelectItem>
+                            <SelectItem value="UNPAID">Outstanding</SelectItem>
+                        </SelectContent>
+                    </Select>
 
-                {/* Status Filter */}
-                <Select value={filterStatus} onValueChange={setFilterStatus}>
-                    <SelectTrigger className="w-fit h-7 bg-[#0B1524]/60 border border-white/5 rounded-lg text-[9px] px-2.5 font-bold uppercase tracking-wider text-white/60 focus:ring-0 cursor-pointer hover:bg-white/10 transition-colors">
-                        <div className="flex items-center gap-1.5">
-                            <CheckCircle2 size={10} className="text-[#64FFDA]" />
-                            <SelectValue>{filterStatus === "ALL" ? "All Status" : (filterStatus === "PAID" ? "Paid" : "Outstanding")}</SelectValue>
-                        </div>
-                    </SelectTrigger>
-                    <SelectContent className="bg-zinc-900 border-white/10 text-white text-xs">
-                        <SelectItem value="ALL">All Status</SelectItem>
-                        <SelectItem value="PAID">Paid</SelectItem>
-                        <SelectItem value="UNPAID">Outstanding</SelectItem>
-                    </SelectContent>
-                </Select>
-
-                {/* Reset Button */}
-                <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => {
-                        setSearchTerm("");
-                        setFilterRole("ALL");
-                        setFilterStatus("ALL");
-                    }}
-                    className="h-7 bg-[#0B1524]/60 border border-white/5 hover:bg-white/10 rounded-lg text-[9px] px-2.5 font-bold uppercase tracking-wider text-white/60 focus:ring-0"
-                >
-                    Reset
-                </Button>
+                    {/* Reset Button */}
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        onClick={() => {
+                            setSearchTerm("");
+                            setFilterRole("ALL");
+                            setFilterStatus("ALL");
+                        }}
+                        className="h-8 bg-[#0B1524]/60 border border-white/5 hover:bg-white/10 rounded-lg text-[10px] px-2.5 font-bold uppercase tracking-wider text-white/60 focus:ring-0"
+                    >
+                        Reset
+                    </Button>
+                </div>
             </div>
 
             {/* List View Container */}
@@ -551,7 +550,7 @@ export default function SalaryPage() {
                                                         </div>
                                                         <div className="flex items-center gap-3 mt-1">
                                                             <span className="text-[10px] text-white/40 tracking-wider font-mono">
-                                                                ID: {emp.schoolId}
+                                                                ID: {emp.teacherId || emp.staffId || emp.id}
                                                             </span>
                                                             <span className="text-[10px] text-white/40 font-mono">
                                                                 Base: ₹{Number(emp.baseSalary || 0).toLocaleString()}
@@ -626,7 +625,7 @@ export default function SalaryPage() {
                                         {/* Col 2: ID */}
                                         <div className="hidden md:flex items-center w-[12%] min-w-0 px-3 py-3.5 border-r border-white/[0.06]">
                                             <span className="text-xs text-zinc-200 tracking-wider font-mono truncate">
-                                                {emp.schoolId}
+                                                {emp.teacherId || emp.staffId || emp.id}
                                             </span>
                                         </div>
 

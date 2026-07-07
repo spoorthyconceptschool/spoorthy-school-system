@@ -1,37 +1,50 @@
 const admin = require('firebase-admin');
-const serviceAccount = require('./serviceAccountKey.json');
 
 if (!admin.apps.length) {
     admin.initializeApp({
-        credential: admin.credential.cert(serviceAccount)
+        projectId: "spoorthy-16292",
+        databaseURL: "https://spoorthy-16292-default-rtdb.firebaseio.com"
     });
 }
 
 const db = admin.firestore();
 
 async function testQuery() {
-    console.log("Testing Student Directory Query...");
-    const selectedYear = "2026-2027";
-
+    const schoolId = "vcQw0kUZsylrL3GtDdEp";
+    const academicYear = "2026-2027";
+    
     try {
-        console.log("1. Simple where query...");
-        const q1 = db.collection("students").where("academicYear", "==", selectedYear).limit(5);
-        const s1 = await q1.get();
-        console.log(`- Success: Found ${s1.size} students.`);
+        console.log("Running Students query...");
+        let studentsBaseQ = db.collection("students")
+            .where("status", "==", "ACTIVE")
+            .where("branchId", "==", schoolId);
+        const studentsCountSnap = await studentsBaseQ.count().get();
+        console.log("Students Count:", studentsCountSnap.data().count);
 
-        console.log("2. Where + OrderBy query...");
-        const q2 = db.collection("students")
-            .where("academicYear", "==", selectedYear)
-            .orderBy("studentName", "asc")
-            .limit(5);
-        const s2 = await q2.get();
-        console.log(`- Success: Found ${s2.size} students with OrderBy.`);
+        console.log("Running Teachers query...");
+        let teachersBaseQ = db.collection("teachers")
+            .where("status", "==", "ACTIVE")
+            .where("branchId", "==", schoolId);
+        const teachersCountSnap = await teachersBaseQ.count().get();
+        console.log("Teachers Count:", teachersCountSnap.data().count);
+
+        console.log("Running Staff query...");
+        let staffBaseQ = db.collection("staff")
+            .where("status", "==", "ACTIVE")
+            .where("branchId", "==", schoolId);
+        const staffCountSnap = await staffBaseQ.count().get();
+        console.log("Staff Count:", staffCountSnap.data().count);
+
+        console.log("Running Ledgers query...");
+        let ledgersQ = db.collection("student_fee_ledgers")
+            .where("academicYearId", "==", academicYear)
+            .where("branchId", "==", schoolId);
+        const ledgersSnap = await ledgersQ.get();
+        console.log("Ledgers Size:", ledgersSnap.size);
+
     } catch (e) {
-        console.error("!!! Query Failed:", e.message);
-        if (e.message.includes("index")) {
-            console.log("CRITICAL: Missing composite index detected.");
-        }
+        console.error("FIRESTORE QUERY ERROR:", e.message);
+        console.error(e.stack);
     }
 }
-
 testQuery();

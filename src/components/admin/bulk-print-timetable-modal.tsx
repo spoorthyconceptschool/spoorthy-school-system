@@ -343,7 +343,7 @@ export function BulkPrintTimetableModal() {
                     <Printer className="w-4 h-4" /> Bulk Print
                 </Button>
             </DialogTrigger>
-            <DialogContent className="max-w-2xl bg-[#0A192F] border-white/10 text-white max-h-[80vh] flex flex-col">
+            <DialogContent className="max-w-2xl bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white max-h-[80vh] flex flex-col border-white/10">
                 <DialogHeader>
                     <DialogTitle className="text-xl font-bold flex items-center gap-2">
                         <Printer className="text-accent" /> Bulk Print Timetables

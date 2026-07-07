@@ -48,7 +48,8 @@ export function EditStudentRequestModal({ student, onClose }: EditStudentRequest
             await addDoc(collection(db, "student_change_requests"), {
                 teacherId: user?.uid,
                 studentId: student.id,
-                schoolId: student.schoolId,
+                schoolId: student.branchId || student.schoolId || "",
+                branchId: student.branchId || "",
                 classId: student.classId,
                 sectionId: student.sectionId,
                 requestType: "EDIT",
@@ -78,7 +79,7 @@ export function EditStudentRequestModal({ student, onClose }: EditStudentRequest
 
     return (
         <Dialog open={true} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-2xl bg-[#0F172A] text-white border-white/10 max-h-[90vh] overflow-y-auto">
+            <DialogContent className="sm:max-w-2xl bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white max-h-[90vh] overflow-y-auto border-white/10">
                 <DialogHeader>
                     <DialogTitle className="text-2xl font-display font-bold">Request Profile Edit</DialogTitle>
                     <p className="text-sm text-muted-foreground">Submit changes for {student.studentName}. These changes require Admin approval before becoming active.</p>
@@ -104,7 +105,7 @@ export function EditStudentRequestModal({ student, onClose }: EditStudentRequest
                                 <SelectTrigger className="bg-white/5 border-white/10">
                                     <SelectValue placeholder="Select Gender" />
                                 </SelectTrigger>
-                                <SelectContent className="bg-slate-900 border-white/10 text-white">
+                                <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                                     <SelectItem value="Male">Male</SelectItem>
                                     <SelectItem value="Female">Female</SelectItem>
                                     <SelectItem value="Other">Other</SelectItem>

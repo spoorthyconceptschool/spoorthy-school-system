@@ -70,16 +70,8 @@ export async function POST(req: NextRequest) {
             const userSnap = await adminDb.collection("users").doc(user.uid).get();
             if (userSnap.exists) {
                 const uData = userSnap.data();
-                // A teacher's schoolId field in the users collection holds their teacher ID (e.g. "TCH100").
-                // A student's schoolId field in the users collection holds their student ID (e.g. "SHS1001").
-                // For multi-tenant partitioning, we only want to partition by schoolId if it is a real school/branch partition,
-                // otherwise we use "global". In this system, teachers and students are within the same single-school workspace,
-                // so we use "global" for both teachers and students.
-                if (uData?.role === "TEACHER" || uData?.role === "STUDENT") {
-                    actorSchoolId = "global";
-                } else {
-                    actorSchoolId = uData?.schoolId || "global";
-                }
+                // Partition by branchId (which holds the school branch ID) or fallback to schoolId
+                actorSchoolId = uData?.branchId || uData?.schoolId || "global";
             }
 
             // Route all logic to our enterprise service

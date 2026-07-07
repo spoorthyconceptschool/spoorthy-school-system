@@ -28,7 +28,7 @@ service cloud.firestore {
     
     function isSuperAdmin() {
       let r = getRole();
-      return isSignedIn() && (r == 'SUPER_ADMIN' || r == 'super_admin' || request.auth.token.email == 'praneeth743x@gmail.com' || request.auth.token.email == 'praneeth.r@example.com');
+      return isSignedIn() && (r == 'SUPER_ADMIN' || r == 'super_admin' || request.auth.token.email == 'praneeth743x@gmail.com' || request.auth.token.email == 'praneeth.r@example.com' || request.auth.token.email == 'admin@school.local' || request.auth.token.email == '25r21a05e2@mlrit.ac.in' || request.auth.token.email == '25421a05e2@mlrit.ac.in');
     }
 
     function isAdmin() {
@@ -110,6 +110,15 @@ service cloud.firestore {
     
     match /teachers/{teacherId} {
       allow read: if isSignedIn() && (request.auth.uid == teacherId || isManager() || isSameSchool(resource.data));
+      allow write: if isManager() && (isSuperAdmin() || request.resource.data.branchId == getSchoolId() || request.resource.data.schoolId == getSchoolId());
+    }
+    match /config/system {
+      allow read: if isSignedIn();
+      allow write: if isManager();
+    }
+
+    match /academic_years/{yearId} {
+      allow read: if isSignedIn() && (isManager() || isSameSchool(resource.data));
       allow write: if isManager() && (isSuperAdmin() || request.resource.data.branchId == getSchoolId() || request.resource.data.schoolId == getSchoolId());
     }
 

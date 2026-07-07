@@ -48,12 +48,14 @@ export async function POST(req: NextRequest) {
 
         // Fetch Admin Profile for schoolId
         const adminDoc = await adminDb.collection("users").doc(decodedToken.uid).get();
-        const schoolId = adminDoc.data()?.schoolId || "global";
+        const adminData = adminDoc.data();
+        const schoolId = adminData?.branchId || adminData?.schoolId || "global";
 
         const hwId = adminDb.collection("homework").doc().id;
         await adminDb.collection("homework").doc(hwId).set({
             id: hwId,
             schoolId,
+            branchId: schoolId,
             yearId,
             classId, // Targeted Class ID
             sectionId, // Targeted Section ID
@@ -75,6 +77,7 @@ export async function POST(req: NextRequest) {
             action: "ADMIN_CREATE_HOMEWORK",
             actorUid: decodedToken.uid,
             schoolId,
+            branchId: schoolId,
             details: { classId, title },
             timestamp: FieldValue.serverTimestamp()
         });
@@ -84,7 +87,7 @@ export async function POST(req: NextRequest) {
             // A. Fetch Target Students
             let studentQuery = adminDb.collection("students")
                 .where("classId", "==", classId)
-                .where("schoolId", "==", schoolId)
+                .where("branchId", "==", schoolId)
                 .where("status", "==", "ACTIVE");
 
             if (sectionId !== "ALL" && sectionId !== "GENERAL") {

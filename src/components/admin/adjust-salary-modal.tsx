@@ -124,7 +124,7 @@ export function AdjustSalaryModal({ isOpen, onClose, person, onSuccess }: Adjust
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="bg-black/95 border-white/10 text-white sm:max-w-[400px] w-[95vw] rounded-2xl">
+            <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white sm:max-w-[400px] w-[95vw] rounded-2xl border-white/10">
                 <DialogHeader>
                     <DialogTitle className="text-xl font-display italic">Adjust Salary</DialogTitle>
                 </DialogHeader>
@@ -136,7 +136,7 @@ export function AdjustSalaryModal({ isOpen, onClose, person, onSuccess }: Adjust
                         </div>
                         <div>
                             <div className="font-bold text-sm md:text-base">{person.name}</div>
-                            <div className="text-[10px] text-muted-foreground font-mono uppercase tracking-tighter opacity-70">{person.schoolId} • {person.role}</div>
+                            <div className="text-[10px] text-muted-foreground font-mono uppercase tracking-tighter opacity-70">{person.role}</div>
                         </div>
                     </div>
 

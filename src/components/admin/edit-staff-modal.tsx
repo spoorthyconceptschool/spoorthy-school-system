@@ -104,7 +104,7 @@ export function EditStaffModal({ isOpen, onClose, staff, onSuccess }: EditStaffM
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="bg-black/95 border-white/10 text-white sm:max-w-[425px]">
+            <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white sm:max-w-[425px] border-white/10">
                 <DialogHeader>
                     <DialogTitle>Edit Staff Member</DialogTitle>
                 </DialogHeader>
@@ -120,7 +120,7 @@ export function EditStaffModal({ isOpen, onClose, staff, onSuccess }: EditStaffM
                             <SelectTrigger className="bg-white/5 border-white/10">
                                 <SelectValue placeholder={loadingRoles ? "Loading roles..." : "Select Role"} />
                             </SelectTrigger>
-                            <SelectContent className="bg-black border-white/10 text-white">
+                            <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                                 {roles.map(role => (
                                     <SelectItem key={role.id} value={role.id}>
                                         {role.name} ({role.code})

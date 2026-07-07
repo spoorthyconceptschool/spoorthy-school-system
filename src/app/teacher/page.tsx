@@ -51,7 +51,7 @@ export default function TeacherDashboard() {
             if (!user?.uid) return;
 
             const [teacherSnapBySchoolId, leaveSnap] = await Promise.all([
-                userData?.schoolId ? getDocs(query(collection(db, "teachers"), where("schoolId", "==", userData.schoolId), limit(1))) : Promise.resolve({ empty: true, docs: [] }),
+                userData?.schoolId ? getDocs(query(collection(db, "teachers"), where("uid", "==", user.uid), where("schoolId", "==", userData.schoolId), limit(1))) : Promise.resolve({ empty: true, docs: [] }),
                 getDocs(query(
                     collection(db, "leave_requests"), 
                     where("teacherId", "==", user.uid),
@@ -160,7 +160,7 @@ export default function TeacherDashboard() {
     // --- CLASS TEACHER HELPERS ---
     const getManagedClasses = () => {
         if (!teacherProfile) return [];
-        const tId = teacherProfile.schoolId;
+        const tId = teacherProfile.teacherId || teacherProfile.id;
         const tDocId = teacherProfile.id;
         return Object.values(classSections).filter((cs: any) =>
             (cs.isActive !== false) && (cs.classTeacherId === tId || cs.classTeacherId === tDocId)
@@ -169,7 +169,7 @@ export default function TeacherDashboard() {
 
     const getTeachingAssignments = () => {
         if (!teacherProfile || !subjectTeachers || !classSections) return [];
-        const tId = teacherProfile.schoolId || teacherProfile.id;
+        const tId = teacherProfile.teacherId || teacherProfile.id;
         
         const groups: Record<string, {
             subjectId: string;
@@ -277,7 +277,7 @@ export default function TeacherDashboard() {
         const q = query(
             collection(db, "students"), 
             where("classId", "in", classIds), 
-            where("schoolId", "==", userData.schoolId)
+            where("branchId", "==", userData.schoolId)
         );
         const unsub = onSnapshot(q, (snap) => {
             let total = 0;

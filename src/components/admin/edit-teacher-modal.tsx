@@ -121,7 +121,7 @@ export function EditTeacherModal({ isOpen, onClose, teacher, onSuccess }: EditTe
         if (!user) return;
         const unsub = onSnapshot(doc(db, "users", user.uid), (d) => {
             if (d.exists()) setRole(d.data().role);
-        });
+        }, (err) => console.warn("[EditTeacherModal] User session sync warning:", err.message));
         return () => unsub();
     }, [user]);
 

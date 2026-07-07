@@ -3,8 +3,8 @@ import * as fs from 'fs';
 
 async function checkData() {
     const payments = await adminDb.collection("payments").orderBy("createdAt", "desc").limit(10).get();
-    const paymentResults = [];
-    payments.forEach(doc => {
+    const paymentResults: any[] = [];
+    payments.forEach((doc: any) => {
         const data = doc.data();
         paymentResults.push({
             id: doc.id,
@@ -15,8 +15,8 @@ async function checkData() {
     });
 
     const ledgers = await adminDb.collection("student_fee_ledgers").limit(10).get();
-    const ledgerResults = [];
-    ledgers.forEach(doc => {
+    const ledgerResults: any[] = [];
+    ledgers.forEach((doc: any) => {
         const data = doc.data();
         ledgerResults.push({
             id: doc.id,

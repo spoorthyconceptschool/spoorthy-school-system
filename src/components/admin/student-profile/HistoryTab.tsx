@@ -1,6 +1,6 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+
 import { History, CheckCircle2, FileText, AlertCircle, IndianRupee } from "lucide-react";
 
 interface HistoryTabProps {
@@ -38,8 +38,8 @@ export function HistoryTab({ payments, loading }: HistoryTabProps) {
                 </h3>
             </div>
             
-            <Card className="bg-[#0f172a] border-white/5 rounded-[1.5rem] shadow-2xl overflow-hidden">
-                <CardContent className="p-3 md:p-4">
+            <div className="flex flex-col border border-white/10 rounded-xl overflow-hidden bg-white/[0.02]">
+                <div className="p-3">
                     <div className="relative border-l-2 border-white/5 ml-3 space-y-6 pb-2 pt-2">
                         {payments.map((p, index) => (
                             <div key={p.id || index} className="relative pl-5 group">
@@ -95,8 +95,8 @@ export function HistoryTab({ payments, loading }: HistoryTabProps) {
                             </div>
                         ))}
                     </div>
-                </CardContent>
-            </Card>
+                </div>
+            </div>
         </div>
     );
 }

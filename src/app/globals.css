@@ -355,3 +355,63 @@ main, main * {
   transition-duration: 0s !important;
   transition-delay: 0s !important;
 }
+
+@media print {
+  /* 1. Hide common non-printable UI elements */
+  aside,
+  header,
+  nav,
+  footer,
+  button,
+  .print\:hidden {
+    display: none !important;
+  }
+
+  /* 2. Remove fixed constraints from layout containers to prevent truncation */
+  html, body, main,
+  .h-screen,
+  .h-\[100dvh\],
+  .min-h-screen,
+  .overflow-hidden,
+  .overflow-y-auto,
+  .overflow-auto,
+  .flex-1 {
+    height: auto !important;
+    min-height: auto !important;
+    max-height: none !important;
+    overflow: visible !important;
+  }
+
+  /* 3. Ensure the body and main layout wrappers don't force a single page */
+  body {
+    background-color: white !important;
+    color: black !important;
+  }
+
+  /* Remove backgrounds from dark layout containers */
+  .bg-\[\#0A192F\],
+  .bg-\[\#112240\],
+  .bg-\[\#0f172a\],
+  .bg-\[\#071A3A\] {
+    background-color: transparent !important;
+  }
+  
+  /* Reset padding left added by sidebars */
+  .md\:pl-\[190px\],
+  .pl-64,
+  .ml-64 {
+    padding-left: 0 !important;
+    margin-left: 0 !important;
+  }
+
+  /* Make all text visible on white paper */
+  * {
+    color-adjust: exact !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  @page {
+    margin: 1cm;
+  }
+}

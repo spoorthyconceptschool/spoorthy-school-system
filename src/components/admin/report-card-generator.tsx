@@ -7,13 +7,15 @@ import { FileText, Loader2, Printer, CheckCircle, AlertCircle } from "lucide-rea
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useMasterData } from "@/context/MasterDataContext";
+import { cn } from "@/lib/utils";
 
 interface ReportCardGeneratorProps {
     exam: any;
     classId: string;
+    className?: string;
 }
 
-export function ReportCardGenerator({ exam, classId }: ReportCardGeneratorProps) {
+export function ReportCardGenerator({ exam, classId, className }: ReportCardGeneratorProps) {
     const [open, setOpen] = useState(false);
     const [loading, setLoading] = useState(false);
     const [branding, setBranding] = useState<any>(null);
@@ -186,11 +188,11 @@ export function ReportCardGenerator({ exam, classId }: ReportCardGeneratorProps)
     return (
         <Dialog open={open} onOpenChange={setOpen}>
             <DialogTrigger asChild>
-                <Button variant="outline" className="gap-2 border-emerald-500/20 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 h-11 px-6">
+                <Button variant="outline" className={cn("gap-2 border-emerald-500/20 bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20 h-11 px-6", className)}>
                     <Printer className="w-4 h-4" /> Bulk Print Results
                 </Button>
             </DialogTrigger>
-            <DialogContent className="bg-black/95 border-white/10 text-white w-[95vw] sm:max-w-md">
+            <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white w-[95vw] sm:max-w-md border-white/10">
                 <DialogHeader>
                     <DialogTitle>Generate Report Cards</DialogTitle>
                 </DialogHeader>

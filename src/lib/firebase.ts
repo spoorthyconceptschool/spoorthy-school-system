@@ -23,24 +23,13 @@ const app = getApps().length ? getApp() : initializeApp(firebaseConfig);
 
 let db: Firestore;
 
-// Robust Firestore Initialization with Persistence (Zero-Latency Pillar)
+// Robust Firestore Initialization (Memory Cache for HMR Stability)
 if (typeof window !== "undefined") {
     // @ts-ignore - Cache db instance on window to survive Next.js HMR
     if (!window.__fireDb) {
-        try {
-            db = initializeFirestore(app, {
-                localCache: persistentLocalCache({
-                    tabManager: persistentMultipleTabManager()
-                })
-            });
-            // @ts-ignore
-            window.__fireDb = db;
-        } catch (e: any) {
-            // Fallback if already initialized
-            db = getFirestore(app);
-            // @ts-ignore
-            window.__fireDb = db;
-        }
+        db = getFirestore(app);
+        // @ts-ignore
+        window.__fireDb = db;
     } else {
         // @ts-ignore
         db = window.__fireDb;
@@ -72,3 +61,26 @@ if (typeof window !== "undefined") {
 }
 
 export { app, auth, db, functions, storage, rtdb, messaging, analytics };
+
+export interface TenantContext {
+  schoolId: string;
+}
+
+export function createTenantQuery(
+  dbInstance: Firestore,
+  collectionName: string,
+  tenant: TenantContext,
+  ...additionalConstraints: any[]
+): import("firebase/firestore").Query<import("firebase/firestore").DocumentData> {
+  if (!tenant?.schoolId) {
+    throw new Error('Tenant context missing: schoolId is required.');
+  }
+
+  const { collection, query, where } = require("firebase/firestore");
+
+  return query(
+    collection(dbInstance, collectionName),
+    where('schoolId', '==', tenant.schoolId),
+    ...additionalConstraints
+  );
+}

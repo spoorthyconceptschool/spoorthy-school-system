@@ -21,7 +21,8 @@ interface MarksEntryManagerProps {
 export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
     const router = useRouter();
     const { classes, sections, subjects, classSections, classSubjects, subjectTeachers, loading: mdLoading } = useMasterData();
-    const { user, isAdmin } = useAuth();
+    const { user, isAdmin, branchId, userData } = useAuth();
+    const currentSchoolId = branchId || userData?.schoolId;
     const [teacherId, setTeacherId] = useState<string | null>(null);
 
     const [exam, setExam] = useState<any>(null);
@@ -147,7 +148,8 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
                 collection(db, "students"),
                 where("classId", "==", selectedClassId),
                 where("sectionId", "==", selectedSectionId),
-                where("status", "==", "ACTIVE")
+                where("status", "==", "ACTIVE"),
+                where("schoolId", "==", currentSchoolId)
             );
             const snap = await getDocs(q);
             const studentList = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -373,7 +375,7 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
                             <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] italic ml-1">Class</label>
                             <Select value={selectedClassId} onValueChange={(v) => { setSelectedClassId(v); setSelectedSectionId(""); setSelectedSubjectId(""); }}>
                                 <SelectTrigger className="bg-white/5 border-white/10 h-11 md:h-10 rounded-xl focus:ring-emerald-500/20"><SelectValue placeholder="Class" /></SelectTrigger>
-                                <SelectContent className="bg-slate-900 border-white/10 text-white">
+                                <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                                     {filteredClasses.map((c: any) => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
                                 </SelectContent>
                             </Select>
@@ -383,7 +385,7 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
                             <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] italic ml-1">Section</label>
                             <Select value={selectedSectionId} onValueChange={setSelectedSectionId} disabled={!selectedClassId}>
                                 <SelectTrigger className="bg-white/5 border-white/10 h-11 md:h-10 rounded-xl focus:ring-emerald-500/20"><SelectValue placeholder="Section" /></SelectTrigger>
-                                <SelectContent className="bg-slate-900 border-white/10 text-white">
+                                <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                                     {availableSections.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                                 </SelectContent>
                             </Select>
@@ -393,7 +395,7 @@ export function MarksEntryManager({ examId, backUrl }: MarksEntryManagerProps) {
                             <label className="text-[10px] font-black text-white/40 uppercase tracking-[0.2em] italic ml-1">Subject</label>
                             <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId} disabled={!selectedSectionId}>
                                 <SelectTrigger className="bg-white/5 border-white/10 h-11 md:h-10 rounded-xl focus:ring-emerald-500/20"><SelectValue placeholder="Subject" /></SelectTrigger>
-                                <SelectContent className="bg-slate-900 border-white/10 text-white">
+                                <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                                     {availableSubjects.map((s: any) => <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>)}
                                 </SelectContent>
                             </Select>

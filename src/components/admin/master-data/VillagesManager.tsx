@@ -7,13 +7,16 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { DataTable } from "@/components/ui/data-table";
 import { Plus, Edit2, Archive, Loader2 } from "lucide-react";
 import { useMasterData } from "@/context/MasterDataContext";
-import { rtdb } from "@/lib/firebase";
-import { ref, set, update, remove, push } from "firebase/database";
+import { db } from "@/lib/firebase";
+import { collection, doc, setDoc, deleteDoc, updateDoc } from "firebase/firestore";
+import { useAuth } from "@/context/AuthContext";
 
 export function VillagesManager() {
     const { villages, loading: contextLoading } = useMasterData();
     const villageList = Object.values(villages || {});
     const [loading, setLoading] = useState(true);
+    const { user, userData, branchId: userBranchId, role } = useAuth();
+    const activeBranchId = userBranchId || userData?.schoolId || (role === "SUPER_ADMIN" ? "global" : null);
 
     useEffect(() => {
         if (!contextLoading) {
@@ -31,33 +34,26 @@ export function VillagesManager() {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        if (!activeBranchId) return;
+        
         setSubmitting(true);
         try {
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("Database operation timed out.")), 5000)
-            );
-
             if (editingId) {
-                const villageRef = ref(rtdb, `master/villages/${editingId}`);
-                await Promise.race([
-                    update(villageRef, {
-                        name: formData.name,
-                        code: formData.code.toUpperCase(),
-                    }),
-                    timeoutPromise
-                ]);
+                const villageRef = doc(db, "villages", editingId);
+                await updateDoc(villageRef, {
+                    name: formData.name,
+                    code: formData.code.toUpperCase(),
+                });
             } else {
-                const newRef = push(ref(rtdb, 'master/villages'));
-                await Promise.race([
-                    set(newRef, {
-                        id: newRef.key,
-                        name: formData.name,
-                        code: formData.code.toUpperCase(),
-                        active: true,
-                        studentCount: 0
-                    }),
-                    timeoutPromise
-                ]);
+                const villageRef = doc(collection(db, "villages"));
+                await setDoc(villageRef, {
+                    id: villageRef.id,
+                    name: formData.name,
+                    code: formData.code.toUpperCase(),
+                    active: true,
+                    schoolId: activeBranchId,
+                    studentCount: 0
+                });
             }
             setOpen(false);
             setFormData({ name: "", code: "" });
@@ -78,9 +74,8 @@ export function VillagesManager() {
 
     const toggleStatus = async (v: any) => {
         try {
-            // Optimistic update via RTDB
-            const villageRef = ref(rtdb, `master/villages/${v.id}`);
-            await update(villageRef, { active: !v.active });
+            const villageRef = doc(db, "villages", v.id);
+            await updateDoc(villageRef, { active: !v.active, isActive: !v.active });
         } catch (e) {
             console.error(e);
             alert("Failed to update status");
@@ -94,9 +89,9 @@ export function VillagesManager() {
             key: "active", header: "Status", render: (v: any) => (
                 <button
                     onClick={() => toggleStatus(v)}
-                    className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider transition-all hover:scale-105 ${v.active ? 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20' : 'bg-red-500/10 text-red-500 hover:bg-red-500/20'}`}
+                    className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider transition-all hover:scale-105 ${v.active !== false && v.isActive !== false ? 'bg-emerald-500/10 text-emerald-500 hover:bg-emerald-500/20' : 'bg-red-500/10 text-red-500 hover:bg-red-500/20'}`}
                 >
-                    {v.active ? 'Active' : 'Inactive'}
+                    {v.active !== false && v.isActive !== false ? 'Active' : 'Inactive'}
                 </button>
             )
         },
@@ -112,7 +107,7 @@ export function VillagesManager() {
                     <DialogTrigger asChild>
                         <Button className="bg-accent text-accent-foreground font-bold"><Plus size={16} className="mr-2" /> Add Village</Button>
                     </DialogTrigger>
-                    <DialogContent className="bg-black/95 border-white/10 text-white">
+                    <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                         <DialogHeader><DialogTitle>{editingId ? "Edit Village" : "Add Village"}</DialogTitle></DialogHeader>
                         <form onSubmit={handleSubmit} className="space-y-4 pt-4">
                             <div className="space-y-2">
@@ -138,7 +133,7 @@ export function VillagesManager() {
                 actions={(v) => (
                     <div className="flex gap-2">
                         <Button size="sm" variant="ghost" onClick={() => handleEdit(v)} className="hover:bg-white/5"><Edit2 size={14} className="mr-2" /> Rename</Button>
-                        <Button size="sm" variant="ghost" className="text-red-500 hover:bg-red-500/10" onClick={() => toggleStatus(v)}><Archive size={14} className="mr-2" /> {v.active ? "Deactivate" : "Activate"}</Button>
+                        <Button size="sm" variant="ghost" className="text-red-500 hover:bg-red-500/10" onClick={() => toggleStatus(v)}><Archive size={14} className="mr-2" /> {v.active !== false && v.isActive !== false ? "Deactivate" : "Activate"}</Button>
                     </div>
                 )}
             />

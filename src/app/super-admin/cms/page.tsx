@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
-import { Loader2, Save, Upload, ImagePlus, CheckCircle, X, Plus } from "lucide-react";
+import { Loader2, Save, Upload, ImagePlus, CheckCircle, X, Plus, Building2 } from "lucide-react";
 
 import { uploadImageFromUrl, uploadFile } from "@/lib/image-pipeline";
 import { useAuth } from "@/context/AuthContext";
@@ -56,6 +56,42 @@ export default function CMSPage() {
         return DEFAULT_CMS_DATA;
     });
 
+    const [branding, setBranding] = useState({
+        website_school_name: "Spoorthy Concept School",
+        website_logo: "",
+        website_favicon: "",
+        website_theme_branding: "emerald",
+        website_organization_name: ""
+    });
+
+    useEffect(() => {
+        const fetchBranding = async () => {
+            try {
+                const token = await user?.getIdToken();
+                if (!token) return;
+                const res = await fetch("/api/admin/settings/website", {
+                    headers: { "Authorization": `Bearer ${token}` }
+                });
+                const resData = await res.json();
+                if (resData.success && resData.settings) {
+                    setBranding({
+                        website_school_name: resData.settings.website_school_name || "Spoorthy Concept School",
+                        website_logo: resData.settings.website_logo || "",
+                        website_favicon: resData.settings.website_favicon || "",
+                        website_theme_branding: resData.settings.website_theme_branding || "emerald",
+                        website_organization_name: resData.settings.website_organization_name || ""
+                    });
+                }
+            } catch (err) {
+                console.error("Failed to load branding in CMS:", err);
+            }
+        };
+
+        if (user) {
+            fetchBranding();
+        }
+    }, [user]);
+
     useEffect(() => {
         const unsub = onValue(ref(rtdb, 'siteContent/home'), (snap) => {
             if (snap.exists() && !isPublishing) {
@@ -87,11 +123,27 @@ export default function CMSPage() {
         console.log("[CMS] Publish Sequence Initiated");
         setIsPublishing(true);
         try {
-            // Remove any undefined values that RTDB rejects
+            // 1. Save siteContent/home to RTDB
             const sanitizedData = JSON.parse(JSON.stringify(data));
             console.log("[CMS] Sanitized Data for Publish:", sanitizedData);
-
             await update(ref(rtdb, 'siteContent/home'), sanitizedData);
+
+            // 2. Save Branding settings to the API
+            const token = await user?.getIdToken();
+            if (token) {
+                const res = await fetch("/api/admin/settings/website", {
+                    method: "POST",
+                    headers: { 
+                        "Content-Type": "application/json",
+                        "Authorization": `Bearer ${token}`
+                    },
+                    body: JSON.stringify(branding)
+                });
+                const resData = await res.json();
+                if (!res.ok || !resData.success) {
+                    throw new Error(resData.error || "Failed to save branding settings");
+                }
+            }
 
             console.log("[CMS] Publish Success");
             alert("Changes published to Landing Page!");
@@ -191,9 +243,9 @@ export default function CMSPage() {
                 </div>
             </div>
 
-            <Tabs defaultValue="hero" className="w-full">
+            <Tabs defaultValue="branding" className="w-full">
                 <TabsList className="bg-zinc-900/40 backdrop-blur-xl border border-white/5 w-full justify-start overflow-x-auto p-1.5 rounded-2xl h-auto gap-1.5 mb-8 no-scrollbar">
-                    {["Hero", "Facilities", "Leadership", "Why Choose Us", "Gallery"].map((tab) => {
+                    {["Branding", "Hero", "Facilities", "Leadership", "Why Choose Us", "Gallery"].map((tab) => {
                         const value = tab.toLowerCase().split(" ")[0];
                         return (
                             <TabsTrigger
@@ -206,6 +258,136 @@ export default function CMSPage() {
                         );
                     })}
                 </TabsList>
+
+                {/* BRANDING TAB */}
+                <TabsContent value="branding" className="mt-6 md:mt-8">
+                    <Card className="bg-zinc-900/40 border-white/10 backdrop-blur-xl shadow-2xl overflow-hidden">
+                        <CardHeader className="border-b border-white/5 bg-white/[0.02]">
+                            <CardTitle className="flex items-center gap-3 text-white">
+                                <div className="p-2 bg-indigo-500/10 rounded-lg">
+                                    <Building2 className="w-5 h-5 text-indigo-400" />
+                                </div>
+                                <span className="text-lg md:text-xl">Global Website Branding</span>
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="p-4 md:p-8 space-y-8">
+                            <div className="grid grid-cols-1 md:grid-cols-2 gap-8 md:gap-12">
+                                <div className="space-y-6">
+                                    <div className="space-y-3">
+                                        <Label className="text-zinc-400 text-xs uppercase tracking-widest font-bold">Website School Name</Label>
+                                        <Input
+                                            value={branding.website_school_name}
+                                            onChange={e => setBranding({ ...branding, website_school_name: e.target.value })}
+                                            className="bg-zinc-950/60 border-white/10 focus:border-indigo-500/50 focus:ring-indigo-500/20 h-12 text-white placeholder:text-zinc-700 rounded-xl"
+                                            placeholder="e.g. Spoorthy Concept School"
+                                        />
+                                    </div>
+                                    <div className="space-y-3">
+                                        <Label className="text-zinc-400 text-xs uppercase tracking-widest font-bold">Website Organization Name</Label>
+                                        <Input
+                                            value={branding.website_organization_name}
+                                            onChange={e => setBranding({ ...branding, website_organization_name: e.target.value })}
+                                            className="bg-zinc-950/60 border-white/10 focus:border-indigo-500/50 focus:ring-indigo-500/20 h-12 text-white placeholder:text-zinc-700 rounded-xl"
+                                            placeholder="e.g. Spoorthy Education Society"
+                                        />
+                                    </div>
+                                    <div className="space-y-3">
+                                        <Label className="text-zinc-400 text-xs uppercase tracking-widest font-bold">Website Theme Branding</Label>
+                                        <select
+                                            value={branding.website_theme_branding}
+                                            onChange={e => setBranding({ ...branding, website_theme_branding: e.target.value })}
+                                            className="w-full bg-zinc-950/60 border border-white/10 rounded-xl px-3 h-12 text-sm text-white outline-none focus:border-indigo-500/50"
+                                        >
+                                            <option value="emerald">Emerald Green</option>
+                                            <option value="indigo">Indigo Blue</option>
+                                            <option value="purple">Royal Purple</option>
+                                            <option value="rose">Crimson Rose</option>
+                                            <option value="amber">Amber Gold</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-6 p-6 rounded-2xl bg-white/[0.02] border border-white/5">
+                                    <div className="space-y-4">
+                                        <Label className="text-zinc-400 text-xs uppercase tracking-widest font-bold flex flex-col gap-1">
+                                            <span>Website Logo</span>
+                                            <span className="text-[10px] text-zinc-500 font-normal lowercase tracking-normal">Transparent background recommended</span>
+                                        </Label>
+                                        <div className="border-2 border-dashed border-zinc-700/50 rounded-2xl p-4 bg-zinc-950/40 hover:bg-zinc-950/60 transition-all group relative aspect-square max-w-[150px] mx-auto flex flex-col items-center justify-center gap-3 overflow-hidden">
+                                            {branding.website_logo ? (
+                                                <img src={branding.website_logo} alt="Logo preview" className="absolute inset-0 w-full h-full object-contain p-2 bg-white/5 opacity-80 group-hover:opacity-35 transition-opacity" />
+                                            ) : (
+                                                <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center">
+                                                    <Upload className="w-5 h-5 text-zinc-400" />
+                                                </div>
+                                            )}
+
+                                            <div className="relative z-10 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                                <Input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    className="hidden"
+                                                    id="branding-logo-upload"
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) handleLocalUpload(file, 'branding', (url) => setBranding(prev => ({ ...prev, website_logo: url })), branding.website_logo);
+                                                    }}
+                                                />
+                                                <Label htmlFor="branding-logo-upload" className="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg cursor-pointer text-[10px] font-bold shadow-xl active:scale-95 transition-all flex items-center gap-1">
+                                                    <Upload className="w-3.5 h-3.5" /> Upload
+                                                </Label>
+                                            </div>
+                                        </div>
+                                        <Input
+                                            value={branding.website_logo}
+                                            onChange={e => setBranding({ ...branding, website_logo: e.target.value })}
+                                            placeholder="Logo URL..."
+                                            className="bg-zinc-950/60 border-white/10 text-[10px] font-mono h-9 text-zinc-500 focus:text-white rounded-lg"
+                                        />
+                                    </div>
+
+                                    <div className="space-y-4">
+                                        <Label className="text-zinc-400 text-xs uppercase tracking-widest font-bold flex flex-col gap-1">
+                                            <span>Website Favicon</span>
+                                            <span className="text-[10px] text-zinc-500 font-normal lowercase tracking-normal">ICO or PNG formats</span>
+                                        </Label>
+                                        <div className="border-2 border-dashed border-zinc-700/50 rounded-2xl p-4 bg-zinc-950/40 hover:bg-zinc-950/60 transition-all group relative aspect-square max-w-[150px] mx-auto flex flex-col items-center justify-center gap-3 overflow-hidden">
+                                            {branding.website_favicon ? (
+                                                <img src={branding.website_favicon} alt="Favicon preview" className="absolute inset-0 w-full h-full object-contain p-4 bg-white/5 opacity-80 group-hover:opacity-35 transition-opacity" />
+                                            ) : (
+                                                <div className="w-12 h-12 rounded-full bg-zinc-800 flex items-center justify-center">
+                                                    <Upload className="w-5 h-5 text-zinc-400" />
+                                                </div>
+                                            )}
+
+                                            <div className="relative z-10 flex flex-col items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-300">
+                                                <Input
+                                                    type="file"
+                                                    accept="image/*,image/x-icon"
+                                                    className="hidden"
+                                                    id="branding-favicon-upload"
+                                                    onChange={(e) => {
+                                                        const file = e.target.files?.[0];
+                                                        if (file) handleLocalUpload(file, 'branding/favicon', (url) => setBranding(prev => ({ ...prev, website_favicon: url })), branding.website_favicon);
+                                                    }}
+                                                />
+                                                <Label htmlFor="branding-favicon-upload" className="bg-indigo-600 hover:bg-indigo-500 text-white px-3 py-1.5 rounded-lg cursor-pointer text-[10px] font-bold shadow-xl active:scale-95 transition-all flex items-center gap-1">
+                                                    <Upload className="w-3.5 h-3.5" /> Upload
+                                                </Label>
+                                            </div>
+                                        </div>
+                                        <Input
+                                            value={branding.website_favicon}
+                                            onChange={e => setBranding({ ...branding, website_favicon: e.target.value })}
+                                            placeholder="Favicon URL..."
+                                            className="bg-zinc-950/60 border-white/10 text-[10px] font-mono h-9 text-zinc-500 focus:text-white rounded-lg"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+                        </CardContent>
+                    </Card>
+                </TabsContent>
 
                 {/* HERO TAB */}
                 <TabsContent value="hero" className="mt-6 md:mt-8">

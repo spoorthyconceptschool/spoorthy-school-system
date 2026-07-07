@@ -51,7 +51,7 @@ export async function POST(req: Request) {
             const snapshot = await adminDb.collection(collectionName).get();
             
             const batch = adminDb.batch();
-            snapshot.docs.forEach((doc) => {
+            snapshot.docs.forEach((doc: any) => {
                 const data = doc.data();
                 if (!data.branchId) {
                     batch.update(doc.ref, { branchId: defaultBranchId });
@@ -70,7 +70,7 @@ export async function POST(req: Request) {
         const userBatch = adminDb.batch();
         let userCount = 0;
 
-        usersSnapshot.docs.forEach((doc) => {
+        usersSnapshot.docs.forEach((doc: any) => {
             const userData = doc.data();
             const role = (userData.role || "").toUpperCase();
             if (role === "ADMIN" || role === "MANAGER" || role === "OWNER" || role === "DEVELOPER") {

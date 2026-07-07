@@ -33,8 +33,9 @@ const DEFAULT_APPROVALS = [
     }
 ];
 
-export function StudentApprovalsManager() {
-    const { user } = useAuth();
+export function StudentApprovalsManager({ activeBranchId }: { activeBranchId?: string | null } = {}) {
+    const { user, branchId, userData, role } = useAuth();
+    const resolvedBranchId = activeBranchId || branchId || userData?.schoolId || (role === "SUPER_ADMIN" ? "global" : null);
     const { selectedYear, classes, sections, villages } = useMasterData();
     const [changeRequests, setChangeRequests] = useState<any[]>(() => {
         if (typeof window !== 'undefined') {
@@ -51,10 +52,13 @@ export function StudentApprovalsManager() {
 
     // Listen for all pending student change requests (both ADD and EDIT)
     useEffect(() => {
-        const q = query(
+        let q = query(
             collection(db, "student_change_requests"),
             where("status", "==", "PENDING")
         );
+        if (resolvedBranchId && resolvedBranchId !== "global") {
+            q = query(q, where("branchId", "==", resolvedBranchId));
+        }
 
         const unsub = onSnapshot(q, (snap) => {
             const docs = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -71,7 +75,7 @@ export function StudentApprovalsManager() {
         });
 
         return () => unsub();
-    }, []);
+    }, [resolvedBranchId]);
 
     // Group by teacher
     const grouped: Record<string, { teacherName: string; requests: any[] }> = {};

@@ -96,12 +96,12 @@ export function TeacherAssignmentsManager() {
 
             const matchesClass = 
                 selectedClass === "ALL" ||
-                t.ctCharges.some(c => c.key === selectedClass) ||
-                t.subAssignments.some(a => a.key === selectedClass);
+                t.ctCharges.some((c: any) => c.key === selectedClass) ||
+                t.subAssignments.some((a: any) => a.key === selectedClass);
 
             const matchesSubject = 
                 selectedSubject === "ALL" ||
-                t.subAssignments.some(a => a.subName.toLowerCase() === selectedSubject.toLowerCase() || a.subId.toLowerCase() === selectedSubject.toLowerCase());
+                t.subAssignments.some((a: any) => a.subName.toLowerCase() === selectedSubject.toLowerCase() || a.subId.toLowerCase() === selectedSubject.toLowerCase());
 
             return matchesSearch && matchesClass && matchesSubject;
         });
@@ -145,7 +145,7 @@ export function TeacherAssignmentsManager() {
                         <SelectTrigger className="bg-white/5 border-white/10 text-white rounded-xl h-10 text-sm">
                             <SelectValue placeholder="Filter by Class" />
                         </SelectTrigger>
-                        <SelectContent className="bg-black border-white/10 text-white">
+                        <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                             <SelectItem value="ALL">All Classes & Sections</SelectItem>
                             {Object.values(classSections || {}).filter((cs: any) => cs.isActive !== false).map((cs: any) => {
                                 const cName = classes[cs.classId]?.name || cs.classId;
@@ -161,7 +161,7 @@ export function TeacherAssignmentsManager() {
                         <SelectTrigger className="bg-white/5 border-white/10 text-white rounded-xl h-10 text-sm">
                             <SelectValue placeholder="Filter by Subject" />
                         </SelectTrigger>
-                        <SelectContent className="bg-black border-white/10 text-white">
+                        <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                             <SelectItem value="ALL">All Subjects</SelectItem>
                             {Object.values(masterSubjects || {}).filter((s: any) => s.isActive !== false).map((s: any) => (
                                 <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>

@@ -25,6 +25,8 @@ export function LiveUpdatePrompt() {
                     setCurrentVersion(val);
                 }
             }
+        }, (err) => {
+            console.warn("[LiveUpdatePrompt] RTDB listener error:", err.message);
         });
 
         return () => unsub();

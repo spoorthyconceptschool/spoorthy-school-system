@@ -29,12 +29,12 @@ export default function BranchManagementPage() {
         <div className="space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold font-display text-white">Branch Management</h1>
-                    <p className="text-[#8892B0] mt-1">Manage organization branches and admins</p>
+                    <h1 className="text-3xl font-bold font-display text-white">School Management</h1>
+                    <p className="text-[#8892B0] mt-1">Manage organization schools and admins</p>
                 </div>
                 <Link href="/super-admin/branches/create">
                     <Button className="bg-emerald-500 hover:bg-emerald-600 text-white font-bold h-10 px-6 rounded-xl shadow-lg shadow-emerald-500/20">
-                        <Plus className="w-5 h-5 mr-2" /> Add Branch
+                        <Plus className="w-5 h-5 mr-2" /> Add School
                     </Button>
                 </Link>
             </div>
@@ -64,7 +64,7 @@ export default function BranchManagementPage() {
                                             <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-widest border ${
                                                 branch.status === 'ACTIVE' 
                                                     ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' 
-                                                    : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
+                                                     : 'bg-rose-500/10 text-rose-400 border-rose-500/20'
                                             }`}>
                                                 {branch.status}
                                             </span>
@@ -88,11 +88,11 @@ export default function BranchManagementPage() {
                     
                     {branches.length === 0 && (
                         <div className="col-span-full py-20 text-center border-2 border-dashed border-white/10 rounded-3xl">
-                            <h3 className="text-xl font-bold text-white mb-2">No Branches Found</h3>
-                            <p className="text-[#8892B0] mb-6">Create your first branch to get started.</p>
+                            <h3 className="text-xl font-bold text-white mb-2">No Schools Found</h3>
+                            <p className="text-[#8892B0] mb-6">Create your first school to get started.</p>
                             <Link href="/super-admin/branches/create">
                                 <Button className="bg-indigo-500 hover:bg-indigo-600 text-white font-bold h-10 px-6 rounded-xl">
-                                    Create Default Branch
+                                    Create Default School
                                 </Button>
                             </Link>
                         </div>

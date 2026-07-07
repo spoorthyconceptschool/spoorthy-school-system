@@ -10,23 +10,31 @@ export async function POST(req: Request) {
         if (!authHeader?.startsWith("Bearer ")) return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
 
         const token = authHeader.split("Bearer ")[1];
+        let decodedToken;
         try {
-            await auth.verifyIdToken(token);
+            decodedToken = await auth.verifyIdToken(token);
         } catch (e) {
             return NextResponse.json({ error: "Invalid Token" }, { status: 401 });
         }
 
         const body = await req.json();
-        const { roleId, roleName, roleCode, name, mobile, address, baseSalary, initialAdjustment } = body; // roleCode e.g. "DRV"
+        const { roleId, roleName, roleCode, name, mobile, address, baseSalary, initialAdjustment, branchId: providedBranchId } = body;
 
         if (!roleCode || !name || !mobile) {
             return NextResponse.json({ error: "Role, Name, and Mobile required." }, { status: 400 });
         }
 
+        // Resolve branch ID
+        let resolvedBranchId = "global";
+        if (decodedToken.role === "ADMIN") {
+            resolvedBranchId = decodedToken.schoolId || "global";
+        } else if (providedBranchId) {
+            resolvedBranchId = providedBranchId;
+        }
+
         // 1. Transaction: Role-based Counter & ID
         const result = await adminDb.runTransaction(async (t: any) => {
-            // Counter: /counters/staff_DRV, /counters/staff_CL, etc.
-            const counterRef = adminDb.collection("counters").doc(`staff_${roleCode}`);
+            const counterRef = adminDb.collection("counters").doc(resolvedBranchId !== "global" ? `staff_${roleCode}_${resolvedBranchId}` : `staff_${roleCode}`);
             const counterSnap = await t.get(counterRef);
 
             let newCount = 1;
@@ -34,20 +42,17 @@ export async function POST(req: Request) {
                 newCount = counterSnap.data()?.count + 1;
             }
 
-            // Create ID: DRV0001 (Pad to 4 digits? Req. said 3 for Watchman, 4 for others. Let's stick to 4 for consistency unless strict.)
-            // Spec said: Watchman WM001. Others 4 digits. Let's make it flexible or just 4. Spec says "WM001 (pad to 3)". 
-            // We'll stick to 4 for consistency (DRV0001) as it's safer.
             const paddedId = String(newCount).padStart(4, "0");
             const staffId = `${roleCode}${paddedId}`;
 
             // Calculate Salary
             let finalSalary = Number(baseSalary) || 0;
-            // If adjustment logic needed, handle here. We just store the final base.
 
             // 2. Write Profile (No Auth User)
             const staffRef = adminDb.collection("staff").doc(staffId);
             t.set(staffRef, {
                 schoolId: staffId,
+                branchId: resolvedBranchId,
                 name,
                 mobile,
                 address,

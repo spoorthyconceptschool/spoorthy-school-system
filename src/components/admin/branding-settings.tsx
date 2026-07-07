@@ -24,8 +24,8 @@ export function BrandingSettingsV2({ branchAdminMode = false, branchId }: { bran
     const [address, setAddress] = useState("");
     const [logoUrl, setLogoUrl] = useState("");
     const [signatureUrl, setSignatureUrl] = useState("");
-    const [studentIdPrefix, setStudentIdPrefix] = useState("SCS");
-    const [teacherIdPrefix, setTeacherIdPrefix] = useState("SHST");
+    const [studentIdPrefix, setStudentIdPrefix] = useState("");
+    const [teacherIdPrefix, setTeacherIdPrefix] = useState("");
     const [studentIdSuffix, setStudentIdSuffix] = useState<number>(1);
     const [teacherIdSuffix, setTeacherIdSuffix] = useState<number>(1);
     const [migrating, setMigrating] = useState(false);
@@ -52,13 +52,13 @@ export function BrandingSettingsV2({ branchAdminMode = false, branchId }: { bran
                     setSchoolName(b.schoolName || "");
                     setAddress(b.address || "");
                     setSignatureUrl(b.principalSignature || "");
-                    setStudentIdPrefix(b.studentIdPrefix || "SCS");
-                    setTeacherIdPrefix(b.teacherIdPrefix || "SHST");
+                    setStudentIdPrefix(b.studentIdPrefix || "");
+                    setTeacherIdPrefix(b.teacherIdPrefix || "");
                     setStudentIdSuffix(b.studentIdSuffix || 1);
                     setTeacherIdSuffix(b.teacherIdSuffix || 1);
                 }
             } catch (e) {
-                console.error("Failed to load branch data", e);
+                console.warn("Failed to load branch data", e);
             } finally {
                 setIsLoadingBranch(false);
             }
@@ -68,9 +68,11 @@ export function BrandingSettingsV2({ branchAdminMode = false, branchId }: { bran
 
         if (branding && (isFormPristine || !saving)) {
             if (isGlobalOnly) {
-                // Global HQ mode: just logo
+                // Global HQ mode: logo, name, address
                 if (isFormPristine) {
                     setLogoUrl(branding.schoolLogo || "");
+                    setSchoolName(branding.schoolName || "");
+                    setAddress(branding.address || "");
                 }
             } else {
                 // Branch mode
@@ -85,8 +87,8 @@ export function BrandingSettingsV2({ branchAdminMode = false, branchId }: { bran
                     setSchoolName(branding.schoolName || "");
                     setAddress(branding.address || "");
                     setSignatureUrl(branding.principalSignature || "");
-                    setStudentIdPrefix(branding.studentIdPrefix || "SCS");
-                    setTeacherIdPrefix(branding.teacherIdPrefix || "SHST");
+                    setStudentIdPrefix(branding.studentIdPrefix || "");
+                    setTeacherIdPrefix(branding.teacherIdPrefix || "");
                     setStudentIdSuffix(branding.studentIdSuffix || 1);
                     setTeacherIdSuffix(branding.teacherIdSuffix || 1);
                 }
@@ -224,8 +226,8 @@ export function BrandingSettingsV2({ branchAdminMode = false, branchId }: { bran
         (address !== (branding.address || "")) ||
         logoUrl !== (branding.schoolLogo || "") ||
         signatureUrl !== (branding.principalSignature || "") ||
-        studentIdPrefix !== (branding.studentIdPrefix || "SCS") ||
-        teacherIdPrefix !== (branding.teacherIdPrefix || "SHST") ||
+        studentIdPrefix !== (branding.studentIdPrefix || "") ||
+        teacherIdPrefix !== (branding.teacherIdPrefix || "") ||
         studentIdSuffix !== (branding.studentIdSuffix || 1) ||
         teacherIdSuffix !== (branding.teacherIdSuffix || 1);
 
@@ -246,91 +248,93 @@ export function BrandingSettingsV2({ branchAdminMode = false, branchId }: { bran
                     </div>
                     <div>
                         <CardTitle className="text-base md:text-lg font-bold text-white tracking-tight">
-                            {isGlobalOnly ? "Global Organization Identity" : "Branch Settings"}
+                            {isGlobalOnly ? "Global Organization Identity" : "School Settings"}
                         </CardTitle>
                         <CardDescription className="text-zinc-400 text-xs mt-0.5">
-                            {isGlobalOnly ? "Manage global school branding." : "Manage branch-specific details and signatures."}
+                            {isGlobalOnly ? "Manage global school branding." : "Manage school-specific details and signatures."}
                         </CardDescription>
                     </div>
                 </div>
             </CardHeader>
 
             <CardContent className="p-4 md:p-6 space-y-6">
-                {!isGlobalOnly && (
-                    <div className="grid md:grid-cols-2 gap-4 md:gap-6 pb-4 md:pb-6 border-b border-white/5">
-                        <div className="space-y-2">
-                            <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
-                                School Name
-                            </Label>
-                            <Input
-                                value={schoolName}
-                                onChange={e => setSchoolName(e.target.value)}
-                                className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700"
-                                placeholder="e.g. Spoorthy High School"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
-                                Address Line
-                            </Label>
-                            <Input
-                                value={address}
-                                onChange={e => setAddress(e.target.value)}
-                                className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700"
-                                placeholder="City, State, Country"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
-                                Student ID Prefix
-                            </Label>
-                            <Input
-                                value={studentIdPrefix}
-                                onChange={e => setStudentIdPrefix(e.target.value.toUpperCase())}
-                                className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700 font-mono"
-                                placeholder="e.g. SCS"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
-                                Teacher ID Prefix
-                            </Label>
-                            <Input
-                                value={teacherIdPrefix}
-                                onChange={e => setTeacherIdPrefix(e.target.value.toUpperCase())}
-                                className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700 font-mono"
-                                placeholder="e.g. SHST"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
-                                Student ID Starting Number
-                            </Label>
-                            <Input
-                                type="number"
-                                min="1"
-                                value={studentIdSuffix}
-                                onChange={e => setStudentIdSuffix(parseInt(e.target.value) || 1)}
-                                className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700 font-mono"
-                                placeholder="e.g. 1000"
-                            />
-                        </div>
-                        <div className="space-y-2">
-                            <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
-                                Teacher ID Starting Number
-                            </Label>
-                            <Input
-                                type="number"
-                                min="1"
-                                value={teacherIdSuffix}
-                                onChange={e => setTeacherIdSuffix(parseInt(e.target.value) || 1)}
-                                className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700 font-mono"
-                                placeholder="e.g. 100"
-                            />
-                        </div>
+                <div className="grid md:grid-cols-2 gap-4 md:gap-6 pb-4 md:pb-6 border-b border-white/5">
+                    <div className="space-y-2">
+                        <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                            {isGlobalOnly ? "Website School Name" : "School Name"}
+                        </Label>
+                        <Input
+                            value={schoolName}
+                            onChange={e => setSchoolName(e.target.value)}
+                            className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700"
+                            placeholder="e.g. Spoorthy High School"
+                        />
                     </div>
-                )}
+                    <div className="space-y-2">
+                        <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                            {isGlobalOnly ? "Website Address Line" : "Address Line"}
+                        </Label>
+                        <Input
+                            value={address}
+                            onChange={e => setAddress(e.target.value)}
+                            className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700"
+                            placeholder="City, State, Country"
+                        />
+                    </div>
+
+                    {!isGlobalOnly && (
+                        <>
+                            <div className="space-y-2">
+                                <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                                    Student ID Prefix
+                                </Label>
+                                <Input
+                                    value={studentIdPrefix}
+                                    onChange={e => setStudentIdPrefix(e.target.value.toUpperCase())}
+                                    className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700 font-mono"
+                                    placeholder="e.g. SCS"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                                    Teacher ID Prefix
+                                </Label>
+                                <Input
+                                    value={teacherIdPrefix}
+                                    onChange={e => setTeacherIdPrefix(e.target.value.toUpperCase())}
+                                    className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700 font-mono"
+                                    placeholder="e.g. SHST"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                                    Student ID Starting Number
+                                </Label>
+                                <Input
+                                    type="number"
+                                    min="1"
+                                    value={studentIdSuffix}
+                                    onChange={e => setStudentIdSuffix(parseInt(e.target.value) || 1)}
+                                    className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700 font-mono"
+                                    placeholder="e.g. 1000"
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label className="text-[10px] md:text-xs font-semibold uppercase tracking-wider text-zinc-500 flex items-center gap-1.5">
+                                    Teacher ID Starting Number
+                                </Label>
+                                <Input
+                                    type="number"
+                                    min="1"
+                                    value={teacherIdSuffix}
+                                    onChange={e => setTeacherIdSuffix(parseInt(e.target.value) || 1)}
+                                    className="bg-zinc-950/50 border-white/10 h-10 md:h-11 rounded-lg focus:ring-indigo-500/20 focus:border-indigo-500/50 transition-all text-white font-medium text-xs md:text-sm placeholder:text-zinc-700 font-mono"
+                                    placeholder="e.g. 100"
+                                />
+                            </div>
+                        </>
+                    )}
+                </div>
 
                 <div className={`grid ${isGlobalOnly ? 'grid-cols-1' : 'grid-cols-2'} gap-4 md:gap-8`}>
                     {/* Logo Section */}

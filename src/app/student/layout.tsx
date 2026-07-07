@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { useRouter, usePathname } from "next/navigation";
 import { useAuth } from "@/context/AuthContext";
+import { StudentDataProvider } from "@/context/StudentDataContext";
 import { Loader2, LayoutDashboard, Wallet, BookOpen, Bell, Calendar, User, LogOut, Menu, X, FileText, Ticket, CalendarCheck, ChevronLeft } from "lucide-react";
 import Link from "next/link";
 import { cn } from "@/lib/utils";
@@ -46,6 +47,11 @@ function StudentContent({ children }: { children: React.ReactNode }) {
     const sidebarCollapsed = false;
     const { branding } = useMasterData();
     const [imageError, setImageError] = useState(false);
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     const navItems = [
         { label: "Home", icon: LayoutDashboard, href: "/student", isActive: pathname === "/student" },
@@ -62,18 +68,22 @@ function StudentContent({ children }: { children: React.ReactNode }) {
     // 1. Fetch User Status ONCE when user logs in (Optimistic rendering)
     useEffect(() => {
         if (loading) return;
-        if (!user) return;
+        
+        // Prevent routing conflicts during logout transition
+        if (typeof window !== "undefined" && window.localStorage.getItem("spoorthy_logging_out")) {
+            return;
+        }
+        if (!user || !userData) {
+            router.replace("/login");
+            return;
+        }
 
-        // Verify Role
+        // Verify Rule: Strict Student Role Check
         if (userData && userData.role) {
-            const actualRole = userData.role || "";
+            const actualRole = String(userData.role).toUpperCase();
 
-            if (["ADMIN", "SUPER_ADMIN", "MANAGER", "DEVELOPER", "OWNER"].includes(actualRole)) {
-                router.replace("/admin");
-                return;
-            }
-            if (actualRole === "TEACHER") {
-                router.replace("/teacher");
+            if (actualRole !== "STUDENT") {
+                router.replace("/unauthorized");
                 return;
             }
         }
@@ -104,6 +114,16 @@ function StudentContent({ children }: { children: React.ReactNode }) {
         }
     }, [pathname, mustChangePassword, router]);
 
+    const isLoggingOut = typeof window !== "undefined" && window.localStorage.getItem("spoorthy_logging_out");
+    if (isLoggingOut) {
+        return (
+            <div className="h-screen w-full flex flex-col items-center justify-center bg-[#030712] text-white space-y-4">
+                <div className="w-8 h-8 border-4 border-blue-500/20 border-t-blue-500 rounded-full animate-spin" />
+                <p className="text-white/50 animate-pulse text-sm font-mono uppercase tracking-widest">Signing out securely...</p>
+            </div>
+        );
+    }
+
     if (!loading && (!user || !userData || !userData.role)) {
         return (
             <div className="h-screen w-full flex flex-col items-center justify-center bg-[#030712] text-white">
@@ -116,15 +136,7 @@ function StudentContent({ children }: { children: React.ReactNode }) {
         );
     }
 
-    const isAuthenticating = loading;
-    if (isAuthenticating) {
-        return (
-            <div className="h-screen w-full flex flex-col items-center justify-center bg-[#030712] text-blue-500 gap-3">
-                <Loader2 className="animate-spin w-8 h-8" />
-                <span className="text-xs font-mono tracking-widest uppercase text-white/40">Loading Student Portal...</span>
-            </div>
-        );
-    }
+
 
     if (pathname === "/student/change-password") {
         return <div className="min-h-screen bg-[#030712] text-white">{children}</div>;
@@ -140,7 +152,7 @@ function StudentContent({ children }: { children: React.ReactNode }) {
                 <div className="h-20 flex items-center justify-between px-6 border-b border-white/[0.04]">
                     <div className="flex items-center gap-3 w-full">
                         <div className="w-9 h-9 rounded-xl bg-white/[0.02] flex items-center justify-center border border-white/10 shadow-sm shrink-0 overflow-hidden transition-all duration-300 hover:border-white/20">
-                            {!imageError ? (
+                            {mounted && !imageError ? (
                                 <img
                                     src={branding?.schoolLogo || "https://fwsjgqdnoupwemaoptrt.supabase.co/storage/v1/object/public/media/6cf7686d-e311-441f-b7f1-9eae54ffad18.png"}
                                     alt="Logo"
@@ -335,14 +347,15 @@ function StudentContent({ children }: { children: React.ReactNode }) {
     );
 }
 
-import { StudentDataProvider } from "@/context/StudentDataContext";
-
 export default function StudentLayout({ children }: { children: React.ReactNode }) {
+    const { userData } = useAuth();
     return (
         <AuthenticatedProvider>
-            <StudentDataProvider>
-                <StudentContent>{children}</StudentContent>
-            </StudentDataProvider>
+            <div key={userData?.schoolId || 'unassigned'} className="contents">
+                <StudentDataProvider>
+                    <StudentContent>{children}</StudentContent>
+                </StudentDataProvider>
+            </div>
         </AuthenticatedProvider>
     );
 }

@@ -13,8 +13,14 @@ import { Loader2, ArrowLeft, Printer, Search, Filter, Sparkles, AlertCircle, Awa
 import Link from "next/link";
 import { cn } from "@/lib/utils";
 
+import { useAuth } from "@/context/AuthContext";
+import { usePathname } from "next/navigation";
+
 export default function AcademicResultsDashboard() {
-    const { classes: classesData, subjects: subjectsData, classSections, selectedYear } = useMasterData();
+    const { classes: classesData, subjects: subjectsData, classSections, selectedYear, branding } = useMasterData();
+    const { branchId: activeBranchId } = useAuth();
+    const pathname = usePathname();
+    const backUrl = pathname.includes("/super-admin") ? "/super-admin/reports" : "/admin/exams";
     
     // Core state
     const [exams, setExams] = useState<any[]>([]);
@@ -57,9 +63,11 @@ export default function AcademicResultsDashboard() {
     useEffect(() => {
         const fetchExams = async () => {
             try {
+                if (!activeBranchId) return;
                 const q = query(
                     collection(db, "exams"), 
-                    where("academicYear", "==", selectedYear || "2025-2026")
+                    where("academicYear", "==", selectedYear || "2025-2026"),
+                    where("schoolId", "==", activeBranchId)
                 );
                 const snap = await getDocs(q);
                 const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
@@ -88,7 +96,8 @@ export default function AcademicResultsDashboard() {
             const sQ = query(
                 collection(db, "students"),
                 where("classId", "==", selectedClassId),
-                where("status", "==", "ACTIVE")
+                where("status", "==", "ACTIVE"),
+                where("branchId", "==", activeBranchId)
             );
             const sSnap = await getDocs(sQ);
             const studentList = sSnap.docs.map(d => ({ id: d.id, ...d.data() })) as any[];
@@ -97,7 +106,8 @@ export default function AcademicResultsDashboard() {
             const rQ = query(
                 collection(db, "exam_results"),
                 where("examId", "==", selectedExamId),
-                where("classId", "==", selectedClassId)
+                where("classId", "==", selectedClassId),
+                where("schoolId", "==", activeBranchId)
             );
             const rSnap = await getDocs(rQ);
             const resultsMap: Record<string, any> = {};
@@ -137,7 +147,7 @@ export default function AcademicResultsDashboard() {
                 const queryLower = searchQuery.toLowerCase();
                 const matchesName = s.studentName?.toLowerCase().includes(queryLower);
                 const matchesRoll = s.rollNo?.toLowerCase().includes(queryLower);
-                const matchesAdm = s.admissionNo?.toLowerCase().includes(queryLower);
+                const matchesAdm = s.schoolId?.toLowerCase().includes(queryLower);
                 if (!matchesName && !matchesRoll && !matchesAdm) return false;
             }
 
@@ -236,22 +246,19 @@ export default function AcademicResultsDashboard() {
     };
 
     return (
-        <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-8 animate-in fade-in duration-200 print:p-0 print:bg-white print:text-black">
+        <div className="space-y-4 md:space-y-6 max-w-7xl mx-auto p-4 md:p-8 animate-in fade-in duration-200 print:p-0 print:bg-white print:text-black">
             {/* Header section */}
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4 border-b border-white/10 pb-6 print:hidden">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-2 md:gap-4 border-b border-white/10 pb-4 md:pb-6 print:hidden">
                 <div className="space-y-1">
-                    <Link href="/admin/exams" className="flex items-center text-xs font-black uppercase tracking-wider text-muted-foreground hover:text-white transition-colors mb-2">
+                    <Link href={backUrl} className="flex items-center text-xs font-black uppercase tracking-wider text-muted-foreground hover:text-white transition-colors mb-2">
                         <ArrowLeft className="w-3.5 h-3.5 mr-1" /> Back to Examinations
                     </Link>
                     <div className="flex items-center gap-2">
-                        <Award className="w-8 h-8 text-blue-400" />
-                        <h1 className="text-2xl md:text-3xl font-display font-black text-white tracking-tight">
-                            Academic Results Dashboard
+                        <Award className="w-6 h-6 md:w-8 md:h-8 text-blue-400" />
+                        <h1 className="text-xl md:text-3xl font-display font-black text-white tracking-tight">
+                            Results
                         </h1>
                     </div>
-                    <p className="text-xs md:text-sm text-muted-foreground">
-                        Analyze full student spreadsheets, topper lists, and print unified class results ledger spreadsheet.
-                    </p>
                 </div>
                 <div className="flex gap-2">
                     <Button
@@ -266,7 +273,7 @@ export default function AcademicResultsDashboard() {
 
             {/* Print Header */}
             <div className="hidden print:block text-center space-y-2 border-b-2 border-black pb-4 mb-6">
-                <h1 className="text-3xl font-black uppercase tracking-tight">Spoorthy High School</h1>
+                <h1 className="text-3xl font-black uppercase tracking-tight">{branding?.schoolName || "Spoorthy High School"}</h1>
                 <h2 className="text-xl font-bold uppercase tracking-widest">Academic Results Spreadsheet Summary</h2>
                 <div className="flex justify-center gap-6 text-sm font-mono mt-1">
                     <span><b>Exam:</b> {exams.find(e => e.id === selectedExamId)?.name}</span>
@@ -283,8 +290,8 @@ export default function AcademicResultsDashboard() {
                         <CardTitle className="text-xs uppercase font-black tracking-widest">Interactive Filters</CardTitle>
                     </div>
                 </CardHeader>
-                <CardContent className="pt-6 space-y-4">
-                    <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
+                <CardContent className="pt-4 md:pt-6 space-y-3 md:space-y-4">
+                    <div className="grid grid-cols-2 md:grid-cols-4 gap-3 md:gap-4">
                         {/* Select Exam */}
                         <div className="space-y-1.5">
                             <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Exam</label>
@@ -351,28 +358,16 @@ export default function AcademicResultsDashboard() {
                             </div>
                         </div>
 
-                        {/* Receipt Search */}
-                        <div className="space-y-1.5">
-                            <label className="text-[10px] font-black text-muted-foreground uppercase tracking-widest">Receipt Number</label>
-                            <div className="relative">
-                                <Search className="absolute left-3 top-3 w-4 h-4 text-muted-foreground" />
-                                <Input
-                                    value={receiptFilter}
-                                    onChange={e => setReceiptFilter(e.target.value)}
-                                    placeholder="Search by fee receipt number..."
-                                    className="bg-white/5 border-white/10 h-10 pl-9 text-xs"
-                                />
-                            </div>
-                        </div>
+
                     </div>
                 </CardContent>
             </Card>
 
             {/* Metrics Summary Blocks */}
             {selectedClassId && (
-                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 md:gap-4">
                     {/* Class Average */}
-                    <Card className="bg-[#0F172A] border-white/5 p-6 shadow-xl relative overflow-hidden group hover:border-blue-500/20 transition-all duration-300">
+                    <Card className="col-span-1 sm:col-span-1 bg-[#0F172A] border-white/5 p-4 md:p-6 shadow-xl relative overflow-hidden group hover:border-blue-500/20 transition-all duration-300">
                         <div className="absolute right-0 bottom-0 text-blue-500/5 -mr-4 -mb-4 transition-transform group-hover:scale-110 duration-500">
                             <Percent className="w-32 h-32" />
                         </div>
@@ -384,7 +379,7 @@ export default function AcademicResultsDashboard() {
                     </Card>
 
                     {/* Class Pass Rate */}
-                    <Card className="bg-[#0F172A] border-white/5 p-6 shadow-xl relative overflow-hidden group hover:border-emerald-500/20 transition-all duration-300">
+                    <Card className="col-span-1 sm:col-span-1 bg-[#0F172A] border-white/5 p-4 md:p-6 shadow-xl relative overflow-hidden group hover:border-emerald-500/20 transition-all duration-300">
                         <div className="absolute right-0 bottom-0 text-emerald-500/5 -mr-4 -mb-4 transition-transform group-hover:scale-110 duration-500">
                             <BookOpen className="w-32 h-32" />
                         </div>
@@ -398,7 +393,7 @@ export default function AcademicResultsDashboard() {
                     </Card>
 
                     {/* Class Topper */}
-                    <Card className="bg-[#0F172A] border-white/5 p-6 shadow-xl relative overflow-hidden group hover:border-amber-500/20 transition-all duration-300">
+                    <Card className="col-span-2 sm:col-span-1 bg-[#0F172A] border-white/5 p-4 md:p-6 shadow-xl relative overflow-hidden group hover:border-amber-500/20 transition-all duration-300">
                         <div className="absolute right-0 bottom-0 text-amber-500/5 -mr-4 -mb-4 transition-transform group-hover:scale-110 duration-500">
                             <Award className="w-32 h-32" />
                         </div>
@@ -447,18 +442,18 @@ export default function AcademicResultsDashboard() {
                         <div className="overflow-x-auto print:overflow-visible">
                             <table className="w-full text-left border-collapse text-xs print:text-[10px] print:w-full">
                                 <thead>
-                                    <tr className="bg-white/5 border-b border-white/10 text-muted-foreground uppercase tracking-widest font-black text-[9px] print:bg-gray-100 print:text-black print:border-black print:border-b-2">
-                                        <th className="p-4 w-12 print:p-2">Roll</th>
-                                        <th className="p-4 w-28 print:p-2">Adm No</th>
-                                        <th className="p-4 min-w-[150px] print:p-2">Student Name</th>
+                                    <tr className="bg-white/5 border-b border-white/10 text-muted-foreground uppercase tracking-widest font-black text-[9px] print:bg-gray-100 print:text-black print:border-black print:border">
+                                        <th className="p-4 w-12 print:p-2 print:border print:border-black">Roll</th>
+                                        <th className="p-4 w-28 print:p-2 print:border print:border-black">School ID</th>
+                                        <th className="p-4 min-w-[150px] print:p-2 print:border print:border-black">Student Name</th>
                                         {activeSubjectsList.map(subject => (
-                                            <th key={subject.id} className="p-4 text-center min-w-[90px] print:p-2">
+                                            <th key={subject.id} className="p-4 text-center min-w-[90px] print:p-2 print:border print:border-black">
                                                 {subject.name}
                                             </th>
                                         ))}
-                                        <th className="p-4 text-center w-24 print:p-2">Total</th>
-                                        <th className="p-4 text-center w-20 print:p-2">%</th>
-                                        <th className="p-4 text-center w-16 print:p-2">Grade</th>
+                                        <th className="p-4 text-center w-24 print:p-2 print:border print:border-black">Total</th>
+                                        <th className="p-4 text-center w-20 print:p-2 print:border print:border-black">%</th>
+                                        <th className="p-4 text-center w-16 print:p-2 print:border print:border-black">Grade</th>
                                     </tr>
                                 </thead>
                                 <tbody>
@@ -491,10 +486,10 @@ export default function AcademicResultsDashboard() {
                                         const grade = percentage >= 90 ? 'A+' : percentage >= 80 ? 'A' : percentage >= 70 ? 'B+' : percentage >= 60 ? 'B' : percentage >= 50 ? 'C' : percentage >= 35 ? 'D' : 'E';
 
                                         return (
-                                            <tr key={student.id} className="border-b border-white/5 hover:bg-white/5 transition-all print:border-black print:border-b print:hover:bg-transparent">
-                                                <td className="p-4 font-mono font-bold text-blue-400 print:text-black print:p-2">{student.rollNo || "-"}</td>
-                                                <td className="p-4 font-mono print:p-2">{student.admissionNo || "-"}</td>
-                                                <td className="p-4 font-bold text-white print:text-black print:p-2">
+                                            <tr key={student.id} className="border-b border-white/5 hover:bg-white/5 transition-all print:border-black print:border print:hover:bg-transparent">
+                                                <td className="p-4 font-mono font-bold text-blue-400 print:text-black print:p-2 print:border print:border-black">{student.rollNo || "-"}</td>
+                                                <td className="p-4 font-mono print:p-2 print:border print:border-black">{student.schoolId || "-"}</td>
+                                                <td className="p-4 font-bold text-white print:text-black print:p-2 print:border print:border-black">
                                                     <div className="font-bold">{student.studentName}</div>
                                                     <div className="text-[9px] text-muted-foreground font-normal print:hidden">
                                                         {student.village || student.address?.village || "No Village Specified"}
@@ -507,7 +502,7 @@ export default function AcademicResultsDashboard() {
                                                     const isSubFail = !isNaN(ob) && ob < (mx * 0.35);
 
                                                     return (
-                                                        <td key={subject.id} className="p-4 text-center print:p-2">
+                                                        <td key={subject.id} className="p-4 text-center print:p-2 print:border print:border-black">
                                                             {subMarks ? (
                                                                 <span className={cn(
                                                                     "font-mono font-bold",
@@ -521,13 +516,13 @@ export default function AcademicResultsDashboard() {
                                                         </td>
                                                     );
                                                 })}
-                                                <td className="p-4 text-center font-mono font-bold print:p-2">
+                                                <td className="p-4 text-center font-mono font-bold print:p-2 print:border print:border-black">
                                                     {hasResults ? `${totalObtained}/${totalMax}` : "-"}
                                                 </td>
-                                                <td className="p-4 text-center font-mono font-bold text-blue-300 print:text-black print:p-2">
+                                                <td className="p-4 text-center font-mono font-bold text-blue-300 print:text-black print:p-2 print:border print:border-black">
                                                     {hasResults ? `${percentage.toFixed(1)}%` : "-"}
                                                 </td>
-                                                <td className="p-4 text-center print:p-2">
+                                                <td className="p-4 text-center print:p-2 print:border print:border-black">
                                                     {hasResults ? (
                                                         <Badge 
                                                             variant={grade === "E" ? "destructive" : "default"}

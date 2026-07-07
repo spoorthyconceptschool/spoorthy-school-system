@@ -5,6 +5,7 @@ export interface Branch {
     id?: string;
     branchName: string;
     branchCode: string;
+    schoolId?: string;
     schoolName: string;
     email: string;
     phone: string;

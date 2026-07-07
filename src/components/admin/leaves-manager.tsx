@@ -47,7 +47,8 @@ const DEFAULT_LEAVES = [
 ];
 
 export function LeavesManager() {
-    const { user } = useAuth();
+    const { user, branchId: authBranchId, userData } = useAuth();
+    const branchId = authBranchId || "global";
     const { selectedYear } = useMasterData();
     const [leaves, setLeaves] = useState<any[]>(() => {
         if (typeof window !== 'undefined') {
@@ -60,24 +61,40 @@ export function LeavesManager() {
     });
     const [loading, setLoading] = useState(false);
     const [actioning, setActioning] = useState<string | null>(null);
-
+ 
     // Impact Monitoring
     const [schedule, setSchedule] = useState<any>(null);
     const [loadingImpact, setLoadingImpact] = useState(false);
-
+ 
     useEffect(() => {
-        // Simple 50-item limit for instant response
-        const q = query(
-            collection(db, "leave_requests"),
-            orderBy("createdAt", "desc"),
-            limit(50)
-        );
-
+        const isGlobal = branchId === "global";
+        let q;
+        if (!isGlobal) {
+            q = query(
+                collection(db, "leave_requests"),
+                where("schoolId", "==", branchId)
+            );
+        } else {
+            q = query(
+                collection(db, "leave_requests"),
+                orderBy("createdAt", "desc"),
+                limit(50)
+            );
+        }
+ 
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            const loaded = snapshot.docs.map(doc => ({
+            let loaded = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
             }));
+            if (!isGlobal) {
+                loaded.sort((a: any, b: any) => {
+                    const timeA = a.createdAt?.seconds ? a.createdAt.seconds * 1000 : (a.createdAt?.toDate ? a.createdAt.toDate().getTime() : new Date(a.createdAt).getTime());
+                    const timeB = b.createdAt?.seconds ? b.createdAt.seconds * 1000 : (b.createdAt?.toDate ? b.createdAt.toDate().getTime() : new Date(b.createdAt).getTime());
+                    return (timeB || 0) - (timeA || 0);
+                });
+                loaded = loaded.slice(0, 50);
+            }
             setLeaves(loaded);
             if (typeof window !== 'undefined') {
                 localStorage.setItem(LEAVES_CACHE_KEY, JSON.stringify(loaded));
@@ -87,9 +104,9 @@ export function LeavesManager() {
             console.error("Leaves Sync Error:", err);
             setLoading(false);
         });
-
+ 
         return () => unsubscribe();
-    }, []);
+    }, [branchId]);
 
     const fetchImpact = async (leave: any) => {
         setLoadingImpact(true);
@@ -206,7 +223,7 @@ export function LeavesManager() {
                                         <BookOpen className="w-3.5 h-3.5" /> Check Impact
                                     </Button>
                                 </DialogTrigger>
-                                <DialogContent className="bg-black/90 border-white/10 text-white backdrop-blur-2xl">
+                                <DialogContent className="bg-[#0B1120]/95 shadow-2xl text-white backdrop-blur-2xl border-white/10">
                                     <DialogHeader>
                                         <DialogTitle className="flex items-center gap-2">
                                             <CalendarDays className="w-5 h-5 text-accent" />

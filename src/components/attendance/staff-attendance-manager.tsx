@@ -21,7 +21,7 @@ export default function StaffAttendanceManager({
 }: {
     defaultDate?: string;
 }) {
-    const { user, userData } = useAuth();
+    const { user, userData, branchId } = useAuth();
     const { branding, staff: globalStaff } = useMasterData();
     const [staff, setStaff] = useState<any[]>([]);
     const [attendance, setAttendance] = useState<Record<string, 'P' | 'A'>>({});
@@ -37,18 +37,36 @@ export default function StaffAttendanceManager({
 
     const date = defaultDate || new Date().toISOString().split('T')[0];
 
-    // Sync Staff from Global Cache
+    // 1. Sync Staff in Real-time from Firestore (Page-level Decoupled Query)
     useEffect(() => {
-        if (globalStaff?.length > 0) {
-            const list = globalStaff.map(d => ({
-                id: d.id,
-                schoolId: d.id,
-                name: d.name,
-                role: d.roleName || "Staff"
-            })).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+        if (!branchId || branchId === "global") return;
+        setLoading(true);
+
+        const q = query(
+            collection(db, "staff"),
+            where("status", "==", "ACTIVE"),
+            where("branchId", "==", branchId)
+        );
+
+        const unsub = onSnapshot(q, (snap) => {
+            const list = snap.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    schoolId: doc.id,
+                    name: data.name,
+                    role: data.roleName || "Staff"
+                };
+            }).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
             setStaff(list);
-        }
-    }, [globalStaff]);
+            setLoading(false);
+        }, (err) => {
+            console.error("Failed to sync staff:", err);
+            setLoading(false);
+        });
+
+        return () => unsub();
+    }, [branchId]);
 
     // Sync Attendance (Real-time & Offline-first)
     useEffect(() => {
@@ -58,7 +76,7 @@ export default function StaffAttendanceManager({
             fetchStats();
         } else {
             setLoading(true);
-            const schoolId = userData?.schoolId || "global";
+            const schoolId = branchId || "global";
             const attId = `${schoolId}_STAFF_${date}`;
             const unsub = onSnapshot(doc(db, "attendance_daily", attId), (snap) => {
                 if (snap.exists()) {
@@ -77,14 +95,14 @@ export default function StaffAttendanceManager({
             });
             return () => unsub();
         }
-    }, [date, viewStats, statsMonth, staff, user]);
+    }, [date, viewStats, statsMonth, staff, user, branchId]);
 
     const fetchStats = async () => {
         setLoading(true);
         try {
             const sList = staff;
             const currentYear = new Date().getFullYear();
-            const schoolId = userData?.schoolId || "global";
+            const schoolId = branchId || "global";
             let startKey, endKey;
             if (statsMonth === "ALL") {
                 startKey = `${schoolId}_STAFF_${currentYear}-01-01`;
@@ -341,7 +359,7 @@ export default function StaffAttendanceManager({
                                     <SelectTrigger className="w-[140px] h-8 bg-transparent border-white/10 text-xs">
                                         <SelectValue placeholder="Period" />
                                     </SelectTrigger>
-                                    <SelectContent className="bg-slate-900 border-white/10">
+                                    <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl border-white/10">
                                         <SelectItem value="ALL">Full Year {new Date().getFullYear()}</SelectItem>
                                         <SelectItem value="01">January</SelectItem>
                                         <SelectItem value="02">February</SelectItem>

@@ -10,7 +10,7 @@ async function simulateAggregation() {
 
     console.log(`Snapshot Size: ${snap.size}`);
 
-    snap.docs.forEach(doc => {
+    snap.docs.forEach((doc: any) => {
         const data = doc.data();
         const rawAmt = data.amount;
         // EXACT LOGIC FROM page.tsx

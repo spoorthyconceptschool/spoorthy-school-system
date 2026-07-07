@@ -57,7 +57,6 @@ export async function POST(req: NextRequest) {
                 studentName: body.studentName || "Unknown",
                 firstName: body.studentName?.split(' ')[0] || "Unknown",
                 lastName: body.studentName?.split(' ').slice(1).join(' ') || "",
-                admissionNumber: body.admissionNumber || "PENDING",
                 classId: body.classId || "UNKNOWN_CLASS",
                 className: body.className || "",
                 sectionId: body.sectionId || "A",

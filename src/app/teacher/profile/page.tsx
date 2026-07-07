@@ -63,8 +63,9 @@ export default function TeacherProfilePage() {
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
-        if (userData?.schoolId) {
-            fetchProfile(userData.schoolId);
+        const targetTeacherId = userData?.teacherId || userData?.schoolId;
+        if (targetTeacherId) {
+            fetchProfile(targetTeacherId);
         }
     }, [user, userData]);
 

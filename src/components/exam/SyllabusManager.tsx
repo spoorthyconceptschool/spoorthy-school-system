@@ -40,6 +40,13 @@ export function SyllabusManager({ examId, role }: SyllabusManagerProps) {
     const [currentTime, setCurrentTime] = useState(new Date());
     const [expandedSubjects, setExpandedSubjects] = useState<Record<string, boolean>>({});
 
+    const toggleSubject = (subId: string) => {
+        setExpandedSubjects(prev => ({
+            ...prev,
+            [subId]: !prev[subId]
+        }));
+    };
+
     useEffect(() => {
         if (role !== "STUDENT") return;
         const interval = setInterval(() => {
@@ -715,60 +722,60 @@ export function SyllabusManager({ examId, role }: SyllabusManagerProps) {
     }
 
     return (
-        <div className="space-y-6">
-            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="space-y-4 md:space-y-6">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 md:gap-4">
                 <div>
-                    <h2 className="text-xl font-bold flex items-center gap-2">
-                        <FileText className="w-5 h-5 text-blue-400" />
+                    <h2 className="text-lg md:text-xl font-bold flex items-center gap-2">
+                        <FileText className="w-4 h-4 md:w-5 md:h-5 text-blue-400" />
                         Examination Syllabus
                     </h2>
-                    <p className="text-sm text-muted-foreground">Define and review syllabus for {exam?.name}</p>
+                    <p className="text-xs md:text-sm text-muted-foreground">Define and review syllabus for {exam?.name}</p>
                 </div>
                 {selectedClassId && (
                     <Button
                         onClick={() => handlePrintClassSyllabus(selectedClassId)}
                         variant="outline"
-                        className="gap-2 border-zinc-500/20 hover:bg-zinc-500/10"
+                        className="gap-2 border-zinc-500/20 hover:bg-zinc-500/10 h-9 md:h-10 text-xs md:text-sm w-full md:w-auto"
                     >
-                        <Printer className="w-4 h-4" /> Print Full Class Syllabus
+                        <Printer className="w-3 h-3 md:w-4 md:h-4" /> Print Full Class Syllabus
                     </Button>
                 )}
             </div>
 
             <Card className="bg-black/20 border-white/10 overflow-hidden">
-                <CardHeader className="bg-white/5 border-b border-white/5">
-                    <CardTitle className="text-sm uppercase tracking-widest text-[#8892B0]">Configuration</CardTitle>
+                <CardHeader className="bg-white/5 border-b border-white/5 p-4 md:p-6">
+                    <CardTitle className="text-xs md:text-sm uppercase tracking-widest text-[#8892B0]">Configuration</CardTitle>
                 </CardHeader>
-                <CardContent className="p-6">
-                    <div className="flex flex-col md:flex-row gap-6">
+                <CardContent className="p-4 md:p-6">
+                    <div className="flex flex-col md:flex-row gap-3 md:gap-6">
                         {(role === "ADMIN" || role === "TEACHER") && (
-                            <div className="space-y-2 flex-1">
-                                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Syllabus Mode</label>
-                                <div className="flex bg-black/40 p-1 rounded-lg border border-white/10 h-12 items-center">
-                                    <button onClick={() => setSyllabusMode("COMBINED")} className={cn("flex-1 py-2 text-xs font-bold rounded-md transition-all h-full", syllabusMode === "COMBINED" ? "bg-white text-black shadow-sm" : "text-white/50 hover:text-white")}>Combined</button>
-                                    <button onClick={() => setSyllabusMode("INDIVIDUAL")} className={cn("flex-1 py-2 text-xs font-bold rounded-md transition-all h-full", syllabusMode === "INDIVIDUAL" ? "bg-white text-black shadow-sm" : "text-white/50 hover:text-white")}>Individual</button>
+                            <div className="space-y-1.5 md:space-y-2 flex-1">
+                                <label className="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-wider">Syllabus Mode</label>
+                                <div className="flex bg-black/40 p-1 rounded-lg border border-white/10 h-10 md:h-12 items-center">
+                                    <button onClick={() => setSyllabusMode("COMBINED")} className={cn("flex-1 py-1 md:py-2 text-[10px] md:text-xs font-bold rounded-md transition-all h-full", syllabusMode === "COMBINED" ? "bg-white text-black shadow-sm" : "text-white/50 hover:text-white")}>Combined</button>
+                                    <button onClick={() => setSyllabusMode("INDIVIDUAL")} className={cn("flex-1 py-1 md:py-2 text-[10px] md:text-xs font-bold rounded-md transition-all h-full", syllabusMode === "INDIVIDUAL" ? "bg-white text-black shadow-sm" : "text-white/50 hover:text-white")}>Individual</button>
                                 </div>
                             </div>
                         )}
-                        <div className="space-y-2 flex-1">
-                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Select Class</label>
+                        <div className="space-y-1.5 md:space-y-2 flex-1">
+                            <label className="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-wider">Select Class</label>
                             <Select value={selectedClassId} onValueChange={(v) => { setSelectedClassId(v); setSelectedSubjectId(""); }}>
-                                <SelectTrigger className="bg-white/5 border-white/10 h-12">
+                                <SelectTrigger className="bg-white/5 border-white/10 h-10 md:h-12 text-xs md:text-sm">
                                     <SelectValue placeholder="Choose Class" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {allowedClasses.sort((a: any, b: any) => a.order - b.order).map((c: any) => (
-                                        <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                                        <SelectItem key={c.id} value={c.id} className="text-xs md:text-sm">{c.name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
                         </div>
 
                         {syllabusMode === "INDIVIDUAL" && selectedClassId && (role === "ADMIN" || role === "TEACHER") && (
-                            <div className="space-y-2 flex-1 animate-in fade-in slide-in-from-top-2">
-                                <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Select Section</label>
+                            <div className="space-y-1.5 md:space-y-2 flex-1 animate-in fade-in slide-in-from-top-2">
+                                <label className="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-wider">Select Section</label>
                                 <Select value={selectedSectionId} onValueChange={setSelectedSectionId}>
-                                    <SelectTrigger className="bg-white/5 border-white/10 h-12">
+                                    <SelectTrigger className="bg-white/5 border-white/10 h-10 md:h-12 text-xs md:text-sm">
                                         <SelectValue placeholder="Choose Section" />
                                     </SelectTrigger>
                                     <SelectContent>
@@ -776,22 +783,22 @@ export function SyllabusManager({ examId, role }: SyllabusManagerProps) {
                                             .filter((cs: any) => cs.classId === selectedClassId)
                                             .map((cs: any) => {
                                                 const sec = sections[cs.sectionId];
-                                                return sec ? <SelectItem key={cs.sectionId} value={cs.sectionId}>{sec.name}</SelectItem> : null;
+                                                return sec ? <SelectItem key={cs.sectionId} value={cs.sectionId} className="text-xs md:text-sm">{sec.name}</SelectItem> : null;
                                             })}
                                     </SelectContent>
                                 </Select>
                             </div>
                         )}
 
-                        <div className="space-y-2 flex-1">
-                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Select Subject</label>
+                        <div className="space-y-1.5 md:space-y-2 flex-1">
+                            <label className="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-wider">Select Subject</label>
                             <Select value={selectedSubjectId} onValueChange={setSelectedSubjectId} disabled={!selectedClassId}>
-                                <SelectTrigger className="bg-white/5 border-white/10 h-12">
+                                <SelectTrigger className="bg-white/5 border-white/10 h-10 md:h-12 text-xs md:text-sm">
                                     <SelectValue placeholder="Choose Subject" />
                                 </SelectTrigger>
                                 <SelectContent>
                                     {allowedSubjects.map((s: any) => (
-                                        <SelectItem key={s.id} value={s.id}>{s.name}</SelectItem>
+                                        <SelectItem key={s.id} value={s.id} className="text-xs md:text-sm">{s.name}</SelectItem>
                                     ))}
                                 </SelectContent>
                             </Select>
@@ -820,11 +827,11 @@ export function SyllabusManager({ examId, role }: SyllabusManagerProps) {
                         </div>
                     </CardHeader>
                     <CardContent className="space-y-4 pt-4">
-                        <div className="space-y-2">
-                            <label className="text-xs font-bold text-muted-foreground uppercase tracking-wider">Syllabus Content</label>
+                        <div className="space-y-1.5 md:space-y-2">
+                            <label className="text-[10px] md:text-xs font-bold text-muted-foreground uppercase tracking-wider">Syllabus Content</label>
                             <Textarea
                                 className={cn(
-                                    "min-h-[300px] bg-white/5 border-white/10 focus:border-blue-500/50 text-base leading-relaxed p-4",
+                                    "min-h-[150px] md:min-h-[300px] bg-white/5 border-white/10 focus:border-blue-500/50 text-sm md:text-base leading-relaxed p-3 md:p-4",
                                     !canEdit && "opacity-80 cursor-not-allowed bg-transparent"
                                 )}
                                 placeholder="Enter specific chapters, topics, and instructions for this exam..."

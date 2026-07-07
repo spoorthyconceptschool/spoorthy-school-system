@@ -22,6 +22,9 @@ export function StudentExportModal({ students, children }: StudentExportModalPro
     const [selectedClasses, setSelectedClasses] = useState<string[]>([]);
     const [selectedVillages, setSelectedVillages] = useState<string[]>([]);
     const [groupBy, setGroupBy] = useState<"none" | "class" | "village">("none");
+    const [printMode, setPrintMode] = useState<"full" | "minimal">("full");
+    const [emptyColumnsCount, setEmptyColumnsCount] = useState<number>(0);
+    const [excelMode, setExcelMode] = useState<"student" | "parent" | "total">("total");
 
     const classes = Object.values(classesData || {}).map((c: any) => ({ id: c.id, name: c.name, order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
     const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name || "Unknown Village" })).sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)));
@@ -78,66 +81,238 @@ export function StudentExportModal({ students, children }: StudentExportModalPro
 
         const groupKeys = Object.keys(groups);
 
+        // Columns structure based on options
+        const isMinimal = printMode === "minimal";
+        const emptyCols = Array.from({ length: emptyColumnsCount }, (_, i) => `Col ${i + 1}`);
+
+        // Table Header HTML
+        let headersHtml = `<th style="width: 50px; text-align: center;">Roll No</th>`;
+        if (isMinimal) {
+            headersHtml += `
+                <th style="width: 150px;">School ID</th>
+                <th style="min-width: 250px;">Student Name</th>
+            `;
+        } else {
+            headersHtml += `
+                <th style="width: 130px;">School ID</th>
+                <th style="min-width: 180px;">Student Name</th>
+                <th style="width: 140px;">Parent Name</th>
+                <th style="width: 100px;">Mobile</th>
+                <th style="width: 80px;">Class</th>
+                <th style="width: 110px;">Village</th>
+            `;
+        }
+        emptyCols.forEach((_, idx) => {
+            headersHtml += `<th class="empty-header" style="width: 80px; border-left: 1px solid #94a3b8;">Col ${idx + 1}</th>`; // Blank header
+        });
+
         const html = `
             <html>
             <head>
                 <title>Student List report</title>
                 <style>
-                    @media print {
-                        .page-break { page-break-after: always; }
+                    @page {
+                        size: A4 portrait;
+                        margin: 1.2cm 1cm 1.2cm 1cm;
                     }
-                    body { font-family: sans-serif; padding: 20px; color: #333; }
-                    .group-container { margin-bottom: 40px; }
-                    table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-                    th, td { border: 1px solid #ddd; padding: 8px; text-align: left; font-size: 11px; }
-                    th { background-color: #f2f2f2; }
-                    h1 { text-align: center; color: #333; margin-bottom: 5px; }
-                    .header-meta { text-align: center; font-size: 12px; color: #666; margin-bottom: 20px; }
-                    .branding { display: flex; align-items: center; justify-content: center; gap: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; margin-bottom: 20px; }
-                    .school-info h1 { margin: 0; font-size: 24px; text-align: left; }
-                    .school-info p { margin: 2px 0; font-size: 12px; color: #666; }
-                    .group-header { font-size: 16px; font-bold; margin-top: 20px; border-bottom: 1px solid #eee; padding-bottom: 5px; }
+                    @media print {
+                        .page-break { page-break-after: always; break-after: page; }
+                        body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+                    }
+                    body { 
+                        font-family: system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; 
+                        padding: 0; 
+                        margin: 0; 
+                        color: #1e293b; 
+                        background: #fff;
+                        font-size: 11px;
+                        line-height: 1.4;
+                    }
+                    .group-container { 
+                        page-break-inside: avoid;
+                        margin-bottom: 20px; 
+                    }
+                    .branding { 
+                        display: flex; 
+                        align-items: center; 
+                        gap: 20px; 
+                        border-bottom: 2px solid #0f172a; 
+                        padding-bottom: 15px; 
+                        margin-bottom: 20px; 
+                    }
+                    .logo-container {
+                        display: flex;
+                        align-items: center;
+                        justify-content: center;
+                        width: 55px;
+                        height: 55px;
+                        border-radius: 8px;
+                        background: #f1f5f9;
+                        overflow: hidden;
+                        border: 1px solid #e2e8f0;
+                    }
+                    .logo-container img {
+                        max-height: 48px;
+                        max-width: 48px;
+                        object-fit: contain;
+                    }
+                    .school-info {
+                        flex: 1;
+                    }
+                    .school-info h1 { 
+                        margin: 0; 
+                        font-size: 20px; 
+                        font-weight: 800; 
+                        color: #0f172a;
+                        letter-spacing: -0.025em;
+                        text-transform: uppercase;
+                    }
+                    .school-info p { 
+                        margin: 2px 0 0 0; 
+                        font-size: 11px; 
+                        color: #64748b; 
+                        font-weight: 500;
+                    }
+                    .report-meta {
+                        text-align: right;
+                        font-size: 10px;
+                        color: #475569;
+                    }
+                    .report-title {
+                        font-weight: 700;
+                        color: #0f172a;
+                        font-size: 12px;
+                        text-transform: uppercase;
+                        margin-bottom: 2px;
+                    }
+                    table { 
+                        width: 100%; 
+                        border-collapse: collapse; 
+                        margin-top: 15px; 
+                        box-shadow: 0 0 0 1px #e2e8f0;
+                        border-radius: 6px;
+                        overflow: hidden;
+                    }
+                    th, td { 
+                        border-bottom: 1px solid #e2e8f0; 
+                        padding: 7px 10px; 
+                        text-align: left; 
+                    }
+                    th { 
+                        background-color: #f8fafc; 
+                        color: #475569;
+                        font-weight: 700;
+                        text-transform: uppercase;
+                        font-size: 9px;
+                        letter-spacing: 0.05em;
+                        border-bottom: 2px solid #cbd5e1;
+                    }
+                    tr:nth-child(even) td {
+                        background-color: #f8fafc;
+                    }
+                    td.roll-col {
+                        text-align: center;
+                        font-weight: 700;
+                        color: #64748b;
+                        font-family: monospace;
+                    }
+                    td.id-col {
+                        font-family: monospace;
+                        font-weight: 600;
+                        color: #0f172a;
+                    }
+                    td.name-col {
+                        font-weight: 600;
+                        color: #0f172a;
+                    }
+                    td.empty-cell {
+                        border-left: 1px solid #cbd5e1;
+                        background-color: #fff !important;
+                    }
+                    th.empty-header {
+                        color: #94a3b8;
+                        background-color: #f8fafc;
+                        font-weight: 500;
+                    }
+                    .summary-box {
+                        display: flex;
+                        justify-content: space-between;
+                        align-items: center;
+                        margin-top: 12px;
+                        padding: 8px 12px;
+                        background: #f8fafc;
+                        border: 1px solid #e2e8f0;
+                        border-radius: 6px;
+                        font-size: 10px;
+                        font-weight: 600;
+                        color: #475569;
+                    }
+                    .summary-badge {
+                        background: #0f172a;
+                        color: #fff;
+                        padding: 3px 8px;
+                        border-radius: 4px;
+                        font-size: 9px;
+                        font-weight: 700;
+                    }
                 </style>
             </head>
             <body>
                 ${groupKeys.map((key, idx) => `
                     <div class="group-container ${groupBy !== "none" ? "page-break" : ""}">
                         <div class="branding">
-                            ${branding?.schoolLogo ? `<img src="${branding.schoolLogo}" style="height: 60px;" />` : ''}
+                            ${branding?.schoolLogo ? `
+                                <div class="logo-container">
+                                    <img src="${branding.schoolLogo}" />
+                                </div>
+                            ` : ''}
                             <div class="school-info">
-                                <h1>${branding?.schoolName}</h1>
+                                <h1>${branding?.schoolName || "Spoorthy High School"}</h1>
                                 <p>${branding?.address || ""}</p>
-                                <p><strong>${groupBy !== "none" ? `${groupBy.toUpperCase()} List: ${key}` : key}</strong> | ${timestamp}</p>
+                            </div>
+                            <div class="report-meta">
+                                <div class="report-title">${groupBy !== "none" ? `${groupBy} List: ${key}` : key}</div>
+                                <div>Printed: ${timestamp}</div>
                             </div>
                         </div>
 
                         <table>
                             <thead>
                                 <tr>
-                                    <th style="width: 40px;">S.No</th>
-                                    <th style="width: 80px;">ID</th>
-                                    <th>Student Name</th>
-                                    <th>Parent Name</th>
-                                    <th>Mobile</th>
-                                    <th>Class</th>
-                                    <th>Village</th>
+                                    ${headersHtml}
                                 </tr>
                             </thead>
                             <tbody>
-                                ${groups[key].map((s, sIdx) => `
-                                    <tr>
-                                        <td>${sIdx + 1}</td>
-                                        <td>${s.schoolId}</td>
-                                        <td>${s.studentName}</td>
-                                        <td>${s.parentName}</td>
-                                        <td>${s.parentMobile}</td>
-                                        <td>${s.className}</td>
-                                        <td>${s.villageName}</td>
-                                    </tr>
-                                `).join('')}
+                                ${groups[key].map((s, sIdx) => {
+                                    const resolvedId = s.schoolId || "---";
+                                    let rowHtml = `<td class="roll-col">${s.rollNumber || (sIdx + 1)}</td>`;
+                                    if (isMinimal) {
+                                        rowHtml += `
+                                            <td class="id-col">${resolvedId}</td>
+                                            <td class="name-col">${s.studentName}</td>
+                                        `;
+                                    } else {
+                                        rowHtml += `
+                                            <td class="id-col">${resolvedId}</td>
+                                            <td class="name-col">${s.studentName}</td>
+                                            <td>${s.parentName || ""}</td>
+                                            <td>${s.parentMobile || ""}</td>
+                                            <td>${s.className || ""}</td>
+                                            <td>${s.villageName || ""}</td>
+                                        `;
+                                    }
+                                    for (let i = 0; i < emptyColumnsCount; i++) {
+                                        rowHtml += `<td class="empty-cell"></td>`;
+                                    }
+                                    return `<tr>${rowHtml}</tr>`;
+                                }).join('')}
                             </tbody>
                         </table>
-                        <p style="font-size: 10px; margin-top: 10px;">Total Students in this group: ${groups[key].length}</p>
+                        
+                        <div class="summary-box">
+                            <span>TOTAL REGISTERED IN THIS SECTION</span>
+                            <span class="summary-badge">${groups[key].length} Students</span>
+                        </div>
                     </div>
                 `).join('')}
                 <script>
@@ -163,22 +338,52 @@ export function StudentExportModal({ students, children }: StudentExportModalPro
                 return;
             }
 
-            // 1. Process Students
-            const headers = ["ID", "Student Name", "Parent Name", "Class", "Section", "Parent Mobile", "Village", "Status", "Date of Birth", "Gender", "Transport", "Login Password"];
-            const data = targetStudents.map(s => ({
-                "ID": s.schoolId,
-                "Student Name": s.studentName,
-                "Parent Name": s.parentName,
-                "Class": s.className,
-                "Section": s.sectionName || "N/A",
-                "Parent Mobile": s.parentMobile,
-                "Village": s.villageName,
-                "Status": s.status,
-                "Date of Birth": s.dateOfBirth || "N/A",
-                "Gender": s.gender || "N/A",
-                "Transport": s.transportRequired ? "YES" : "NO",
-                "Login Password": s.recoveryPassword || "N/A"
-            }));
+            // 1. Process Columns & Headers based on excelMode
+            let headers: string[] = [];
+            let data: any[] = [];
+
+            if (excelMode === "student") {
+                headers = ["School ID", "Student Name", "Class", "Section", "Date of Birth", "Gender"];
+                data = targetStudents.map(s => ({
+                    "School ID": s.schoolId || "N/A",
+                    "Student Name": s.studentName,
+                    "Class": s.className,
+                    "Section": s.sectionName || "N/A",
+                    "Date of Birth": s.dateOfBirth || "N/A",
+                    "Gender": s.gender || "N/A"
+                }));
+            } else if (excelMode === "parent") {
+                headers = ["School ID", "Student Name", "Parent Name", "Parent Mobile", "Class", "Section", "Village", "Date of Birth", "Gender"];
+                data = targetStudents.map(s => ({
+                    "School ID": s.schoolId || "N/A",
+                    "Student Name": s.studentName,
+                    "Parent Name": s.parentName || "N/A",
+                    "Parent Mobile": s.parentMobile || "N/A",
+                    "Class": s.className,
+                    "Section": s.sectionName || "N/A",
+                    "Village": s.villageName || "N/A",
+                    "Date of Birth": s.dateOfBirth || "N/A",
+                    "Gender": s.gender || "N/A"
+                }));
+            } else {
+                // "total"
+                headers = ["School ID", "Student Name", "Parent Name", "Class", "Section", "Parent Mobile", "Village", "Status", "Date of Birth", "Gender", "Transport", "Login Password"];
+                data = targetStudents.map(s => ({
+                    "School ID": s.schoolId || "N/A",
+                    "Student Name": s.studentName,
+                    "Parent Name": s.parentName || "N/A",
+                    "Class": s.className,
+                    "Section": s.sectionName || "N/A",
+                    "Parent Mobile": s.parentMobile || "N/A",
+                    "Village": s.villageName || "N/A",
+                    "Status": s.status,
+                    "Date of Birth": s.dateOfBirth || "N/A",
+                    "Gender": s.gender || "N/A",
+                    "Transport": s.transportRequired ? "YES" : "NO",
+                    "Login Password": s.recoveryPassword || "N/A"
+                }));
+            }
+
             const ws = XLSX.utils.json_to_sheet(data, { header: headers });
             XLSX.utils.book_append_sheet(wb, ws, "Students");
 
@@ -217,111 +422,184 @@ export function StudentExportModal({ students, children }: StudentExportModalPro
                     </Button>
                 )}
             </DialogTrigger>
-            <DialogContent className="bg-[#0A192F] border-white/10 text-white max-w-2xl max-h-[90vh] overflow-y-auto rounded-3xl shadow-2xl backdrop-blur-3xl">
-                <DialogHeader>
-                    <DialogTitle className="text-2xl font-display font-bold italic bg-gradient-to-r from-blue-400 to-indigo-400 bg-clip-text text-transparent">Student Reporting Center</DialogTitle>
+            <DialogContent className="bg-[#0B1524]/95 border-white/10 text-white w-[92vw] sm:max-w-md p-4 rounded-[20px] shadow-2xl backdrop-blur-xl duration-300 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=open]:fade-in-0 data-[state=closed]:fade-out-0 data-[state=open]:zoom-in-95 data-[state=closed]:zoom-out-95 !data-[state=open]:slide-in-from-left-1/2 !data-[state=open]:slide-in-from-top-[50%] !data-[state=closed]:slide-out-to-left-1/2 !data-[state=closed]:slide-out-to-top-[50%] ease-out !gap-0 max-h-[85vh] overflow-y-auto">
+                <DialogHeader className="mb-3">
+                    <DialogTitle className="text-[20px] font-sans font-bold text-white leading-tight text-center sm:text-left">
+                        Reports & Export
+                    </DialogTitle>
                 </DialogHeader>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-6 py-4">
+                <div className="flex flex-col gap-3">
                     {/* Print Section */}
-                    <div className="space-y-6">
-                        <div className="p-5 bg-blue-500/5 border border-blue-500/10 rounded-2xl space-y-4">
-                            <div className="flex items-center gap-2 text-blue-400 text-xs font-bold uppercase tracking-tighter">
+                    <div className="bg-blue-500/5 border border-blue-500/10 rounded-xl p-3 flex flex-col gap-3">
+                        <div className="flex items-center justify-between">
+                            <span className="flex items-center gap-1.5 text-blue-400 text-[13px] font-bold uppercase tracking-tighter">
                                 <Printer size={16} /> Student List Printing
+                            </span>
+                        </div>
+                        
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <Label className="text-[12px] font-black text-white/50 uppercase tracking-widest shrink-0">Group By:</Label>
+                            <div className="flex flex-wrap items-center gap-1 bg-white/5 p-1 rounded-lg w-full sm:w-auto">
+                                {[
+                                    { id: "none", label: "None" },
+                                    { id: "class", label: "Class" },
+                                    { id: "village", label: "Village" }
+                                ].map(opt => (
+                                    <button
+                                        key={opt.id}
+                                        onClick={() => setGroupBy(opt.id as any)}
+                                        className={cn(
+                                            "flex-1 sm:flex-none px-3 py-1.5 rounded-md text-[12px] font-bold transition-all text-center",
+                                            groupBy === opt.id
+                                                ? "bg-blue-600 text-white shadow-sm"
+                                                : "text-white/40 hover:text-white"
+                                        )}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
                             </div>
-                            <p className="text-[11px] text-blue-300 opacity-70 leading-relaxed italic">
-                                Generate high-quality physical student directories. Use the filters on the right to target specific groups.
-                            </p>
-
-                            <div className="space-y-2 pt-1 border-t border-white/5 mt-2">
-                                <Label className="text-[10px] font-black text-white/40 uppercase tracking-widest">Grouping Strategy</Label>
-                                <div className="grid grid-cols-3 gap-2">
-                                    {[
-                                        { id: "none", label: "None" },
-                                        { id: "class", label: "By Class" },
-                                        { id: "village", label: "By Village" }
-                                    ].map(opt => (
-                                        <button
-                                            key={opt.id}
-                                            onClick={() => setGroupBy(opt.id as any)}
-                                            className={cn(
-                                                "py-2 px-2 rounded-xl text-[11px] font-bold border transition-all",
-                                                groupBy === opt.id
-                                                    ? "bg-blue-600 border-blue-500 text-white shadow-lg shadow-blue-500/20"
-                                                    : "bg-white/5 border-white/10 text-white/40 hover:bg-white/10"
-                                            )}
-                                        >
-                                            {opt.label}
-                                        </button>
-                                    ))}
-                                </div>
-                            </div>
-
-                            <Button onClick={handlePrintList} variant="outline" className="w-full mt-2 h-12 gap-2 border-blue-500/40 bg-blue-500/10 text-blue-400 hover:bg-blue-600 hover:text-white rounded-2xl transition-all font-black uppercase tracking-tighter">
-                                <Printer size={16} /> Print Selected Students
-                            </Button>
                         </div>
 
-                        <div className="p-4 bg-white/5 border border-white/10 rounded-2xl space-y-2">
-                            <div className="flex items-center gap-2 text-emerald-400 text-xs font-bold">
-                                <Download size={14} /> Quick Export
+                        {/* Print Columns Selection */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <Label className="text-[12px] font-black text-white/50 uppercase tracking-widest shrink-0">Print Columns:</Label>
+                            <div className="flex flex-wrap items-center gap-1 bg-white/5 p-1 rounded-lg w-full sm:w-auto">
+                                {[
+                                    { id: "full", label: "Full Details" },
+                                    { id: "minimal", label: "ID & Name" }
+                                ].map(opt => (
+                                    <button
+                                        key={opt.id}
+                                        onClick={() => setPrintMode(opt.id as any)}
+                                        className={cn(
+                                            "flex-1 sm:flex-none px-3 py-1.5 rounded-md text-[11px] font-bold transition-all text-center",
+                                            printMode === opt.id
+                                                ? "bg-blue-600 text-white shadow-sm"
+                                                : "text-white/40 hover:text-white"
+                                        )}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
                             </div>
-                            <p className="text-[10px] text-muted-foreground italic">Download student data in Excel format for offline management.</p>
+                        </div>
+
+                        {/* Empty Columns Selection */}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <Label className="text-[12px] font-black text-white/50 uppercase tracking-widest shrink-0">Empty Columns:</Label>
+                            <div className="flex flex-wrap items-center gap-1 bg-white/5 p-1 rounded-lg w-full sm:w-auto">
+                                {[0, 1, 2, 3, 4, 5].map(num => (
+                                    <button
+                                        key={num}
+                                        onClick={() => setEmptyColumnsCount(num)}
+                                        className={cn(
+                                            "flex-1 sm:flex-none sm:w-7 h-7 flex items-center justify-center rounded-md text-[11px] font-bold transition-all",
+                                            emptyColumnsCount === num
+                                                ? "bg-blue-600 text-white shadow-sm"
+                                                : "text-white/40 hover:text-white"
+                                        )}
+                                    >
+                                        {num}
+                                    </button>
+                                ))}
+                            </div>
+                        </div>
+
+                        <Button onClick={handlePrintList} variant="outline" className="w-full h-10 gap-2 border-blue-500/40 bg-blue-500/10 text-blue-400 hover:bg-blue-600 hover:text-white rounded-lg transition-all font-black text-[13px] uppercase tracking-tighter">
+                            <Printer size={16} /> Print List
+                        </Button>
+                    </div>
+
+                    {/* Excel Export Configuration */}
+                    <div className="bg-emerald-500/5 border border-emerald-500/10 rounded-xl p-3 flex flex-col gap-3">
+                        <div className="flex items-center justify-between">
+                            <span className="flex items-center gap-1.5 text-emerald-400 text-[13px] font-bold uppercase tracking-tighter">
+                                <Download size={16} /> Excel Export Columns
+                            </span>
+                        </div>
+                        
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                            <Label className="text-[12px] font-black text-white/50 uppercase tracking-widest shrink-0">Export Mode:</Label>
+                            <div className="flex flex-wrap items-center gap-1 bg-white/5 p-1 rounded-lg w-full sm:w-auto">
+                                {[
+                                    { id: "student", label: "Student Only" },
+                                    { id: "parent", label: "With Parents" },
+                                    { id: "total", label: "Total Details" }
+                                ].map(opt => (
+                                    <button
+                                        key={opt.id}
+                                        type="button"
+                                        onClick={() => setExcelMode(opt.id as any)}
+                                        className={cn(
+                                            "flex-1 sm:flex-none px-2.5 py-1.5 rounded-md text-[11px] font-bold transition-all text-center",
+                                            excelMode === opt.id
+                                                ? "bg-emerald-600 text-white shadow-sm"
+                                                : "text-white/40 hover:text-white"
+                                        )}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
 
                     {/* Filter Selectors */}
-                    <div className="space-y-4">
-                        <div className="space-y-3">
-                            <Label className="text-muted-foreground uppercase text-[10px] font-black tracking-widest flex items-center gap-2">
-                                <MapPin size={12} /> Filter Hierarchy
-                            </Label>
+                    <div className="flex flex-col gap-3 bg-white/5 border border-white/10 rounded-xl p-3">
+                        <Label className="text-white/50 uppercase text-[12px] font-black tracking-widest flex items-center gap-1.5">
+                            <MapPin size={14} /> Target Filters
+                        </Label>
 
-                            <div className="bg-white/5 border border-white/10 rounded-2xl p-4 space-y-4">
-                                <div className="flex justify-between items-center mb-2">
-                                    <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Target Classes</span>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 mt-1">
+                            {/* Classes */}
+                            <div className="flex flex-col gap-2 border border-white/5 rounded-lg p-3 bg-white/[0.02]">
+                                <div className="flex justify-between items-center pb-1 border-b border-white/5">
+                                    <span className="text-[11px] font-bold text-white/50 uppercase">Classes</span>
                                     <div className="flex gap-2">
-                                        <button onClick={selectAllClasses} className="text-[9px] font-black text-emerald-400 hover:underline uppercase">All</button>
-                                        <button onClick={clearClasses} className="text-[9px] font-black text-red-400 hover:underline uppercase">Clear</button>
+                                        <button onClick={selectAllClasses} className="text-[10px] font-black text-emerald-400 hover:underline uppercase">All</button>
+                                        <button onClick={clearClasses} className="text-[10px] font-black text-red-400 hover:underline uppercase">X</button>
                                     </div>
                                 </div>
-                                <div className="h-[120px] overflow-y-auto pr-2 custom-scrollbar space-y-1">
+                                <div className="h-[90px] overflow-y-auto custom-scrollbar flex flex-col gap-1 pr-1">
                                     {classes.map((c) => (
                                         <div
                                             key={c.id}
                                             onClick={() => toggleClass(c.id)}
                                             className={cn(
-                                                "flex items-center gap-2 p-1.5 rounded-lg cursor-pointer text-[11px] transition-colors",
-                                                selectedClasses.includes(c.id) ? "bg-blue-500/20 text-blue-400" : "text-white/40 hover:bg-white/5"
+                                                "flex items-center gap-2 p-1.5 rounded-md cursor-pointer text-[13px] font-medium transition-colors",
+                                                selectedClasses.includes(c.id) ? "bg-blue-500/20 text-blue-400" : "text-white/70 hover:bg-white/5"
                                             )}
                                         >
-                                            <div className={cn("w-3 h-3 rounded-sm border", selectedClasses.includes(c.id) ? "bg-blue-500 border-blue-500" : "border-white/20")} />
-                                            {c.name}
+                                            <div className={cn("w-3 h-3 rounded-[3px] shrink-0", selectedClasses.includes(c.id) ? "bg-blue-500" : "bg-white/10")} />
+                                            <span className="truncate">{c.name}</span>
                                         </div>
                                     ))}
                                 </div>
                             </div>
 
-                            <div className="border-t border-white/5 pt-4">
-                                <div className="flex justify-between items-center mb-2">
-                                    <span className="text-[10px] font-bold text-white/40 uppercase tracking-widest">Target Villages</span>
+                            {/* Villages */}
+                            <div className="flex flex-col gap-2 border border-white/5 rounded-lg p-3 bg-white/[0.02]">
+                                <div className="flex justify-between items-center pb-1 border-b border-white/5">
+                                    <span className="text-[11px] font-bold text-white/50 uppercase">Villages</span>
                                     <div className="flex gap-2">
-                                        <button onClick={selectAllVillages} className="text-[9px] font-black text-cyan-400 hover:underline uppercase">All</button>
-                                        <button onClick={clearVillages} className="text-[9px] font-black text-red-500 hover:underline uppercase">Clear</button>
+                                        <button onClick={selectAllVillages} className="text-[10px] font-black text-cyan-400 hover:underline uppercase">All</button>
+                                        <button onClick={clearVillages} className="text-[10px] font-black text-red-400 hover:underline uppercase">X</button>
                                     </div>
                                 </div>
-                                <div className="h-[120px] overflow-y-auto pr-2 custom-scrollbar space-y-1">
+                                <div className="h-[90px] overflow-y-auto custom-scrollbar flex flex-col gap-1 pr-1">
                                     {villages.map((v) => (
                                         <div
                                             key={v.id}
                                             onClick={() => toggleVillage(v.id)}
                                             className={cn(
-                                                "flex items-center gap-2 p-1.5 rounded-lg cursor-pointer text-[11px] transition-colors",
-                                                selectedVillages.includes(v.id) ? "bg-cyan-500/20 text-cyan-400" : "text-white/40 hover:bg-white/5"
+                                                "flex items-center gap-2 p-1.5 rounded-md cursor-pointer text-[13px] font-medium transition-colors",
+                                                selectedVillages.includes(v.id) ? "bg-cyan-500/20 text-cyan-400" : "text-white/70 hover:bg-white/5"
                                             )}
                                         >
-                                            <div className={cn("w-3 h-3 rounded-sm border", selectedVillages.includes(v.id) ? "bg-cyan-500 border-cyan-500" : "border-white/20")} />
-                                            {v.name}
+                                            <div className={cn("w-3 h-3 rounded-[3px] shrink-0", selectedVillages.includes(v.id) ? "bg-cyan-500" : "bg-white/10")} />
+                                            <span className="truncate">{v.name}</span>
                                         </div>
                                     ))}
                                 </div>
@@ -330,17 +608,21 @@ export function StudentExportModal({ students, children }: StudentExportModalPro
                     </div>
                 </div>
 
-                <DialogFooter className="pt-4 border-t border-white/5">
+                <DialogFooter className="mt-4">
                     <Button
                         onClick={handleExport}
                         disabled={loading}
-                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black h-12 rounded-2xl shadow-xl shadow-emerald-500/20 transition-all uppercase tracking-tighter"
+                        className="w-full bg-emerald-600 hover:bg-emerald-500 text-white font-black h-10 rounded-xl shadow-lg shadow-emerald-500/20 transition-all uppercase text-[11px] tracking-tighter"
                     >
                         {loading ? (
                             <span className="flex items-center gap-2">
-                                <Loader2 className="animate-spin w-4 h-4" /> Generating Package...
+                                <Loader2 className="animate-spin w-4 h-4" /> Generating...
                             </span>
-                        ) : `Export Student Dataset`}
+                        ) : (
+                            <span className="flex items-center gap-1.5">
+                                <Download size={14} /> Export Dataset (Excel)
+                            </span>
+                        )}
                     </Button>
                 </DialogFooter>
             </DialogContent>

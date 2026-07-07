@@ -36,11 +36,15 @@ export async function POST(request: Request) {
         const studentRef = adminDb.collection("students").doc(studentId);
 
         // Run as a transaction to ensure atomic updates
-        await adminDb.runTransaction(async (transaction: any) => {
+        const { paymentId, schoolId, branchId } = await adminDb.runTransaction(async (transaction: any) => {
             const ledgerDoc = await transaction.get(ledgerRef);
             const studentDoc = await transaction.get(studentRef);
 
+            const studentData = studentDoc.exists ? studentDoc.data() : null;
             // Fetch Ledger data safely
+            // Note: studentData.schoolId is often the admission number, so we must use branchId for tenant isolation
+            const branchId = studentData?.branchId || callerSchoolId;
+            const schoolId = studentData?.branchId || callerSchoolId; // fallback to branchId because studentData.schoolId is admission number!
             let totalFee = 0;
             let totalPaid = 0;
 
@@ -59,6 +63,8 @@ export async function POST(request: Request) {
                     totalPaid: newTotalPaid,
                     status: newStatus,
                     updatedAt: new Date().toISOString(),
+                    schoolId,
+                    branchId
                 });
             } else {
                 // Should practically never happen, but handle missing ledgers gracefully
@@ -68,8 +74,10 @@ export async function POST(request: Request) {
                     totalFee: 0,
                     totalPaid: newTotalPaid,
                     status: newStatus,
-                    yearId: currentYearId,
-                    updatedAt: new Date().toISOString()
+                    academicYearId: currentYearId,
+                    updatedAt: new Date().toISOString(),
+                    schoolId,
+                    branchId
                 });
             }
 
@@ -86,12 +94,14 @@ export async function POST(request: Request) {
                 createdAt: new Date(),
                 verifiedBy: (callerRole === "MANAGER" || callerRole === "manager") ? `manager:${callerSchoolId || decodedToken.email}` : (adminId || "admin"),
                 type: "credit",
-                academicYear: currentYearId
+                academicYear: currentYearId,
+                schoolId,
+                branchId
             });
 
             // Notify Student (if UID exists)
-            if (studentDoc.exists && studentDoc.data()?.uid) {
-                const studentUid = studentDoc.data()!.uid;
+            if (studentDoc.exists && studentData?.uid) {
+                const studentUid = studentData.uid;
                 const notificationRef = adminDb.collection("notifications").doc();
                 transaction.set(notificationRef, {
                     userId: studentUid,
@@ -100,7 +110,9 @@ export async function POST(request: Request) {
                     type: "PAYMENT_RECEIVED",
                     status: "UNREAD",
                     createdAt: new Date(),
-                    read: false
+                    read: false,
+                    schoolId,
+                    branchId
                 });
             }
 
@@ -113,11 +125,32 @@ export async function POST(request: Request) {
                 type: "PAYMENT_COLLECTED",
                 status: "UNREAD",
                 createdAt: new Date(),
-                read: false
+                read: false,
+                schoolId,
+                branchId
             });
+
+            return { paymentId: paymentRef.id, schoolId, branchId };
         });
 
-        return NextResponse.json({ success: true, message: "Payment recorded successfully" });
+        return NextResponse.json({ 
+            success: true, 
+            message: "Payment recorded successfully",
+            payment: {
+                id: paymentId,
+                studentId,
+                studentName,
+                amount: Number(amount),
+                method,
+                date: new Date(date).toISOString(),
+                status: "success",
+                remarks: finalRemarks,
+                type: "credit",
+                academicYear: currentYearId,
+                schoolId,
+                branchId
+            }
+        });
     } catch (e: any) {
         console.error("Payment API Error:", e);
         return NextResponse.json({ success: false, error: e.message }, { status: 500 });

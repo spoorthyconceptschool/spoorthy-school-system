@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Shield, Plus, User, MoreVertical, Key, Trash2, Archive, Loader2 } from "lucide-react";
-import { collection, query, onSnapshot, orderBy } from "firebase/firestore";
+import { collection, query, onSnapshot, orderBy, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { AddSystemUserModal } from "./add-system-user-modal";
 import { Badge } from "@/components/ui/badge";
@@ -39,7 +39,9 @@ const DEFAULT_SYSTEM_USERS = [
 ];
 
 export function SystemUsersManager() {
-    const { user: currentUser } = useAuth();
+    const { user: currentUser, userData, branchId: userBranchId } = useAuth();
+    const activeBranchId = userBranchId || null;
+
     const [users, setUsers] = useState<any[]>(() => {
         if (typeof window !== 'undefined') {
             const cached = localStorage.getItem(SYSTEM_USERS_CACHE_KEY);
@@ -57,23 +59,57 @@ export function SystemUsersManager() {
     const [actionType, setActionType] = useState<"delete" | "password" | null>(null);
 
     useEffect(() => {
-        const q = query(collection(db, "users"), orderBy("role"));
-        const unsubscribe = onSnapshot(q, (snap) => {
-            const systemUsers = snap.docs
-                .map(d => ({ id: d.id, ...d.data() }))
-                .filter((u: any) => ["ADMIN", "MANAGER", "TIMETABLE_EDITOR"].includes(u.role));
-            setUsers(systemUsers);
-            if (typeof window !== 'undefined') {
-                localStorage.setItem(SYSTEM_USERS_CACHE_KEY, JSON.stringify(systemUsers));
-            }
-            setLoading(false);
-        }, (err) => {
-            console.error("System Users Sync Error:", err);
-            setLoading(false);
-        });
+        const currentSchoolId = activeBranchId;
+        const auth = { currentUser };
+        if (!currentSchoolId || !auth.currentUser) return;
 
-        return () => unsubscribe();
-    }, []);
+        let q = query(collection(db, "users"), orderBy("role"));
+        if (currentSchoolId !== "global") {
+            q = query(collection(db, "users"), where("schoolId", "==", currentSchoolId));
+        }
+
+        let unsubscribe: (() => void) | null = null;
+
+        try {
+            unsubscribe = onSnapshot(q, (snap) => {
+                const systemUsers = snap.docs
+                    .map(d => ({ id: d.id, ...d.data() }))
+                    .filter((u: any) => ["ADMIN", "MANAGER", "TIMETABLE_EDITOR"].includes(u.role));
+                setUsers(systemUsers);
+                if (typeof window !== 'undefined') {
+                    localStorage.setItem(SYSTEM_USERS_CACHE_KEY, JSON.stringify(systemUsers));
+                }
+                setLoading(false);
+            }, (err) => {
+                console.warn("[SystemUsersManager] Sync Warning:", err.message);
+                setLoading(false);
+                if (err.code === "permission-denied" || err.message?.includes("permission")) {
+                    if (unsubscribe) {
+                        try { unsubscribe(); } catch (ue) {}
+                    } else {
+                        setTimeout(() => {
+                            if (unsubscribe) {
+                                try { unsubscribe(); } catch (ue) {}
+                            }
+                        }, 0);
+                    }
+                }
+            });
+        } catch (e: any) {
+            console.error("[SystemUsersManager] setup error:", e.message);
+            setLoading(false);
+        }
+
+        return () => {
+            if (unsubscribe) {
+                try {
+                    unsubscribe();
+                } catch(e) {
+                    console.debug("Silent unsubscribe catch", e);
+                }
+            }
+        };
+    }, [currentUser, activeBranchId]);
 
     const handleDeactivate = async (reason: string) => {
         if (!selectedUser || !currentUser) return;
@@ -168,7 +204,7 @@ export function SystemUsersManager() {
                                                 <MoreVertical size={16} />
                                             </Button>
                                         </DropdownMenuTrigger>
-                                        <DropdownMenuContent align="end" className="bg-zinc-900 border-white/10 text-white">
+                                        <DropdownMenuContent align="end" className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                                             <DropdownMenuItem
                                                 className="gap-2 text-xs font-bold text-amber-500"
                                                 onClick={() => { setSelectedUser(u); setActionType("password"); }}

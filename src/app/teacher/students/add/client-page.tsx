@@ -21,7 +21,7 @@ export default function AddStudentClientPage() {
     const classIdFromUrl = searchParams.get("classId");
     const sectionIdFromUrl = searchParams.get("sectionId");
 
-    const { user } = useAuth();
+    const { user, branchId } = useAuth();
     const { classes, sections, villages, selectedYear } = useMasterData();
     const [submitting, setSubmitting] = useState(false);
 
@@ -63,6 +63,8 @@ export default function AddStudentClientPage() {
             // Add to Student Change Requests
             await addDoc(collection(db, "student_change_requests"), {
                 teacherId: user?.uid,
+                schoolId: branchId || "",
+                branchId: branchId || "",
                 classId: formData.classId,
                 sectionId: formData.sectionId,
                 academicYear: selectedYear || "2026-2027",

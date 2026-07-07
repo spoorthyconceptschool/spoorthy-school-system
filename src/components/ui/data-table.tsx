@@ -135,7 +135,7 @@ export function DataTable<T>({
                                                             <MoreVertical className="h-3 w-3 md:h-4 md:w-4" />
                                                         </Button>
                                                     </DropdownMenuTrigger>
-                                                    <DropdownMenuContent align="end" className="bg-[#0A192F] border-white/10 backdrop-blur-xl rounded-xl">
+                                                    <DropdownMenuContent align="end" className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl backdrop-blur-xl rounded-xl border-white/10">
                                                         <DropdownMenuLabel className="text-[10px] uppercase font-black tracking-widest text-muted-foreground/60 p-3 italic">Operations</DropdownMenuLabel>
                                                         <DropdownMenuSeparator className="bg-white/5" />
                                                         <div className="p-1">

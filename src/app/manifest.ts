@@ -10,7 +10,7 @@ export default async function manifest(): Promise<MetadataRoute.Manifest> {
 
     try {
         const { adminRtdb } = await import('@/lib/firebase-admin');
-        const snap = await adminRtdb.ref('siteContent/branding').once('value');
+        const snap = await adminRtdb.ref('siteContent/branding').get();
         if (snap.exists()) {
             const data = snap.val();
             if (data.schoolName) {

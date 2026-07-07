@@ -10,7 +10,8 @@ import { useMasterData } from "@/context/MasterDataContext";
 import { rtdb, db } from "@/lib/firebase";
 import { ref, update, push, set, remove, get } from "firebase/database";
 import { Trash2, Plus, Edit, BookOpen, CheckCircle2, GraduationCap, Users, Download, Printer, Check } from "lucide-react";
-import { collection, getDocs, query, orderBy, doc, updateDoc } from "firebase/firestore";
+import { collection, getDocs, query, orderBy, doc, updateDoc, setDoc, deleteDoc } from "firebase/firestore";
+import { useAuth } from "@/context/AuthContext";
 import { exportAcademicLoad, printAcademicLoadReport } from "@/lib/export-utils";
 import { cn } from "@/lib/utils";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -40,40 +41,89 @@ export function ClassesSectionsManager() {
         fetchTeachers();
     }, []);
 
+    const { user, userData, branchId: userBranchId, role } = useAuth();
+    const activeBranchId = userBranchId || userData?.schoolId || (role === "SUPER_ADMIN" ? "global" : null);
+
     // === CLASSES ===
     const addClass = async () => {
-        if (!newName) return;
+        if (!newName || !activeBranchId) return;
         setSubmitting(true);
-        const newRef = push(ref(rtdb, 'master/classes'));
-        await set(newRef, { id: newRef.key, name: newName, order: newOrder });
-        setNewName(""); setSubmitting(false);
+        try {
+            const classRef = doc(collection(db, "classes"));
+            await setDoc(classRef, {
+                id: classRef.id,
+                name: newName,
+                order: newOrder,
+                schoolId: activeBranchId,
+                isActive: true
+            });
+            setNewName("");
+        } catch (e) {
+            console.error(e);
+            alert("Failed to add class.");
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     const deleteClass = async (id: string) => {
-        if (confirm("Delete this Class?")) await remove(ref(rtdb, `master/classes/${id}`));
+        if (confirm("Delete this Class?")) {
+            await deleteDoc(doc(db, "classes", id));
+        }
     };
 
     // === SECTIONS ===
     const addSection = async () => {
-        if (!newName) return;
+        if (!newName || !activeBranchId) return;
         setSubmitting(true);
-        const newRef = push(ref(rtdb, 'master/sections'));
-        await set(newRef, { id: newRef.key, name: newName });
-        setNewName(""); setSubmitting(false);
+        try {
+            const sectionRef = doc(collection(db, "sections"));
+            await setDoc(sectionRef, {
+                id: sectionRef.id,
+                name: newName,
+                schoolId: activeBranchId,
+                isActive: true
+            });
+            setNewName("");
+        } catch (e) {
+            console.error(e);
+            alert("Failed to add section.");
+        } finally {
+            setSubmitting(false);
+        }
     };
 
     const deleteSection = async (id: string) => {
-        if (confirm("Delete this Section?")) await remove(ref(rtdb, `master/sections/${id}`));
+        if (confirm("Delete this Section?")) {
+            await deleteDoc(doc(db, "sections", id));
+        }
     };
 
     // === COMBINATIONS ===
     const toggleCombination = async (cId: string, sId: string, currentStatus: boolean) => {
-        const key = `${cId}_${sId}`;
-        const targetRef = ref(rtdb, `master/classSections/${key}`);
-        if (currentStatus) {
-            await remove(targetRef);
-        } else {
-            await set(targetRef, { id: key, classId: cId, sectionId: sId, active: true });
+        if (!activeBranchId) return;
+        try {
+            // MasterDataContext strips the activeBranchId + '_' prefix, so the ID in Firestore MUST have it!
+            const key = `${cId}_${sId}`;
+            const docId = `${activeBranchId}_${key}`;
+            const targetRef = doc(db, "master_class_sections", docId);
+            
+            if (currentStatus) {
+                await deleteDoc(targetRef);
+            } else {
+                await setDoc(targetRef, {
+                    id: docId,
+                    classId: cId,
+                    sectionId: sId,
+                    schoolId: activeBranchId,
+                    className: classes[cId]?.name || "",
+                    sectionName: sections[sId]?.name || "",
+                    isActive: true
+                });
+            }
+        } catch (error) {
+            console.error("Failed to toggle section mapping:", error);
+            alert("Failed to assign section. Please check permissions.");
         }
     };
 
@@ -198,7 +248,7 @@ export function ClassesSectionsManager() {
                                 <Download size={14} /> Export / Print Reports
                             </Button>
                         </DialogTrigger>
-                        <DialogContent className="bg-black/95 border-white/10 text-white max-w-xl">
+                        <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white max-w-xl border-white/10">
                             <DialogHeader>
                                 <DialogTitle>Select Classes for Report</DialogTitle>
                             </DialogHeader>
@@ -303,7 +353,7 @@ export function ClassesSectionsManager() {
                                                 <BookOpen size={14} /> Subjects
                                             </Button>
                                         </DialogTrigger>
-                                        <DialogContent className="bg-black/95 border-white/10 text-white max-w-md">
+                                        <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white max-w-md border-white/10">
                                             <DialogHeader><DialogTitle>Subjects: {c.name}</DialogTitle></DialogHeader>
                                             <div className="grid grid-cols-1 gap-2 mt-4 max-h-[400px] overflow-y-auto pr-2">
                                                 {Object.values(subjects || {}).map((s: any) => {
@@ -330,7 +380,7 @@ export function ClassesSectionsManager() {
                                                 <GraduationCap size={14} /> Staffing
                                             </Button>
                                         </DialogTrigger>
-                                        <DialogContent className="bg-black/95 border-white/10 text-white max-w-2xl">
+                                        <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white max-w-2xl border-white/10">
                                             <DialogHeader><DialogTitle>Academic Assignments: {c.name}</DialogTitle></DialogHeader>
                                             <div className="space-y-6 mt-4 max-h-[70vh] overflow-y-auto pr-2">
                                                 {Object.values(classSections).filter((cs: any) => cs.classId === c.id).map((cs: any) => {

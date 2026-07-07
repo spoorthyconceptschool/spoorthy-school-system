@@ -66,7 +66,7 @@ export default function TeacherExamsPage() {
                 });
 
                 // 3. Fetch all exams
-                const snap = await getDocs(collection(db, "exams"));
+                const snap = await getDocs(query(collection(db, "exams"), where("schoolId", "==", schoolId)));
                 const allExams = snap.docs
                     .map(d => ({ id: d.id, ...d.data() }))
                     .sort((a: any, b: any) => {

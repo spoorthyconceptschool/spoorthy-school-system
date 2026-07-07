@@ -10,6 +10,7 @@ import { Badge } from "@/components/ui/badge";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
 import { toast } from "@/lib/toast-store";
+import { useAuth } from "@/context/AuthContext";
 
 const INACTIVE_STUDENTS_CACHE_KEY = "spoorthy_inactive_students_cache";
 const INACTIVE_TEACHERS_CACHE_KEY = "spoorthy_inactive_teachers_cache";
@@ -35,6 +36,9 @@ const DEFAULT_INACTIVE_TEACHERS = [
 ];
 
 export function InactiveUsersManager() {
+    const { user: currentUser, userData, branchId: userBranchId } = useAuth();
+    const activeBranchId = userBranchId || null;
+
     const [search, setSearch] = useState("");
     const [students, setStudents] = useState<any[]>(() => {
         if (typeof window !== 'undefined') {
@@ -58,8 +62,17 @@ export function InactiveUsersManager() {
     const [restoringId, setRestoringId] = useState<string | null>(null);
 
     useEffect(() => {
+        if (!activeBranchId || !currentUser) return;
+
+        let isStudentsDead = false;
+        let isTeachersDead = false;
+
         // Sync Inactive Students
-        const qStudents = query(collection(db, "students"), where("status", "==", "INACTIVE"));
+        let qStudents = query(collection(db, "students"), where("status", "==", "INACTIVE"));
+        if (activeBranchId !== "global") {
+            qStudents = query(collection(db, "students"), where("status", "==", "INACTIVE"), where("branchId", "==", activeBranchId));
+        }
+
         const unsubStudents = onSnapshot(qStudents, (snap) => {
             const list = snap.docs.map(d => ({ id: d.id, collection: "students", ...d.data() }));
             setStudents(list);
@@ -68,12 +81,17 @@ export function InactiveUsersManager() {
             }
             setLoading(false);
         }, (err) => {
-            console.error("Inactive Students Sync Error:", err);
+            console.warn("Inactive Students Sync Warning:", err.message);
+            isStudentsDead = true;
             setLoading(false);
         });
 
         // Sync Inactive Teachers
-        const qTeachers = query(collection(db, "teachers"), where("status", "==", "INACTIVE"));
+        let qTeachers = query(collection(db, "teachers"), where("status", "==", "INACTIVE"));
+        if (activeBranchId !== "global") {
+            qTeachers = query(collection(db, "teachers"), where("status", "==", "INACTIVE"), where("schoolId", "==", activeBranchId));
+        }
+
         const unsubTeachers = onSnapshot(qTeachers, (snap) => {
             const list = snap.docs.map(d => ({ id: d.id, collection: "teachers", ...d.data() }));
             setTeachers(list);
@@ -82,15 +100,20 @@ export function InactiveUsersManager() {
             }
             setLoading(false);
         }, (err) => {
-            console.error("Inactive Teachers Sync Error:", err);
+            console.warn("Inactive Teachers Sync Warning:", err.message);
+            isTeachersDead = true;
             setLoading(false);
         });
 
         return () => {
-            unsubStudents();
-            unsubTeachers();
+            if (!isStudentsDead && typeof unsubStudents === 'function') {
+                try { unsubStudents(); } catch(e) {}
+            }
+            if (!isTeachersDead && typeof unsubTeachers === 'function') {
+                try { unsubTeachers(); } catch(e) {}
+            }
         };
-    }, []);
+    }, [currentUser, activeBranchId]);
 
     const allInactive = [...students, ...teachers].filter(u =>
         (u.studentName || u.name)?.toLowerCase().includes(search.toLowerCase()) ||

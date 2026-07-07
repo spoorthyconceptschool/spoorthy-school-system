@@ -17,7 +17,7 @@ interface Notification {
 }
 
 export default function AdminNotificationsPage() {
-    const { user } = useAuth();
+    const { user, branchId } = useAuth();
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [loading, setLoading] = useState(true);
     const [optimisticReads, setOptimisticReads] = useState<Set<string>>(() => {
@@ -98,15 +98,20 @@ export default function AdminNotificationsPage() {
         const unsubPersonal = onSnapshot(qPersonal, (snap) => {
             if (!isMounted) return;
             updateNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
-        });
+        }, (err) => console.warn("[Notifications] Personal subscription error:", err.message));
         unsubscribes.push(unsubPersonal);
 
         // 2. Global Admin Notifications
-        const qAdmin = query(collection(db, "notifications"), where("target", "==", "ALL_ADMINS"), limit(50));
+        let qAdmin;
+        if (branchId) {
+            qAdmin = query(collection(db, "notifications"), where("schoolId", "==", branchId), where("target", "==", "ALL_ADMINS"), limit(50));
+        } else {
+            qAdmin = query(collection(db, "notifications"), where("target", "==", "ALL_ADMINS"), limit(50));
+        }
         const unsubAdmin = onSnapshot(qAdmin, (snap) => {
             if (!isMounted) return;
             updateNotifications(snap.docs.map(d => ({ id: d.id, ...d.data() } as Notification)));
-        });
+        }, (err) => console.warn("[Notifications] Admin subscription error:", err.message));
         unsubscribes.push(unsubAdmin);
 
         return () => {

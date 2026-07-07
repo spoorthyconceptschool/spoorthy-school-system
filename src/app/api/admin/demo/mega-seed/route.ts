@@ -169,7 +169,7 @@ export async function GET(req: NextRequest) {
             const vId = `v${(i % 10) + 1}`;
 
             batch.set(adminDb.collection("students").doc(sid), {
-                studentName: `${fn} ${ln}`, schoolId: sid, admissionNo: sid,
+                studentName: `${fn} ${ln}`, schoolId: sid,
                 classId: clObj.id, className: clObj.name, sectionId: sec, sectionName: sections[sec as keyof typeof sections].name,
                 parentName: `${ln} Parent`, parentMobile: `9${String(i).padStart(9, '0')}`,
                 villageId: vId, villageName: villages[vId as keyof typeof villages].name,

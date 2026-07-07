@@ -3,7 +3,7 @@
 import { useState, useEffect } from "react";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Button } from "@/components/ui/button";
-import { Plus, User, Briefcase, Search, MoreVertical, Key, Trash2, DollarSign, MapPin, Phone, ArrowRight, Shield } from "lucide-react";
+import { Plus, User, Briefcase, Search, MoreVertical, Key, Trash2, DollarSign, MapPin, Phone, ArrowRight, Shield, Printer, Download } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { collection, query, orderBy, getDocs, where, doc, updateDoc, onSnapshot, writeBatch } from "firebase/firestore";
 import { db } from "@/lib/firebase";
@@ -54,6 +54,7 @@ interface Staff {
 interface TeachersDirectoryProps {
     hideHeader?: boolean;
     onTabChange?: (tab: string) => void;
+    isReportMode?: boolean;
 }
 
 /**
@@ -65,9 +66,10 @@ interface TeachersDirectoryProps {
  * @param onTabChange Callback utility to sync external component state when sub-tabs switch.
  * @returns Complete page or embedded element housing the interactive data tables.
  */
-export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersDirectoryProps) {
+export function TeachersDirectory({ hideHeader = false, onTabChange, isReportMode = false }: TeachersDirectoryProps) {
     const router = useRouter();
-    const { user, role } = useAuth(); // Use role from global context
+    const { user, userData, branchId: userBranchId, role } = useAuth(); // Use role from global context
+    const activeBranchId = userBranchId || userData?.schoolId || (role === "SUPER_ADMIN" ? "global" : null);
 
     const [activeTab, setActiveTab] = useState("teachers");
     const [search, setSearch] = useState("");
@@ -80,11 +82,57 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
         onTabChange?.(activeTab);
     }, [activeTab, onTabChange]);
 
-    const {
-        teachers: masterTeachers,
-        staff: masterStaff,
-        loading
-    } = useMasterData();
+    const { loading: masterLoading } = useMasterData();
+    const [masterTeachers, setMasterTeachers] = useState<any[]>([]);
+    const [masterStaff, setMasterStaff] = useState<any[]>([]);
+    const [localLoading, setLocalLoading] = useState(false);
+
+    const loading = masterLoading || localLoading;
+
+    useEffect(() => {
+        if (!activeBranchId) return;
+
+        setLocalLoading(true);
+
+        let teachersQuery = query(collection(db, "teachers"), where("status", "==", "ACTIVE"));
+        if (activeBranchId !== "global") {
+            teachersQuery = query(collection(db, "teachers"), where("status", "==", "ACTIVE"), where("branchId", "==", activeBranchId));
+        }
+
+        const unsubTeachers = onSnapshot(teachersQuery, (snap) => {
+            const list = snap.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setMasterTeachers(list);
+            setLocalLoading(false);
+        }, (err) => {
+            console.error("Error syncing teachers:", err);
+            setLocalLoading(false);
+        });
+
+        let staffQuery = query(collection(db, "staff"), where("status", "==", "ACTIVE"));
+        if (activeBranchId !== "global") {
+            staffQuery = query(collection(db, "staff"), where("status", "==", "ACTIVE"), where("branchId", "==", activeBranchId));
+        }
+
+        const unsubStaff = onSnapshot(staffQuery, (snap) => {
+            const list = snap.docs.map(doc => ({
+                id: doc.id,
+                ...doc.data()
+            }));
+            setMasterStaff(list);
+            setLocalLoading(false);
+        }, (err) => {
+            console.error("Error syncing staff:", err);
+            setLocalLoading(false);
+        });
+
+        return () => {
+            unsubTeachers();
+            unsubStaff();
+        };
+    }, [activeBranchId]);
 
     const [optimisticTeachers, setOptimisticTeachers] = useState<any[]>([]);
     const [optimisticStaff, setOptimisticStaff] = useState<any[]>([]);
@@ -173,7 +221,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
             const loadedRoles = snap.docs.map(d => ({ id: d.id, ...d.data() }));
             const uniqueRoles = Array.from(new Map(loadedRoles.map((item: any) => [item['code'], item])).values());
             setRoles(uniqueRoles);
-        });
+        }, (err) => console.warn("[TeachersDir] Staff roles listener:", err?.code));
 
         return () => {
             unsubscribeRoles();
@@ -231,7 +279,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
     return (
         <div className={cn("space-y-6 animate-in fade-in duration-500 max-w-7xl mx-auto pb-20", !hideHeader ? "p-4 md:p-0" : "p-0")}>
             {/* Header */}
-            {!hideHeader && (
+            {!hideHeader && !isReportMode && (
                 <div className="flex flex-col md:flex-row md:items-center md:justify-between pt-2 md:pt-4 gap-4 md:gap-6 px-2 md:px-0">
                     <div className="space-y-0.5 md:space-y-1">
                         <h1 className="text-2xl md:text-5xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic leading-tight">
@@ -246,6 +294,28 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                             className="h-10 md:h-12 flex-1 md:flex-initial bg-white text-black hover:bg-zinc-200 rounded-xl font-black uppercase tracking-tighter px-4 md:px-6 shadow-lg shadow-white/10 text-xs md:text-sm"
                         >
                             <Plus className="w-3.5 h-3.5 md:w-4 md:h-4 mr-2 stroke-[3]" /> Add {activeTab === 'teachers' ? 'Teacher' : 'Staff'}
+                        </Button>
+                    </div>
+                </div>
+            )}
+            
+            {/* Report Mode Header */}
+            {isReportMode && (
+                <div className="flex flex-col md:flex-row md:items-center md:justify-between pt-2 md:pt-4 gap-4 md:gap-6 px-2 md:px-0 mb-4">
+                    <div className="space-y-0.5 md:space-y-1">
+                        <h1 className="text-2xl md:text-3xl font-display font-bold bg-gradient-to-r from-white to-white/60 bg-clip-text text-transparent italic leading-tight">
+                            Faculty Reports
+                        </h1>
+                        <p className="text-muted-foreground text-[10px] md:text-sm tracking-tight uppercase font-black opacity-90">Total Staff: <span className="text-white">{masterTeachers.length + masterStaff.length}</span></p>
+                    </div>
+
+                    <div className="flex items-center gap-2">
+                        <Button
+                            variant="outline"
+                            onClick={() => { window.print(); }}
+                            className="h-10 border-white/10 bg-black/20 hover:bg-white/5 text-white rounded-xl font-black uppercase tracking-tighter px-4 shadow-lg shadow-white/5 text-xs"
+                        >
+                            <Printer className="w-4 h-4 mr-2" /> Print Report
                         </Button>
                     </div>
                 </div>
@@ -281,7 +351,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                                         <SelectTrigger className="flex-1 md:w-[180px] h-10 md:h-12 bg-white/5 border-white/10 rounded-lg md:rounded-xl text-xs md:text-sm">
                                             <SelectValue placeholder="All Roles" />
                                         </SelectTrigger>
-                                        <SelectContent className="bg-zinc-900 border-white/10 text-white">
+                                        <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                                             <SelectItem value="ALL">All Roles</SelectItem>
                                             {roles.filter((r: any) => !r.hasLogin).map((r: any) => (
                                                 <SelectItem key={r.code} value={r.code}>{r.name}</SelectItem>
@@ -333,7 +403,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                                                         </Badge>
                                                     )}
                                                 </div>
-                                                <span className="text-[10px] font-mono text-white/40 tracking-tighter uppercase">{t.schoolId}</span>
+                                                <span className="text-[10px] font-mono text-white/40 tracking-tighter uppercase">{(t as any).teacherId || "Teacher"}</span>
                                             </div>
                                         </div>
                                     );
@@ -396,7 +466,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                                 )
                             }
                         ]}
-                        actions={(t) => (
+                        actions={isReportMode ? undefined : (t) => (
                             <div className="flex flex-col gap-1">
                                 <DropdownMenuItem onClick={() => {
                                     setResetUser({ uid: t.uid || "", schoolId: t.schoolId, name: t.name, role: "TEACHER" });
@@ -460,7 +530,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                                         </div>
                                         <div className="flex flex-col">
                                             <span className="font-bold text-sm text-white group-hover:text-blue-400 transition-colors leading-tight">{s.name}</span>
-                                            <span className="text-[10px] font-mono text-white/40 tracking-tighter uppercase">{s.schoolId}</span>
+                                            <span className="text-[10px] font-mono text-white/40 tracking-tighter uppercase">{(s as any).staffId || "Staff"}</span>
                                         </div>
                                     </div>
                                 )
@@ -518,7 +588,7 @@ export function TeachersDirectory({ hideHeader = false, onTabChange }: TeachersD
                                 )
                             }
                         ]}
-                        actions={(s) => (
+                        actions={isReportMode ? undefined : (s) => (
                             <div className="flex flex-col gap-1">
                                 <DropdownMenuItem onClick={() => {
                                     setResetUser({ uid: s.uid || "", schoolId: s.schoolId, name: s.name, role: "STAFF" });

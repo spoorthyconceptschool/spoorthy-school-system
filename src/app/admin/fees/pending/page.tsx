@@ -15,9 +15,10 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { Label } from "@/components/ui/label";
 import { useAuth } from "@/context/AuthContext";
+import { useBranch } from "@/context/BranchContext";
 import { toast } from "@/lib/toast-store";
 import { cn } from "@/lib/utils";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import { FeeSlipGenerator } from "@/components/admin/fee-slip-generator";
 import Link from "next/link";
 
@@ -74,16 +75,27 @@ const DEFAULT_PENDING_LEDGERS = [
 ];
 
 export default function FeePendingsPage() {
-    const PENDING_CACHE_KEY = "spoorthy_pending_ledgers";
-    const [ledgers, setLedgers] = useState<any[]>(() => {
-        if (typeof window !== 'undefined') {
+    const { classes: classesData, villages: villagesData, branding, selectedYear, setSelectedYear, academicYears, feeConfig, customFees } = useMasterData();
+    const { user, userData, branchId: userBranchId, role } = useAuth();
+    const { selectedBranchId } = useBranch();
+    const activeBranchId = selectedBranchId || (role === "SUPER_ADMIN" ? "global" : (userBranchId || userData?.schoolId));
+
+    const PENDING_CACHE_KEY = activeBranchId ? `spoorthy_pending_ledgers_${activeBranchId}` : null;
+    const [ledgers, setLedgers] = useState<any[]>(DEFAULT_PENDING_LEDGERS);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && PENDING_CACHE_KEY) {
             const cached = localStorage.getItem(PENDING_CACHE_KEY);
             if (cached) {
-                try { return JSON.parse(cached); } catch (e) {}
+                try {
+                    setLedgers(JSON.parse(cached));
+                    return;
+                } catch (e) {}
             }
         }
-        return DEFAULT_PENDING_LEDGERS;
-    });
+        setLedgers([]);
+    }, [PENDING_CACHE_KEY]);
+
     const [loading, setLoading] = useState(false);
     const [search, setSearch] = useState("");
     const [classFilter, setClassFilter] = useState("all");
@@ -91,8 +103,8 @@ export default function FeePendingsPage() {
     const [feeTypeFilter, setFeeTypeFilter] = useState("all");
     const [statusFilter, setStatusFilter] = useState("all_pending");
     const router = useRouter();
-
-    const { user, userData, role } = useAuth();
+    const pathname = usePathname();
+    const backUrl = pathname.includes("/super-admin") ? "/super-admin/reports" : "/admin/fees";
 
     // Report Wizard State
     const [isWizardOpen, setIsWizardOpen] = useState(false);
@@ -119,7 +131,7 @@ export default function FeePendingsPage() {
         const allocations: any[] = [];
         
         const allocate = (filterFn: (i: any) => boolean) => {
-            const group = items.filter(filterFn).sort((a, b) => (a.dueDate || "9999-99-99").localeCompare(b.dueDate || "9999-99-99"));
+            const group = items.filter(filterFn).sort((a: any, b: any) => (a.dueDate || "9999-99-99").localeCompare(b.dueDate || "9999-99-99"));
             for (const item of group) {
                 if (remaining <= 0) break;
                 const due = Number(item.amount || 0) - Number(item.paidAmount || 0);
@@ -144,20 +156,31 @@ export default function FeePendingsPage() {
         return allocations;
     }, [feeForm.amount, feeForm.selectedItems, selectedLedger]);
 
-    const { classes: classesData, villages: villagesData, branding, selectedYear, setSelectedYear, academicYears, feeConfig, customFees } = useMasterData();
     const classes = Object.values(classesData || {}).map((c: any) => ({ id: c.id, name: c.name, order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
-    const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name || "Unknown Village" })).sort((a: any, b: any) => String(a.name).localeCompare(String(b.name)));
+    const villages = Object.values(villagesData || {}).map((v: any) => ({ id: v.id, name: v.name || "Unknown Village" })).sort((a, b) => String(a.name).localeCompare(String(b.name)));
 
     const fetchPendings = async () => {
+        if (!activeBranchId) {
+            console.log("[FeePendingsPage] activeBranchId is not yet resolved, skipping fetch.");
+            return;
+        }
+        setLoading(true);
         try {
-            // 1. Fetch ledgers with pending status for the current year
+            // 1. Fetch ledgers with pending status for the current year, isolated by branchId
+            const baseConstraints: any[] = [
+                where("academicYearId", "==", selectedYear || "2025-2026")
+            ];
+            if (activeBranchId && activeBranchId !== "global") {
+                baseConstraints.push(where("branchId", "==", activeBranchId));
+            }
+
             const q = query(
                 collection(db, "student_fee_ledgers"),
-                where("academicYearId", "==", selectedYear || "2025-2026")
+                ...baseConstraints
             );
             const snap = await getDocs(q);
 
-            const rawLedgers: any[] = snap.docs.map(d => {
+            let rawLedgers: any[] = snap.docs.map(d => {
                 const data = d.data();
                 return {
                     id: d.id,
@@ -186,10 +209,10 @@ export default function FeePendingsPage() {
                     transportFee,
                     customFee
                 };
-            }).sort((a, b) => b.pendingAmount - a.pendingAmount);
+            }).sort((a: any, b: any) => b.pendingAmount - a.pendingAmount);
 
             setLedgers(joined);
-            if (typeof window !== 'undefined') {
+            if (typeof window !== 'undefined' && PENDING_CACHE_KEY) {
                 localStorage.setItem(PENDING_CACHE_KEY, JSON.stringify(joined));
             }
         } catch (e) {
@@ -201,7 +224,7 @@ export default function FeePendingsPage() {
 
     useEffect(() => {
         fetchPendings();
-    }, [selectedYear]);
+    }, [selectedYear, activeBranchId, PENDING_CACHE_KEY]);
 
     const handleCollectFee = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -249,7 +272,7 @@ export default function FeePendingsPage() {
             const updatedItems = (selectedLedger.items || []).map((i: any) => ({ ...i }));
 
             const allocateToItems = (filterFn: (i: any) => boolean) => {
-                const group = updatedItems.filter(filterFn).sort((a, b) => (a.dueDate || "9999-99-99").localeCompare(b.dueDate || "9999-99-99"));
+                const group = updatedItems.filter(filterFn).sort((a: any, b: any) => (a.dueDate || "9999-99-99").localeCompare(b.dueDate || "9999-99-99"));
                 for (const item of group) {
                     if (remainingAmount <= 0) break;
                     const itemDue = Number(item.amount || 0) - Number(item.paidAmount || 0);
@@ -411,8 +434,12 @@ export default function FeePendingsPage() {
     };
 
     const handlePrint = (targetData: any[]) => {
+        setIsWizardOpen(false);
         const printWindow = window.open('', '_blank');
-        if (!printWindow) return;
+        if (!printWindow) {
+            toast({ title: "Popup Blocked", description: "Please allow popups for this site to print reports.", type: "error" });
+            return;
+        }
 
         const timestamp = new Date().toLocaleString();
         const subsetTotalDues = targetData.reduce((sum, l) => sum + (l.pendingAmount || 0), 0);
@@ -537,7 +564,7 @@ export default function FeePendingsPage() {
             {/* Header & Actions */}
             <div className="flex justify-between items-center px-2 md:px-0">
                 <Link 
-                    href="/admin/fees" 
+                    href={backUrl} 
                     className="inline-flex items-center gap-2 text-xs font-black uppercase tracking-widest text-muted-foreground hover:text-white transition-colors group"
                 >
                     <ArrowLeft className="w-3.5 h-3.5 transition-transform group-hover:-translate-x-1" />
@@ -927,7 +954,7 @@ export default function FeePendingsPage() {
                     setShowFeeSelector(false);
                 }
             }}>
-                <DialogContent className="bg-[#0A192F] text-white border-white/10 w-[90vw] sm:max-w-sm rounded-2xl">
+                <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white w-[90vw] sm:max-w-sm rounded-2xl border-white/10">
                     <DialogHeader>
                         <DialogTitle className="text-xl font-display font-bold text-emerald-400">Collect Payment</DialogTitle>
                         <div className="text-sm text-white/60 font-medium">Student: <span className="text-white">{selectedLedger?.studentName}</span></div>
@@ -1020,7 +1047,7 @@ export default function FeePendingsPage() {
                                     <Label className="text-[10px] font-bold text-white/70 uppercase">Mode</Label>
                                     <Select value={feeForm.method} onValueChange={v => setFeeForm({ ...feeForm, method: v })}>
                                         <SelectTrigger className="bg-white/5 border-white/10 h-9 text-xs focus:ring-emerald-500/20"><SelectValue /></SelectTrigger>
-                                        <SelectContent className="bg-[#0A192F] border-white/10 text-white">
+                                        <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                                             <SelectItem value="cash">Cash</SelectItem>
                                             <SelectItem value="upi">UPI / GPay</SelectItem>
                                             <SelectItem value="cheque">Cheque</SelectItem>
@@ -1044,7 +1071,7 @@ export default function FeePendingsPage() {
             </Dialog>
 
             <Dialog open={!!receiptData} onOpenChange={(open) => !open && setReceiptData(null)}>
-                <DialogContent className="bg-[#0A192F] text-white border-white/10 sm:max-w-md print:bg-white print:text-black print:border-none print:shadow-none print:max-w-full">
+                <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white sm:max-w-md print:bg-white print:text-black print:border-none print:shadow-none print:max-w-full border-white/10">
                     <DialogHeader className="print:hidden">
                         <DialogTitle className="text-emerald-400 flex items-center gap-2">Payment Successful</DialogTitle>
                     </DialogHeader>
@@ -1109,7 +1136,7 @@ export default function FeePendingsPage() {
             </Dialog>
 
             <Dialog open={isWizardOpen} onOpenChange={setIsWizardOpen}>
-                <DialogContent className="max-w-2xl bg-[#0A192F] border-white/10 text-white shadow-2xl backdrop-blur-3xl rounded-3xl">
+                <DialogContent className="max-w-2xl bg-[#0B1120]/95 backdrop-blur-2xl text-white backdrop-blur-3xl rounded-3xl shadow-2xl border-white/10">
                     <DialogHeader>
                         <DialogTitle className="text-2xl font-display font-bold italic bg-gradient-to-r from-red-500 to-orange-400 bg-clip-text text-transparent">
                             {wizardType === 'notify' ? 'Fee Notification Wizard' : 'Report Configuration'}
@@ -1187,8 +1214,9 @@ export default function FeePendingsPage() {
                     </div>
 
                     <DialogFooter className="gap-2">
-                        <Button variant="ghost" onClick={() => setIsWizardOpen(false)} className="rounded-xl hover:bg-white/5">Cancel</Button>
+                        <Button type="button" variant="ghost" onClick={() => setIsWizardOpen(false)} className="rounded-xl hover:bg-white/5">Cancel</Button>
                         <Button
+                            type="button"
                             className={cn(
                                 "text-white font-black uppercase tracking-tighter gap-2 rounded-xl border-none shadow-lg transition-all",
                                 wizardType === 'notify' ? "bg-red-600 hover:bg-red-500 shadow-red-500/20" : "bg-gradient-to-r from-emerald-600 to-cyan-600 hover:from-emerald-500 hover:to-cyan-500 shadow-emerald-500/20"

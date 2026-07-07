@@ -22,7 +22,7 @@ export default function TeacherAttendanceManager({
 }: {
     defaultDate?: string;
 }) {
-    const { user, userData } = useAuth();
+    const { user, userData, branchId } = useAuth();
     const { branding, teachers: globalTeachers } = useMasterData();
 
     const [teachers, setTeachers] = useState<any[]>(() => {
@@ -50,18 +50,36 @@ export default function TeacherAttendanceManager({
 
     const date = defaultDate || new Date().toISOString().split('T')[0];
 
-    // 1. Sync Teachers from Global Cache
+    // 1. Sync Teachers in Real-time from Firestore (Page-level Decoupled Query)
     useEffect(() => {
-        if (globalTeachers?.length > 0) {
-            const list = globalTeachers.map(d => ({
-                id: d.id,
-                schoolId: d.schoolId || d.id,
-                name: d.name,
-                uid: d.uid
-            })).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
+        if (!branchId || branchId === "global") return;
+        setLoading(true);
+
+        const q = query(
+            collection(db, "teachers"),
+            where("status", "==", "ACTIVE"),
+            where("branchId", "==", branchId)
+        );
+
+        const unsub = onSnapshot(q, (snap) => {
+            const list = snap.docs.map(doc => {
+                const data = doc.data();
+                return {
+                    id: doc.id,
+                    schoolId: data.schoolId || doc.id,
+                    name: data.name,
+                    uid: data.uid
+                };
+            }).sort((a, b) => String(a.name || "").localeCompare(String(b.name || "")));
             setTeachers(list);
-        }
-    }, [globalTeachers]);
+            setLoading(false);
+        }, (err) => {
+            console.error("Failed to sync teachers:", err);
+            setLoading(false);
+        });
+
+        return () => unsub();
+    }, [branchId]);
 
     // 2. Sync Attendance (Real-time & Offline-first)
     useEffect(() => {
@@ -71,7 +89,7 @@ export default function TeacherAttendanceManager({
             fetchStats();
         } else {
             setLoading(true);
-            const schoolId = userData?.schoolId || "global";
+            const schoolId = branchId || "global";
             const attId = `${schoolId}_TEACHERS_${date}`;
             const unsub = onSnapshot(doc(db, "attendance_daily", attId), (snap) => {
                 if (snap.exists()) {
@@ -91,30 +109,31 @@ export default function TeacherAttendanceManager({
 
             // Sync leaves
             const leavesQ = query(
-                collection(db, "leaves"),
-                where("status", "==", "APPROVED")
+                collection(db, "leave_requests"),
+                where("status", "==", "APPROVED"),
+                where("schoolId", "==", schoolId)
             );
             const leavesUnsub = onSnapshot(leavesQ, (snap) => {
                 const lMap: Record<string, boolean> = {};
                 snap.docs.forEach(d => {
                     const data = d.data();
-                    if (data.teacherId && data.startDate <= date && data.endDate >= date) {
+                    if (data.teacherId && data.fromDate <= date && data.toDate >= date) {
                         lMap[data.teacherId] = true;
                     }
                 });
                 setLeavesMap(lMap);
-            });
+            }, (err) => console.warn("[TeacherAttendance] Leaves sync warning:", err.message));
 
             return () => { unsub(); leavesUnsub(); };
         }
-    }, [date, viewStats, statsMonth, teachers, user]);
+    }, [date, viewStats, statsMonth, teachers, user, branchId]);
 
     const fetchStats = async () => {
         setLoading(true);
         try {
             const tList = teachers;
             const currentYear = new Date().getFullYear();
-            const schoolId = userData?.schoolId || "global";
+            const schoolId = branchId || "global";
             let startKey, endKey;
             if (statsMonth === "ALL") {
                 startKey = `${schoolId}_TEACHERS_${currentYear}-01-01`;
@@ -333,7 +352,7 @@ export default function TeacherAttendanceManager({
                                 <SelectTrigger className="w-[120px] h-8 bg-transparent border-white/10 text-xs">
                                     <SelectValue />
                                 </SelectTrigger>
-                                <SelectContent className="bg-slate-900 border-white/10">
+                                <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl border-white/10">
                                     <SelectItem value="ALL">Full Year</SelectItem>
                                     {["01", "02", "03", "04", "05", "06", "07", "08", "09", "10", "11", "12"].map(m => (
                                         <SelectItem key={m} value={m}>{new Date(2000, Number(m) - 1).toLocaleString('default', { month: 'short' })}</SelectItem>

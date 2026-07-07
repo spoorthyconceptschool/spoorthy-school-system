@@ -140,7 +140,7 @@ export function HallTicketGenerator({ }: HallTicketGeneratorProps) {
                     <CreditCard className="w-4 h-4" /> Bulk Hall Tickets
                 </Button>
             </DialogTrigger>
-            <DialogContent className="bg-black/95 border-white/10 text-white w-[95vw] sm:max-w-md">
+            <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white w-[95vw] sm:max-w-md border-white/10">
                 <DialogHeader>
                     <DialogTitle>Generate Batch Hall Tickets</DialogTitle>
                 </DialogHeader>

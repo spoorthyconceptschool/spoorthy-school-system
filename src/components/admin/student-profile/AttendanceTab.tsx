@@ -1,6 +1,5 @@
 "use client";
 
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { cn } from "@/lib/utils";
 import { Activity, CheckCircle2, XCircle } from "lucide-react";
 
@@ -84,11 +83,11 @@ export function AttendanceTab({
             </div>
 
             {/* Heatmap / Calendar Style */}
-            <Card className="bg-[#0f172a] border-white/5 rounded-[1.5rem] shadow-2xl overflow-hidden">
-                <CardHeader className="bg-white/[0.02] border-b border-white/5 py-3 px-4">
-                    <CardTitle className="text-[14px] font-bold text-white">Academic Heatmap ({viewingYear})</CardTitle>
-                </CardHeader>
-                <CardContent className="p-3 md:p-4">
+            <div className="flex flex-col border border-white/10 rounded-xl overflow-hidden bg-white/[0.02]">
+                <div className="bg-white/[0.05] border-b border-white/10 py-2.5 px-3">
+                    <h3 className="text-[14px] font-bold text-white">Academic Heatmap ({viewingYear})</h3>
+                </div>
+                <div className="p-3">
                     <div className="overflow-x-auto custom-scrollbar pb-4 pt-1 snap-x">
                         <div className="flex gap-3 md:gap-5 min-w-max px-1">
                             {academicMonths.map((m, i) => {
@@ -147,8 +146,8 @@ export function AttendanceTab({
                         <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-[3px] bg-rose-500 shadow-sm shadow-rose-500/20"></div> Absent</div>
                         <div className="flex items-center gap-1.5"><div className="w-3 h-3 rounded-[3px] bg-white/5 border border-white/10"></div> No Data</div>
                     </div>
-                </CardContent>
-            </Card>
+                </div>
+            </div>
         </div>
     );
 }

@@ -13,6 +13,7 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuCheckboxItem, DropdownMenuTrigger } from "@/components/ui/dropdown-menu";
 import { useAuth } from "@/context/AuthContext";
+import { useBranch } from "@/context/BranchContext";
 import { useMasterData } from "@/context/MasterDataContext";
 import Link from "next/link";
 import { useMemo } from "react";
@@ -51,16 +52,26 @@ const formatPaymentTime = (date: any) => {
 };
 
 export default function PaymentsPage() {
-    const { user, userData, role } = useAuth();
-    const [allPayments, setAllPayments] = useState<Payment[]>(() => {
-        if (typeof window !== 'undefined') {
+    const { user, userData, branchId: userBranchId, role } = useAuth();
+    const { selectedBranchId } = useBranch();
+    const activeBranchId = selectedBranchId || (role === "SUPER_ADMIN" ? "global" : (userBranchId || userData?.schoolId));
+
+    const PAYMENTS_CACHE_KEY = activeBranchId ? `spoorthy_all_payments_cache_${activeBranchId}` : null;
+    const [allPayments, setAllPayments] = useState<Payment[]>([]);
+
+    useEffect(() => {
+        if (typeof window !== 'undefined' && PAYMENTS_CACHE_KEY) {
             const cached = localStorage.getItem(PAYMENTS_CACHE_KEY);
             if (cached) {
-                try { return JSON.parse(cached); } catch(e) {}
+                try {
+                    setAllPayments(JSON.parse(cached));
+                    return;
+                } catch(e) {}
             }
         }
-        return [];
-    });
+        setAllPayments([]);
+    }, [PAYMENTS_CACHE_KEY]);
+
     const [paymentsLoaded, setPaymentsLoaded] = useState(true);
     const [studentsLoaded, setStudentsLoaded] = useState(true);
     const [open, setOpen] = useState(false);
@@ -145,9 +156,18 @@ export default function PaymentsPage() {
 
     useEffect(() => {
         if (!selectedYear) return;
+        if (!activeBranchId) {
+            console.log("[PaymentsPage] activeBranchId is not yet resolved, skipping subscription.");
+            return;
+        }
         let isMounted = true;
 
-        const allPaymentsQ = query(collection(db, "payments"), orderBy("date", "desc"));
+        let basePaymentsConstraints: any[] = [];
+        if (activeBranchId && activeBranchId !== "global") {
+            basePaymentsConstraints.push(where("schoolId", "==", activeBranchId));
+        }
+
+        const allPaymentsQ = query(collection(db, "payments"), ...basePaymentsConstraints);
         const unsubPayments = onSnapshot(allPaymentsQ, (snapshot) => {
             if (!isMounted) return;
             const loaded = snapshot.docs.map(doc => ({
@@ -174,7 +194,7 @@ export default function PaymentsPage() {
             });
 
             setAllPayments(loaded);
-            if (typeof window !== 'undefined') {
+            if (typeof window !== 'undefined' && PAYMENTS_CACHE_KEY) {
                 localStorage.setItem(PAYMENTS_CACHE_KEY, JSON.stringify(loaded));
             }
             setPaymentsLoaded(true);
@@ -183,13 +203,22 @@ export default function PaymentsPage() {
             console.warn("Payments list listener error:", err.message);
         });
 
-        const sq = query(collection(db, "students"), where("academicYear", "==", selectedYear), orderBy("studentName", "asc"));
+        let baseStudentConstraints: any[] = [
+            where("academicYear", "==", selectedYear)
+        ];
+        if (activeBranchId && activeBranchId !== "global") {
+            baseStudentConstraints.push(where("branchId", "==", activeBranchId));
+        }
+
+        const sq = query(collection(db, "students"), ...baseStudentConstraints);
         const unsubStudents = onSnapshot(sq, (snapshot) => {
             if (!isMounted) return;
             const loaded = snapshot.docs.map(doc => ({
                 id: doc.id,
                 ...doc.data()
             }));
+            // Sort in memory by studentName to avoid composite index requirement
+            loaded.sort((a: any, b: any) => String(a.studentName || "").localeCompare(String(b.studentName || "")));
             setAllStudents(loaded);
             setStudentsLoaded(true);
         }, (err) => {
@@ -202,7 +231,7 @@ export default function PaymentsPage() {
             unsubPayments();
             unsubStudents();
         };
-    }, [selectedYear]);
+    }, [selectedYear, activeBranchId, PAYMENTS_CACHE_KEY]);
 
     const handleSearch = (val: string) => {
         setSearchTerm(val);
@@ -247,6 +276,24 @@ export default function PaymentsPage() {
             const amount = Number(feeForm.amount);
             if (amount <= 0) throw new Error("Invalid Amount");
 
+            const payload = {
+                studentId: selectedStudent.schoolId,
+                studentName: selectedStudent.studentName,
+                amount,
+                method: feeForm.method,
+                date: feeForm.date,
+                remarks: feeForm.remarks,
+                adminId: user.uid,
+                currentYearId: selectedYear || "2025-2026",
+                allocations: previewAllocations
+            };
+
+            // Optimistically close dialog for zero-latency feel
+            setOpen(false);
+            setFeeForm({ amount: "", method: "cash", date: new Date().toISOString().split('T')[0], remarks: "", selectedItems: [] });
+            setSelectedStudent(null);
+            setStudentLedger(null);
+
             const token = await user.getIdToken();
             const res = await fetch("/api/admin/payments/create", {
                 method: "POST",
@@ -254,28 +301,22 @@ export default function PaymentsPage() {
                     "Content-Type": "application/json",
                     "Authorization": `Bearer ${token}`
                 },
-                body: JSON.stringify({
-                    studentId: selectedStudent.schoolId,
-                    studentName: selectedStudent.studentName,
-                    amount,
-                    method: feeForm.method,
-                    date: feeForm.date,
-                    remarks: feeForm.remarks,
-                    adminId: user.uid,
-                    currentYearId: selectedYear || "2025-2026",
-                    allocations: previewAllocations
-                })
+                body: JSON.stringify(payload)
             });
 
             const data = await res.json();
             if (!data.success) throw new Error(data.error || "Failed to record payment");
 
-            setOpen(false);
-            setFeeForm({ amount: "", method: "cash", date: new Date().toISOString().split('T')[0], remarks: "", selectedItems: [] });
-            setSelectedStudent(null);
-            setStudentLedger(null);
-
-            alert("Payment Recorded & Ledger Updated");
+            // Assuming a toast function exists or we can just use alert for now if toast is not available.
+            // But let's check if we can dispatch a custom event or just use alert since it was there.
+            // Actually, since this is a background operation now (dialog is closed), an alert might be annoying.
+            // Let's use a non-blocking console log and a simple notification if possible.
+            console.log("Payment Recorded & Ledger Updated");
+            
+            if (data.payment) {
+                // Auto-print receipt
+                handlePrintReceipt(data.payment);
+            }
 
         } catch (e: any) {
             console.error(e);
@@ -485,7 +526,7 @@ export default function PaymentsPage() {
                                         <Plus className="w-5 h-5 stroke-[3]" />
                                     </Button>
                                 </DialogTrigger>
-                                <DialogContent className="bg-[#0A192F] text-white border-white/10 w-[90vw] sm:max-w-sm rounded-2xl">
+                                <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white w-[90vw] sm:max-w-sm rounded-2xl border-white/10">
                                     <DialogHeader>
                                         <DialogTitle className="text-xl font-display font-bold text-emerald-400">
                                             {selectedStudent ? `Collect Payment` : "Find Student"}
@@ -632,7 +673,7 @@ export default function PaymentsPage() {
                                                     <Label className="text-[10px] font-bold text-white/70 uppercase">Payment Mode</Label>
                                                     <Select value={feeForm.method} onValueChange={v => setFeeForm({ ...feeForm, method: v })}>
                                                         <SelectTrigger className="bg-white/5 border-white/10 h-9 text-xs text-white focus:ring-emerald-500/20"><SelectValue /></SelectTrigger>
-                                                        <SelectContent className="bg-[#0A192F] border-white/10 text-white">
+                                                        <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                                                             <SelectItem value="cash">Cash</SelectItem>
                                                             <SelectItem value="upi">UPI / GPay</SelectItem>
                                                             <SelectItem value="cheque">Cheque</SelectItem>
@@ -785,11 +826,11 @@ export default function PaymentsPage() {
                     </div>
 
                     {/* Mobile Header (Strictly fits screen) */}
-                    <div className="flex md:hidden h-8 items-center px-2 border-b border-[rgba(255,255,255,0.06)] text-[9px] font-bold text-[#9AA7C7] uppercase tracking-wider bg-[#0B2247] shrink-0 divide-x divide-[rgba(255,255,255,0.06)]">
-                        <div className="w-[85px] shrink-0 px-2 text-center"># / ID</div>
-                        <div className="flex-1 min-w-0 px-2">Name / Date</div>
-                        <div className="w-[80px] shrink-0 text-right px-2">Amount</div>
-                        <div className="w-[55px] shrink-0 text-center px-1">Acts</div>
+                    <div className="flex md:hidden h-8 items-center px-1 border-b border-[rgba(255,255,255,0.06)] text-[9px] font-bold text-[#9AA7C7] uppercase tracking-wider bg-[#0B2247] shrink-0 divide-x divide-[rgba(255,255,255,0.06)]">
+                        <div className="w-[70px] shrink-0 px-1 text-center truncate"># / ID</div>
+                        <div className="flex-1 min-w-0 px-1 truncate">Name/Date</div>
+                        <div className="w-[65px] shrink-0 text-right px-1 truncate">Amt</div>
+                        <div className="w-[45px] shrink-0 text-center px-1 truncate">Acts</div>
                     </div>
                     
                     {/* List Content */}
@@ -827,32 +868,34 @@ export default function PaymentsPage() {
                                     <div key={p.id} className="flex flex-col hover:bg-white/[0.02] transition-colors border-b border-[rgba(255,255,255,0.04)] last:border-0 relative">
                                         
                                         {/* Mobile Row */}
-                                        <div className="flex md:hidden items-center h-[60px] px-2 w-full border-b border-[rgba(255,255,255,0.04)] last:border-0 relative divide-x divide-[rgba(255,255,255,0.06)]">
+                                        <div className="flex md:hidden items-center min-h-[60px] py-1.5 px-1 w-full border-b border-[rgba(255,255,255,0.04)] last:border-0 relative divide-x divide-[rgba(255,255,255,0.06)]">
                                             {/* ID & Class */}
-                                            <div className="flex flex-col w-[85px] shrink-0 justify-center px-2 items-center">
-                                                <span className="text-xs text-[#9AA7C7] font-mono font-bold leading-tight mb-0.5">{formattedNum}. <span className="text-white">{p.studentId}</span></span>
-                                                <span className="text-[9px] text-[#9AA7C7] leading-tight truncate w-full text-center">{className}</span>
+                                            <div className="flex flex-col w-[70px] shrink-0 justify-center px-1 items-center min-w-0 overflow-hidden">
+                                                <span className="text-[10px] text-[#9AA7C7] font-mono font-bold leading-tight mb-0.5 w-full truncate text-center">
+                                                    {formattedNum}. <span className="text-white">{student?.schoolId || p.studentId?.substring(0, 5)}</span>
+                                                </span>
+                                                <span className="text-[8px] text-[#9AA7C7] leading-tight truncate w-full text-center">{className}</span>
                                             </div>
                                             
                                             {/* Name & Date */}
-                                            <div className="flex-1 min-w-0 flex flex-col justify-center px-2">
-                                                <span className="text-[13px] font-extrabold text-white truncate leading-tight mb-1">{p.studentName}</span>
-                                                <div className="flex items-center gap-1.5 flex-wrap">
-                                                    <span className="text-[10px] text-[#9AA7C7] font-medium leading-tight shrink-0">{formatPaymentDate(p.date)}</span>
+                                            <div className="flex-1 min-w-0 flex flex-col justify-center px-1">
+                                                <span className="text-[11px] font-extrabold text-white truncate leading-tight mb-0.5">{p.studentName}</span>
+                                                <div className="flex items-center gap-1 flex-wrap">
+                                                    <span className="text-[9px] text-[#9AA7C7] font-medium leading-tight shrink-0">{formatPaymentDate(p.date)}</span>
                                                     {p.isEdited && <span className="text-[8px] text-[#FFA629] font-bold border border-[#FFA629]/20 px-1 rounded uppercase tracking-widest bg-[#FFA629]/10 leading-none py-0.5 shrink-0">Edited</span>}
                                                 </div>
                                             </div>
                                             
                                             {/* Amount & Method */}
-                                            <div className="w-[80px] shrink-0 flex flex-col items-end justify-center px-2">
-                                                <span className="text-[13px] font-black text-[#00D98B] font-mono leading-tight mb-1">₹{p.amount.toLocaleString()}</span>
-                                                <span className={cn("px-1 py-[2px] rounded text-[9px] w-fit font-bold capitalize border leading-none", methodBg, methodColor)}>{p.method}</span>
+                                            <div className="w-[65px] shrink-0 flex flex-col items-end justify-center px-1 min-w-0">
+                                                <span className="text-[11px] font-black text-[#00D98B] font-mono leading-tight mb-0.5 truncate w-full text-right">₹{p.amount.toLocaleString()}</span>
+                                                <span className={cn("px-1 py-[2px] rounded text-[8px] w-fit font-bold capitalize border leading-none truncate max-w-full", methodBg, methodColor)}>{p.method}</span>
                                             </div>
                                             
-                                            {/* Actions */}
-                                            <div className="w-[55px] shrink-0 flex items-center justify-end gap-1 px-1">
-                                                <Button variant="ghost" size="icon" onClick={() => handlePrintReceipt(p)} className="h-6 w-6 text-white hover:bg-white/10 rounded p-0 shrink-0">
-                                                    <Printer className="w-3.5 h-3.5" />
+                                            {/* Actions (Stacked Vertically to save horizontal space) */}
+                                            <div className="w-[45px] shrink-0 flex flex-col items-center justify-center gap-1.5 px-0.5">
+                                                <Button variant="ghost" size="icon" onClick={() => handlePrintReceipt(p)} className="h-5 w-5 text-white hover:bg-white/10 rounded p-0 shrink-0 bg-white/5">
+                                                    <Printer className="w-3 h-3 text-[#9AA7C7]" />
                                                 </Button>
                                                 <Button variant="ghost" size="icon" onClick={(e) => {
                                                     e.stopPropagation();
@@ -864,8 +907,8 @@ export default function PaymentsPage() {
                                                     });
                                                     setEditPaymentObj(p);
                                                     setActiveDropdown(null);
-                                                }} className="h-6 w-6 text-white hover:bg-white/10 rounded p-0 shrink-0">
-                                                    <Edit2 className="w-3.5 h-3.5 text-[#00D98B]" />
+                                                }} className="h-5 w-5 text-white hover:bg-white/10 rounded p-0 shrink-0 bg-[#00D98B]/5">
+                                                    <Edit2 className="w-3 h-3 text-[#00D98B]" />
                                                 </Button>
                                             </div>
                                         </div>

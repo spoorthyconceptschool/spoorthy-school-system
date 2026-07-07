@@ -97,7 +97,7 @@ export function DeleteUserModal({
 
     return (
         <Dialog open={isOpen} onOpenChange={onClose}>
-            <DialogContent className="sm:max-w-md bg-black/95 border-white/10 text-white backdrop-blur-xl">
+            <DialogContent className="sm:max-w-md bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white backdrop-blur-xl border-white/10">
                 <DialogHeader>
                     <DialogTitle className="text-xl font-bold flex items-center gap-2">
                         {mode === "delete" ? (
@@ -107,7 +107,7 @@ export function DeleteUserModal({
                         )}
                     </DialogTitle>
                     <DialogDescription className="text-zinc-400">
-                        Managing access for <span className="text-white font-medium">{user.name}</span> ({user.schoolId})
+                        Managing access for <span className="text-white font-medium">{user.name}</span>
                     </DialogDescription>
                 </DialogHeader>
 

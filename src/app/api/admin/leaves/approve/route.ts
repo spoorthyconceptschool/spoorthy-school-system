@@ -271,6 +271,7 @@ export async function POST(req: NextRequest) {
                             resType = "LEISURE";
                         }
 
+                        const taskBranchId = applicantData.branchId || applicantData.schoolId || applicantSchoolId || "global";
                         coverageTasks.push({
                             leaveRequestId: leaveId,
                             originalTeacherId: applicantSchoolId,
@@ -282,6 +283,8 @@ export async function POST(req: NextRequest) {
                             status: "PENDING",
                             suggestedSubstituteId: subId,
                             suggestedType: resType,
+                            schoolId: taskBranchId,
+                            branchId: taskBranchId,
                             createdAt: FieldValue.serverTimestamp()
                         });
                     });

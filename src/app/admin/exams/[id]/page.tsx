@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, use, useMemo } from "react";
-import { doc, getDoc, setDoc, collection, getDocs, query, where } from "firebase/firestore";
+import { doc, getDoc, setDoc, updateDoc, collection, getDocs, query, where } from "firebase/firestore";
 import { db } from "@/lib/firebase";
 import { useAuth } from "@/context/AuthContext";
 import { useMasterData } from "@/context/MasterDataContext";
@@ -24,6 +24,9 @@ import { useRouter } from "next/navigation";
 export default function ExamDetailsPage({ params }: { params: Promise<{ id: string }> }) {
     const { id: examId } = use(params);
     const router = useRouter();
+    const { branchId: userBranchId, userData } = useAuth();
+    const currentSchoolId = userBranchId || userData?.schoolId;
+    const authUser = { token: { schoolId: userData?.schoolId || userData?.branchId } };
     const { classes: classesData, subjects: subjectsData, classSubjects, sections: sectionsData, classSections } = useMasterData();
     const [exam, setExam] = useState<any>(null);
     const [loading, setLoading] = useState(true);
@@ -44,7 +47,12 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
         const fetchStudents = async () => {
             setLoadingStudents(true);
             try {
-                const q = query(collection(db, "students"), where("classId", "==", selectedClassId), where("status", "==", "ACTIVE"));
+                const q = query(
+                    collection(db, "students"),
+                    where("classId", "==", selectedClassId),
+                    where("status", "==", "ACTIVE"),
+                    where("schoolId", "==", authUser.token.schoolId || currentSchoolId)
+                );
                 const snap = await getDocs(q);
                 const list = snap.docs.map(d => ({ id: d.id, ...d.data() }));
                 list.sort((a: any, b: any) => (parseInt(a.rollNo) || 999) - (parseInt(b.rollNo) || 999));
@@ -56,7 +64,7 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
             }
         };
         fetchStudents();
-    }, [selectedClassId]);
+    }, [selectedClassId, currentSchoolId]);
 
     const handleToggleOverride = async (studentId: string, currentOverride: boolean) => {
         if (!exam) return;
@@ -71,9 +79,7 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                 delete updatedOverrides[studentId];
             }
 
-            const { id, ...examDataWithoutId } = exam;
-            await setDoc(doc(db, "exams", examId), {
-                ...examDataWithoutId,
+            await updateDoc(doc(db, "exams", examId), {
                 hallTicketOverrides: updatedOverrides
             });
 
@@ -98,7 +104,9 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
     };
 
     // Convert master data
-    const classes = Object.values(classesData).map((c: any) => ({ id: c.id, name: c.name, order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
+    const classes = useMemo(() => {
+        return Object.values(classesData || {}).map((c: any) => ({ id: c.id, name: c.name, order: c.order || 99 })).sort((a: any, b: any) => a.order - b.order);
+    }, [classesData]);
 
     const filteredClasses = useMemo(() => {
         if (exam?.classIds && Array.isArray(exam.classIds) && exam.classIds.length > 0) {
@@ -138,9 +146,9 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
     // All active subjects in the system, with a flag for those assigned to the class
     const relevantSubjects = useMemo(() => {
         if (!selectedClassId) return [];
-        const classSubMapping = classSubjects[selectedClassId] || {};
+        const classSubMapping = classSubjects?.[selectedClassId] || {};
 
-        return Object.values(subjectsData)
+        return Object.values(subjectsData || {})
             .filter((s: any) => s.isActive !== false)
             .map((s: any) => ({
                 ...s,
@@ -182,9 +190,15 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                     initial[s.id] = { date: "", startTime: "09:00", endTime: "12:00", maxMarks: "100", passMarks: "35", enabled: false };
                 }
             });
-            setTimetable(initial);
+            setTimetable((prev: any) => {
+                if (JSON.stringify(prev) === JSON.stringify(initial)) return prev;
+                return initial;
+            });
         } else {
-            setTimetable({});
+            setTimetable((prev: any) => {
+                if (Object.keys(prev || {}).length === 0) return prev;
+                return {};
+            });
         }
     }, [selectedClassId, selectedSectionId, timetableMode, exam, relevantSubjects]);
 
@@ -195,7 +209,7 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
         }
 
         let targetKey = selectedClassId;
-        let targetLabel = classesData[selectedClassId]?.name || "Class";
+        let targetLabel = classesData?.[selectedClassId]?.name || "Class";
 
         if (timetableMode === "INDIVIDUAL") {
             if (!selectedSectionId) {
@@ -327,58 +341,68 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
     if (loading) return <div className="flex justify-center p-20"><Loader2 className="animate-spin" /></div>;
     if (!exam) return null;
 
+    const now = new Date();
+    const startDate = new Date(exam.startDate);
+    const endDate = new Date(exam.endDate);
+    let statusColor = "bg-emerald-500 shadow-emerald-500/50";
+    if (now < startDate) statusColor = "bg-yellow-500 shadow-yellow-500/50";
+    else if (now > endDate) statusColor = "bg-rose-500 shadow-rose-500/50";
+
     return (
         <div className="space-y-6 max-w-7xl mx-auto p-4 md:p-6 animate-in fade-in">
-            <div className="flex flex-col md:flex-row md:items-center gap-4 mb-6 border-b border-white/5 pb-6">
-                <div className="flex items-center gap-4">
-                    <Button variant="ghost" size="icon" onClick={() => router.push("/admin/exams")} className="shrink-0">
+            <div className="flex flex-col mb-6 border-b border-white/5 pb-6 space-y-4">
+                <div className="flex items-center gap-2 md:gap-4">
+                    <Button variant="ghost" size="icon" onClick={() => router.push("/admin/exams")} className="shrink-0 hidden md:flex">
                         <ArrowLeft className="w-5 h-5" />
                     </Button>
-                    <div>
-                        <h1 className="text-2xl md:text-3xl font-display font-bold tracking-tight">{exam.name}</h1>
-                        <p className="text-[10px] md:text-sm text-muted-foreground flex items-center gap-2 mt-0.5">
-                            <Calendar className="w-3 h-3 md:w-4 md:h-4" />
-                            {new Date(exam.startDate).toLocaleDateString('en-GB')} - {new Date(exam.endDate).toLocaleDateString('en-GB')}
-                        </p>
+                    
+                    <div className="flex flex-row items-center justify-between w-full gap-2">
+                        <div className="flex flex-col justify-center">
+                            <div className="flex items-center gap-2 md:gap-3">
+                                <Button variant="ghost" size="icon" onClick={() => router.push("/admin/exams")} className="shrink-0 flex md:hidden h-6 w-6">
+                                    <ArrowLeft className="w-4 h-4" />
+                                </Button>
+                                <div className={cn("w-2 h-2 md:w-3 md:h-3 rounded-full shadow-[0_0_10px_rgba(0,0,0,0.8)]", statusColor)} title={`Status: ${exam.status || 'ACTIVE'}`} />
+                                <h1 className="text-lg md:text-3xl font-display font-bold tracking-tight truncate max-w-[120px] md:max-w-none">{exam.name}</h1>
+                            </div>
+                            <p className="text-[8px] md:text-sm text-muted-foreground flex items-center gap-1 mt-0.5 ml-8 md:ml-6">
+                                <Calendar className="w-2.5 h-2.5 md:w-4 md:h-4" />
+                                {new Date(exam.startDate).toLocaleDateString('en-GB')} - {new Date(exam.endDate).toLocaleDateString('en-GB')}
+                            </p>
+                        </div>
+                        
+                        <div className="flex flex-row items-center gap-1 md:gap-3 shrink-0">
+                            <Button size="sm" className="h-7 md:h-10 px-2 md:px-4 text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all shadow-[inset_1px_1px_2px_rgba(255,255,255,0.1),2px_2px_5px_rgba(0,0,0,0.5)] backdrop-blur-md border border-white/10 bg-white/5 hover:bg-white/10 text-white rounded-lg" onClick={() => setEditOpen(true)}>
+                                Edit
+                            </Button>
+                            <Link href={`/admin/exams/${examId}/marks`} className="shrink-0">
+                                <Button size="sm" className="h-7 md:h-10 px-2 md:px-4 text-[9px] md:text-[10px] font-black uppercase tracking-widest gap-1 transition-all shadow-[inset_1px_1px_2px_rgba(255,255,255,0.1),2px_2px_5px_rgba(0,0,0,0.5)] backdrop-blur-md border border-white/10 bg-white/5 hover:bg-white/10 text-white rounded-lg">
+                                    <ClipboardCheck className="w-3 h-3 hidden md:block" /> Marks
+                                </Button>
+                            </Link>
+                            <Button
+                                size="sm"
+                                onClick={async () => {
+                                    if (!confirm(exam.status === 'RESULTS_RELEASED' ? "Hide results from students?" : "Release results to students?")) return;
+                                    const newStatus = exam.status === 'RESULTS_RELEASED' ? 'ACTIVE' : 'RESULTS_RELEASED';
+                                    await setDoc(doc(db, "exams", examId), { status: newStatus }, { merge: true });
+                                    setExam({ ...exam, status: newStatus });
+                                }}
+                                className={cn(
+                                    "h-7 md:h-10 px-2 md:px-4 text-[9px] md:text-[10px] font-black uppercase tracking-widest transition-all shadow-[inset_1px_1px_2px_rgba(255,255,255,0.2),2px_2px_5px_rgba(0,0,0,0.5)] backdrop-blur-md border border-white/10 rounded-lg",
+                                    exam.status === 'RESULTS_RELEASED' ? "bg-amber-600/80 hover:bg-amber-600 text-white" : "bg-emerald-600/80 hover:bg-emerald-600 text-white"
+                                )}
+                            >
+                                {exam.status === 'RESULTS_RELEASED' ? "Unpublish" : "Release"}
+                            </Button>
+                        </div>
                     </div>
-                </div>
-
-                <div className="flex flex-wrap items-center gap-2 md:ml-auto">
-                    <span className={`px-2 py-1 rounded text-[10px] font-black uppercase tracking-widest border shrink-0 ${exam.status === 'RESULTS_RELEASED'
-                        ? 'bg-emerald-500/10 border-emerald-500/20 text-emerald-400'
-                        : 'bg-blue-500/10 border-blue-500/20 text-blue-400'
-                        }`}>
-                        {exam.status === 'RESULTS_RELEASED' ? 'PUBLISHED' : exam.status || 'ACTIVE'}
-                    </span>
-                    <Button size="sm" variant="outline" className="h-9 px-4 text-[10px] font-bold uppercase tracking-widest bg-white/5 border-white/10 shrink-0" onClick={() => setEditOpen(true)}>
-                        Edit
-                    </Button>
-                    <Link href={`/admin/exams/${examId}/marks`} className="shrink-0">
-                        <Button size="sm" variant="secondary" className="h-9 px-4 text-[10px] font-bold uppercase tracking-widest gap-2">
-                            <ClipboardCheck className="w-4 h-4" /> Marks
-                        </Button>
-                    </Link>
-                    <Button
-                        size="sm"
-                        onClick={async () => {
-                            if (!confirm(exam.status === 'RESULTS_RELEASED' ? "Hide results from students?" : "Release results to students?")) return;
-                            const newStatus = exam.status === 'RESULTS_RELEASED' ? 'ACTIVE' : 'RESULTS_RELEASED';
-                            await setDoc(doc(db, "exams", examId), { status: newStatus }, { merge: true });
-                            setExam({ ...exam, status: newStatus });
-                        }}
-                        className={cn(
-                            "h-9 px-4 text-[10px] font-bold uppercase tracking-widest shrink-0",
-                            exam.status === 'RESULTS_RELEASED' ? "bg-amber-600 hover:bg-amber-700" : "bg-emerald-600 hover:bg-emerald-700"
-                        )}
-                    >
-                        {exam.status === 'RESULTS_RELEASED' ? "Unpublish" : "Release Results"}
-                    </Button>
                 </div>
             </div>
 
             {/* Edit Dialog */}
             <Dialog open={editOpen} onOpenChange={setEditOpen}>
-                <DialogContent className="bg-black/95 border-white/10 text-white">
+                <DialogContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                     <DialogHeader>
                         <DialogTitle>Edit Exam Details</DialogTitle>
                     </DialogHeader>
@@ -448,7 +472,7 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                                     <SelectTrigger className="w-full bg-white/5 border-white/10 h-10">
                                         <SelectValue placeholder="Select Criteria" />
                                     </SelectTrigger>
-                                    <SelectContent className="bg-black border-white/10 text-white">
+                                    <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                                         <SelectItem value="NO_RESTRICTION">Unrestricted Access (Free for all)</SelectItem>
                                         <SelectItem value="PAID_FULL_FEE">Must Clear 100% of Total Dues</SelectItem>
                                         <SelectItem value="PAID_SPECIFIC_TERM">Must Clear Dues up to a Specific Term</SelectItem>
@@ -482,7 +506,7 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                                         <SelectTrigger className="w-full bg-white/5 border-white/10 h-10">
                                             <SelectValue placeholder="Choose Term" />
                                         </SelectTrigger>
-                                        <SelectContent className="bg-black text-white border-white/10">
+                                        <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white border-white/10">
                                             <SelectItem value="Term 1">Term 1</SelectItem>
                                             <SelectItem value="Term 2">Term 2</SelectItem>
                                             <SelectItem value="Term 3">Term 3</SelectItem>
@@ -514,55 +538,49 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                 </TabsList>
 
                 {/* TIMETABLE TAB */}
-                <TabsContent value="timetable" className="space-y-6">
-                    <Card className="bg-black/20 border-white/10">
-                        <CardHeader>
-                            <CardTitle>Configure Timetable</CardTitle>
-                            <CardDescription>Select a class to set exam dates and times for each subject.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="flex flex-col lg:flex-row lg:items-end gap-4 bg-white/5 p-4 rounded-xl border border-white/10">
-                                <div className="space-y-2 flex-1">
-                                    <Label className="text-xs md:text-sm font-bold text-white/70">Timetable Mode</Label>
-                                    <div className="flex bg-black/40 p-1 rounded-lg border border-white/10">
-                                        <button onClick={() => setTimetableMode("COMBINED")} className={cn("flex-1 py-2 text-xs font-bold rounded-md transition-all", timetableMode === "COMBINED" ? "bg-white text-black shadow-sm" : "text-white/50 hover:text-white")}>Combined Sections</button>
-                                        <button onClick={() => setTimetableMode("INDIVIDUAL")} className={cn("flex-1 py-2 text-xs font-bold rounded-md transition-all", timetableMode === "INDIVIDUAL" ? "bg-white text-black shadow-sm" : "text-white/50 hover:text-white")}>Individual Sections</button>
-                                    </div>
-                                </div>
-                                <div className="space-y-2 flex-1">
-                                    <Label className="text-xs md:text-sm font-bold text-white/70">Select Class</Label>
-                                    <Select value={selectedClassId} onValueChange={setSelectedClassId}>
-                                        <SelectTrigger className="w-full bg-black/40 border-white/10 h-10"><SelectValue placeholder="Choose Class" /></SelectTrigger>
-                                        <SelectContent>
-                                            {filteredClasses.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
-                                {timetableMode === "INDIVIDUAL" && selectedClassId && (
-                                    <div className="space-y-2 flex-1 animate-in fade-in slide-in-from-top-2">
-                                        <Label className="text-xs md:text-sm font-bold text-white/70">Select Section</Label>
-                                        <Select value={selectedSectionId} onValueChange={setSelectedSectionId}>
-                                            <SelectTrigger className="w-full bg-black/40 border-white/10 h-10"><SelectValue placeholder="Choose Section" /></SelectTrigger>
-                                            <SelectContent>
-                                                {Object.values(classSections || {})
-                                                    .filter((cs: any) => cs.classId === selectedClassId)
-                                                    .map((cs: any) => {
-                                                        const sec = sectionsData?.[cs.sectionId];
-                                                        return sec ? <SelectItem key={cs.sectionId} value={cs.sectionId}>{sec.name}</SelectItem> : null;
-                                                    })}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                )}
-                                <div className="space-y-2">
-                                    <Button onClick={handleSaveTimetable} disabled={saving || !selectedClassId || (timetableMode === 'INDIVIDUAL' && !selectedSectionId)} className="w-full lg:w-auto bg-emerald-600 hover:bg-emerald-700 text-white h-10 text-[10px] font-black uppercase tracking-widest gap-2 shadow-[0_0_15px_-3px_theme(colors.emerald.500/0.4)]">
-                                        {saving ? <Loader2 className="animate-spin w-4 h-4" /> : <Save className="w-4 h-4" />}
-                                        Save
-                                    </Button>
-                                </div>
+                <TabsContent value="timetable" className="space-y-4 md:space-y-6">
+                    <div className="flex flex-col lg:flex-row lg:items-end gap-2 md:gap-3 bg-white/5 p-2 md:p-3 rounded-xl border border-white/10">
+                        <div className="space-y-1 flex-1">
+                            <Label className="text-[9px] md:text-[10px] font-bold text-white/50 uppercase tracking-widest">Timetable Mode</Label>
+                            <div className="flex bg-black/40 p-1 rounded-lg border border-white/10 h-8 md:h-10 items-center">
+                                <button onClick={() => setTimetableMode("COMBINED")} className={cn("flex-1 py-1 text-[9px] md:text-[10px] font-black uppercase tracking-widest rounded-md transition-all h-full", timetableMode === "COMBINED" ? "bg-white text-black shadow-sm" : "text-white/50 hover:text-white")}>Combined</button>
+                                <button onClick={() => setTimetableMode("INDIVIDUAL")} className={cn("flex-1 py-1 text-[9px] md:text-[10px] font-black uppercase tracking-widest rounded-md transition-all h-full", timetableMode === "INDIVIDUAL" ? "bg-white text-black shadow-sm" : "text-white/50 hover:text-white")}>Individual</button>
                             </div>
+                        </div>
+                        <div className="space-y-1 flex-1">
+                            <Label className="text-[9px] md:text-[10px] font-bold text-white/50 uppercase tracking-widest">Select Class</Label>
+                            <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+                                <SelectTrigger className="w-full bg-black/40 border-white/10 h-8 md:h-10 text-[10px] md:text-xs font-bold"><SelectValue placeholder="Choose Class" /></SelectTrigger>
+                                <SelectContent>
+                                    {filteredClasses.map(c => <SelectItem key={c.id} value={c.id} className="text-xs md:text-sm">{c.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        {timetableMode === "INDIVIDUAL" && selectedClassId && (
+                            <div className="space-y-1 flex-1 animate-in fade-in slide-in-from-top-2">
+                                <Label className="text-[9px] md:text-[10px] font-bold text-white/50 uppercase tracking-widest">Select Section</Label>
+                                <Select value={selectedSectionId} onValueChange={setSelectedSectionId}>
+                                    <SelectTrigger className="w-full bg-black/40 border-white/10 h-8 md:h-10 text-[10px] md:text-xs font-bold"><SelectValue placeholder="Choose Section" /></SelectTrigger>
+                                    <SelectContent>
+                                        {Object.values(classSections || {})
+                                            .filter((cs: any) => cs.classId === selectedClassId)
+                                            .map((cs: any) => {
+                                                const sec = sectionsData?.[cs.sectionId];
+                                                return sec ? <SelectItem key={cs.sectionId} value={cs.sectionId} className="text-xs md:text-sm">{sec.name}</SelectItem> : null;
+                                            })}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        )}
+                        <div className="space-y-1 mt-1 md:mt-0">
+                            <Button onClick={handleSaveTimetable} disabled={saving || !selectedClassId || (timetableMode === 'INDIVIDUAL' && !selectedSectionId)} className="w-full lg:w-auto bg-emerald-600 hover:bg-emerald-700 text-white h-8 md:h-10 px-6 text-[9px] md:text-[10px] font-black uppercase tracking-widest gap-2 shadow-[4px_4px_10px_rgba(0,0,0,0.5),-4px_-4px_10px_rgba(255,255,255,0.03)] border-none">
+                                {saving ? <Loader2 className="animate-spin w-3 h-3" /> : <Save className="w-3 h-3" />}
+                                Save
+                            </Button>
+                        </div>
+                    </div>
 
-                            {selectedClassId && (
+                    {selectedClassId && (
                                 <div className="space-y-4">
                                     {/* Mobile Card View */}
                                     <div className="md:hidden space-y-3">
@@ -682,7 +700,7 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                                             </thead>
                                             <tbody className="divide-y divide-white/5">
                                                 {Object.keys(timetable).map(subId => {
-                                                    const subject = subjectsData[subId];
+                                                    const subject = subjectsData?.[subId];
                                                     if (!subject) return null;
                                                     const data = timetable[subId];
                                                     return (
@@ -762,8 +780,6 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                                     </div>
                                 </div>
                             )}
-                        </CardContent>
-                    </Card>
                 </TabsContent>
 
                 {/* SYLLABUS TAB */}
@@ -772,111 +788,96 @@ export default function ExamDetailsPage({ params }: { params: Promise<{ id: stri
                 </TabsContent>
 
                 {/* DOCUMENTS TAB */}
-                <TabsContent value="documents">
-                    <Card className="bg-black/20 border-white/10">
-                        <CardHeader>
-                            <CardTitle>Generate Documents</CardTitle>
-                            <CardDescription>Select a class to generate hall tickets or final report cards.</CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
-                            <div className="flex flex-col md:flex-row md:items-center gap-4">
-                                <div className="flex items-center gap-4 flex-1">
-                                    <Label className="shrink-0 text-xs md:text-sm">Select Class:</Label>
-                                    <Select value={selectedClassId} onValueChange={setSelectedClassId}>
-                                        <SelectTrigger className="w-full md:w-[200px] bg-white/5 border-white/10 h-10 md:h-9"><SelectValue placeholder="Choose Class" /></SelectTrigger>
-                                        <SelectContent>
-                                            {classes.map(c => <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>)}
-                                        </SelectContent>
-                                    </Select>
-                                </div>
+                <TabsContent value="documents" className="space-y-4 md:space-y-6">
+                    <div className="flex flex-col lg:flex-row lg:items-end gap-3 md:gap-4 bg-white/5 p-3 md:p-4 rounded-xl border border-white/10 shadow-[inset_1px_1px_2px_rgba(255,255,255,0.05)]">
+                        <div className="flex flex-col flex-1 space-y-1">
+                            <Label className="text-[9px] md:text-sm font-bold text-white/70 uppercase tracking-widest">Select Class</Label>
+                            <Select value={selectedClassId} onValueChange={setSelectedClassId}>
+                                <SelectTrigger className="w-full bg-black/40 border-white/10 h-10 text-xs md:text-sm shadow-[inset_1px_1px_3px_rgba(0,0,0,0.5)]"><SelectValue placeholder="Choose Class" /></SelectTrigger>
+                                <SelectContent>
+                                    {classes.map(c => <SelectItem key={c.id} value={c.id} className="text-xs md:text-sm">{c.name}</SelectItem>)}
+                                </SelectContent>
+                            </Select>
+                        </div>
 
-                                {selectedClassId && (
-                                    <div className="flex flex-col sm:flex-row items-center gap-3 w-full md:w-auto">
-                                        <div className="w-full sm:w-auto">
-                                            <ReportCardGenerator exam={exam} classId={selectedClassId} />
-                                        </div>
-                                        <Button
-                                            onClick={() => {
-                                                window.open(`/admin/exams/${examId}/print/${selectedClassId}`, '_blank');
-                                            }}
-                                            className="w-full sm:w-auto bg-blue-600 hover:bg-blue-700 text-white gap-2 h-11 md:h-9 text-[10px] font-bold uppercase tracking-widest"
-                                        >
-                                            <Printer className="w-4 h-4" /> Print Hall Tickets
-                                        </Button>
-                                    </div>
-                                )}
+                        {selectedClassId && (
+                            <div className="flex flex-row items-center gap-2 w-full lg:w-auto mt-2 lg:mt-0">
+                                <ReportCardGenerator 
+                                    exam={exam} 
+                                    classId={selectedClassId} 
+                                    className="flex-1 lg:w-auto h-10 px-2 md:px-6 text-[9px] md:text-xs font-black uppercase tracking-widest border-white/10 shadow-[2px_2px_5px_rgba(0,0,0,0.5)] backdrop-blur-md" 
+                                />
+                                <Button
+                                    onClick={() => {
+                                        window.open(`/admin/exams/${examId}/print/${selectedClassId}`, '_blank');
+                                    }}
+                                    className="flex-1 lg:w-auto bg-blue-600/80 hover:bg-blue-600 text-white h-10 px-2 md:px-6 text-[9px] md:text-xs font-black uppercase tracking-widest shadow-[2px_2px_5px_rgba(0,0,0,0.5)] backdrop-blur-md border border-white/10"
+                                >
+                                    <Printer className="w-3 h-3 md:w-4 md:h-4 mr-1 md:mr-2" /> Hall Tickets
+                                </Button>
                             </div>
+                        )}
+                    </div>
 
-                            {selectedClassId && (
-                                <div className="space-y-4 border-t border-white/5 pt-6 mt-6">
-                                    <div className="flex justify-between items-center">
-                                        <h3 className="text-xs font-black uppercase tracking-widest text-[#64FFDA]">Manual Student Hall Ticket Overrides</h3>
-                                        <span className="text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{students.length} Students found</span>
-                                    </div>
-                                    
-                                    {loadingStudents ? (
-                                        <div className="flex justify-center p-6"><Loader2 className="animate-spin text-blue-500" /></div>
-                                    ) : (
-                                        <div className="border border-white/10 rounded-xl overflow-hidden bg-black/10">
-                                            <table className="w-full text-left border-collapse text-xs">
-                                                <thead>
-                                                    <tr className="bg-white/5 border-b border-white/10 text-muted-foreground uppercase tracking-widest font-black text-[9px]">
-                                                        <th className="p-3 w-16">Roll No</th>
-                                                        <th className="p-3 w-32">Admission No</th>
-                                                        <th className="p-3">Name</th>
-                                                        <th className="p-3 w-48 text-center">Override Status</th>
+                    {selectedClassId && (
+                        <div className="space-y-4 animate-in fade-in slide-in-from-top-2">
+                            <div className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-2">
+                                <h3 className="text-[10px] md:text-xs font-black uppercase tracking-widest text-[#64FFDA]">Manual Student Hall Ticket Overrides</h3>
+                                <span className="text-[9px] md:text-[10px] font-bold text-muted-foreground uppercase tracking-widest">{students.length} Students found</span>
+                            </div>
+                            
+                            {loadingStudents ? (
+                                <div className="flex justify-center p-6"><Loader2 className="animate-spin text-blue-500" /></div>
+                            ) : (
+                                <div className="border border-white/10 rounded-xl overflow-x-auto bg-black/20 backdrop-blur-md shadow-[inset_1px_1px_5px_rgba(0,0,0,0.5)]">
+                                    <table className="w-full text-left border-collapse text-[10px] md:text-xs whitespace-nowrap md:whitespace-normal min-w-[600px] md:min-w-0">
+                                        <thead>
+                                            <tr className="bg-white/5 border-b border-white/10 text-muted-foreground uppercase tracking-widest font-black text-[8px] md:text-[9px]">
+                                                <th className="p-2 md:p-3 w-16">Roll No</th>
+                                                <th className="p-2 md:p-3 w-32">Admission No</th>
+                                                <th className="p-2 md:p-3">Name</th>
+                                                <th className="p-2 md:p-3 w-48 text-center">Override Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            {students.map((student: any) => {
+                                                const isOverridden = exam?.hallTicketOverrides?.[student.id] === true;
+                                                return (
+                                                    <tr key={student.id} className="border-b border-white/5 hover:bg-white/10 transition-all">
+                                                        <td className="p-2 md:p-3 font-mono font-bold text-blue-400">{student.rollNo || "-"}</td>
+                                                        <td className="p-2 md:p-3 font-mono">{student.schoolId || "-"}</td>
+                                                        <td className="p-2 md:p-3 font-bold text-white">{student.studentName}</td>
+                                                        <td className="p-2 md:p-3 text-center">
+                                                            <Button
+                                                                size="sm"
+                                                                variant={isOverridden ? "default" : "outline"}
+                                                                onClick={() => handleToggleOverride(student.id, isOverridden)}
+                                                                className={cn(
+                                                                    "h-7 md:h-8 px-2 md:px-4 font-bold text-[8px] md:text-[9px] uppercase tracking-widest rounded-lg transition-all shadow-[2px_2px_5px_rgba(0,0,0,0.3)] backdrop-blur-md",
+                                                                    isOverridden 
+                                                                        ? "bg-emerald-600/80 hover:bg-emerald-600 text-white border-none" 
+                                                                        : "border-white/10 bg-white/5 text-muted-foreground hover:bg-white/10 hover:text-white"
+                                                                )}
+                                                            >
+                                                                {isOverridden ? "Force Released" : "Policy Default"}
+                                                            </Button>
+                                                        </td>
                                                     </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {students.map((student: any) => {
-                                                        const isOverridden = exam?.hallTicketOverrides?.[student.id] === true;
-                                                        return (
-                                                            <tr key={student.id} className="border-b border-white/5 hover:bg-white/5 transition-all">
-                                                                <td className="p-3 font-mono font-bold text-blue-400">{student.rollNo || "-"}</td>
-                                                                <td className="p-3 font-mono">{student.admissionNo || "-"}</td>
-                                                                <td className="p-3 font-bold text-white">{student.studentName}</td>
-                                                                <td className="p-3 text-center">
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant={isOverridden ? "default" : "outline"}
-                                                                        onClick={() => handleToggleOverride(student.id, isOverridden)}
-                                                                        className={cn(
-                                                                            "h-8 px-4 font-bold text-[9px] uppercase tracking-widest rounded-lg transition-all",
-                                                                            isOverridden 
-                                                                                ? "bg-emerald-600 hover:bg-emerald-700 text-white font-black" 
-                                                                                : "border-white/10 text-muted-foreground hover:bg-white/5 hover:text-white"
-                                                                        )}
-                                                                    >
-                                                                        {isOverridden ? "Force Released" : "Policy Default"}
-                                                                    </Button>
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                    {students.length === 0 && (
-                                                        <tr>
-                                                            <td colSpan={4} className="p-8 text-center text-muted-foreground italic">
-                                                                No active students found in this class.
-                                                            </td>
-                                                        </tr>
-                                                    )}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    )}
+                                                );
+                                            })}
+                                            {students.length === 0 && (
+                                                <tr>
+                                                    <td colSpan={4} className="p-8 text-center text-muted-foreground italic">
+                                                        No active students found in this class.
+                                                    </td>
+                                                </tr>
+                                            )}
+                                        </tbody>
+                                    </table>
                                 </div>
                             )}
-
-                            <div className="bg-emerald-500/10 border border-emerald-500/20 rounded-lg p-4 text-emerald-300 text-sm">
-                                <h4 className="font-bold flex items-center mb-2"><FileText className="w-4 h-4 mr-2" /> Printing Instructions</h4>
-                                <ul className="list-disc list-inside space-y-1">
-                                    <li>Ensure the timetable is configured for the selected class before printing.</li>
-                                    <li>Hall tickets will be generated for all <b>ACTIVE</b> students in the class.</li>
-                                    <li>The print view will open in a new tab. Use browser print (Ctrl+P) setting "Background Graphics" ON.</li>
-                                </ul>
-                            </div>
-                        </CardContent>
-                    </Card>
+                        </div>
+                    )}
                 </TabsContent>
             </Tabs>
         </div>

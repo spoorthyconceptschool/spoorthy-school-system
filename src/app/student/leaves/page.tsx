@@ -509,7 +509,7 @@ export default function StudentLeavesPage() {
                                         <SelectTrigger className="bg-black/60 border-white/10 text-xs h-9 text-white font-sans rounded-lg">
                                             <SelectValue />
                                         </SelectTrigger>
-                                        <SelectContent className="bg-[#112240] border-white/10 text-white font-sans rounded-lg">
+                                        <SelectContent className="bg-[#0B1120]/95 backdrop-blur-2xl shadow-2xl text-white font-sans rounded-lg border-white/10">
                                             <SelectItem value="MEDICAL">Medical Leave</SelectItem>
                                             <SelectItem value="PERSONAL">Personal Leave</SelectItem>
                                         </SelectContent>
