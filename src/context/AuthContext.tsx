@@ -633,7 +633,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     
                     if (snapshot.exists()) {
                         const currentDeviceId = getOrCreateDeviceId();
-                        if (data.deviceId === currentDeviceId) {
+                        const sessionData = snapshot.val();
+                        if (sessionData.deviceId === currentDeviceId) {
                             console.log("[Auth] Session still valid after network recovery.");
                             return;
                         }
